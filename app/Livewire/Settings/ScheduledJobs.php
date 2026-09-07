@@ -28,6 +28,10 @@ class ScheduledJobs extends Component
 
     public string $filterDate = 'last_24h';
 
+    public string $search = '';
+
+    public string $sortOrder = 'newest';
+
     public int $skipPage = 0;
 
     public int $skipDefaultTake = 20;
@@ -73,6 +77,16 @@ class ScheduledJobs extends Component
     public function updatedFilterDate(): void
     {
         $this->skipPage = 0;
+        $this->loadData();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->loadData();
+    }
+
+    public function updatedSortOrder(): void
+    {
         $this->loadData();
     }
 
@@ -241,8 +255,26 @@ class ScheduledJobs extends Component
             $cleanups = $this->getCleanupExecutions($dateFrom, $teamId);
         }
 
-        return $backups->concat($tasks)->concat($cleanups)
-            ->sortByDesc('created_at')
+        $executions = $backups->concat($tasks)->concat($cleanups);
+
+        if (filled($this->search)) {
+            $search = str($this->search)->lower()->trim()->toString();
+            $executions = $executions->filter(function (array $execution) use ($search): bool {
+                return collect([
+                    $execution['type'],
+                    $execution['resource_name'],
+                    $execution['resource_type'],
+                    $execution['server_name'],
+                    $execution['message'],
+                ])->filter()->contains(
+                    fn ($value): bool => str((string) $value)->lower()->contains($search)
+                );
+            });
+        }
+
+        return ($this->sortOrder === 'oldest'
+            ? $executions->sortBy('created_at')
+            : $executions->sortByDesc('created_at'))
             ->values()
             ->take(100);
     }

@@ -245,6 +245,79 @@ describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
     });
 });
 
+describe('PATCH /api/v1/destinations/{uuid}', function () {
+    test('updates destination name only', function () {
+        $originalNetwork = $this->destination->network;
+
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Renamed Destination',
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'uuid' => $this->destination->uuid,
+                'name' => 'Renamed Destination',
+                'network' => $originalNetwork,
+                'type' => 'standalone',
+                'server_uuid' => $this->server->uuid,
+            ]);
+
+        $this->destination->refresh();
+        expect($this->destination->name)->toBe('Renamed Destination')
+            ->and($this->destination->network)->toBe($originalNetwork);
+    });
+
+    test('requires a write token', function () {
+        $readOnlyToken = destinationsApiToken($this->user, $this->team, ['read']);
+
+        $response = $this->withHeaders(destinationsApiHeaders($readOnlyToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Should Fail',
+            ]);
+
+        $response->assertForbidden();
+    });
+
+    test('rejects update requests from non-admin team members', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $memberToken = destinationsApiToken($member, $this->team, ['*']);
+
+        $response = $this->withHeaders(destinationsApiHeaders($memberToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Member Rename',
+            ]);
+
+        $response->assertForbidden();
+    });
+
+    test('rejects network changes and unknown fields', function () {
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Valid Name',
+                'network' => 'new-network',
+            ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['network']);
+    });
+
+    test('does not update another team destination', function () {
+        $otherTeam = Team::factory()->create();
+        $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+        $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->first();
+
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$otherDestination->uuid}", [
+                'name' => 'Stolen Name',
+            ]);
+
+        $response->assertNotFound();
+        expect($otherDestination->fresh()->name)->not->toBe('Stolen Name');
+    });
+});
+
 describe('DELETE /api/v1/destinations/{uuid}', function () {
     test('requires a write token', function () {
         $readOnlyToken = destinationsApiToken($this->user, $this->team, ['read']);

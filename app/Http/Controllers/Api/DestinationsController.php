@@ -274,6 +274,84 @@ class DestinationsController extends Controller
             || in_array($driverCode, ['19', '1062', '2067'], true);
     }
 
+    #[OA\Patch(
+        summary: 'Update destination',
+        description: 'Update a Docker network destination name. Network cannot be changed via the API.',
+        path: '/destinations/{uuid}',
+        operationId: 'update-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', maxLength: 255),
+                ],
+                type: 'object',
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination updated.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update(Request $request, string $uuid): JsonResponse
+    {
+        $teamId = $this->teamIdOrAbort();
+        if (! is_int($teamId)) {
+            return $teamId;
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowed = ['name'];
+
+        $validator = customApiValidator($request->all(), [
+            'name' => 'required|string|max:255',
+        ]);
+        $extra = array_diff(array_keys($request->all()), $allowed);
+        if ($validator->fails() || ! empty($extra)) {
+            $errors = $validator->errors();
+            if (! empty($extra)) {
+                foreach ($extra as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+        }
+
+        $destination = $this->findDestinationForTeam($teamId, $uuid);
+
+        $this->authorize('update', $destination);
+
+        $destination->update(['name' => $request->input('name')]);
+        $destination->load('server:id,uuid');
+
+        auditLog('api.destination.updated', [
+            'team_id' => $teamId,
+            'destination_uuid' => $destination->uuid,
+            'destination_name' => $destination->name,
+            'destination_type' => $destination instanceof SwarmDocker ? 'swarm' : 'standalone',
+            'server_uuid' => $destination->server?->uuid,
+            'changed_fields' => ['name'],
+        ]);
+
+        return response()->json($this->transform($destination));
+    }
+
     #[OA\Delete(
         summary: 'Delete destination',
         description: 'Delete an unused Docker network destination.',

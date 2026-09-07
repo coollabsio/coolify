@@ -56,7 +56,6 @@ it('allows target team admins to perform privileged team actions', function (str
     expect((new TeamPolicy)->{$ability}($user, $team))->toBeTrue();
 })->with([
     'update',
-    'delete',
     'manageMembers',
     'viewAdmin',
     'manageInvitations',
@@ -72,7 +71,6 @@ it('denies target team members even when their current session role is admin els
     expect((new TeamPolicy)->{$ability}($user, $team))->toBeFalse();
 })->with([
     'update',
-    'delete',
     'manageMembers',
     'viewAdmin',
     'manageInvitations',
@@ -89,4 +87,16 @@ it('denies non-members from privileged team actions', function (string $ability)
     'manageMembers',
     'viewAdmin',
     'manageInvitations',
+]);
+
+it('only allows target team owners to delete the team', function (string $role, bool $allowed) {
+    $user = teamPolicyUserWithTeams([1]);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn($role);
+    $team = teamPolicyTeam(1);
+
+    expect((new TeamPolicy)->delete($user, $team))->toBe($allowed);
+})->with([
+    'owner' => ['owner', true],
+    'admin' => ['admin', false],
+    'member' => ['member', false],
 ]);

@@ -510,6 +510,12 @@ EOD;
                 // Dispatch activity to the monitor and open slide-over
                 $this->dispatch('activityMonitor', $activity->id);
                 $this->dispatch('databaserestore');
+                auditLog('ui.database.import_started', [
+                    'team_id' => $this->resource->team()?->id,
+                    'database_uuid' => $this->resource->uuid,
+                    'database_name' => $this->resource->name,
+                    'source' => 'file',
+                ]);
             }
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -768,6 +774,13 @@ EOD;
             // Dispatch activity to the monitor and open slide-over
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
+            auditLog('ui.database.restore_started', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+                'source' => 's3',
+                'storage_id' => $this->s3StorageId,
+            ]);
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (\Throwable $e) {
             $this->importRunning = false;
@@ -796,6 +809,8 @@ EOD;
      *
      * Hardened against bypasses:
      *  - decompresses gzip backups before scanning,
+     *  - converts custom-format (PGDMP) archives to SQL with pg_restore
+     *    before scanning, and rejects archives that cannot be inspected,
      *  - strips `--` line comments and flattens newlines so multi-line and
      *    comment-separated payloads (e.g. `FROM/**​/PROGRAM`) are caught,
      *  - matches a literal `\!` shell escape and `\o|`/`\g|` pipe redirects.
@@ -812,14 +827,35 @@ EOD;
         // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
         $sep = '([[:space:]]|/\\*[^*]*\\*/)';
 
-        $pattern = implode('|', [
-            "copy{$sep}+[^;]*(from|to){$sep}+program",
-            '(^|[[:space:]])\\\\!',
-            "(^|[[:space:]])\\\\(o|g){$sep}*\\|",
-        ]);
-        $escapedPattern = escapeshellarg($pattern);
+        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
+        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        $escapedSqlPattern = escapeshellarg($sqlPattern);
+        $escapedPsqlPattern = escapeshellarg($psqlPattern);
+        $contents = "{ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; }";
+        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
+        $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
+        $sqlScan = $scan($contents);
+        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
+        $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
 
-        return "if (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
+        return <<<SH
+header=\$({$contents} | head -c 5)
+if [ "\$header" = 'PGDMP' ]; then
+  inspect=\$(mktemp)
+  trap 'rm -f "\$inspect"' EXIT
+  if ! {$contents} > "\$inspect"; then
+    {$blockedInspect}
+  fi
+  if ! pg_restore -l "\$inspect" >/dev/null 2>&1; then
+    {$blockedInspect}
+  fi
+  if {$customScan}; then
+    {$blockedProgram}
+  fi
+elif {$sqlScan}; then
+  {$blockedProgram}
+fi
+SH;
     }
 
     private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void
@@ -884,7 +920,7 @@ EOD;
             case 'postgresql':
                 $restoreCommand = $this->postgresqlRestoreCommand;
                 if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}";
+                    $restoreCommand .= " && if [ \"\$({ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; } | head -c 5)\" = 'PGDMP' ]; then pg_restore -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}} {$escapedTmpPath}; else (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}; fi";
                 } else {
                     $restoreCommand .= " {$escapedTmpPath}";
                 }

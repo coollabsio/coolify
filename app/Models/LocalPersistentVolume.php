@@ -3,10 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalPersistentVolume extends BaseModel
 {
+    protected static function booted(): void
+    {
+        static::deleting(function (LocalPersistentVolume $volume): void {
+            if ($volume->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this volume backup schedule and its archives before deleting the volume.');
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
         'mount_path',
@@ -83,6 +94,18 @@ class LocalPersistentVolume extends BaseModel
         }
     }
 
+    public function scheduledBackups(): MorphMany
+    {
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
+    }
+
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this volume backup schedule and its archives before deleting the volume.');
+        }
+    }
+
     protected function customizeName($value)
     {
         return str($value)->trim()->value;
@@ -112,15 +135,15 @@ class LocalPersistentVolume extends BaseModel
     public function isServiceResource(): bool
     {
         return in_array($this->resource_type, [
-            'App\Models\ServiceApplication',
-            'App\Models\ServiceDatabase',
-        ]);
+            (new ServiceApplication)->getMorphClass(),
+            (new ServiceDatabase)->getMorphClass(),
+        ], true);
     }
 
     // Check if this volume belongs to a dockercompose application
     public function isDockerComposeResource(): bool
     {
-        if ($this->resource_type !== 'App\Models\Application') {
+        if ($this->resource_type !== (new Application)->getMorphClass()) {
             return false;
         }
 
@@ -154,6 +177,49 @@ class LocalPersistentVolume extends BaseModel
 
         // Check for explicit :ro flag in compose (existing logic)
         return $this->isReadOnlyVolume();
+    }
+
+    public function isDeclaredInCompose(): bool
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return true;
+            }
+
+            $composeContent = $resource instanceof Application
+                ? $resource->docker_compose_raw
+                : data_get($resource, 'service.docker_compose_raw');
+
+            if (blank($composeContent)) {
+                return true;
+            }
+
+            $compose = Yaml::parse($composeContent);
+            $services = data_get($compose, 'services', []);
+
+            if ($this->isServiceResource()) {
+                $services = array_intersect_key($services, [$resource->name => true]);
+            }
+
+            foreach ($services as $service) {
+                foreach (data_get($service, 'volumes', []) as $volume) {
+                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
+                    $source = data_get($parsedVolume, 'source');
+                    $target = data_get($parsedVolume, 'target');
+                    $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
+                    $generatedName = $source ? $resourceUuid.'_'.Str::slug($source, '-') : null;
+
+                    if ($generatedName === $this->name && $target && str($target)->start('/')->value() === $this->mount_path) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     // Check if this volume is read-only by parsing the docker-compose content

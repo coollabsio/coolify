@@ -8,6 +8,7 @@ use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -79,6 +80,8 @@ class Change extends Component
 
     public string $activeTab = 'general';
 
+    public bool $isConnected = false;
+
     private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
 
     protected function rules(): array
@@ -116,13 +119,6 @@ class Change extends Component
     {
         if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
             $this->apiUrl = githubApiUrlFromHtmlUrl($this->htmlUrl);
-        }
-    }
-
-    public function boot()
-    {
-        if ($this->github_app) {
-            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
         }
     }
 
@@ -167,8 +163,9 @@ class Change extends Component
             $this->appId = $this->github_app->app_id;
             $this->installationId = $this->github_app->installation_id;
             $this->clientId = $this->github_app->client_id;
-            $this->clientSecret = $this->github_app->client_secret;
-            $this->webhookSecret = $this->github_app->webhook_secret;
+            $canUpdate = auth()->user()->can('update', $this->github_app);
+            $this->clientSecret = $canUpdate ? $this->github_app->client_secret : null;
+            $this->webhookSecret = $canUpdate ? $this->github_app->webhook_secret : null;
             $this->isSystemWide = $this->github_app->is_system_wide;
             $this->privateKeyId = $this->github_app->private_key_id;
             $this->contents = $this->github_app->contents;
@@ -228,8 +225,9 @@ class Change extends Component
             syncGithubAppName($this->github_app);
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
-            $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->github_app->refresh();
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
             $this->name = str($this->github_app->name)->kebab();
 
             $this->dispatch('success', 'Github App permissions updated.');
@@ -247,12 +245,61 @@ class Change extends Component
         }
     }
 
+    public function testConnection()
+    {
+        try {
+            $this->authorize('view', $this->github_app);
+
+            if (! $this->github_app->isConnected()) {
+                $this->dispatch('error', 'GitHub App is not fully set up. Please complete installation first.');
+
+                return;
+            }
+
+            if (! $this->github_app->private_key_id || ! $this->github_app->privateKey) {
+                $this->dispatch('error', 'Private Key not found. Please select a valid private key.');
+
+                return;
+            }
+
+            $jwt = generateGithubJwt($this->github_app);
+            $appResponse = Http::withHeaders([
+                'Authorization' => "Bearer $jwt",
+                'Accept' => 'application/vnd.github+json',
+            ])->timeout(10)->get("{$this->github_app->api_url}/app");
+
+            if (! $appResponse->successful()) {
+                $error = data_get($appResponse->json(), 'message', 'Unknown error');
+                $this->dispatch('error', "Connection failed: {$error}");
+
+                return;
+            }
+
+            // Confirm installation credentials can mint an installation access token.
+            generateGithubInstallationToken($this->github_app);
+
+            $appName = data_get($appResponse->json(), 'name')
+                ?? data_get($appResponse->json(), 'slug', 'unknown');
+            $this->dispatch('success', "Connection successful! Authenticated as GitHub App: {$appName}");
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
+                str_contains($errorMessage, 'parse your key')) {
+                $this->dispatch('error', 'The selected private key format is not supported for GitHub Apps. <br><br>Please use an RSA private key in PEM format (BEGIN RSA PRIVATE KEY). <br><br>OpenSSH format keys (BEGIN OPENSSH PRIVATE KEY) are not supported.');
+
+                return;
+            }
+
+            return handleError($e, $this);
+        }
+    }
+
     public function mount()
     {
         try {
             $github_app_uuid = request()->github_app_uuid;
             $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
-            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
+            $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
             $this->applications = $this->github_app->applications;
@@ -260,6 +307,7 @@ class Change extends Component
 
             // Sync data from model to properties
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
@@ -299,6 +347,8 @@ class Change extends Component
                 $this->activeTab = 'permissions';
             } elseif ($routeName === 'source.github.resources') {
                 $this->activeTab = 'resources';
+            } elseif ($routeName === 'source.github.danger') {
+                $this->activeTab = 'danger';
             } else {
                 $this->activeTab = 'general';
             }
@@ -364,7 +414,6 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
-            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->organization = normalizeGithubOrganization($this->organization);
             $this->apiUrl = filled($this->apiUrl)
                 ? $this->apiUrl
@@ -373,6 +422,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
         } catch (ValidationException $e) {
             throw $e;
@@ -385,7 +435,6 @@ class Change extends Component
     {
         $this->authorize('update', $this->github_app);
 
-        $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
         $this->github_app->app_id = 1234567890;
         $this->github_app->installation_id = 1234567890;
         $this->github_app->save();
@@ -400,10 +449,9 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
-            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -417,13 +465,15 @@ class Change extends Component
 
             if ($this->github_app->applications->isNotEmpty()) {
                 $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
-                $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
                 return;
             }
             $this->github_app->delete();
+            // Clear so post-delete Livewire re-render / modal $refresh does not re-run
+            // @can and canGate checks against a deleted model (null team_id TypeError).
+            $this->github_app = null;
 
-            return redirect()->route('source.all');
+            return redirectRoute($this, 'source.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

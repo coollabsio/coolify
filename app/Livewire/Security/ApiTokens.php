@@ -59,7 +59,10 @@ class ApiTokens extends Component
 
     private function getTokens()
     {
-        $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
+        $this->tokens = auth()->user()->tokens()
+            ->where('team_id', currentTeam()->id)
+            ->latest()
+            ->get();
     }
 
     public function updatedPermissions($permissionToUpdate)
@@ -93,11 +96,11 @@ class ApiTokens extends Component
             return;
         }
 
-        if ($permissionToUpdate == 'root') {
+        if ($permissionToUpdate == 'root' && in_array('root', $this->permissions, true)) {
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
             $this->permissions[] = 'read';
-        } elseif ($permissionToUpdate == 'deploy') {
+        } elseif ($permissionToUpdate == 'deploy' && in_array('deploy', $this->permissions, true)) {
             $this->permissions = ['deploy'];
         } else {
             if (count($this->permissions) == 0) {
@@ -137,6 +140,12 @@ class ApiTokens extends Component
             ]);
             $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
             $token = auth()->user()->createToken($this->description, array_values($this->permissions), $expiresAt);
+            auditLog('ui.api_token.created', [
+                'team_id' => currentTeam()->id,
+                'api_token_name' => $this->description,
+                'abilities' => array_values($this->permissions),
+                'expires_at' => $expiresAt?->toIso8601String(),
+            ]);
             $this->getTokens();
             // Do NOT strip the numeric prefix (e.g. "69|...") — Sanctum uses it to index and look up tokens.
             session()->flash('token', $token->plainTextToken);
@@ -148,9 +157,17 @@ class ApiTokens extends Component
     public function revoke(int $id)
     {
         try {
-            $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
+            $token = auth()->user()->tokens()
+                ->where('team_id', currentTeam()->id)
+                ->where('id', $id)
+                ->firstOrFail();
             $this->authorize('delete', $token);
+            $tokenName = $token->name;
             $token->delete();
+            auditLog('ui.api_token.revoked', [
+                'team_id' => currentTeam()->id,
+                'api_token_name' => $tokenName,
+            ]);
             $this->getTokens();
         } catch (\Exception $e) {
             return handleError($e, $this);

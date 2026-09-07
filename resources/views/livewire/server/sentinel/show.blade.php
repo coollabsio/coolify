@@ -3,14 +3,22 @@
         Sentinel Configuration | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    @if ($server->isFunctional())
-        <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
-            <x-server.sidebar-sentinel :server="$server" :parameters="$parameters" />
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="sentinel" />
+        @if ($server->isFunctional())
             <div class="w-full">
                 <livewire:server.sentinel :server="$server" />
             </div>
-        </div>
-    @else
-        <div>Server is not validated. Validate first.</div>
-    @endif
+        @else
+            <div class="application-settings-form w-full">
+                <x-application.settings-section title="Sentinel"
+                    helper="Monitor server and container health while collecting metrics.">
+                    <x-empty size="sm" title="Server validation required"
+                        description="Validate this server before enabling Sentinel."
+                        icon-name="dashboard" />
+                </x-application.settings-section>
+            </div>
+        @endif
+    </div>
 </div>

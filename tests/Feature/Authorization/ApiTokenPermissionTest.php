@@ -77,13 +77,13 @@ describe('POST /api/v1/servers', function () {
     });
 });
 
-describe('GET /api/v1/servers/{uuid}/validate', function () {
+describe('POST /api/v1/servers/{uuid}/validate', function () {
     test('read-only token cannot trigger server validation', function () {
         $token = $this->user->createToken('read-only', ['read']);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$token->plainTextToken,
-        ])->getJson('/api/v1/servers/fake-uuid/validate');
+        ])->postJson('/api/v1/servers/fake-uuid/validate');
 
         $response->assertStatus(403);
     });

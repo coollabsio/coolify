@@ -1,0 +1,152 @@
+name: Build Coolify Next
+
+on:
+  push:
+    branches: [next]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - .github/workflows/coolify-helper-next.yml
+      - .github/workflows/coolify-realtime.yml
+      - .github/workflows/coolify-realtime-next.yml
+      - .github/workflows/pr-quality.yaml
+      - docker/coolify-helper/Dockerfile
+      - docker/coolify-realtime/Dockerfile
+      - docker/testing-host/Dockerfile
+      - templates/**
+      - CHANGELOG.md
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: coolify-next-build
+  cancel-in-progress: false
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: coollabsio/coolify
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      rc_version: ${{ steps.version.outputs.rc_version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Resolve next version
+        id: version
+        run: |
+          RC_VERSION=$(jq -r '.coolify.nightly.version' versions.json)
+          if [[ ! "${RC_VERSION}" =~ ^[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "Invalid next RC version: ${RC_VERSION}"
+            exit 1
+          fi
+
+          SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="${RC_VERSION}.${SHORT_SHA}"
+          echo "rc_version=${RC_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push next image (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            COOLIFY_VERSION=${{ needs.prepare.outputs.version }}
+          tags: |
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:next-build-${{ needs.prepare.outputs.short_sha }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:next-build-${{ needs.prepare.outputs.short_sha }}-${{ matrix.arch }}
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish next manifest on ${{ env.GITHUB_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          SHA: ${{ needs.prepare.outputs.short_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          SOURCE="next-build-${SHA}"
+          docker buildx imagetools create \
+            "${IMAGE}:${SOURCE}-amd64" \
+            "${IMAGE}:${SOURCE}-aarch64" \
+            --tag "${IMAGE}:sha-${SHA}" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:next"
+
+      - name: Publish next manifest on ${{ env.DOCKER_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          SHA: ${{ needs.prepare.outputs.short_sha }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          SOURCE="next-build-${SHA}"
+          docker buildx imagetools create \
+            "${IMAGE}:${SOURCE}-amd64" \
+            "${IMAGE}:${SOURCE}-aarch64" \
+            --tag "${IMAGE}:sha-${SHA}" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:next"

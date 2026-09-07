@@ -2,17 +2,22 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
+use App\Traits\HasRestartLimit;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneClickhouse extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasRestartLimit, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+
+    protected array $auditExclude = ['last_online_at'];
 
     protected $fillable = [
         'uuid',
@@ -373,6 +378,6 @@ class StandaloneClickhouse extends BaseModel
 
     public function isBackupSolutionAvailable()
     {
-        return false;
+        return true;
     }
 }

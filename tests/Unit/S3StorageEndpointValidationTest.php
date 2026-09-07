@@ -104,3 +104,68 @@ it('accepts explicitly allowlisted intranet S3 endpoints', function (string $end
     'Self-hosted MinIO on 172.16.x CIDR' => ['http://172.16.0.10:9000', ['172.16.0.0/12']],
     'Self-hosted MinIO on 192.168.x exact IP' => ['http://192.168.1.50:9000', ['192.168.1.50']],
 ]);
+
+it('accepts allowlisted docker-style MinIO hostnames that resolve to private IPs', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['coolify-minio'],
+    ]));
+
+    $validator = Validator::make(
+        ['endpoint' => 'http://coolify-minio:9000'],
+        ['endpoint' => ['required', 'max:255', new SafeWebhookUrl(fn (string $host): array => ['172.16.0.5'])]],
+    );
+
+    expect($validator->passes())->toBeTrue('Expected coolify-minio with private IP to pass when allowlisted');
+});
+
+it('rejects docker-style MinIO hostnames resolving to private IPs without allowlist', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => [],
+    ]));
+
+    $validator = Validator::make(
+        ['endpoint' => 'http://coolify-minio:9000'],
+        ['endpoint' => ['required', 'max:255', new SafeWebhookUrl(fn (string $host): array => ['172.16.0.5'])]],
+    );
+
+    expect($validator->fails())->toBeTrue('Expected coolify-minio private IP rejection without allowlist');
+});
+
+it('allows the bundled MinIO endpoint only when explicitly trusted by S3 storage', function () {
+    $validator = Validator::make(
+        ['endpoint' => 'http://coolify-minio:9000'],
+        ['endpoint' => ['required', new SafeWebhookUrl(
+            fn (string $host): array => ['172.16.0.5'],
+            trustedInternalHosts: ['coolify-minio'],
+        )]],
+    );
+
+    expect($validator->passes())->toBeTrue();
+});
+
+it('accepts allowlisted docker MinIO hostname after custom DNS miss and system DNS hit', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'custom_dns_servers' => '1.1.1.1',
+        'webhook_allowed_internal_hosts' => ['coolify-minio'],
+    ]));
+
+    $rule = new class extends SafeWebhookUrl
+    {
+        protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+        {
+            return [];
+        }
+
+        protected function resolveHostWithSystemDns(string $host): array
+        {
+            return ['172.16.0.5'];
+        }
+    };
+
+    $validator = Validator::make(
+        ['endpoint' => 'http://coolify-minio:9000'],
+        ['endpoint' => ['required', 'max:255', $rule]],
+    );
+
+    expect($validator->passes())->toBeTrue('Expected S3 endpoint to pass after DNS fallback + allowlist');
+});

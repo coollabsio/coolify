@@ -3,8 +3,8 @@
         <div>
             <h3>Resource</h3>
             <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <x-forms.copy-button label="Name" :text="$resource->name ?? ''" />
-                <x-forms.copy-button label="UUID" :text="$resource->uuid ?? ''" />
+                <x-forms.copy-input label="Name" :text="$resource->name ?? ''" />
+                <x-forms.copy-input label="UUID" :text="$resource->uuid ?? ''" />
             </div>
         </div>
 
@@ -12,8 +12,8 @@
             <div>
                 <h3>Environment</h3>
                 <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <x-forms.copy-button label="Name" :text="$environment_name ?? ''" />
-                    <x-forms.copy-button label="UUID" :text="$environment_uuid" />
+                    <x-forms.copy-input label="Name" :text="$environment_name ?? ''" />
+                    <x-forms.copy-input label="UUID" :text="$environment_uuid" />
                 </div>
             </div>
         @endif
@@ -22,8 +22,8 @@
             <div>
                 <h3>Project</h3>
                 <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <x-forms.copy-button label="Name" :text="$project_name ?? ''" />
-                    <x-forms.copy-button label="UUID" :text="$project_uuid" />
+                    <x-forms.copy-input label="Name" :text="$project_name ?? ''" />
+                    <x-forms.copy-input label="UUID" :text="$project_uuid" />
                 </div>
             </div>
         @endif
@@ -32,8 +32,8 @@
             <div>
                 <h3>Server</h3>
                 <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <x-forms.copy-button label="Name" :text="$server_name ?? ''" />
-                    <x-forms.copy-button label="UUID" :text="$server_uuid" />
+                    <x-forms.copy-input label="Name" :text="$server_name ?? ''" />
+                    <x-forms.copy-input label="UUID" :text="$server_uuid" />
                 </div>
             </div>
         @endif
@@ -43,10 +43,10 @@
                 <h3>Stack Sub-Resources</h3>
                 <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                     @foreach ($stack_applications as $item)
-                        <x-forms.copy-button :label="'Application — ' . $item['name']" :text="$item['uuid']" />
+                        <x-forms.copy-input :label="'Application: ' . $item['name']" :text="$item['uuid']" />
                     @endforeach
                     @foreach ($stack_databases as $item)
-                        <x-forms.copy-button :label="'Database — ' . $item['name']" :text="$item['uuid']" />
+                        <x-forms.copy-input :label="'Database: ' . $item['name']" :text="$item['uuid']" />
                     @endforeach
                 </div>
             </div>

@@ -80,14 +80,31 @@ class Logs extends Component
                 ]);
 
                 return $containers->toArray();
-            } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
-                if ($containers && $containers->count() > 0) {
-                    return $containers->sort()->toArray();
-                }
-
-                return [];
             }
+
+            // Docker labels differ by resource type:
+            // applications → coolify.applicationId, services → coolify.serviceId, databases → coolify.databaseId
+            $containers = match (true) {
+                $this->resource instanceof Application => getCurrentApplicationContainerStatus(
+                    $server,
+                    $this->resource->id,
+                    includePullrequests: true
+                ),
+                $this->resource instanceof Service => getCurrentServiceContainerStatus(
+                    $server,
+                    $this->resource->id
+                ),
+                default => getCurrentDatabaseContainerStatus(
+                    $server,
+                    $this->resource->id
+                ),
+            };
+
+            if ($containers && $containers->count() > 0) {
+                return $containers->sort()->toArray();
+            }
+
+            return [];
         } catch (\Exception $e) {
             // Log error but don't fail the entire operation
 

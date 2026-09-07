@@ -64,7 +64,7 @@ class GithubPrivateRepository extends Component
 
     protected int $page = 1;
 
-    public $build_pack = 'nixpacks';
+    public $build_pack = 'railpack';
 
     public bool $show_is_static = true;
 
@@ -134,8 +134,9 @@ class GithubPrivateRepository extends Component
 
     public function loadBranches()
     {
-        $this->selected_repository_owner = $this->repositories->where('id', $this->selected_repository_id)->first()['owner']['login'];
-        $this->selected_repository_repo = $this->repositories->where('id', $this->selected_repository_id)->first()['name'];
+        $repository = $this->repositories->firstWhere('id', $this->selected_repository_id);
+        $this->selected_repository_owner = data_get($repository, 'owner.login');
+        $this->selected_repository_repo = data_get($repository, 'name');
         $this->branches = collect();
         $this->page = 1;
         $this->loadBranchByPage();
@@ -146,7 +147,10 @@ class GithubPrivateRepository extends Component
             }
         }
         $this->branches = sortBranchesByPriority($this->branches);
-        $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
+        $defaultBranch = data_get($repository, 'default_branch', 'main');
+        $this->selected_branch_name = $this->branches->contains('name', $defaultBranch)
+            ? $defaultBranch
+            : data_get($this->branches, '0.name', 'main');
     }
 
     protected function loadBranchByPage()
@@ -192,7 +196,7 @@ class GithubPrivateRepository extends Component
             }
 
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
@@ -201,7 +205,7 @@ class GithubPrivateRepository extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
-            $application = Application::create([
+            $application = new Application([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
@@ -216,6 +220,7 @@ class GithubPrivateRepository extends Component
                 'source_id' => $this->github_app->id,
                 'source_type' => $this->github_app->getMorphClass(),
             ]);
+            $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 

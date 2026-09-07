@@ -2,6 +2,7 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
@@ -28,6 +29,7 @@ use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
+use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Http\Middleware\ValidatePostSize;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Middleware\SetCacheHeaders;
@@ -49,6 +51,8 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
+        // Outermost so Server-Timing includes the full middleware + app cost.
+        AddServerTimingHeaders::class,
         TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,
@@ -56,6 +60,7 @@ class Kernel extends HttpKernel
         ValidatePostSize::class,
         TrimStrings::class,
         ConvertEmptyStringsToNull::class,
+        InvokeDeferredCallbacks::class,
 
     ];
 

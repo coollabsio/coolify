@@ -33,10 +33,11 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        $this->clearOutdatedInfo();
+
         // Detect current version (makes SSH call)
         $currentVersion = getTraefikVersionFromDockerCompose($this->server);
 
-        // Update detected version in database
         $this->server->update(['detected_traefik_version' => $currentVersion]);
 
         if (! $currentVersion) {
@@ -111,6 +112,11 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Dispatch UI update event so warning state refreshes in real-time
         ProxyStatusChangedUI::dispatch($this->server->team_id);
+    }
+
+    private function clearOutdatedInfo(): void
+    {
+        $this->server->update(['traefik_outdated_info' => null]);
     }
 
     /**

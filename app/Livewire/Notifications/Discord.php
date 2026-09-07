@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\DiscordNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Discord extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -32,6 +33,9 @@ class Discord extends Component
 
     #[Validate(['boolean'])]
     public bool $statusChangeDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedDiscordNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $backupSuccessDiscordNotifications = false;
@@ -81,17 +85,17 @@ class Discord extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->discord_enabled = $this->discordEnabled;
             $this->settings->discord_webhook_url = $this->discordWebhookUrl;
 
             $this->settings->deployment_success_discord_notifications = $this->deploymentSuccessDiscordNotifications;
             $this->settings->deployment_failure_discord_notifications = $this->deploymentFailureDiscordNotifications;
             $this->settings->status_change_discord_notifications = $this->statusChangeDiscordNotifications;
+            $this->settings->restart_limit_reached_discord_notifications = $this->restartLimitReachedDiscordNotifications;
             $this->settings->backup_success_discord_notifications = $this->backupSuccessDiscordNotifications;
             $this->settings->backup_failure_discord_notifications = $this->backupFailureDiscordNotifications;
             $this->settings->scheduled_task_success_discord_notifications = $this->scheduledTaskSuccessDiscordNotifications;
@@ -117,6 +121,7 @@ class Discord extends Component
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;
             $this->statusChangeDiscordNotifications = $this->settings->status_change_discord_notifications;
+            $this->restartLimitReachedDiscordNotifications = $this->settings->restart_limit_reached_discord_notifications;
             $this->backupSuccessDiscordNotifications = $this->settings->backup_success_discord_notifications;
             $this->backupFailureDiscordNotifications = $this->settings->backup_failure_discord_notifications;
             $this->scheduledTaskSuccessDiscordNotifications = $this->settings->scheduled_task_success_discord_notifications;
@@ -165,9 +170,34 @@ class Discord extends Component
         }
     }
 
+    public function toggleDiscordEnabled(): void
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->discordEnabled) {
+                $this->discordEnabled = false;
+            } else {
+                $this->validate([
+                    'discordWebhookUrl' => 'required',
+                ], [
+                    'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
+                ]);
+                $this->discordEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            handleError($e, $this);
+        }
+    }
+
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -178,6 +208,7 @@ class Discord extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -187,6 +218,8 @@ class Discord extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');

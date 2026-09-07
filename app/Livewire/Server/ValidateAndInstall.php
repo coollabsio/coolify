@@ -39,6 +39,8 @@ class ValidateAndInstall extends Component
 
     public bool $ask = false;
 
+    public bool $isInstalling = false;
+
     protected $listeners = [
         'init',
         'validateConnection',
@@ -51,6 +53,24 @@ class ValidateAndInstall extends Component
 
     public function init(int $data = 0)
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->server->canBeValidated()) {
+            $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+            $this->server->update([
+                'validation_logs' => $this->error,
+                'is_validating' => false,
+            ]);
+            $this->dispatch(
+                'error',
+                'Cannot revalidate',
+                $this->error
+            );
+
+            return;
+        }
+
+        $this->isInstalling = false;
         $this->uptime = null;
         $this->supported_os_type = null;
         $this->prerequisites_installed = null;
@@ -142,6 +162,8 @@ class ValidateAndInstall extends Component
 
     public function validateOS()
     {
+        $this->authorize('update', $this->server);
+
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
@@ -156,6 +178,8 @@ class ValidateAndInstall extends Component
 
     public function validatePrerequisites()
     {
+        $this->authorize('update', $this->server);
+
         $validationResult = $this->server->validatePrerequisites();
         $this->prerequisites_installed = $validationResult['success'];
         if (! $validationResult['success']) {
@@ -172,6 +196,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Prerequisites';
                         $activity = $this->server->installPrerequisites();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
@@ -193,6 +218,8 @@ class ValidateAndInstall extends Component
 
     public function validateDockerEngine()
     {
+        $this->authorize('update', $this->server);
+
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
@@ -208,6 +235,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Docker';
                         $activity = $this->server->installDocker();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
@@ -228,6 +256,8 @@ class ValidateAndInstall extends Component
 
     public function validateDockerVersion()
     {
+        $this->authorize('update', $this->server);
+
         if ($this->server->isSwarm()) {
             $swarmInstalled = $this->server->validateDockerSwarm();
             if ($swarmInstalled) {

@@ -6,9 +6,6 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Index extends Component
@@ -66,7 +63,9 @@ class Index extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
             $this->description = $this->team->description;
-            $this->is_mcp_server_enabled = $this->team->is_mcp_server_enabled;
+            // Null can appear after Team::create() when the DB default is not
+            // hydrated onto the in-memory model stored in session.
+            $this->is_mcp_server_enabled = (bool) ($this->team->is_mcp_server_enabled ?? true);
         }
     }
 
@@ -94,36 +93,6 @@ class Index extends Component
             $this->team->save();
             refreshSession();
             $this->dispatch('success', 'Team updated.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    public function delete()
-    {
-        try {
-            $currentTeam = currentTeam();
-            $this->authorize('delete', $currentTeam);
-            $currentTeam->members->each(function ($user) use ($currentTeam) {
-                if ($user->id === Auth::id()) {
-                    return;
-                }
-                $user->teams()->detach($currentTeam);
-                $session = DB::table('sessions')->where('user_id', $user->id)->first();
-                if ($session) {
-                    DB::table('sessions')->where('id', $session->id)->delete();
-                }
-            });
-
-            // Clear stale cache before deleting so refreshSession doesn't resolve the deleted team
-            Cache::forget('user:'.Auth::id().':team:'.$currentTeam->id);
-            $currentTeam->delete();
-
-            // Switch to the user's next available team
-            $newTeam = Auth::user()->teams()->first();
-            refreshSession($newTeam);
-
-            return redirect()->route('team.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -1,9 +1,12 @@
 <?php
 
+use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Environment;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
@@ -13,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 function getTeamIdFromToken()
 {
@@ -129,10 +133,22 @@ function sharedDataApplications()
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
+        'is_log_drain_enabled' => 'boolean',
+        'is_gpu_enabled' => 'boolean',
+        'gpu_driver' => 'string|nullable',
+        'gpu_count' => 'string|nullable',
+        'gpu_device_ids' => 'string|nullable',
+        'gpu_options' => 'string|nullable',
+        'is_consistent_container_name_enabled' => 'boolean',
+        'custom_internal_name' => 'string|nullable',
+        'preview_url_template' => 'string',
+        'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
+        'noindex_domains' => 'array|nullable',
+        'noindex_domains.*' => 'string',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
@@ -248,6 +264,80 @@ function moveResourceToEnvironment(Request $request, $resource, string $resource
     ]);
 }
 
+function migrateResourceToDestination(Request $request, $resource, string $resourceType, int $teamId): JsonResponse
+{
+    if (! isDev()) {
+        abort(404);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'destination_uuid' => 'required|string',
+        'migrate_volumes' => 'boolean',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $allowedFields = ['destination_uuid', 'migrate_volumes'];
+    $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    Gate::authorize('update', $resource);
+
+    $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+    if (! $destination || ! $destination->server?->canHostResources()) {
+        return response()->json(['message' => 'Destination not found.'], 404);
+    }
+
+    $sourceDestination = $resource->destination;
+    $migrateVolumes = $request->boolean('migrate_volumes', true);
+
+    try {
+        $result = MigrateResourceToDestination::run(
+            $resource,
+            $destination,
+            $migrateVolumes,
+        );
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => collect($e->errors())->flatten()->first() ?? $e->getMessage(),
+            'errors' => $e->errors(),
+        ], 422);
+    }
+
+    auditLog('api.'.str($resourceType)->lower()->value().'.migrated', [
+        'team_id' => $teamId,
+        'resource_uuid' => $resource->uuid,
+        'resource_type' => str($resourceType)->lower()->value(),
+        'from_destination_uuid' => $sourceDestination?->uuid,
+        'to_destination_uuid' => $destination->uuid,
+        'from_server_id' => $sourceDestination?->server_id,
+        'to_server_id' => $destination->server_id,
+        'migrate_volumes' => $migrateVolumes,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
+    ]);
+
+    return response()->json([
+        'message' => $result['message'],
+        'uuid' => $resource->uuid,
+        'destination_uuid' => $destination->uuid,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
+    ]);
+}
+
 function validateIncomingRequest(Request $request)
 {
     // check if request is json
@@ -310,6 +400,14 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
+    $request->offsetUnset('is_log_drain_enabled');
+    $request->offsetUnset('is_gpu_enabled');
+    $request->offsetUnset('gpu_driver');
+    $request->offsetUnset('gpu_count');
+    $request->offsetUnset('gpu_device_ids');
+    $request->offsetUnset('gpu_options');
+    $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('custom_internal_name');
     $request->offsetUnset('docker_compose_raw');
     $request->offsetUnset('tags');
 }

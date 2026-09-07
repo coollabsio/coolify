@@ -275,6 +275,23 @@ describe('StandaloneDocker/SwarmDocker ownedByCurrentTeam scope', function () {
 });
 
 describe('Destination/Show team scope', function () {
+    test('deleting a destination redirects without rendering the deleted destination', function () {
+        $destination = SwarmDocker::create([
+            'uuid' => fake()->uuid(),
+            'name' => 'swarm-a-'.fake()->unique()->word(),
+            'network' => 'swarm-a-'.fake()->unique()->word(),
+            'server_id' => $this->serverA->id,
+        ]);
+
+        $component = Livewire::test(DestinationShow::class, ['destination_uuid' => $destination->uuid])
+            ->call('delete')
+            ->assertRedirect(route('destination.index'));
+
+        expect($component->effects)
+            ->toHaveKey('redirectUsingNavigate', true);
+        expect($destination->fresh())->toBeNull();
+    });
+
     test('mount with other team destination UUID redirects to index', function () {
         $component = Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationB->uuid]);
 
@@ -301,7 +318,7 @@ describe('Destination/Show team scope', function () {
             ->assertSee('General')
             ->assertSee('Resources')
             ->assertDontSee('Search resources...')
-            ->assertDontSee('No resources are using this destination.');
+            ->assertDontSee('No resources use this destination');
     });
 
     test('mount with own standalone destination lists deployed resources', function () {
@@ -341,7 +358,7 @@ describe('Destination/Show team scope', function () {
 
     test('mount with own standalone destination shows empty state without resources', function () {
         Livewire::test(DestinationResources::class, ['destination_uuid' => $this->destinationA->uuid])
-            ->assertSee('No resources are using this destination.');
+            ->assertSee('No resources use this destination');
     });
 
     test('mount with own standalone destination does not list another team resources', function () {

@@ -170,6 +170,10 @@ else
     log "Network 'coolify' already exists"
 fi
 
+mkdir -p /data/coolify/images/{avatars,project-icons}
+chown -R 9999:root /data/coolify/images
+chmod -R 700 /data/coolify/images
+
 # Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
 # Only changes owner — preserves existing group to respect custom setups
 SSH_OWNER=$(stat -c '%u' /data/coolify/ssh 2>/dev/null || echo "unknown")
@@ -224,6 +228,9 @@ done
 
 log "All images pulled successfully"
 echo "     All images pulled successfully."
+
+set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
+set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
 
 log_section "Step 4/6: Stopping and restarting containers"
 write_status "4" "Stopping containers"

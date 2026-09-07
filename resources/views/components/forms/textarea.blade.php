@@ -15,19 +15,24 @@
 
 <div class="flex-1 form-control">
     @if ($label)
-        <label class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
     @if ($useMonacoEditor)
-        <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
-            name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
-            readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
+        @php $monacoRows = (int) $attributes->get('rows', 0); @endphp
+        <div class="w-full" @if ($monacoRows > 0) style="--editor-height: {{ $monacoRows * 23 + 38 }}px" @endif>
+            <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
+                name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
+                readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
+        </div>
     @else
         @if ($type === 'password')
             <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">

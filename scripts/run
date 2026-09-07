@@ -21,10 +21,10 @@ function help {
 }
 
 function logs {
-    docker exec -t coolify tail -f storage/logs/laravel.log
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify tail -f storage/logs/laravel.log
 }
 function test {
-    docker exec -t coolify php artisan test --testsuite=Feature -p
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan test --testsuite=Feature -p
 }
 
 function sync:bunny {
@@ -32,33 +32,33 @@ function sync:bunny {
 }
 
 function db:reset {
-    bash spin exec -u www-data coolify php artisan migrate:fresh --seed
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -u www-data coolify php artisan migrate:fresh --seed
 }
 function db:reset-prod {
-    bash spin exec -u www-data coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -u www-data coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
 function coolify {
-    bash spin exec -u www-data coolify sh
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -u www-data coolify sh
 }
 
 function coolify:root {
-    bash spin exec coolify sh
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec coolify sh
 }
 function coolify:proxy {
-    docker exec -ti coolify-proxy sh
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec coolify-proxy sh
 }
 
 function redis {
-    docker exec -ti coolify-redis redis-cli
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec redis redis-cli
 }
 
 function vite {
-    bash spin exec vite bash
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec vite bash
 }
 
 function tinker {
-    bash spin exec -u www-data coolify php artisan tinker
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -u www-data coolify php artisan tinker
 }
 
 function default {

@@ -76,6 +76,42 @@ test('member can still create read token', function () {
         ->and($token->abilities)->toBe(['read']);
 });
 
+test('api token list only contains tokens for the current team', function () {
+    $user = User::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'admin']);
+    $otherTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    session(['currentTeam' => $this->team]);
+    $currentTeamToken = $user->createToken('current-team-token', ['read'])->accessToken;
+
+    session(['currentTeam' => $otherTeam]);
+    $user->createToken('other-team-token', ['read']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->assertSet('tokens', fn ($tokens) => $tokens->pluck('id')->all() === [$currentTeamToken->id]);
+});
+
+test('user cannot revoke a token from another team through the current team', function () {
+    $user = User::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => 'admin']);
+    $otherTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    session(['currentTeam' => $otherTeam]);
+    $otherTeamToken = $user->createToken('other-team-token', ['read'])->accessToken;
+
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)->call('revoke', $otherTeamToken->id);
+
+    expect($user->tokens()->whereKey($otherTeamToken->id)->exists())->toBeTrue();
+});
+
 test('owner can create root token', function () {
     $owner = User::factory()->create();
     $this->team->members()->attach($owner->id, ['role' => 'owner']);
@@ -94,4 +130,17 @@ test('owner can create root token', function () {
 
     expect($token)->not->toBeNull()
         ->and($token->abilities)->toBe(['root']);
+});
+
+test('owner can deselect root and falls back to read permission', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->set('permissions', ['root'])
+        ->set('permissions', [])
+        ->assertSet('permissions', ['read']);
 });

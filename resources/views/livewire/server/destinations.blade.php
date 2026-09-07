@@ -2,52 +2,83 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Destinations | Coolify
     </x-slot>
+
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="destinations" />
-        <div class="w-full">
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
             @if ($server->isFunctional())
-                <div class="flex items-end gap-2">
-                    <h2>Destinations</h2>
-                    @can('update', $server)
-                        <x-modal-input buttonTitle="+ Add" title="New Destination">
-                            <livewire:destination.new.docker :server_id="$server->id" />
-                        </x-modal-input>
-                    @endcan
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click='scan'>Scan for Destinations</x-forms.button>
-                </div>
-                <div>Destinations are used to segregate resources by network.</div>
-                <h4 class="pt-4 pb-2">Available Destinations</h4>
-                <div class="flex gap-2">
-                    @foreach ($server->standaloneDockers as $docker)
-                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}" {{ wireNavigate() }}>
-                            <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
-                        </a>
-                    @endforeach
-                    @foreach ($server->swarmDockers as $docker)
-                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}" {{ wireNavigate() }}>
-                            <x-forms.button>{{ data_get($docker, 'network') }} </x-forms.button>
-                        </a>
-                    @endforeach
-                    @if ($server->standaloneDockers->isEmpty() && $server->swarmDockers->isEmpty())
-                        <div class="text-sm text-neutral-500">No destinations configured for this server yet.</div>
-                    @endif
-                </div>
-                @if ($networks->count() > 0)
-                    <div class="pt-2">
-                        <h3 class="pb-4">Found Destinations</h3>
-                        <div class="flex flex-wrap gap-2 ">
-                            @foreach ($networks as $network)
-                                <div class="min-w-fit">
-                                    <x-forms.button canGate="update" :canResource="$server" wire:click="add('{{ data_get($network, 'Name') }}')">Add
-                                        {{ data_get($network, 'Name') }}</x-forms.button>
-                                </div>
-                            @endforeach
+                <x-application.settings-section id="server-destinations-section" title="Destinations"
+                    helper="Docker networks used to isolate and connect resources on this server." flush>
+                    <x-slot:actions>
+                        <div class="flex items-center gap-2">
+                            <x-forms.button canGate="update" :canResource="$server" wire:click="scan">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                Scan networks
+                            </x-forms.button>
+                            @can('update', $server)
+                                <x-modal-input buttonTitle="+ Add" title="New Destination">
+                                    <livewire:destination.new.docker :server_id="$server->id" />
+                                </x-modal-input>
+                            @endcan
                         </div>
-                    </div>
+                    </x-slot:actions>
+
+                    @forelse ($server->standaloneDockers->concat($server->swarmDockers) as $destination)
+                        <a href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}"
+                            {{ wireNavigate() }}
+                            class="flex items-center gap-4 border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.08] dark:hover:bg-white/[0.03]">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                                <x-reicon name="destinations" class="size-4" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium text-neutral-950 dark:text-fg">
+                                    {{ data_get($destination, 'network') }}
+                                </p>
+                                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">
+                                    {{ $server->swarmDockers->contains('id', data_get($destination, 'id')) ? 'Docker Swarm' : 'Standalone Docker' }}
+                                </p>
+                            </div>
+                        </a>
+                    @empty
+                        <x-empty size="sm" title="No destinations"
+                            description="Add a destination or scan the server for existing Docker networks."
+                            icon-name="destinations" />
+                    @endforelse
+                </x-application.settings-section>
+
+                @if ($networks->count() > 0)
+                    <x-application.settings-section id="server-found-networks-section" title="Discovered networks"
+                        helper="Networks found on the server that are not registered as Coolify destinations."
+                        flush>
+                        @foreach ($networks as $network)
+                            <div
+                                class="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3 last:border-b-0 dark:border-white/[0.08]">
+                                <div>
+                                    <p class="text-sm font-medium text-neutral-950 dark:text-fg">
+                                        {{ data_get($network, 'Name') }}
+                                    </p>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Docker network</p>
+                                </div>
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    wire:click="add('{{ data_get($network, 'Name') }}')">
+                                    Add destination
+                                </x-forms.button>
+                            </div>
+                        @endforeach
+                    </x-application.settings-section>
                 @endif
             @else
-                <div>Server is not validated. Validate first.</div>
+                <x-application.settings-section title="Destinations"
+                    helper="Docker networks used to isolate and connect resources on this server.">
+                    <x-empty size="sm" title="Server validation required"
+                        description="Validate this server before managing its destinations."
+                        icon-name="destinations" />
+                </x-application.settings-section>
             @endif
         </div>
     </div>

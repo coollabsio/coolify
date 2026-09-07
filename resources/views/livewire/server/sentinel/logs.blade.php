@@ -3,11 +3,23 @@
         Sentinel Logs | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
-        <x-server.sidebar-sentinel :server="$server" :parameters="$parameters" />
-        <div class="w-full">
-            <h2 class="pb-4">Logs</h2>
-            <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel" displayName="Sentinel" :collapsible="false" />
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="sentinel" />
+        <div class="application-settings-form w-full">
+            <x-application.settings-section title="Sentinel logs"
+                helper="Search, filter, follow, copy, or download recent output from the Sentinel container."
+                flush class="logs-settings-section">
+                <x-slot:actions>
+                    <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                        :type="$server->isSentinelLive() ? 'success' : 'warning'"
+                        class="logs-section-status-badge" />
+                </x-slot:actions>
+                <div class="settings-log-panel">
+                    <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel"
+                        displayName="Sentinel" :collapsible="false" />
+                </div>
+            </x-application.settings-section>
         </div>
     </div>
 </div>

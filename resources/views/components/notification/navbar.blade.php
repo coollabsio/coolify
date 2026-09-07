@@ -1,32 +1,8 @@
-<div class="pb-6">
-    <h1>Notifications</h1>
-    <div class="subtitle">Get notified about your infrastructure.</div>
-    <div class="navbar-main">
-        <nav class="flex items-center gap-6 min-h-10 whitespace-nowrap">
-            <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.email') }}">
-                <button>Email</button>
-            </a>
-            <a class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.discord') }}">
-                <button>Discord</button>
-            </a>
-            <a class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.telegram') }}">
-                <button>Telegram</button>
-            </a>
-            <a class="{{ request()->routeIs('notifications.slack') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.slack') }}">
-                <button>Slack</button>
-            </a>
-            <a class="{{ request()->routeIs('notifications.pushover') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.pushover') }}">
-                <button>Pushover</button>
-            </a>
-            <a class="{{ request()->routeIs('notifications.webhook') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('notifications.webhook') }}">
-                <button>Webhook</button>
-            </a>
-        </nav>
-    </div>
-</div>
+@props([
+    'title' => 'Notifications',
+    'subtitle' => 'Delivery channels for team events',
+    // Topbar + channel tabs identify the page at xl+; keep the H1 on tablet.
+    'titleOnDesktop' => false,
+])
+
+<x-dashboard.navbar section="notifications" :title="$title" :subtitle="$subtitle" :titleOnDesktop="$titleOnDesktop" />

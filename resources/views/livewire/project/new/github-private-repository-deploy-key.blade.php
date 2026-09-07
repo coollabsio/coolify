@@ -1,115 +1,110 @@
-<div>
-    <h1>Create a new Application</h1>
-    <div class="pb-4">Deploy any public or private Git repositories through a Deploy Key.</div>
-    <div class="flex flex-col ">
-        @if ($current_step === 'private_keys')
-            <h2 class="pb-4">Select a private key</h2>
-            <div class="flex flex-col justify-center gap-2 text-left ">
+<div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
+    @if ($current_step === 'private_keys')
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Private repository</h2>
+                    <p>Choose the SSH key Coolify will use to clone this repository.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body p-0!">
                 @forelse ($private_keys as $key)
-                    @if ($private_key_id == $key->id)
-                        <div class="gap-2 py-4 cursor-pointer group coolbox"
-                            wire:click="setPrivateKey('{{ $key->id }}')"
-                            wire:loading.class="coolbox-loading"
-                            wire:target="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
-                            <div class="flex flex-col mx-6">
-                                <div class="box-title">
-                                    {{ $key->name }}
-                                </div>
-                                <div class="box-description">
-                                    {{ $key->description }}</div>
-                            </div>
+                    <button type="button"
+                        class="group flex w-full items-center gap-3 border-b border-neutral-200 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.06] dark:hover:bg-white/[0.025]"
+                        wire:click="setPrivateKey('{{ $key->id }}')"
+                        wire:loading.attr="disabled" wire:target="setPrivateKey('{{ $key->id }}')"
+                        wire:key="{{ $key->id }}">
+                        <div
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                            <x-reicon name="keys" class="size-4" />
                         </div>
-                    @else
-                        <div class="gap-2 py-4 cursor-pointer group coolbox"
-                            wire:click="setPrivateKey('{{ $key->id }}')"
-                            wire:loading.class="coolbox-loading"
-                            wire:target="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
-                            <div class="flex flex-col mx-6">
-                                <div class="box-title">
-                                    {{ $key->name }}
-                                </div>
-                                <div class="box-description">
-                                    {{ $key->description }}</div>
-                            </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate text-sm font-semibold text-black dark:text-fg">{{ $key->name }}</div>
+                            <p class="mt-0.5 truncate text-xs text-neutral-500 dark:text-fg-dim">
+                                {{ $key->description ?: 'SSH deploy key' }}
+                            </p>
                         </div>
-                    @endif
+                    </button>
                 @empty
-                    <div class="flex flex-col items-center justify-center gap-2">
-                        <div>
-                            No private keys found.
-                        </div>
-                        <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
-                            <x-forms.button>Create a new private key</x-forms.button>
-                        </a>
-                    </div>
+                    <x-empty title="No private keys"
+                        description="Create an SSH key before connecting a private repository."
+                        icon-name="keys">
+                        <x-slot:contents>
+                            <a class="button" href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
+                                Create private key
+                            </a>
+                        </x-slot:contents>
+                    </x-empty>
                 @endforelse
             </div>
-        @endif
-        @if ($current_step === 'repository')
-            <form class="flex flex-col gap-2" wire:submit='submit'>
-                <x-forms.input id="repository_url" required label="Repository URL (https:// or git@)" />
-                <div class="flex gap-2">
-                    <x-forms.input id="branch" required label="Branch" />
-                    <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
-                        <option value="nixpacks">Nixpacks</option>
-                        <option value="railpack">Railpack (Beta)</option>
-                        <option value="static">Static</option>
-                        <option value="dockerfile">Dockerfile</option>
-                        <option value="dockercompose">Docker Compose</option>
-                    </x-forms.select>
-                    @if ($is_static)
-                        <x-forms.input id="publish_directory" required label="Publish Directory" />
+        </section>
+    @endif
+
+    @if ($current_step === 'repository')
+        <form wire:submit="submit">
+            <section class="application-settings-section">
+                <div class="application-settings-section-header">
+                    <div>
+                        <h2>Repository configuration</h2>
+                        <p>Enter the repository location and choose how Coolify should build it.</p>
+                    </div>
+                    <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
+                </div>
+                <div class="application-settings-section-body space-y-5">
+                    <x-forms.input id="repository_url" required label="Repository URL"
+                        placeholder="git@github.com:owner/repository.git" />
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <x-forms.input id="branch" required label="Branch" />
+                        <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
+                            ['value' => 'railpack', 'label' => 'Railpack'],
+                            ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                            ['value' => 'static', 'label' => 'Static'],
+                            ['value' => 'dockerfile', 'label' => 'Dockerfile'],
+                            ['value' => 'dockercompose', 'label' => 'Docker Compose'],
+                        ]" />
+                        @if ($show_is_static)
+                            <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
+                                :options="[
+                                    ['value' => false, 'label' => 'Web application'],
+                                    ['value' => true, 'label' => 'Static site'],
+                                ]" />
+                            <x-forms.input type="number" required id="port" label="Port"
+                                :readonly="$is_static || $build_pack === 'static'" />
+                        @endif
+                        @if ($is_static)
+                            <x-forms.input id="publish_directory" required label="Publish directory" />
+                        @endif
+                    </div>
+
+                    @if ($build_pack === 'dockercompose')
+                        <div x-data="{
+                            baseDir: @js($base_directory),
+                            composeLocation: @js($docker_compose_location),
+                            normalize(path) {
+                                if (!path || path.trim() === '') return '/';
+                                const normalized = path.trim().replace(/\/+$/, '');
+                                return normalized.startsWith('/') ? normalized : '/' + normalized;
+                            },
+                        }" class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.input placeholder="/" wire:model.defer="base_directory"
+                                label="Base directory" helper="Repository directory used as the build root."
+                                x-model="baseDir" @blur="baseDir = normalize(baseDir)" />
+                            <x-forms.input placeholder="/docker-compose.yaml"
+                                wire:model.defer="docker_compose_location" label="Compose file"
+                                helper="Path relative to the base directory." x-model="composeLocation"
+                                @blur="composeLocation = normalize(composeLocation)" />
+                            <p class="sm:col-span-2 text-xs text-neutral-500 dark:text-fg-dim">
+                                Resolved file:
+                                <code class="font-mono text-coollabs dark:text-warning"
+                                    x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></code>
+                            </p>
+                        </div>
+                    @else
+                        <x-forms.input wire:model="base_directory" label="Base directory"
+                            helper="Repository directory used as the build root." />
                     @endif
                 </div>
-                @if ($build_pack === 'dockercompose')
-                    <div x-data="{
-                        baseDir: '{{ $base_directory }}',
-                        composeLocation: '{{ $docker_compose_location }}',
-                        normalizePath(path) {
-                            if (!path || path.trim() === '') return '/';
-                            path = path.trim();
-                            // Remove trailing slashes
-                            path = path.replace(/\/+$/, '');
-                            // Ensure leading slash
-                            if (!path.startsWith('/')) {
-                                path = '/' + path;
-                            }
-                            return path;
-                        },
-                        normalizeBaseDir() {
-                            this.baseDir = this.normalizePath(this.baseDir);
-                        },
-                        normalizeComposeLocation() {
-                            this.composeLocation = this.normalizePath(this.composeLocation);
-                        }
-                    }" class="gap-2 flex flex-col">
-                        <x-forms.input placeholder="/" wire:model.defer="base_directory" label="Base Directory"
-                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
-                            @blur="normalizeBaseDir()" />
-                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.defer="docker_compose_location"
-                            label="Docker Compose Location" helper="It is calculated together with the Base Directory."
-                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
-                        <div class="pt-2">
-                            <span>
-                                Compose file location in your repository: </span><span class='dark:text-warning'
-                                x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></span>
-                        </div>
-                    </div>
-                @else
-                    <x-forms.input wire:model="base_directory" label="Base Directory"
-                        helper="Directory to use as root. Useful for monorepos." />
-                @endif
-                @if ($show_is_static)
-                    <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />
-                    <div class="w-52">
-                        <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                            helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-                    </div>
-                @endif
-                <x-forms.button type="submit" class="mt-4">
-                    Continue
-                </x-forms.button>
-            </form>
-        @endif
-    </div>
+            </section>
+        </form>
+    @endif
 </div>

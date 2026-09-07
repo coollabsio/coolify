@@ -14,6 +14,8 @@ class Show extends Component
 
     public PrivateKey $private_key;
 
+    public bool $modalMode = false;
+
     // Explicit properties
     public string $name;
 
@@ -74,13 +76,16 @@ class Show extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->private_key->name;
             $this->description = $this->private_key->description;
-            $this->privateKeyValue = $this->private_key->private_key;
+            $this->privateKeyValue = auth()->user()->can('update', $this->private_key)
+                ? $this->private_key->private_key
+                : '';
             $this->isGitRelated = $this->private_key->is_git_related;
         }
     }
 
-    public function mount(?string $private_key_uuid = null)
+    public function mount(?string $private_key_uuid = null, bool $modalMode = false)
     {
+        $this->modalMode = $modalMode;
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid($private_key_uuid ?? request()->private_key_uuid)->firstOrFail();
 
@@ -89,18 +94,11 @@ class Show extends Component
 
             $this->syncData(false);
             $this->isInUse = $this->private_key->isInUse();
+            $this->public_key = $this->private_key->getPublicKey();
         } catch (AuthorizationException $e) {
             abort(403, 'You do not have permission to view this private key.');
         } catch (\Throwable) {
             abort(404);
-        }
-    }
-
-    public function loadPublicKey()
-    {
-        $this->public_key = $this->private_key->getPublicKey();
-        if ($this->public_key === 'Error loading private key') {
-            $this->dispatch('error', 'Failed to load public key. The private key may be invalid.');
         }
     }
 
@@ -118,6 +116,12 @@ class Show extends Component
 
             $this->private_key->delete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+
+            if ($this->modalMode) {
+                $this->dispatch('privateKeyDeleted');
+
+                return null;
+            }
 
             return redirectRoute($this, 'security.private-key.index');
         } catch (\Exception $e) {
@@ -140,6 +144,12 @@ class Show extends Component
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
+            if ($this->modalMode) {
+                $this->dispatch('privateKeyUpdated');
+
+                return null;
+            }
+            $this->dispatch('securityResourceChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

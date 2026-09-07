@@ -2,10 +2,9 @@
 
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
-use App\Models\InstanceSettings;
-use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -13,46 +12,13 @@ use Illuminate\Support\Facades\Hash;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_sponsorship_popup_enabled' => false]);
-
-    // Create root/owner user
-    $this->user = User::factory()->create([
-        'id' => 0,
-        'name' => 'Root User',
-        'email' => 'test@example.com',
-        'password' => Hash::make('password'),
+    $this->stack = seedBrowserResourceStack([
+        'projectUuid' => 'project-1',
+        'projectName' => 'My first project',
+        'projectDescription' => 'This is a test project',
+        'serverDescription' => 'Test docker container in development',
     ]);
-
-    // Create SSH key for the root user's team
-    PrivateKey::create([
-        'id' => 1,
-        'uuid' => 'ssh-test',
-        'team_id' => 0,
-        'name' => 'Test Key',
-        'description' => 'Test SSH key',
-        'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
-hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
-AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
-uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
------END OPENSSH PRIVATE KEY-----',
-    ]);
-
-    // Create servers for testing
-    Server::create([
-        'id' => 0,
-        'uuid' => 'localhost',
-        'name' => 'localhost',
-        'description' => 'Test docker container in development',
-        'ip' => 'coolify-testing-host',
-        'team_id' => 0,
-        'private_key_id' => 1,
-        'proxy' => [
-            'type' => ProxyTypes::TRAEFIK->value,
-            'status' => ProxyStatus::EXITED->value,
-        ],
-    ]);
+    $this->user = $this->stack['user'];
 
     Server::create([
         'uuid' => 'production-1',
@@ -65,14 +31,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'type' => ProxyTypes::TRAEFIK->value,
             'status' => ProxyStatus::EXITED->value,
         ],
-    ]);
-
-    // Create projects for testing
-    Project::create([
-        'uuid' => 'project-1',
-        'name' => 'My first project',
-        'description' => 'This is a test project',
-        'team_id' => 0,
     ]);
 
     Project::create([
@@ -94,6 +52,9 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     $personalTeam->delete();
     // Attach member to root team (id=0) with 'member' role
     $this->member->teams()->attach(0, ['role' => 'member']);
+
+    // Skip onboarding UI for both owner and member sessions.
+    Team::query()->whereKey(0)->update(['show_boarding' => false]);
 });
 
 function loginAsMember(): mixed
@@ -101,7 +62,8 @@ function loginAsMember(): mixed
     return visit('/login')
         ->fill('email', 'member@example.com')
         ->fill('password', 'password')
-        ->click('Login');
+        ->click('Login')
+        ->wait(1);
 }
 
 it('redirects unauthenticated users to login', function () {
@@ -115,7 +77,8 @@ it('shows dashboard after successful login and onboarding skip', function () {
     $page = loginAndSkipBoarding();
 
     $page->assertSee('Dashboard')
-        ->assertSee('Your self-hosted infrastructure')
+        ->assertSee('Projects')
+        ->assertSee('Servers')
         ->screenshot();
 });
 
@@ -147,7 +110,9 @@ it('allows authenticated users to access team settings', function () {
     $page = visit('/team');
 
     $page->assertSee('General')
-        ->assertSee('Manage the general settings of this team')
+        ->assertSee('Name')
+        ->assertSee('MCP server')
+        ->assertSee('Root Team')
         ->screenshot();
 });
 
@@ -156,8 +121,8 @@ it('shows danger zone to team owner', function () {
 
     $page = visit('/team');
 
-    $page->assertSee('Danger Zone')
-        ->assertSee('Delete Team')
+    $page->assertSee('Danger zone')
+        ->assertSee('Destructive actions for this team.')
         ->screenshot();
 });
 
@@ -248,8 +213,8 @@ it('member does not see danger zone on team settings', function () {
     $page = visit('/team');
 
     $page->assertSee('General')
-        ->assertDontSee('Danger Zone')
-        ->assertDontSee('Delete Team')
+        ->assertDontSee('Danger zone')
+        ->assertDontSee('Destructive actions for this team.')
         ->screenshot();
 });
 
@@ -315,8 +280,9 @@ it('member does not see add environment button on project page', function () {
     $project = Project::where('uuid', 'project-1')->first();
     $page = visit("/project/{$project->uuid}");
 
-    $page->assertSee('Environments')
-        ->assertDontSee('+ Add')
+    $page->assertSee('My first project')
+        ->assertSee('in this project')
+        ->assertDontSee('New environment')
         ->screenshot();
 });
 
@@ -326,7 +292,7 @@ it('member does not see environment settings link on project page', function () 
     $project = Project::where('uuid', 'project-1')->first();
     $page = visit("/project/{$project->uuid}");
 
-    $page->assertSee('Environments')
+    $page->assertSee('My first project')
         ->assertDontSee('Settings')
         ->screenshot();
 });
@@ -337,8 +303,8 @@ it('owner sees add environment and settings on project page', function () {
     $project = Project::where('uuid', 'project-1')->first();
     $page = visit("/project/{$project->uuid}");
 
-    $page->assertSee('Environments')
-        ->assertSee('+ Add')
+    $page->assertSee('My first project')
+        ->assertSee('New environment')
         ->assertSee('Settings')
         ->screenshot();
 });
@@ -350,7 +316,8 @@ it('member does not see add resource link on dashboard project cards', function 
 
     $page->assertSee('Projects')
         ->assertSee('My first project')
-        ->assertDontSee('+ Add Resource')
+        ->assertDontSee('Add resource to My first project')
+        ->assertSourceMissing('title="Add resource"')
         ->screenshot();
 });
 
@@ -361,17 +328,16 @@ it('owner sees add resource link on dashboard project cards', function () {
 
     $page->assertSee('Projects')
         ->assertSee('My first project')
-        ->assertSee('+ Add Resource')
+        ->assertSourceHas('title="Add resource"')
         ->screenshot();
 });
 
 it('member does not see project settings link on dashboard', function () {
     $page = loginAsMember();
 
-    // The "Settings" link is inside the project card on the dashboard
-    // Member should not see it due to @can('update', $project)
+    // Project settings control is an icon link with this aria-label for owners only.
     $page->assertSee('My first project')
-        ->assertDontSee('Settings')
+        ->assertSourceMissing('Open settings for My first project')
         ->screenshot();
 });
 
@@ -383,7 +349,7 @@ it('member does not see invite form on team members page', function () {
     $page = visit('/team/members');
 
     $page->assertSee('Members')
-        ->assertDontSee('Invite New Member')
+        ->assertDontSee('Invite a member')
         ->screenshot();
 });
 
@@ -393,7 +359,7 @@ it('owner sees invite form on team members page', function () {
     $page = visit('/team/members');
 
     $page->assertSee('Members')
-        ->assertSee('Invite New Member')
+        ->assertSee('Invite a member')
         ->screenshot();
 });
 
@@ -441,7 +407,8 @@ it('member does not see delete project button on project page', function () {
     $project = Project::where('uuid', 'project-1')->first();
     $page = visit("/project/{$project->uuid}");
 
-    $page->assertSee('Environments')
+    $page->assertSee('My first project')
         ->assertDontSee('Delete Project')
+        ->assertDontSee('Delete project')
         ->screenshot();
 });

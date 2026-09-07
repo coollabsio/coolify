@@ -1,7 +1,7 @@
 @php use App\Actions\CoolifyTask\RunRemoteProcess; @endphp
 <div @class([
     'h-full flex flex-col overflow-hidden' => $fullHeight,
-    'h-full overflow-hidden' => !$fullHeight,
+    'overflow-hidden' => !$fullHeight,
 ])>
     @if ($activity)
         @if (isset($header))

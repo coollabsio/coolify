@@ -21,8 +21,9 @@
     <env name="MAIL_MAILER" value="array" force="true"/>
     <env name="QUEUE_CONNECTION" value="sync" force="true"/>
     <env name="SESSION_DRIVER" value="array" force="true"/>
-    <env name="TELESCOPE_ENABLED" value="false"/>
     <env name="NIGHTWATCH_ENABLED" value="false"/>
+    <!-- Host-side Pest browser runs cannot resolve docker DNS (coolify-realtime). -->
+    <env name="BROADCAST_DRIVER" value="null" force="true"/>
   </php>
   <source>
     <include>

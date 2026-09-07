@@ -6,6 +6,8 @@
         <livewire:project.new.public-git-repository :type="$type" />
     @elseif ($type === 'private-gh-app')
         <livewire:project.new.github-private-repository :type="$type" />
+    @elseif ($type === 'private-gitlab-app')
+        <livewire:project.new.gitlab-private-repository :type="$type" />
     @elseif ($type === 'private-deploy-key')
         <livewire:project.new.github-private-repository-deploy-key :type="$type" />
     @elseif ($type === 'dockerfile')

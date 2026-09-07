@@ -2,7 +2,7 @@
 
 use App\Jobs\VolumeCloneJob;
 use App\Livewire\Project\Service\Storage;
-use App\Livewire\Project\Shared\Storages\Show as ShowStorage;
+use App\Livewire\Project\Shared\Storages\All as AllStorages;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
@@ -144,13 +144,13 @@ it('allows a Docker Compose volume to keep its declared name', function () {
         'resource_type' => $this->application->getMorphClass(),
     ])->load('resource');
 
-    Livewire::test(ShowStorage::class, [
-        'storage' => $storage,
-        'resource' => $this->application,
-    ])
+    expect($storage->isDockerComposeResource())->toBeTrue();
+
+    Livewire::test(AllStorages::class, ['resource' => $this->application])
         ->assertSee('Use volume name as-is')
-        ->set('isNameAsIs', true)
-        ->call('instantSave')
+        ->set("forms.{$storage->id}.isNameAsIs", true)
+        ->call('saveNameAsIs', $storage->id)
+        ->assertHasNoErrors()
         ->assertDispatched('success');
 
     expect($storage->fresh()->is_name_as_is)->toBeTrue();
@@ -253,13 +253,9 @@ it('rejects tampering that enables name-as-is for unsupported resources', functi
         'resource_type' => $this->application->getMorphClass(),
     ])->load('resource');
 
-    Livewire::test(ShowStorage::class, [
-        'storage' => $storage,
-        'resource' => $this->application,
-    ])
-        ->set('canUseNameAsIs', true)
-        ->set('isNameAsIs', true)
-        ->call('instantSave');
+    Livewire::test(AllStorages::class, ['resource' => $this->application])
+        ->set("forms.{$storage->id}.isNameAsIs", true)
+        ->call('saveNameAsIs', $storage->id);
 
     expect($storage->fresh()->is_name_as_is)->toBeFalse();
 });

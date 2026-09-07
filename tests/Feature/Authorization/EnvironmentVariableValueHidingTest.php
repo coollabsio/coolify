@@ -18,7 +18,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
 
@@ -103,6 +103,11 @@ test('admin sees unlocked env value in Show component', function () {
         'type' => 'application',
     ]);
 
+    // Values hydrate lazily; the edit modal triggers loadValues() on open.
+    expect($component->get('value'))->toBeNull();
+
+    $component->call('loadValues');
+
     expect($component->get('value'))->toBe('secret-unlocked-value');
 });
 
@@ -164,7 +169,7 @@ test('admin dev view shows unlocked env value', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->toContain('UNLOCKED_VAR=secret-unlocked-value');
 });
@@ -175,7 +180,7 @@ test('admin dev view hides locked env value', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->toContain('LOCKED_VAR=(Locked Secret, delete and add again to change)');
     expect($component->get('variables'))->not->toContain('secret-locked-value');
@@ -187,7 +192,7 @@ test('member dev view hides all env values', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->not->toContain('secret-unlocked-value');
     expect($component->get('variables'))->not->toContain('secret-locked-value');
@@ -241,6 +246,17 @@ test('API hides locked env value with root token', function () {
 test('API hides env values for member even with read:sensitive token', function () {
     session(['currentTeam' => $this->team]);
     $token = $this->member->createToken('member-sensitive', ['read', 'read:sensitive']);
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$token->plainTextToken,
+    ])->getJson("/api/v1/applications/{$this->application->uuid}/envs");
+
+    $response->assertForbidden();
+});
+
+test('API hides env values for member with read token', function () {
+    session(['currentTeam' => $this->team]);
+    $token = $this->member->createToken('member-read', ['read']);
 
     $response = $this->withHeaders([
         'Authorization' => 'Bearer '.$token->plainTextToken,

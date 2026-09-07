@@ -14,6 +14,7 @@ use App\Services\VultrService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -377,9 +378,8 @@ class ByVultr extends Component
         return "{$providerName} API error: {$details}";
     }
 
-    private function createVultrServer(string $token): array
+    private function createVultrServer(VultrService $vultrService): array
     {
-        $vultrService = new VultrService($token);
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
         $publicKey = $privateKey->getPublicKey();
         $existingKey = $this->findMatchingSshKey($vultrService->getSshKeys(), $publicKey);
@@ -419,6 +419,10 @@ class ByVultr extends Component
             return null;
         }
 
+        $vultrService = null;
+        $vultrInstanceId = null;
+        $server = null;
+
         try {
             $this->authorize('create', Server::class);
 
@@ -437,20 +441,29 @@ class ByVultr extends Component
             }
 
             $vultrService = new VultrService($this->getVultrToken());
-            $vultrInstance = $this->createVultrServer($this->getVultrToken());
+            $vultrInstance = $this->createVultrServer($vultrService);
+            $vultrInstanceId = (string) $vultrInstance['id'];
             $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
-            $server = Server::create([
-                'name' => strtolower(trim($this->server_name)),
-                'ip' => $ipAddress,
-                'user' => 'root',
-                'port' => 22,
-                'team_id' => currentTeam()->id,
-                'private_key_id' => $this->private_key_id,
-                'cloud_provider_token_id' => $this->selected_token_id,
-                'vultr_instance_id' => $vultrInstance['id'],
-                'vultr_instance_status' => $vultrInstance['status'] ?? null,
-            ]);
+            $server = DB::transaction(function () use ($ipAddress, $vultrInstanceId, $vultrInstance): Server {
+                $server = Server::create([
+                    'name' => strtolower(trim($this->server_name)),
+                    'ip' => $ipAddress,
+                    'user' => 'root',
+                    'port' => 22,
+                    'team_id' => currentTeam()->id,
+                    'private_key_id' => $this->private_key_id,
+                    'cloud_provider_token_id' => $this->selected_token_id,
+                    'vultr_instance_id' => $vultrInstanceId,
+                    'vultr_instance_status' => $vultrInstance['status'] ?? null,
+                ]);
+
+                $server->proxy->set('status', 'exited');
+                $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
+                $server->save();
+
+                return $server;
+            });
 
             try {
                 $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
@@ -466,10 +479,6 @@ class ByVultr extends Component
                 report($e);
             }
 
-            $server->proxy->set('status', 'exited');
-            $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
-            $server->save();
-
             if ($this->from_onboarding) {
                 currentTeam()->update([
                     'show_boarding' => false,
@@ -479,7 +488,22 @@ class ByVultr extends Component
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+
             return handleError($e, $this);
+        }
+    }
+
+    private function deleteUntrackedInstance(?VultrService $vultrService, ?string $vultrInstanceId, ?Server $server): void
+    {
+        if (! $vultrService || ! $vultrInstanceId || $server) {
+            return;
+        }
+
+        try {
+            $vultrService->deleteInstance($vultrInstanceId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
@@ -170,6 +171,56 @@ it('persists the server with a placeholder IP when Vultr has not assigned one ye
         'vultr_instance_id' => 'instance-1',
         'vultr_instance_status' => 'pending',
     ]);
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'DELETE'
+        && $request->url() === 'https://api.vultr.com/v2/instances/instance-1');
+});
+
+it('deletes the Vultr instance when local server persistence fails', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/ssh-keys' => Http::response([
+            'ssh_key' => ['id' => 'key-1', 'ssh_key' => vultrLivewireTestPublicKey()],
+        ], 201),
+        'https://api.vultr.com/v2/ssh-keys*' => Http::response([
+            'ssh_keys' => [],
+            'meta' => ['links' => ['next' => null]],
+        ], 200),
+        'https://api.vultr.com/v2/instances' => Http::response([
+            'instance' => [
+                'id' => 'instance-1',
+                'label' => 'persistence-fails',
+                'main_ip' => '192.0.2.10',
+                'v6_main_ip' => '2001:db8::1',
+                'status' => 'pending',
+            ],
+        ], 202),
+        'https://api.vultr.com/v2/instances/instance-1' => Http::response(null, 204),
+    ]);
+
+    $eventDispatcher = Server::getEventDispatcher();
+    Server::setEventDispatcher(clone $eventDispatcher);
+    Server::created(function (): void {
+        throw new RuntimeException('local persistence failed');
+    });
+
+    try {
+        Livewire::test(ByVultr::class, ['selectedTokenUuid' => $this->vultrToken->uuid])
+            ->set('server_name', 'persistence-fails')
+            ->set('selected_region', 'ewr')
+            ->set('selected_plan', 'vc2-1c-1gb')
+            ->set('selected_os_id', 2284)
+            ->set('private_key_id', $this->privateKey->id)
+            ->call('submit')
+            ->assertDispatched('error', 'local persistence failed');
+    } finally {
+        Server::setEventDispatcher($eventDispatcher);
+    }
+
+    $this->assertDatabaseMissing('servers', [
+        'vultr_instance_id' => 'instance-1',
+    ]);
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE'
+        && $request->url() === 'https://api.vultr.com/v2/instances/instance-1');
 });
 
 it('requires IPv6 when public IPv4 is disabled', function () {

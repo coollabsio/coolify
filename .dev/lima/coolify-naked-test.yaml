@@ -1,0 +1,32 @@
+vmType: "vz"
+arch: "default"
+cpus: 2
+memory: "2GiB"
+disk: "20GiB"
+containerd:
+  system: false
+  user: false
+ssh:
+  localPort: 60003
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+mounts: []
+provision:
+  - mode: system
+    script: |
+      #!/usr/bin/env bash
+      set -euxo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      install -d -m 700 /root/.ssh
+      cat >/root/.ssh/authorized_keys <<'KEYS'
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 sail@76ff66d2e2dd
+      KEYS
+      chmod 600 /root/.ssh/authorized_keys
+      sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+      sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+      systemctl restart ssh || systemctl restart sshd
+      apt-get update
+      apt-get install -y --no-install-recommends ca-certificates curl openssh-server sudo

@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import cookie from 'cookie';
+import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
     extractHereDocContent,
@@ -10,6 +10,8 @@ import {
     extractTimeout,
     getTerminalSessionTimeout,
     isAuthorizedTargetHost,
+    sanitizeSshArgs,
+    validateSshArgs,
 } from './terminal-utils.js';
 
 async function postToCoolify(path, headers) {
@@ -96,7 +98,7 @@ const server = http.createServer((req, res) => {
 });
 
 const getSessionCookie = (req) => {
-    const cookies = cookie.parse(req.headers.cookie || '');
+    const cookies = parseCookie(req.headers.cookie || '');
     const xsrfToken = cookies['XSRF-TOKEN'];
     const appName = process.env.APP_NAME || 'laravel';
     const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
@@ -384,6 +386,16 @@ async function handleCommand(ws, command, userId) {
         return;
     }
 
+    if (!validateSshArgs(sshArgs, userSession.authorizedIPs)) {
+        logTerminal('warn', 'Rejecting terminal command because its SSH arguments are not allowed.', {
+            userId,
+            targetHost,
+        });
+        ws.send('Invalid SSH command: Unsupported SSH arguments');
+        return;
+    }
+    const sanitizedSshArgs = sanitizeSshArgs(sshArgs);
+
     const options = {
         name: 'xterm-color',
         cols: 80,
@@ -401,7 +413,7 @@ async function handleCommand(ws, command, userId) {
         commandTimeout,
         terminalSessionTimeout,
     });
-    const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
+    const ptyProcess = pty.spawn('ssh', sanitizedSshArgs.concat([hereDocContent]), options);
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;

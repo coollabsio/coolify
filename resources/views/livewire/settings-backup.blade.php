@@ -1,53 +1,54 @@
 <div>
     <x-slot:title>
-        Settings | Coolify
+        Instance Backup | Coolify
     </x-slot>
-    <x-settings.navbar />
-    <div class="flex flex-col">
-        <div class="flex items-center gap-2 pb-2">
-            <h2>Backup</h2>
-            @if (isset($database) && $server->isFunctional())
-                <x-forms.button type="submit" wire:click="submit">
-                    Save
-                </x-forms.button>
-            @endif
-        </div>
-        <div class="pb-4">Backup configuration for Coolify instance.</div>
-        <div>
-            @if ($server->isFunctional())
-                @if (isset($database) && isset($backup))
-                    <div class="flex flex-col gap-3 pb-4">
-                        <div class="flex gap-2">
-                            <x-forms.input label="UUID" readonly id="uuid" />
+
+    <x-settings.layout>
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
+        @if ($server->isFunctional())
+            @if (isset($database) && isset($backup))
+                <form wire:submit="submit">
+                    <x-unsaved-bar action="submit" />
+
+                    <x-application.settings-section title="Instance database">
+                        <div class="grid gap-4 lg:grid-cols-2">
                             <x-forms.input label="Name" readonly id="name" />
                             <x-forms.input label="Description" id="description" />
-                        </div>
-                        <div class="flex gap-2">
+                            <div class="lg:col-span-2">
+                                <x-forms.input label="UUID" readonly id="uuid" />
+                            </div>
                             <x-forms.input label="User" readonly id="postgres_user" />
                             <x-forms.input type="password" label="Password" readonly id="postgres_password" />
                         </div>
-                    </div>
-                    <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s" :status="data_get($database, 'status')" />
-                    <div class="py-4">
-                        <livewire:project.database.backup-executions :backup="$backup" />
-                    </div>
-                @else
-                    To configure automatic backup for your Coolify instance, you first need to add a database resource
-                    into Coolify.
-                    <x-forms.button class="mt-2" wire:click="addCoolifyDatabase">Configure Backup</x-forms.button>
-                @endif
+                    </x-application.settings-section>
+                </form>
+
+                <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s"
+                    :status="data_get($database, 'status')" />
+
+                <livewire:project.database.backup-executions :backup="$backup" />
             @else
-                <div class="p-6 bg-red-500/10 rounded-lg border border-red-500/20">
-                    <div class="text-red-500 font-medium mb-4">
-                        Instance Backup is currently disabled because the localhost server is not properly validated.
-                        Please validate your server to enable Instance Backup.
-                    </div>
-                    <a href="{{ route('server.show', [$server->uuid]) }}"
-                        class="text-black hover:text-gray-700 dark:text-white dark:hover:text-gray-200 underline" {{ wireNavigate() }}>
-                        Go to Server Settings to Validate
-                    </a>
-                </div>
+                <x-application.settings-section title="Instance backup">
+                    <x-empty title="Backup is not configured"
+                        description="Coolify needs an internal database resource to create automatic backups."
+                        icon-name="database" size="sm">
+                        <x-slot:actions>
+                            <x-forms.button wire:click="addCoolifyDatabase" isHighlighted>
+                                Configure backup
+                            </x-forms.button>
+                        </x-slot:actions>
+                    </x-empty>
+                </x-application.settings-section>
             @endif
-        </div>
+        @else
+            <x-application.settings-section title="Instance backup">
+                <x-callout type="danger" title="Localhost is not ready">
+                    Validate the localhost connection before configuring instance backups.
+                    <a href="{{ route('server.show', [$server->uuid]) }}" class="font-medium underline"
+                        {{ wireNavigate() }}>Open server settings</a>
+                </x-callout>
+            </x-application.settings-section>
+        @endif
     </div>
+    </x-settings.layout>
 </div>

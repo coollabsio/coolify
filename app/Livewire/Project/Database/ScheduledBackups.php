@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -17,41 +17,17 @@ class ScheduledBackups extends Component
 
     public $type;
 
-    public ?ScheduledDatabaseBackup $selectedBackup;
-
-    public $selectedBackupId;
-
-    public $s3s;
-
     public string $custom_type = 'mysql';
 
     protected $listeners = ['refreshScheduledBackups'];
 
-    protected $queryString = ['selectedBackupId'];
-
     public function mount(): void
     {
-        if ($this->selectedBackupId) {
-            $this->setSelectedBackup($this->selectedBackupId, true);
-        }
         $this->parameters = get_route_parameters();
         if ($this->database->getMorphClass() === ServiceDatabase::class) {
             $this->type = 'service-database';
         } else {
             $this->type = 'database';
-        }
-        $this->s3s = currentTeam()->s3s;
-    }
-
-    public function setSelectedBackup($backupId, $force = false)
-    {
-        if ($this->selectedBackupId === $backupId && ! $force) {
-            return;
-        }
-        $this->selectedBackupId = $backupId;
-        $this->selectedBackup = $this->database->scheduledBackups->find($backupId);
-        if (is_null($this->selectedBackup)) {
-            $this->selectedBackupId = null;
         }
     }
 
@@ -86,9 +62,13 @@ class ScheduledBackups extends Component
     public function refreshScheduledBackups(?int $id = null): void
     {
         $this->database->refresh();
-        if ($id) {
-            $this->setSelectedBackup($id);
-        }
         $this->dispatch('refreshScheduledBackups');
+    }
+
+    public function render(): View
+    {
+        $this->database->loadMissing('scheduledBackups.s3');
+
+        return view('livewire.project.database.scheduled-backups');
     }
 }

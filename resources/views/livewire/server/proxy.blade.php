@@ -1,183 +1,214 @@
 @php use App\Enums\ProxyTypes; @endphp
-<div>
+
+<div class="application-settings-form flex w-full flex-col gap-6">
     @if ($server->proxyType())
-        <div>
-            @if ($selectedProxy !== 'NONE')
-                <form wire:submit='submit'>
-                    <div class="flex items-center gap-2">
-                        <h2>Configuration</h2>
-                        @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                            @can('update', $server)
-                                <x-modal-confirmation title="Confirm Proxy Switching?" buttonTitle="Switch Proxy"
-                                    submitAction="changeProxy" :actions="['Custom proxy configurations may be reset to their default settings.']"
-                                    warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!"
-                                    step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
-                                </x-modal-confirmation>
-                            @endcan
-                        @else
-                            <x-forms.button canGate="update" :canResource="$server"
-                                wire:click="$dispatch('error', 'Currently running proxy must be stopped before switching proxy')">Switch
-                                Proxy</x-forms.button>
-                        @endif
-                        <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
-                    </div>
-                    <div class="pb-4">Configure your proxy settings and advanced options.</div>
+        @if ($selectedProxy !== 'NONE')
+            <form wire:submit="submit" class="contents">
+                <x-unsaved-bar action="submit" />
+
+                <fieldset class="contents" wire:loading.attr="disabled"
+                    wire:target="submit,resetProxyConfiguration">
+
+                <x-application.settings-section id="server-proxy-overview-section" title="Proxy configuration"
+                    helper="Configure the reverse proxy and request handling for this server.">
+                    <x-slot:actions>
+                        <div class="flex items-center gap-2">
+                            <x-status-badge :status="str($server->proxy->status)->headline()"
+                                :type="str($server->proxy->status)->contains('running') ? 'success' : 'neutral'" />
+                            @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
+                                @can('update', $server)
+                                    <x-modal-confirmation title="Confirm Proxy Switching?"
+                                        buttonTitle="Switch proxy" submitAction="changeProxy"
+                                        :actions="['Custom proxy configurations may be reset to their default settings.']"
+                                        warningMessage="Review the proxy switching guide before continuing."
+                                        step2ButtonText="Switch Proxy" :confirmWithText="false"
+                                        :confirmWithPassword="false" />
+                                @endcan
+                            @else
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    wire:click="$dispatch('error', 'The running proxy must be stopped before switching.')">
+                                    Switch proxy
+                                </x-forms.button>
+                            @endif
+                        </div>
+                    </x-slot:actions>
+
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                        <x-callout type="warning" title="Configuration Out of Sync" class="my-4">
-                            The saved proxy configuration differs from the currently running configuration. Restart the
-                            proxy to apply your changes.
+                        <x-callout type="warning" title="Configuration out of sync">
+                            Restart the proxy to apply the saved configuration.
                         </x-callout>
+                    @else
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                                <x-reicon name="servers" class="size-4" />
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-neutral-950 dark:text-fg">
+                                    {{ str($server->proxyType())->title() }}
+                                </p>
+                                <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                    Saved and running configuration are synchronized.
+                                </p>
+                            </div>
+                        </div>
                     @endif
-                    <h3>Advanced</h3>
-                    <div class="pb-6 w-full sm:w-96">
-                        <x-forms.checkbox canGate="update" :canResource="$server"
-                            helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
-                            id="generateExactLabels"
-                            label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
-                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave="instantSaveRedirect"
-                            id="redirectEnabled" label="Override default request handler"
-                            helper="Requests to unknown hosts or stopped services will receive a 503 response or be redirected to the URL you set below (need to enable this first)." />
+                </x-application.settings-section>
+
+                <x-application.settings-section id="server-proxy-routing-section" title="Routing behavior"
+                    helper="Control generated labels and requests that do not match a running resource.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.listbox id="generateExactLabels" label="Generated labels"
+                            helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Labels for all supported proxies'],
+                                ['value' => true, 'label' => 'Labels for the active proxy only'],
+                            ]" />
+                        <x-forms.listbox id="redirectEnabled" label="Unknown requests"
+                            helper="Override the default 503 response for unknown hosts and stopped services."
+                            onChange="instantSaveRedirect" :options="[
+                                ['value' => false, 'label' => 'Return the default 503 response'],
+                                ['value' => true, 'label' => 'Use custom request handling'],
+                            ]" />
                         @if ($redirectEnabled)
-                            <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
-                                id="redirectUrl" label="Redirect to (optional)" />
+                            <x-forms.input canGate="update" :canResource="$server"
+                                placeholder="https://app.coolify.io" id="redirectUrl"
+                                label="Redirect URL"
+                                helper="Leave empty to keep a custom 503 response without redirecting." />
                         @endif
                     </div>
-                    @php
-                        $proxyTitle =
-                            $server->proxyType() === ProxyTypes::TRAEFIK->value
-                                ? 'Traefik (Coolify Proxy)'
-                                : 'Caddy (Coolify Proxy)';
-                    @endphp
-                    @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
-                        <div @if($server->proxyType() === ProxyTypes::TRAEFIK->value) x-data="{ traefikWarningsDismissed: localStorage.getItem('callout-dismissed-traefik-warnings-{{ $server->id }}') === 'true' }" @endif>
-                            <div class="flex items-center gap-2">
-                                <h3>{{ $proxyTitle }}</h3>
-                                @can('update', $server)
-                                    @if ($proxySettings)
-                                        <x-modal-confirmation title="Reset Proxy Configuration?"
-                                            buttonTitle="Reset Configuration" submitAction="resetProxyConfiguration"
-                                            :actions="[
-                                                'Reset proxy configuration to default settings',
-                                                'All custom configurations will be lost',
-                                                'Custom ports and entrypoints will be removed',
-                                            ]" confirmationText="{{ $server->name }}"
-                                            confirmationLabel="Please confirm by entering the server name below"
-                                            shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
-                                            :confirmWithPassword="false" :confirmWithText="true">
-                                        </x-modal-confirmation>
-                                    @endif
-                                @endcan
-                                @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                                    <button type="button" x-show="traefikWarningsDismissed"
-                                            @click="traefikWarningsDismissed = false; localStorage.removeItem('callout-dismissed-traefik-warnings-{{ $server->id }}')"
-                                            class="p-1.5 rounded hover:bg-warning-100 dark:hover:bg-warning-900/30 transition-colors"
-                                            title="Show Traefik warnings">
-                                        <svg class="w-4 h-4 text-warning-600 dark:text-warning-400" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                                            <path fill="currentColor" d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16"></path>
-                                        </svg>
-                                    </button>
+                </x-application.settings-section>
+
+                @php
+                    $proxyTitle =
+                        $server->proxyType() === ProxyTypes::TRAEFIK->value
+                            ? 'Traefik configuration'
+                            : 'Caddy configuration';
+                @endphp
+
+                @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
+                    <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
+                        helper="Edit the generated proxy compose configuration used on this server.">
+                        <x-slot:actions>
+                            @can('update', $server)
+                                @if ($proxySettings)
+                                    <x-modal-confirmation title="Reset Proxy Configuration?"
+                                        buttonTitle="Reset configuration"
+                                        submitAction="resetProxyConfiguration" :actions="[
+                                            'Reset the proxy configuration to Coolify defaults.',
+                                            'Remove custom ports, entrypoints, and other manual changes.',
+                                        ]" confirmationText="{{ $server->name }}"
+                                        confirmationLabel="Confirm by entering the server name"
+                                        shortConfirmationLabel="Server Name"
+                                        step2ButtonText="Reset Configuration"
+                                        :confirmWithPassword="false" :confirmWithText="true" />
                                 @endif
-                            </div>
-                            @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                                <div x-show="!traefikWarningsDismissed"
-                                     x-transition:enter="transition ease-out duration-200"
-                                     x-transition:enter-start="opacity-0 -translate-y-2"
-                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                     x-transition:leave="transition ease-in duration-150"
-                                     x-transition:leave-start="opacity-100 translate-y-0"
-                                     x-transition:leave-end="opacity-0 -translate-y-2">
-                                    @if ($server->detected_traefik_version === 'latest')
-                                        <x-callout dismissible onDismiss="traefikWarningsDismissed = true; localStorage.setItem('callout-dismissed-traefik-warnings-{{ $server->id }}', 'true')" type="warning" title="Using 'latest' Traefik Tag" class="my-4">
-                                            Your proxy container is running the <span class="font-mono">latest</span> tag. While
-                                            this ensures you always have the newest version, it may introduce unexpected breaking
-                                            changes.
-                                            <br><br>
-                                            <strong>Recommendation:</strong> Pin to a specific version (e.g., <span
-                                                class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>) to ensure
-                                            stability and predictable updates.
-                                        </x-callout>
-                                    @elseif($this->isTraefikOutdated)
-                                        <x-callout dismissible onDismiss="traefikWarningsDismissed = true; localStorage.setItem('callout-dismissed-traefik-warnings-{{ $server->id }}', 'true')" type="warning" title="Traefik Patch Update Available" class="my-4">
-                                            Your Traefik proxy container is running version <span
-                                                class="font-mono">v{{ $server->detected_traefik_version }}</span>, but version <span
-                                                class="font-mono">{{ $this->latestTraefikVersion }}</span> is available.
-                                            <br><br>
-                                            <strong>Recommendation:</strong> Update to the latest patch version for security fixes
-                                            and
-                                            bug fixes. Please test in a non-production environment first.
-                                        </x-callout>
-                                    @endif
-                                    @if ($this->newerTraefikBranchAvailable)
-                                        <x-callout dismissible onDismiss="traefikWarningsDismissed = true; localStorage.setItem('callout-dismissed-traefik-warnings-{{ $server->id }}', 'true')" type="info" title="New Minor Traefik Version Available" class="my-4">
-                                            A new minor version of Traefik is available: <span
-                                                class="font-mono">{{ $this->newerTraefikBranchAvailable }}</span>
-                                            <br><br>
-                                            You are currently running <span class="font-mono">v{{ $server->detected_traefik_version }}</span>.
-                                            Upgrading to <span class="font-mono">{{ $this->newerTraefikBranchAvailable }}</span> will give you access to new features and improvements.
-                                            <br><br>
-                                            <strong>Important:</strong> Before upgrading to a new minor version, please read
-                                            the <a href="https://github.com/traefik/traefik/releases" target="_blank"
-                                                class="underline text-white">Traefik changelog</a> to understand breaking changes
-                                            and new features.
-                                            <br><br>
-                                            <strong>Recommendation:</strong> Test the upgrade in a non-production environment first.
-                                        </x-callout>
-                                    @endif
-                                </div>
+                            @endcan
+                        </x-slot:actions>
+
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            @if ($server->detected_traefik_version === 'latest')
+                                <x-callout type="warning" title="Unpinned Traefik version">
+                                    The proxy uses the <span class="font-mono">latest</span> tag. Pin
+                                    <span class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>
+                                    for predictable updates.
+                                </x-callout>
+                            @elseif($this->isTraefikOutdated)
+                                <x-callout type="warning" title="Traefik patch update available">
+                                    Version {{ $this->latestTraefikVersion }} is available. Test the update before
+                                    applying it to production servers.
+                                </x-callout>
+                            @elseif($this->newerTraefikBranchAvailable)
+                                <x-callout type="info" title="New Traefik minor version available">
+                                    {{ $this->newerTraefikBranchAvailable }} is available. Review the Traefik
+                                    changelog for breaking changes before upgrading.
+                                </x-callout>
                             @endif
-                        </div>
-                    @endif
-                    @if ($proxySettings)
-                        <div class="flex flex-col gap-2 pt-2">
-                            <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
-                                monacoEditorLanguage="yaml"
-                                label="Configuration file ( {{ $this->configurationFilePath }} )"
-                                name="proxySettings" id="proxySettings" rows="30" />
-                        </div>
-                    @endif
-                </form>
-            @elseif($selectedProxy === 'NONE')
-                <div class="flex items-center gap-2">
-                    <h2>Configuration</h2>
+                        @endif
+
+                        @if ($proxySettings)
+                            <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"
+                                wire:target="submit,resetProxyConfiguration" aria-live="polite">
+                                <div wire:loading.flex wire:target="submit,resetProxyConfiguration"
+                                    class="absolute inset-0 z-20 hidden items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px] dark:bg-black/55">
+                                    <div
+                                        class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-medium text-neutral-700 shadow-sm ring-1 ring-neutral-200 dark:bg-coolgray-100 dark:text-fg dark:ring-white/10">
+                                        <x-loading />
+                                        Updating proxy configuration…
+                                    </div>
+                                </div>
+                                <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
+                                    monacoEditorLanguage="yaml"
+                                    label="Configuration file · {{ $this->configurationFilePath }}"
+                                    name="proxySettings" id="proxySettings" rows="30" />
+                            </div>
+                        @endif
+                    </x-application.settings-section>
+                @endif
+                </fieldset>
+            </form>
+        @elseif($selectedProxy === 'NONE')
+            <x-application.settings-section title="Custom proxy"
+                helper="Coolify will not manage a reverse proxy for this server.">
+                <x-slot:actions>
                     @can('update', $server)
-                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                        <x-forms.button wire:click.prevent="changeProxy">Switch proxy</x-forms.button>
                     @endcan
-                </div>
-                <div class="pt-2 pb-4">Custom (None) Proxy Selected</div>
-            @else
-                <div class="flex items-center gap-2">
-                    <h2>Configuration</h2>
-                    @can('update', $server)
-                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
-                    @endcan
-                </div>
-            @endif
+                </x-slot:actions>
+                <x-callout type="info" title="Custom proxy selected">
+                    Configure and operate the proxy outside Coolify.
+                </x-callout>
+            </x-application.settings-section>
         @else
-            <div>
-                <h2>Configuration</h2>
-                <div class="subtitle">Select a proxy you would like to use on this server.</div>
+            <x-application.settings-section title="Proxy configuration"
+                helper="Choose the reverse proxy implementation for this server.">
                 @can('update', $server)
-                    <div class="grid gap-4">
-                        <x-forms.button class="coolbox" wire:click="selectProxy('NONE')">
-                            Custom (None)
-                        </x-forms.button>
-                        <x-forms.button class="coolbox" wire:click="selectProxy('TRAEFIK')">
-                            Traefik
-                        </x-forms.button>
-                        <x-forms.button class="coolbox" wire:click="selectProxy('CADDY')">
-                            Caddy
-                        </x-forms.button>
-                        {{-- <x-forms.button disabled class="box">
-                            Nginx
-                        </x-forms.button> --}}
+                    <div class="grid gap-3 lg:grid-cols-3">
+                        @foreach ([
+                            ['value' => 'NONE', 'title' => 'Custom', 'description' => 'Manage the proxy outside Coolify.'],
+                            ['value' => 'TRAEFIK', 'title' => 'Traefik', 'description' => 'Use the default Coolify proxy.'],
+                            ['value' => 'CADDY', 'title' => 'Caddy', 'description' => 'Use the Coolify Caddy integration.'],
+                        ] as $proxyOption)
+                            <button type="button" wire:click="selectProxy('{{ $proxyOption['value'] }}')"
+                                class="rounded-lg p-4 text-left ring-1 ring-neutral-200 transition-colors hover:bg-neutral-50 dark:ring-white/[0.08] dark:hover:bg-white/[0.04]">
+                                <p class="text-sm font-medium text-neutral-950 dark:text-fg">
+                                    {{ $proxyOption['title'] }}
+                                </p>
+                                <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                    {{ $proxyOption['description'] }}
+                                </p>
+                            </button>
+                        @endforeach
                     </div>
                 @else
-                    <x-callout type="danger" title="Insufficient Permissions" class="mb-4">
-                        You don't have permission to configure proxy settings for this server.
+                    <x-callout type="danger" title="Insufficient permissions">
+                        You do not have permission to select a proxy for this server.
                     </x-callout>
                 @endcan
-            </div>
+            </x-application.settings-section>
+        @endif
+    @else
+        <x-application.settings-section title="Proxy configuration"
+            helper="Choose the reverse proxy implementation for this server.">
+            @can('update', $server)
+                <div class="grid gap-3 lg:grid-cols-3">
+                    @foreach ([
+                        ['value' => 'NONE', 'title' => 'Custom', 'description' => 'Manage the proxy outside Coolify.'],
+                        ['value' => 'TRAEFIK', 'title' => 'Traefik', 'description' => 'Use the default Coolify proxy.'],
+                        ['value' => 'CADDY', 'title' => 'Caddy', 'description' => 'Use the Coolify Caddy integration.'],
+                    ] as $proxyOption)
+                        <button type="button" wire:click="selectProxy('{{ $proxyOption['value'] }}')"
+                            class="rounded-lg p-4 text-left ring-1 ring-neutral-200 transition-colors hover:bg-neutral-50 dark:ring-white/[0.08] dark:hover:bg-white/[0.04]">
+                            <p class="text-sm font-medium text-neutral-950 dark:text-fg">{{ $proxyOption['title'] }}</p>
+                            <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                {{ $proxyOption['description'] }}
+                            </p>
+                        </button>
+                    @endforeach
+                </div>
+            @endcan
+        </x-application.settings-section>
     @endif
 </div>

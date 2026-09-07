@@ -100,7 +100,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             if ($this->server->unreachable_count > 0) {
-                $this->server->update(['unreachable_count' => 0]);
+                // Direct assignment: unreachable_count is not mass-assignable,
+                // so update() would silently drop the reset.
+                $this->server->unreachable_count = 0;
+                $this->server->save();
             }
 
             $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, true);
@@ -194,6 +197,20 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             $output = trim($output);
             if (! empty($output)) {
                 $dockerInfo = json_decode($output, true);
+                $dockerVersion = dockerEngineVersionFromJson($output);
+                if ($dockerVersion !== null) {
+                    $this->server->rememberDockerVersion($dockerVersion);
+                }
+
+                $composeOutput = instant_remote_process_with_timeout(
+                    ['docker compose version --short'],
+                    $this->server,
+                    false
+                );
+                $composeVersion = parseDockerEngineVersion($composeOutput);
+                if ($composeVersion !== null) {
+                    $this->server->rememberComposeVersion($composeVersion);
+                }
 
                 return isset($dockerInfo['Server']['Version']);
             }

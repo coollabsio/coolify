@@ -7,6 +7,7 @@ it('defines OpenAPI documentation for every destinations endpoint', function () 
     expect($model)->toContain("schema: 'Destination'")
         ->and($controller)->toContain("operationId: 'list-destinations'")
         ->and($controller)->toContain("operationId: 'get-destination-by-uuid'")
+        ->and($controller)->toContain("operationId: 'update-destination-by-uuid'")
         ->and($controller)->toContain("operationId: 'delete-destination-by-uuid'")
         ->and($controller)->toContain("operationId: 'list-server-destinations'")
         ->and($controller)->toContain("operationId: 'create-server-destination'");

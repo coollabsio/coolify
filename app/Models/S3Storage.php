@@ -4,16 +4,18 @@ namespace App\Models;
 
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
+use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class S3Storage extends BaseModel
 {
-    use HasFactory, HasSafeStringAttribute;
+    use Auditable, HasFactory, HasSafeStringAttribute;
 
     private const CONNECTION_TIMEOUT_SECONDS = 15;
 
@@ -69,6 +71,15 @@ class S3Storage extends BaseModel
                 'save_s3' => false,
                 's3_storage_id' => null,
             ]);
+            ScheduledVolumeBackupExecution::where('s3_storage_id', $storage->id)
+                ->update([
+                    's3_storage_deleted' => true,
+                    's3_cleanup_pending' => false,
+                ]);
+            ScheduledVolumeBackup::where('s3_storage_id', $storage->id)->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
         });
     }
 
@@ -99,6 +110,11 @@ class S3Storage extends BaseModel
     public function scheduledBackups()
     {
         return $this->hasMany(ScheduledDatabaseBackup::class, 's3_storage_id');
+    }
+
+    public function scheduledVolumeBackups()
+    {
+        return $this->hasMany(ScheduledVolumeBackup::class, 's3_storage_id');
     }
 
     public function awsUrl()
@@ -158,7 +174,7 @@ class S3Storage extends BaseModel
                     'bucket' => $this['bucket'],
                 ],
                 [
-                    'endpoint' => ['required', new SafeWebhookUrl],
+                    'endpoint' => ['required', new SafeWebhookUrl(trustedInternalHosts: $this->trustedInternalHosts())],
                     'bucket' => ['required', new ValidS3BucketName],
                 ],
             );
@@ -170,19 +186,7 @@ class S3Storage extends BaseModel
                 throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
             }
 
-            $disk = Storage::build([
-                'driver' => 's3',
-                'region' => $this['region'],
-                'key' => $this['key'],
-                'secret' => $this['secret'],
-                'bucket' => $this['bucket'],
-                'endpoint' => $this['endpoint'],
-                'use_path_style_endpoint' => true,
-                'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint']), [
-                    'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
-                    'timeout' => self::REQUEST_TIMEOUT_SECONDS,
-                ]),
-            ]);
+            $disk = $this->filesystem();
             // Test the connection by listing files with ListObjectsV2 (S3)
             $disk->files();
 
@@ -195,7 +199,7 @@ class S3Storage extends BaseModel
                 try {
                     $mail = new MailMessage;
                     $mail->subject('Coolify: S3 Storage Connection Error');
-                    $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $exception->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
+                    $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => base_url().'/storages/'.$this->uuid]);
 
                     // Load the team with its members and their roles explicitly
                     $team = $this->team()->with(['members' => function ($query) {
@@ -219,6 +223,35 @@ class S3Storage extends BaseModel
                 $this->save();
             }
         }
+    }
+
+    public function filesystem(): FilesystemAdapter
+    {
+        return Storage::build([
+            'driver' => 's3',
+            'region' => $this['region'],
+            'key' => $this['key'],
+            'secret' => $this['secret'],
+            'bucket' => $this['bucket'],
+            'endpoint' => $this['endpoint'],
+            'use_path_style_endpoint' => true,
+            'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint'], $this->trustedInternalHosts()), [
+                'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
+                'timeout' => self::REQUEST_TIMEOUT_SECONDS,
+            ]),
+        ]);
+    }
+
+    /**
+     * The bundled MinIO container is a trusted internal S3 target, not a user-supplied webhook destination.
+     *
+     * @return array<int, string>
+     */
+    public function trustedInternalHosts(): array
+    {
+        return $this->uuid === 'minio' && parse_url($this->endpoint, PHP_URL_HOST) === 'coolify-minio'
+            ? ['coolify-minio']
+            : [];
     }
 
     private function toUserFriendlyConnectionException(\Throwable $exception): \Throwable

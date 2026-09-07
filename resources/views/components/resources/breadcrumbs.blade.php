@@ -64,6 +64,8 @@
         </div>
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
@@ -257,6 +259,8 @@
         <!-- Current Section Status -->
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif

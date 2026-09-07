@@ -49,6 +49,15 @@ class StopService
                 $this->stopContainersInParallel($containersToStop, $server);
             }
 
+            $applications->each(function ($application): void {
+                $application->update(['status' => 'exited']);
+                $application->resetRestartLimit();
+            });
+            $dbs->each(function ($database): void {
+                $database->update(['status' => 'exited']);
+                $database->resetRestartLimit();
+            });
+
             if ($deleteConnectedNetworks) {
                 $service->deleteConnectedNetworks();
             }
@@ -67,7 +76,7 @@ class StopService
         $timeout = count($containersToStop) > 5 ? 10 : 30;
         $commands = [];
         $containerList = implode(' ', $containersToStop);
-        $commands[] = "docker stop -t $timeout $containerList";
+        $commands[] = dockerStopCommand($timeout, $containerList, $server);
         $commands[] = "docker rm -f $containerList";
         instant_remote_process(
             command: $commands,

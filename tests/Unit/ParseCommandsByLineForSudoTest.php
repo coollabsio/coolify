@@ -24,6 +24,24 @@ test('wraps complex Docker install command with pipes in bash -c', function () {
     expect($result[0])->toBe("sudo bash -c 'curl https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh'");
 });
 
+test('preserves command substitutions inside database and volume backup scripts', function () {
+    $script = 'compressor=$(if command -v pigz; then printf pigz; else printf gzip; fi); exec $compressor';
+    $command = 'docker exec database pg_dumpall | docker run --rm -i helper sh -c '.escapeshellarg($script);
+    $volumeCommand = 'docker run --rm helper sh -c '.escapeshellarg($script).' > /data/coolify/backups/volume.tar.gz';
+
+    $result = parseCommandsByLineForSudo(collect([$command, $volumeCommand]), $this->server);
+
+    expect($result[0])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if')
+        ->not->toContain('| sudo docker run')
+        ->and($result[1])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if');
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',

@@ -53,7 +53,7 @@ class TeamPolicy
             return false;
         }
 
-        return $user->isAdminOfTeam($team->id);
+        return $user->roleInTeam($team->id) === 'owner';
     }
 
     /**

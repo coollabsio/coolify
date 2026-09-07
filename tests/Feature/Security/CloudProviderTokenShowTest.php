@@ -30,14 +30,16 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
-test('saved cloud token cards link to the token detail page', function () {
+test('saved cloud token rows render frontend-only modal editors', function () {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'name' => 'Production Hetzner',
     ]);
 
     Livewire::test(CloudProviderTokens::class)
-        ->assertSee(route('security.cloud-tokens.show', ['cloud_token_uuid' => $token->uuid]), false);
+        ->assertSee('Edit Cloud Token')
+        ->assertSee('Production Hetzner')
+        ->assertDontSee(route('security.cloud-tokens.show', ['cloud_token_uuid' => $token->uuid]), false);
 });
 
 test('cloud token detail page shows editable name and description fields', function () {

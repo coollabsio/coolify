@@ -29,6 +29,8 @@ trait BuildsResponse
         'service_id', 'project_id', 'parent_id',
         'resourceable', 'resourceable_id', 'resourceable_type',
         'destination_type', 'source_type', 'tokenable',
+        'build_server_id', 'horizon_job_id', 'horizon_job_worker',
+        'current_process_id', 'app_id', 'installation_id',
 
         // sentinel / observability secrets
         'sentinel_token', 'sentinel_custom_url',
@@ -45,18 +47,34 @@ trait BuildsResponse
         // app/env secrets
         'value', 'real_value', 'http_basic_auth_password',
 
+        // free-form commands / configurations can embed credentials
+        'git_full_url',
+        'install_command', 'build_command', 'start_command',
+        'health_check_command', 'health_check_response_text',
+        'custom_docker_run_options', 'pre_deployment_command', 'post_deployment_command',
+        'docker_compose_custom_start_command', 'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+
+        // raw database configuration blobs
+        'postgres_conf', 'mysql_conf', 'mariadb_conf', 'mongo_conf',
+        'redis_conf', 'keydb_conf',
+
         // database connection strings embed credentials
         'internal_db_url', 'external_db_url', 'init_scripts',
 
-        // webhook secrets
+        // webhook / oauth / key secrets
         'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea',
         'manual_webhook_secret_github', 'manual_webhook_secret_gitlab',
+        'client_secret', 'webhook_secret', 'client_id',
+        'private_key', 'public_key',
 
         // bulky / unsafe blobs
         'dockerfile', 'docker_compose', 'docker_compose_raw',
+        'last_saved_proxy_configuration',
         'custom_labels', 'environment_variables',
         'environment_variables_preview', 'validation_logs',
-        'server_metadata',
+        'server_metadata', 'logs', 'configuration_snapshot',
+        'configuration_diff', 'fs_path', 'content', 'file_storage_content',
     ];
 
     /**
@@ -86,6 +104,31 @@ trait BuildsResponse
         };
 
         return $walk($data);
+    }
+
+    /**
+     * Best-effort redaction for free-form log text shown to MCP clients.
+     * Uses remove_iip plus common KEY=value / JSON secret patterns; not a guarantee.
+     */
+    protected function redactLogText(string $text): string
+    {
+        $text = remove_iip($text);
+
+        // password= / secret= / token= / "token":"..." style (shell or JSON; quoted or bare)
+        $text = preg_replace(
+            '/(?<![\w])["\']?(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
+            '$1='.REDACTED,
+            $text
+        ) ?? $text;
+
+        // export FOO=bar / "API_KEY":"..." style for sensitive-looking names
+        $text = preg_replace(
+            '/(?<![\w])(export\s+)?["\']?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)["\']?\s*[=:]\s*["\']?[^\s"\']{3,}["\']?/i',
+            '$1$2='.REDACTED,
+            $text
+        ) ?? $text;
+
+        return $text;
     }
 
     /**
@@ -132,7 +175,7 @@ trait BuildsResponse
     {
         $page = $args['page'];
         $perPage = $args['per_page'];
-        $totalPages = (int) ceil($total / $perPage);
+        $totalPages = (int) ceil($total / max(1, $perPage));
 
         $meta = [
             'page' => $page,
@@ -152,7 +195,7 @@ trait BuildsResponse
     }
 
     /**
-     * HATEOAS-style action suggestions for an application.
+     * HATEOAS-style action suggestions for an application (read tools only).
      *
      * @return array<int, array<string, mixed>>
      */
@@ -160,14 +203,22 @@ trait BuildsResponse
     {
         $actions = [
             ['tool' => 'get_application', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_deployments', 'args' => ['application_uuid' => $uuid], 'hint' => 'Deployment history'],
+            ['tool' => 'list_application_previews', 'args' => ['uuid' => $uuid], 'hint' => 'PR preview deployments'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
+            ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
 
         $s = strtolower((string) $status);
-        if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
+        // Match GetLogs/control: any running* status (including unhealthy) can fetch logs / restart / stop.
+        if (str_starts_with($s, 'running')) {
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Live container logs (requires running)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'stop', 'uuid' => $uuid, 'confirm' => true], 'hint' => 'Stop (needs deploy + confirm)'];
         } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
+            $actions[] = ['tool' => 'deploy', 'args' => ['uuid' => $uuid], 'hint' => 'Deploy/start (needs deploy ability)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
         }
 
         return $actions;
@@ -180,14 +231,19 @@ trait BuildsResponse
     {
         $actions = [
             ['tool' => 'get_database', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_database_backups', 'args' => ['uuid' => $uuid], 'hint' => 'Backup schedules'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
         ];
 
         $s = strtolower((string) $status);
-        if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
+        // Control treats any status containing "running" as already started (including unhealthy).
+        // Suggest logs/restart for those; only non-running statuses get start.
+        if (str_starts_with($s, 'running')) {
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
         } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
         }
 
         return $actions;
@@ -200,14 +256,21 @@ trait BuildsResponse
     {
         $actions = [
             ['tool' => 'get_service', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'list_service_applications', 'args' => ['uuid' => $uuid], 'hint' => 'Service applications'],
+            ['tool' => 'list_service_databases', 'args' => ['uuid' => $uuid], 'hint' => 'Service databases'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
+            ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
 
         $s = strtolower((string) $status);
+        // Control treats any status containing "running" as already started (including unhealthy).
+        // Suggest logs/restart for those; only non-running statuses get start.
         if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
         } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
         }
 
         return $actions;
@@ -220,6 +283,39 @@ trait BuildsResponse
     {
         return [
             ['tool' => 'get_server', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'get_server_domains', 'args' => ['uuid' => $uuid], 'hint' => 'Domains on this server'],
+            ['tool' => 'get_server_resources', 'args' => ['uuid' => $uuid], 'hint' => 'Resources on this server'],
+            ['tool' => 'list_destinations', 'args' => ['server_uuid' => $uuid], 'hint' => 'Docker destinations'],
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function actionsForProject(string $uuid): array
+    {
+        return [
+            ['tool' => 'get_project', 'args' => ['uuid' => $uuid], 'hint' => 'Project details'],
+            ['tool' => 'list_applications', 'args' => ['project_uuid' => $uuid], 'hint' => 'Applications in project'],
+            ['tool' => 'list_services', 'args' => ['project_uuid' => $uuid], 'hint' => 'Services in project'],
+            ['tool' => 'list_databases', 'args' => ['project_uuid' => $uuid], 'hint' => 'Databases in project'],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function actionsForDeployment(string $deploymentUuid, ?string $applicationUuid = null): array
+    {
+        $actions = [
+            ['tool' => 'get_deployment', 'args' => ['uuid' => $deploymentUuid], 'hint' => 'Deployment details'],
+        ];
+
+        if (is_string($applicationUuid) && $applicationUuid !== '') {
+            $actions[] = ['tool' => 'get_application', 'args' => ['uuid' => $applicationUuid], 'hint' => 'Parent application'];
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $applicationUuid], 'hint' => 'Application logs'];
+        }
+
+        return $actions;
     }
 }

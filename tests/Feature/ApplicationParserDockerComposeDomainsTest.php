@@ -10,9 +10,19 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use phpseclib3\Crypt\EC;
 
 uses(RefreshDatabase::class);
+
+function disableExactProxyLabels(Application $application): Application
+{
+    $settings = $application->destination->server->settings;
+    $settings->generate_exact_labels = false;
+    $settings->save();
+
+    return $application;
+}
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -211,6 +221,117 @@ YAML;
         ->and($domains['backend']['domain'])->toStartWith('http://');
 });
 
+test('applicationParser stores domains under original hyphenated compose service names', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+  analytics:
+    image: myapp/analytics:latest
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->toBeArray()
+        ->and($domains)->toHaveKey('another-service')
+        ->and($domains)->not->toHaveKey('another_service')
+        ->and($domains['another-service']['domain'])->toStartWith('http://');
+});
+
+test('applicationParser preserves legacy underscore domain keys by matching hyphenated services', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'another_service' => ['domain' => 'https://legacy.example.com'],
+        ]),
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    // Existing domain is preserved (not overwritten) even when stored under legacy underscore key.
+    expect(getComposeServiceDomainString($domains, 'another-service'))->toBe('https://legacy.example.com');
+});
+
+test('applicationParser reads redirect settings from the compose service domain', function () {
+    $this->server->proxy->set('type', 'TRAEFIK');
+    $this->server->save();
+    ServerSetting::query()
+        ->where('server_id', $this->server->id)
+        ->update(['generate_exact_labels' => true]);
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => [
+                'domain' => 'https://example.com,https://www.example.com',
+                'redirect' => 'www',
+            ],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=$${1}://www.$${2}')))->toBeTrue();
+});
+
+test('compose domain reconciliation preserves stored domains when parsing returns no services', function () {
+    $storedDomains = json_encode([
+        'frontend' => ['domain' => 'https://frontend.example.com'],
+    ]);
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => $storedDomains,
+    ]);
+
+    $method = new ReflectionMethod($application, 'reconcileDockerComposeDomains');
+    $method->invoke($application, ['services' => []]);
+
+    expect($application->fresh()->docker_compose_domains)->toBe($storedDomains);
+});
+
 test('applicationParser handles other docker compose domain shapes without regressions', function () {
     $createApplication = function (string $dockerCompose, ?string $dockerComposeDomains = null): Application {
         return Application::factory()->create([
@@ -286,4 +407,195 @@ YAML;
     $plainApplication->refresh();
 
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
+});
+
+test('applicationParser selects the resource network for Traefik routed compose services', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('applicationParser preserves a user-selected Traefik network', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    labels:
+      traefik.docker.network: custom-network
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())
+        ->toContain('traefik.docker.network=custom-network')
+        ->not->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('generateLabelsApplication routes portless domains to saved internal port overrides for Traefik and Caddy', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`one.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=3000')
+        ->toContain('traefik.http.routers.https-1-'.$application->uuid.'.rule=Host(`two.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-1-'.$application->uuid.'.loadbalancer.server.port=8080')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}')
+        ->toContain('caddy_1.handle_path.1_reverse_proxy={{upstreams 8080}}')
+        ->not->toContain('Host(`one.example.com:3000`)')
+        ->not->toContain('Host(`two.example.com:8080`)');
+});
+
+test('generateLabelsApplication uses the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '4000,5000',
+        'fqdn' => 'https://plain.example.com',
+        'domain_port_overrides' => null,
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=4000')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 4000}}');
+});
+
+test('generateLabelsApplication keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://legacy.example.com',
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    DB::table('applications')->where('id', $application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+        'domain_port_overrides' => null,
+    ]);
+
+    $labels = collect(generateLabelsApplication($application->fresh()));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`legacy.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=9090')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
+});
+
+test('applicationParser compose labels receive the application domain port override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://frontend.example.com' => 8080,
+        ],
+    ]);
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8080}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+});
+
+test('applicationParser compose labels use the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=3000')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 3000}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
 });

@@ -54,10 +54,9 @@ class Sentinel extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
@@ -114,9 +113,10 @@ class Sentinel extends Component
 
                     return;
                 }
-                $this->isSentinelEnabled = true;
                 $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
                 StartSentinel::run($this->server, true, null, $customImage);
+                $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+                $this->isSentinelEnabled = true;
             } else {
                 $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;
@@ -144,8 +144,9 @@ class Sentinel extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
-            $this->dispatch('success', 'Sentinel settings updated.');
+            $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -154,6 +155,7 @@ class Sentinel extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->restartSentinel();
         } catch (\Throwable $e) {

@@ -6,9 +6,11 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -94,6 +96,44 @@ test('role downgrade through team member component revokes team tokens', functio
         ->call('makeReadonly');
 
     expect(DB::table('personal_access_tokens')->where('id', $token->id)->exists())->toBeFalse();
+});
+
+test('member removal rolls back when token revocation fails', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+    $token = $this->user->createToken('protected-token', ['read'])->accessToken;
+    Schema::create('protected_personal_access_tokens', function (Blueprint $table): void {
+        $table->foreignId('token_id')->constrained('personal_access_tokens');
+    });
+    DB::table('protected_personal_access_tokens')->insert(['token_id' => $token->id]);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Member::class, ['member' => $this->user])
+        ->call('remove')
+        ->assertDispatched('error');
+
+    expect($this->team->members()->whereKey($this->user->id)->exists())->toBeTrue();
+});
+
+test('role change rolls back when token revocation fails', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+    $token = $this->user->createToken('protected-token', ['write'])->accessToken;
+    Schema::create('protected_personal_access_tokens', function (Blueprint $table): void {
+        $table->foreignId('token_id')->constrained('personal_access_tokens');
+    });
+    DB::table('protected_personal_access_tokens')->insert(['token_id' => $token->id]);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Member::class, ['member' => $this->user])
+        ->call('makeReadonly')
+        ->assertDispatched('error');
+
+    expect($this->user->fresh()->teams()->findOrFail($this->team->id)->pivot->role)->toBe('admin');
 });
 
 test('member cannot create write token through livewire token form', function () {

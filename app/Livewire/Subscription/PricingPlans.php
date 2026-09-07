@@ -73,4 +73,9 @@ class PricingPlans extends Component
 
         return redirect($session->url, 303);
     }
+
+    public function render()
+    {
+        return view('livewire.subscription.pricing-plans');
+    }
 }

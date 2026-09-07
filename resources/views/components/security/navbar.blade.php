@@ -1,24 +1,20 @@
-<div class="pb-6">
-    <h1>Security</h1>
-    <div class="subtitle">Security related settings.</div>
-    <div class="navbar-main">
-        <nav class="flex items-center gap-6 scrollbar min-h-10">
-            <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
-                <button>Private Keys</button>
-            </a>
-            @can('viewAny', App\Models\CloudProviderToken::class)
-                <a href="{{ route('security.cloud-tokens') }}" {{ wireNavigate() }}>
-                    <button>Cloud Tokens</button>
-                </a>
-            @endcan
-            @can('viewAny', App\Models\CloudInitScript::class)
-                <a href="{{ route('security.cloud-init-scripts') }}" {{ wireNavigate() }}>
-                    <button>Cloud-Init Scripts</button>
-                </a>
-            @endcan
-            <a href="{{ route('security.api-tokens') }}" {{ wireNavigate() }}>
-                <button>API Tokens</button>
-            </a>
-        </nav>
-    </div>
-</div>
+@props([
+    'title' => 'Keys & Tokens',
+    'subtitle' => 'SSH keys, cloud tokens, and API access',
+    // Family index/list views hide the H1 only at xl+ (topbar + tabs cover context).
+    // Detail views pass true so the resource name stays visible.
+    'titleOnDesktop' => false,
+])
+
+<x-dashboard.navbar section="security" :title="$title" :subtitle="$subtitle" :titleOnDesktop="$titleOnDesktop">
+    @isset($titleActions)
+        <x-slot:titleActions>
+            {{ $titleActions }}
+        </x-slot:titleActions>
+    @endisset
+    @isset($actions)
+        <x-slot:actions>
+            {{ $actions }}
+        </x-slot:actions>
+    @endisset
+</x-dashboard.navbar>

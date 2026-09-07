@@ -2,111 +2,116 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Docker Cleanup | Coolify
     </x-slot>
+
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="docker-cleanup" />
-        <div class="w-full">
-            <form wire:submit='submit'>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h2>Docker Cleanup</h2>
-                        <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
+            <form wire:submit="submit" class="contents">
+                {{-- Scope to cron/threshold fields; listboxes use instantSave and would flash the bar. --}}
+                <x-unsaved-bar action="submit"
+                    targets="dockerCleanupFrequency,dockerCleanupThreshold" />
+
+                <x-application.settings-section id="docker-cleanup-overview-section" title="Docker cleanup"
+                    helper="Remove unused Docker data and keep disk usage under control.">
+                    <x-slot:actions>
                         @can('update', $server)
-                            <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
-                                isHighlightedButton submitAction="manualCleanup" :actions="[
-                                    'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
-                                    'Permanently deletes all unused images',
-                                    'Clears build cache',
-                                    'Removes old versions of the Coolify helper image',
-                                    'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
-                                    'Optionally permanently deletes all unused networks (if enabled in advanced options).',
-                                ]" :confirmWithText="false"
-                                :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
+                            <x-modal-confirmation title="Confirm Docker Cleanup?"
+                                buttonTitle="Run cleanup" isHighlightedButton submitAction="manualCleanup"
+                                :actions="[
+                                    'Deletes stopped containers managed by Coolify.',
+                                    'Deletes unused images and clears the build cache.',
+                                    'Removes old Coolify helper images.',
+                                    'May delete unused volumes or networks when those options are enabled.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false"
+                                step2ButtonText="Run Docker Cleanup" />
                         @endcan
-                    </div>
-                    <div class="mt-1 mb-6">Configure Docker cleanup settings for your server.</div>
-                </div>
+                    </x-slot:actions>
 
-                @if (!isCloud() && $this->isCleanupStale)
-                    <div class="mb-4">
-                        <x-callout type="warning" title="Docker Cleanup May Be Stalled">
-                            <p>The last Docker cleanup ran {{ $this->lastExecutionTime ?? 'unknown time' }} ago,
-                                which is longer than expected for the configured frequency.</p>
+                    @if (!isCloud() && $this->isCleanupStale)
+                        <x-callout type="warning" title="Docker cleanup may be stalled">
+                            The last cleanup ran {{ $this->lastExecutionTime ?? 'at an unknown time' }}.
                             @if (!$this->isSchedulerHealthy)
-                                <p class="mt-1">The scheduled job manager appears to be inactive. This may indicate
-                                    a stale Redis lock is blocking all scheduled jobs.</p>
+                                The scheduled job manager also appears inactive.
                             @endif
-                            <p class="mt-2">To resolve, run on your Coolify instance:
-                                <code class="bg-black/10 dark:bg-white/10 px-1 rounded">php artisan cleanup:redis --clear-locks</code>
-                            </p>
+                            Run
+                            <code class="rounded bg-black/10 px-1 dark:bg-white/10">php artisan cleanup:redis --clear-locks</code>
+                            on the Coolify instance to clear stale locks.
                         </x-callout>
-                    </div>
-                @endif
+                    @else
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                                <x-reicon name="storages" class="size-4" />
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-neutral-950 dark:text-fg">Scheduled maintenance</p>
+                                <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Cleanup runs automatically using the schedule and threshold configured below.
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+                </x-application.settings-section>
 
-                <div class="flex flex-col gap-2">
-                    <div class="flex gap-4">
-                        <h3>Cleanup Configuration</h3>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <x-forms.input canGate="update" :canResource="$server" placeholder="*/10 * * * *"
-                            id="dockerCleanupFrequency" label="Docker cleanup frequency" required
-                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
+                <x-application.settings-section id="docker-cleanup-configuration-section"
+                    title="Cleanup configuration"
+                    helper="Choose when cleanup runs and whether it should wait for a disk threshold.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$server" placeholder="0 0 * * *"
+                            id="dockerCleanupFrequency" label="Cleanup frequency" required
+                            helper="Cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
                         @if (!$forceDockerCleanup)
                             <x-forms.input canGate="update" :canResource="$server" id="dockerCleanupThreshold"
-                                label="Docker cleanup threshold (%)" required
-                                helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                                type="number" min="1" max="99" label="Disk threshold" required
+                                helper="Run cleanup after disk usage exceeds this percentage." />
                         @endif
+                        <x-forms.listbox id="forceDockerCleanup" label="Cleanup trigger"
+                            helper="Forced cleanup runs on every schedule without waiting for the threshold."
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Only above disk threshold'],
+                                ['value' => true, 'label' => 'Run on every schedule'],
+                            ]" />
                     </div>
-                    <div class="w-full sm:w-96">
-                        <x-forms.checkbox canGate="update" :canResource="$server"
-                            helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
-                            <ul class='list-disc pl-4 mt-2'>
-                                <li>Removes stopped containers managed by Coolify (as containers are non-persistent, no data will be lost).</li>
-                                <li>Deletes unused images.</li>
-                                <li>Clears build cache.</li>
-                                <li>Removes old versions of the Coolify helper image.</li>
-                                <li>Optionally delete unused volumes (if enabled in advanced options).</li>
-                                <li>Optionally remove unused networks (if enabled in advanced options).</li>
-                            </ul>"
-                            instantSave id="forceDockerCleanup" label="Force Docker Cleanup" />
-                    </div>
+                </x-application.settings-section>
 
-                </div>
-
-                <div class="flex flex-col gap-2 mt-6">
-                    <h3>Advanced</h3>
-                    <x-callout type="warning" title="Caution">
-                        <p>These options can cause permanent data loss and functional issues. Only enable if you fully
-                            understand the consequences.</p>
+                <x-application.settings-section id="docker-cleanup-advanced-section" title="Advanced cleanup"
+                    helper="Control destructive cleanup behavior and application image retention.">
+                    <x-callout type="warning" title="These options can remove recoverable data">
+                        Unused volumes may contain data from stopped containers, while removing retained images
+                        disables rollback to older application versions.
                     </x-callout>
-                    <div class="w-full sm:w-96">
-                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedVolumes"
-                            label="Delete Unused Volumes"
-                            helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data from stopped containers will be lost!</strong><br><br>Consequences include:<br>
-                            <ul class='list-disc pl-4 mt-2'>
-                                <li>Volumes not attached to running containers will be permanently deleted (volumes from stopped containers are affected).</li>
-                                <li>Data stored in deleted volumes cannot be recovered.</li>
-                            </ul>" />
-                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedNetworks"
-                            label="Delete Unused Networks"
-                            helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
-                            <ul class='list-disc pl-4 mt-2'>
-                                <li>Networks not attached to running containers will be permanently deleted (networks used by stopped containers are affected).</li>
-                                <li>Containers may lose connectivity if required networks are removed.</li>
-                            </ul>" />
-                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                            id="disableApplicationImageRetention"
-                            label="Disable Application Image Retention"
-                            helper="When enabled, Docker cleanup will delete all old application images regardless of per-application retention settings. Only the currently running image will be kept.<br><br><strong>Warning: This disables rollback capabilities for all applications on this server.</strong>" />
+
+                    <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                        <x-forms.listbox id="deleteUnusedVolumes" label="Unused volumes"
+                            helper="Permanently remove volumes not attached to running containers."
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Keep unused volumes'],
+                                ['value' => true, 'label' => 'Delete unused volumes'],
+                            ]" />
+                        <x-forms.listbox id="deleteUnusedNetworks" label="Unused networks"
+                            helper="Remove Docker networks not attached to running containers."
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Keep unused networks'],
+                                ['value' => true, 'label' => 'Delete unused networks'],
+                            ]" />
+                        <x-forms.listbox id="disableApplicationImageRetention" label="Application images"
+                            helper="Choose Keep retained images to follow each application’s Images to keep setting under Rollback. Delete all old images ignores that setting and keeps only the running image."
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Keep retained images'],
+                                ['value' => true, 'label' => 'Delete all old images'],
+                            ]" />
                     </div>
-                </div>
+                </x-application.settings-section>
             </form>
 
-            <div class="mt-8">
-                <h3 class="mb-4">Recent executions <span class="text-xs text-neutral-500">(click to check
-                        output)</span></h3>
+            <x-application.settings-section id="docker-cleanup-executions-section" title="Recent executions"
+                helper="Review cleanup status, duration, and command output." flush>
                 <livewire:server.docker-cleanup-executions :server="$server" />
-            </div>
+            </x-application.settings-section>
         </div>
     </div>
 </div>

@@ -34,7 +34,7 @@ class Health extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -66,7 +66,7 @@ class Health extends Component
             $this->authorize('update', $this->database);
             $this->syncData(true);
             $updateSuccessful = true;
-            $this->dispatch('success', 'Health check updated. Restart the database to apply the changes.');
+            $this->dispatch('success', 'Healthcheck updated. Restart the database to apply the changes.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -87,7 +87,7 @@ class Health extends Component
             $this->healthCheckEnabled = ! $this->healthCheckEnabled;
             $this->syncData(true);
             $updateSuccessful = true;
-            $this->dispatch('success', 'Health check '.($this->healthCheckEnabled ? 'enabled' : 'disabled').'. Restart the database to apply the changes.');
+            $this->dispatch('success', 'Healthcheck '.($this->healthCheckEnabled ? 'enabled' : 'disabled').'. Restart the database to apply the changes.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

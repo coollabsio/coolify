@@ -144,9 +144,18 @@
                     <div @click="toggleOption(option.value)"
                         class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
                         :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
-                        <input type="checkbox" :checked="isSelected(option.value)"
-                            class="w-4 h-4 rounded border-neutral-300 dark:border-neutral-600 bg-white dark:bg-coolgray-100 text-black dark:text-white checked:bg-white dark:checked:bg-coolgray-100 focus:ring-coollabs dark:focus:ring-warning pointer-events-none"
-                            tabindex="-1">
+                        <span class="relative flex size-[18px] shrink-0">
+                            <input type="checkbox" :checked="isSelected(option.value)"
+                                class="peer absolute inset-0 m-0 h-full w-full appearance-none opacity-0"
+                                tabindex="-1">
+                            <span
+                                class="pointer-events-none absolute inset-0 rounded-[5px] border border-neutral-300 bg-white transition-colors peer-checked:border-coollabs peer-checked:bg-coollabs dark:border-white/[0.14] dark:bg-white/[0.045] dark:peer-checked:border-warning dark:peer-checked:bg-warning"></span>
+                            <svg class="pointer-events-none absolute inset-0 m-auto size-3 scale-75 text-white opacity-0 transition-[opacity,transform] peer-checked:scale-100 peer-checked:opacity-100 dark:text-black"
+                                viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </span>
                         <span class="text-sm flex-1" x-text="option.text"></span>
                     </div>
                 </template>

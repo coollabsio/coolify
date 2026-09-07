@@ -1,14 +1,18 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    DB::table('instance_settings')->insert(['id' => 0]);
     $user = User::factory()->create();
     $this->team = $user->teams()->first();
 
@@ -143,6 +147,38 @@ describe('ServerSetting::ensureValidSentinelToken', function () {
 
         expect(fn () => $stub->ensureValidSentinelToken())
             ->toThrow(RuntimeException::class, 'Sentinel token invalid after regeneration');
+    });
+});
+
+describe('ServerSetting::ensureSentinelUrl', function () {
+    it('uses the current private instance URL when no public address is configured', function () {
+        InstanceSettings::query()->whereKey(0)->update([
+            'fqdn' => null,
+            'public_ipv4' => null,
+            'public_ipv6' => null,
+        ]);
+        Once::flush();
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update(['sentinel_custom_url' => null]);
+        app()->instance('request', Request::create('http://192.168.1.50:8000/server'));
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://192.168.1.50:8000')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    });
+
+    it('does not use a loopback request URL for a remote server', function () {
+        InstanceSettings::query()->whereKey(0)->update([
+            'fqdn' => null,
+            'public_ipv4' => null,
+            'public_ipv6' => null,
+        ]);
+        Once::flush();
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update(['sentinel_custom_url' => null]);
+        app()->instance('request', Request::create('http://localhost:8000/server'));
+
+        expect(fn () => $this->server->settings->fresh()->ensureSentinelUrl())
+            ->toThrow(RuntimeException::class, 'Set an instance FQDN, public IP, or reachable Coolify URL before enabling Sentinel.');
     });
 });
 

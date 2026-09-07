@@ -19,6 +19,13 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config([
+        'cache.default' => 'array',
+        'session.driver' => 'array',
+        'queue.default' => 'sync',
+        'app.maintenance.driver' => 'file',
+    ]);
+
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]));
 
     $this->team = Team::factory()->create();
@@ -84,6 +91,140 @@ describe('GET /api/v1/tags', function () {
         $response->assertJsonCount(1);
         $response->assertJsonFragment(['name' => 'my-tag']);
         $response->assertJsonMissing(['name' => 'other-team-tag']);
+    });
+});
+
+describe('POST /api/v1/tags', function () {
+    test('creates a tag for the current team', function () {
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->postJson('/api/v1/tags', [
+                'name' => 'Production',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonFragment(['name' => 'production'])
+            ->assertJsonStructure(['uuid', 'name', 'created_at', 'updated_at']);
+
+        expect(Tag::where('team_id', $this->team->id)->where('name', 'production')->exists())->toBeTrue();
+    });
+
+    test('rejects duplicate tag names for the team', function () {
+        Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->postJson('/api/v1/tags', [
+                'name' => 'production',
+            ]);
+
+        $response->assertStatus(409);
+    });
+
+    test('rejects unknown fields', function () {
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->postJson('/api/v1/tags', [
+                'name' => 'valid-tag',
+                'unexpected' => 'value',
+            ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['unexpected']);
+    });
+
+    test('rejects create requests from non-admin team members', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        session(['currentTeam' => $this->team]);
+        $memberToken = $member->createToken('member-token', ['*'])->plainTextToken;
+
+        $response = $this->withHeaders(tagApiAuthHeaders($memberToken))
+            ->postJson('/api/v1/tags', [
+                'name' => 'member-tag',
+            ]);
+
+        $response->assertForbidden();
+        expect(Tag::where('team_id', $this->team->id)->where('name', 'member-tag')->exists())->toBeFalse();
+    });
+});
+
+describe('PATCH /api/v1/tags/{uuid}', function () {
+    test('renames a team tag', function () {
+        $tag = Tag::create(['name' => 'old-name', 'team_id' => $this->team->id]);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/tags/{$tag->uuid}", [
+                'name' => 'New Name',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonFragment(['uuid' => $tag->uuid, 'name' => 'new name']);
+
+        expect($tag->fresh()->name)->toBe('new name');
+    });
+
+    test('does not rename tags from another team', function () {
+        $otherTeam = Team::factory()->create();
+        $tag = Tag::create(['name' => 'other-tag', 'team_id' => $otherTeam->id]);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/tags/{$tag->uuid}", [
+                'name' => 'stolen',
+            ]);
+
+        $response->assertNotFound();
+        expect($tag->fresh()->name)->toBe('other-tag');
+    });
+
+    test('rejects renaming to an existing team tag name', function () {
+        Tag::create(['name' => 'taken', 'team_id' => $this->team->id]);
+        $tag = Tag::create(['name' => 'rename-me', 'team_id' => $this->team->id]);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/tags/{$tag->uuid}", [
+                'name' => 'taken',
+            ]);
+
+        $response->assertStatus(409);
+    });
+});
+
+describe('DELETE /api/v1/tags/{uuid}', function () {
+    test('deletes a tag and detaches it from resources', function () {
+        $tag = Tag::create(['name' => 'to-delete', 'team_id' => $this->team->id]);
+        $this->application->tags()->attach($tag->id);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->deleteJson("/api/v1/tags/{$tag->uuid}");
+
+        $response->assertOk()
+            ->assertJson(['message' => 'Tag deleted.']);
+
+        expect(Tag::find($tag->id))->toBeNull()
+            ->and($this->application->tags()->count())->toBe(0);
+    });
+
+    test('does not delete tags from another team', function () {
+        $otherTeam = Team::factory()->create();
+        $tag = Tag::create(['name' => 'other-team-tag', 'team_id' => $otherTeam->id]);
+
+        $response = $this->withHeaders(tagApiAuthHeaders($this->bearerToken))
+            ->deleteJson("/api/v1/tags/{$tag->uuid}");
+
+        $response->assertNotFound();
+        expect(Tag::find($tag->id))->not->toBeNull();
+    });
+
+    test('rejects delete requests from non-admin team members', function () {
+        $tag = Tag::create(['name' => 'protected', 'team_id' => $this->team->id]);
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        session(['currentTeam' => $this->team]);
+        $memberToken = $member->createToken('member-token', ['*'])->plainTextToken;
+
+        $response = $this->withHeaders(tagApiAuthHeaders($memberToken))
+            ->deleteJson("/api/v1/tags/{$tag->uuid}");
+
+        $response->assertForbidden();
+        expect(Tag::find($tag->id))->not->toBeNull();
     });
 });
 

@@ -50,10 +50,59 @@ it('filters production environment variables by key case-insensitively', functio
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
         ->toBe(['API_KEY']);
+});
+
+it('orders environment variables by creation order or alphabetically based on the setting', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'ZEBRA',
+        'value' => 'last-key',
+        'order' => 1,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'ALPHA',
+        'value' => 'first-key',
+        'order' => 2,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
+        ->assertSet('is_env_sorting_enabled', false);
+
+    $userManagedKeys = $component->instance()->environmentVariables
+        ->pluck('key')
+        ->filter(fn (string $key) => in_array($key, ['ZEBRA', 'ALPHA'], true))
+        ->values()
+        ->all();
+
+    expect($userManagedKeys)->toBe(['ZEBRA', 'ALPHA']);
+
+    $component
+        ->set('is_env_sorting_enabled', true)
+        ->call('instantSave');
+
+    $alphabeticallyOrderedKeys = $component->instance()->environmentVariables
+        ->pluck('key')
+        ->filter(fn (string $key) => in_array($key, ['ZEBRA', 'ALPHA'], true))
+        ->values()
+        ->all();
+
+    expect($alphabeticallyOrderedKeys)
+        ->toBe(['ALPHA', 'ZEBRA'])
+        ->and($application->settings->fresh()->is_env_sorting_enabled)->toBeTrue();
 });
 
 it('treats production environment variable search underscore wildcards literally', function () {
@@ -76,6 +125,7 @@ it('treats production environment variable search underscore wildcards literally
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api_key');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
@@ -104,6 +154,7 @@ it('filters preview environment variables by key case-insensitively', function (
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'token');
 
     expect($component->instance()->environmentVariablesPreview->pluck('key')->all())
@@ -124,10 +175,75 @@ YAML,
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api');
 
     expect($component->instance()->hardcodedEnvironmentVariables->pluck('key')->all())
         ->toBe(['API_TOKEN']);
+});
+
+it('keeps Compose self-referencing environment variables editable without changing Compose', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      API_TOKEN: ${API_TOKEN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      FIXED_VALUE: production
+YAML;
+
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    foreach (['API_TOKEN', 'LOG_LEVEL'] as $key) {
+        EnvironmentVariable::create([
+            'key' => $key,
+            'resourceable_type' => Service::class,
+            'resourceable_id' => $service->id,
+        ]);
+    }
+
+    $rows = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
+        ->instance()
+        ->environmentVariablePageRows;
+
+    expect($rows->where('kind', 'managed')->pluck('environmentVariable.key')->all())
+        ->toBe(['API_TOKEN', 'LOG_LEVEL'])
+        ->and($rows->where('kind', 'hardcoded')->pluck('environmentVariable.key')->all())
+        ->toBe(['FIXED_VALUE'])
+        ->and($service->fresh()->docker_compose_raw)->toBe($dockerCompose);
+});
+
+it('shows a Compose-defined value as read-only when a managed variable has the same key', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      - API_TOKEN=from-compose
+YAML,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'API_TOKEN',
+        'value' => 'from-environment-tab',
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables');
+
+    expect($component->instance()->environmentVariablePageRows)
+        ->toHaveCount(1)
+        ->and($component->instance()->environmentVariablePageRows->first()['kind'])->toBe('hardcoded')
+        ->and($component->instance()->environmentVariablePageRows->first()['environmentVariable']['value'])->toBe('from-compose');
 });
 
 it('searches service environment variables without requiring preview variables', function () {
@@ -150,12 +266,55 @@ it('searches service environment variables without requiring preview variables',
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
         ->assertDontSee('Preview Deployments Environment Variables');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
-        ->toBe(['API_KEY']);
+        ->toBe(['API_KEY'])
+        ->and($component->instance()->showPreview)->toBeFalse();
+});
+
+it('pins required service environment variables only while their values are missing', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      HARDCODED_FIRST: configured
+YAML,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'OPTIONAL_FIRST',
+        'value' => 'configured',
+        'order' => 1,
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $required = EnvironmentVariable::create([
+        'key' => 'REQUIRED_SECOND',
+        'value' => '',
+        'order' => 2,
+        'is_required' => true,
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables');
+
+    expect($component->instance()->environmentVariablePageRows->pluck('environmentVariable.key')->all())
+        ->toBe(['REQUIRED_SECOND', 'OPTIONAL_FIRST', 'HARDCODED_FIRST']);
+
+    $required->update(['value' => 'configured']);
+    $component->call('$refresh');
+
+    expect($component->instance()->environmentVariablePageRows->pluck('environmentVariable.key')->all())
+        ->toBe(['OPTIONAL_FIRST', 'REQUIRED_SECOND', 'HARDCODED_FIRST']);
 });
 
 it('does not show the empty production message when search only matches hardcoded variables', function () {
@@ -172,9 +331,9 @@ YAML,
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
-        ->assertDontSee('No environment variables found.');
+        ->assertDontSee('No environment variables found');
 
     expect($component->instance()->hardcodedEnvironmentVariables->pluck('key')->all())
         ->toBe(['API_TOKEN']);
@@ -200,6 +359,7 @@ it('keeps developer view unfiltered after searching', function () {
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
         ->call('switch')
         ->assertSet('view', 'dev');
@@ -229,6 +389,7 @@ it('does not delete non-matching variables when saving developer view after sear
     ]);
 
     Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
         ->call('switch')
         ->call('submit');
@@ -261,11 +422,11 @@ it('hides the preview section when search filters out all preview variables', fu
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
-        ->assertDontSee('Preview Deployments Environment Variables')
         ->assertDontSee('PREVIEW_TOKEN');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
-        ->toBe(['API_KEY']);
+        ->toBe(['API_KEY'])
+        ->and($component->instance()->environmentVariablesPreview)->toHaveCount(0);
 });

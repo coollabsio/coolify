@@ -1,104 +1,85 @@
 <div>
     <x-slot:title>
         Settings | Coolify
-        </x-slot>
-        <x-settings.navbar />
-        <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
-            class="flex flex-col h-full gap-8 sm:flex-row">
-            <x-settings.sidebar activeMenu="general" />
-            <form wire:submit='submit' class="flex flex-col">
-                <div class="flex items-center gap-2">
-                    <h2>General</h2>
-                    <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                        Save
-                    </x-forms.button>
-                </div>
-                <div class="pb-4">General configuration for your Coolify instance.</div>
+    </x-slot>
 
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-wrap items-end gap-2">
-                        <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
-                                helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br>
-                                <span class='dark:text-warning text-coollabs'>Important: </span>
-                                If you want the dashboard to be accessible over HTTPS, you must include <b>https://</b> at the start of the URL. Without it, the dashboard will use HTTP and won’t be secured."
-                                placeholder="https://coolify.yourdomain.com" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name" placeholder="Coolify"
-                                helper="Custom name for your Coolify instance, shown in the URL." />
-                            <div class="w-full" x-data="{
-                            open: false,
-                            search: '{{ $settings->instance_timezone ?: '' }}',
-                            timezones: @js($this->timezones),
-                            placeholder: '{{ $settings->instance_timezone ? 'Search timezone...' : 'Select Server Timezone' }}',
-                            init() {
-                                this.$watch('search', value => {
-                                    if (value === '') {
-                                        this.open = true;
-                                    }
-                                })
-                            }
-                        }">
-                                <div class="flex items-center mb-1">
-                                    <label for="instance_timezone">Instance
-                                        Timezone</label>
-                                    <x-helper class="ml-2"
-                                        helper="Timezone for the Coolify instance. This is used for the update check and automatic update frequency." />
-                                </div>
-                                <div class="relative">
-                                    <div class="inline-flex relative items-center w-full">
-                                        <input autocomplete="off"
-                                            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                                            wire:dirty.class="dark:focus:ring-warning dark:ring-warning"
-                                            x-model="search" @focus="open = true" @click.away="open = false"
-                                            @input="open = true" class="w-full input" :placeholder="placeholder"
-                                            wire:model="instance_timezone">
-                                        <svg class="absolute right-0 mr-2 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
-                                            fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                                            @click="open = true">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                        </svg>
-                                    </div>
-                                    <div x-show="open"
-                                        class="overflow-auto overflow-x-hidden absolute z-50 mt-1 w-full max-h-60 bg-white rounded-md border shadow-lg dark:bg-coolgray-100 dark:border-coolgray-200 scrollbar">
-                                        <template
-                                            x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
-                                            :key="timezone">
-                                            <div @click="search = timezone; open = false; $wire.set('instance_timezone', timezone); $wire.submit()"
-                                                class="px-4 py-2 text-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 dark:text-gray-200"
-                                                x-text="timezone"></div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
+    <x-settings.layout>
+        <form wire:submit="submit" class="application-settings-form flex w-full min-w-0 flex-col gap-6">
+            {{-- instance_timezone auto-saves via $wire.set + submit; exclude it so
+                 the bar does not flash while the snapshot catches up. --}}
+            <x-unsaved-bar action="submit"
+                targets="fqdn,instance_name,public_ipv4,public_ipv6,dev_helper_version" />
+            <x-application.settings-section title="General">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <div @class([
+                        'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
+                    ])>
+                        <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
+                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS."
+                            placeholder="https://coolify.yourdomain.com" />
+                    </div>
+
+                    @if (str_starts_with(strtolower($fqdn ?? ''), 'https://'))
+                        <div>
+                            <x-forms.listbox canGate="update" :canResource="$settings"
+                                id="is_dashboard_force_https_enabled" label="Redirect HTTP to HTTPS"
+                                onChange="submit"
+                                helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                                :options="[
+                                    ['value' => true, 'label' => 'Enabled'],
+                                    ['value' => false, 'label' => 'Disabled'],
+                                ]" />
                         </div>
-                        <div class="flex gap-2 md:flex-row flex-col w-full">
-                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password" label="Instance's Public IPv4"
-                                helper="Enter the IPv4 address of the instance.<br><br>It is useful if you have several IPv4 addresses and Coolify could not detect the correct one."
-                                placeholder="1.2.3.4" autocomplete="new-password" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password" label="Instance's Public IPv6"
-                                helper="Enter the IPv6 address of the instance.<br><br>It is useful if you have several IPv6 addresses and Coolify could not detect the correct one."
-                                placeholder="2001:db8::1" autocomplete="new-password" />
-                        </div>
+                    @endif
 
-                        @if(isDev())
-                            <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version" label="Dev Helper Version (Development Only)"
-                                helper="Override the default coolify-helper image version. Leave empty to use the default version from config ({{ config('constants.coolify.helper_version') }}). Examples: 1.0.11, latest, dev"
-                                placeholder="{{ config('constants.coolify.helper_version') }}" />
-                        @endif
+                    <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name"
+                        placeholder="Coolify" helper="Custom name for this Coolify instance." />
+
+                    {{-- Use searchable-listbox so the label row (h-4) and control height match
+                         sibling x-forms.input fields (Name). onChange auto-saves like before. --}}
+                    <x-forms.searchable-listbox id="instance_timezone" label="Instance timezone"
+                        helper="Timezone used for update checks and the automatic update schedule."
+                        searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                        onChange="submit" :options="collect($this->timezones)->map(fn ($timezone) => [
+                            'value' => $timezone,
+                            'label' => $timezone,
+                        ])->all()" :disabled="! auth()->user()->can('update', $settings)" />
                 </div>
-            </form>
+            </x-application.settings-section>
 
-            <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
-                confirmAction="confirmDomainUsage">
-                <x-slot:consequences>
-                    <ul class="mt-2 ml-4 list-disc">
-                        <li>The Coolify instance domain will conflict with existing resources</li>
-                        <li>SSL certificates might not work correctly</li>
-                        <li>Routing behavior will be unpredictable</li>
-                        <li>You may not be able to access the Coolify dashboard properly</li>
-                    </ul>
-                </x-slot:consequences>
-            </x-domain-conflict-modal>
-        </div>
+            <x-application.settings-section title="Network addresses">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password"
+                        label="Instance public IPv4"
+                        helper="Set this when Coolify cannot detect the correct public IPv4 address."
+                        placeholder="1.2.3.4" autocomplete="new-password" />
+                    <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password"
+                        label="Instance public IPv6"
+                        helper="Set this when Coolify cannot detect the correct public IPv6 address."
+                        placeholder="2001:db8::1" autocomplete="new-password" />
+                </div>
+            </x-application.settings-section>
+
+            @if (isDev())
+                <x-application.settings-section title="Development helper">
+                    <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version"
+                        label="Version override"
+                        helper="Override the default coolify-helper image version. Leave empty to use {{ config('constants.coolify.helper_version') }}."
+                        placeholder="{{ config('constants.coolify.helper_version') }}" />
+                </x-application.settings-section>
+            @endif
+        </form>
+
+    <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
+        confirmAction="confirmDomainUsage">
+        <x-slot:consequences>
+            <ul class="mt-2 ml-4 list-disc">
+                <li>The Coolify instance domain will conflict with existing resources.</li>
+                <li>SSL certificates might not work correctly.</li>
+                <li>Routing behavior will be unpredictable.</li>
+                <li>You may not be able to access the Coolify dashboard properly.</li>
+            </ul>
+        </x-slot:consequences>
+    </x-domain-conflict-modal>
+    </x-settings.layout>
 </div>

@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\RateLimiter;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    config()->set('app.maintenance.store', 'array');
+
+    InstanceSettings::forceCreate(['id' => 0]);
     RateLimiter::clear('login');
 
     $this->user = User::factory()->create([
@@ -65,4 +67,28 @@ test('successful login is still possible within rate limit', function () {
 
     $response->assertRedirect();
     expect($response->status())->not->toBe(429);
+});
+
+test('cloud login rate limits use the Cloudflare client ip', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->withHeader('CF-Connecting-IP', '2001:db8::10')
+            ->withHeader('X-Forwarded-For', '2001:db8::10, 108.162.221.29')
+            ->withServerVariables(['REMOTE_ADDR' => '10.0.0.5'])
+            ->post('/login', [
+                'email' => 'test@example.com',
+                'password' => 'wrong-password',
+            ])
+            ->assertRedirect();
+    }
+
+    $this->withHeader('CF-Connecting-IP', '2001:db8::20')
+        ->withHeader('X-Forwarded-For', '2001:db8::20, 108.162.221.29')
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.0.5'])
+        ->post('/login', [
+            'email' => 'test@example.com',
+            'password' => 'wrong-password',
+        ])
+        ->assertRedirect();
 });

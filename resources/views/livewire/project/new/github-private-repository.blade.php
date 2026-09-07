@@ -1,156 +1,169 @@
-<div>
-    <div class="flex items-end gap-2">
-        <h1>Create a new Application</h1>
-        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
-            <livewire:source.github.create />
-        </x-modal-input>
-        @if ($repositories->count() > 0)
-            <x-forms.button wire:click.prevent="loadRepositories({{ $github_app->id }})">
-                Refresh Repository List
-            </x-forms.button>
-            <a target="_blank" class="inline-flex items-center self-center gap-1 text-sm hover:underline dark:text-neutral-400"
-                href="{{ getInstallationPath($github_app) }}">
-                Change Repositories on GitHub
-                <x-external-link />
-            </a>
-        @endif
-    </div>
-    <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
-    @if ($github_apps->count() !== 0)
-        <div class="flex flex-col gap-2">
-            @if ($current_step === 'github_apps')
-                <h2 class="pt-4 pb-4">Select a Github App</h2>
-                <div class="flex flex-col justify-center gap-2 text-left">
-                    @foreach ($github_apps as $ghapp)
-                        <div class="flex">
-                            <div class="w-full gap-2 py-4 group coolbox"
-                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
-                                wire:loading.class="coolbox-loading"
-                                wire:target="loadRepositories({{ $ghapp->id }})"
-                                wire:key="{{ $ghapp->id }}">
-                                <div class="flex mr-4">
-                                    <div class="flex flex-col mx-6">
-                                        <div class="box-title">
-                                            {{ data_get($ghapp, 'name') }}
-                                        </div>
-                                        <div class="box-description">
-                                            {{ data_get($ghapp, 'html_url') }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
+<div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
+    @if ($github_apps->isEmpty())
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>GitHub App</h2>
+                    <p>Connect a GitHub App before selecting a private repository.</p>
                 </div>
-            @endif
-            @if ($current_step === 'repository')
-                @if ($repositories->count() > 0)
-                    <div class="flex flex-col gap-2 pb-6">
-                        <div class="flex gap-2">
-                            <x-forms.datalist class="w-full" label="Repository" placeholder="Search repositories..." wire:model.live="selected_repository_id">
-                                @foreach ($repositories as $repo)
-                                    <option value="{{ data_get($repo, 'id') }}">{{ data_get($repo, 'name') }}</option>
-                                @endforeach
-                            </x-forms.datalist>
+            </div>
+            <x-empty title="No GitHub Apps"
+                description="Create an app to grant Coolify access to selected repositories."
+                icon-name="sources">
+                <x-slot:contents>
+                    <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
+                        <livewire:source.github.create />
+                    </x-modal-input>
+                </x-slot:contents>
+            </x-empty>
+        </section>
+    @elseif ($current_step === 'github_apps')
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Choose GitHub App</h2>
+                    <p>Select the installation that can access the repository you want to deploy.</p>
+                </div>
+                <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
+                    <livewire:source.github.create />
+                </x-modal-input>
+            </div>
+            <div class="application-settings-section-body p-0!">
+                @foreach ($github_apps as $ghapp)
+                    <button type="button"
+                        class="group relative flex w-full items-center gap-3 border-b border-neutral-200 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.06] dark:hover:bg-white/[0.025]"
+                        wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                        wire:loading.class="coolbox-loading"
+                        wire:loading.attr="disabled" wire:target="loadRepositories({{ $ghapp->id }})"
+                        wire:key="{{ $ghapp->id }}">
+                        <div
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                            <x-reicon name="sources" class="size-4" />
                         </div>
-                        <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches" wire:target="loadBranches, selected_repository_id">
-                            Load Repository
-                            <x-loading-on-button wire:loading.delay wire:target="loadBranches, selected_repository_id" />
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate text-sm font-semibold text-black dark:text-fg">
+                                {{ data_get($ghapp, 'name') }}
+                            </div>
+                            <p class="mt-0.5 truncate text-xs text-neutral-500 dark:text-fg-dim">
+                                {{ data_get($ghapp, 'html_url') }}
+                            </p>
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+    @elseif ($current_step === 'repository')
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Choose repository</h2>
+                    <p>Search repositories available through {{ $github_app->name }}.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <x-forms.button wire:click.prevent="loadRepositories({{ $github_app->id }})">
+                        Refresh
+                    </x-forms.button>
+                    <a target="_blank" class="button" href="{{ getInstallationPath($github_app) }}">
+                        GitHub access
+                        <x-reicon name="arrow-right" class="size-3.5 -rotate-45" />
+                    </a>
+                </div>
+            </div>
+            <div class="application-settings-section-body">
+                @if ($repositories->isNotEmpty())
+                    <div class="flex items-end gap-2">
+                        <x-forms.searchable-listbox id="selected_repository_id" label="Repository" required live
+                            searchPlaceholder="Search repositories…"
+                            :options="$repositories->map(fn ($repository) => [
+                                'value' => data_get($repository, 'id'),
+                                'label' => data_get($repository, 'full_name', data_get($repository, 'name')),
+                            ])->values()->all()" />
+                        <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches"
+                            wire:loading.attr="disabled"
+                            wire:target="loadBranches,selected_repository_id">
+                            <x-loading-on-button wire:loading.delay
+                                wire:target="loadBranches,selected_repository_id" />
+                            Load repository
                         </x-forms.button>
                     </div>
                 @else
-                    <div>No repositories found. Check your GitHub App configuration.</div>
+                    <x-empty size="sm" title="No repositories available"
+                        description="Review this GitHub App installation and grant access to a repository." />
                 @endif
-                @if ($branches->count() > 0)
-                    <h2 class="text-lg font-bold">Configuration</h2>
-                    <div class="flex flex-col gap-2 pb-6">
-                        <form class="flex flex-col" wire:submit='submit'>
-                            <div class="flex flex-col gap-2 pb-6">
-                                <div class="flex gap-2">
-                                    <x-forms.select id="selected_branch_name" label="Branch">
-                                        <option value="default" disabled selected>Select a branch</option>
-                                        @foreach ($branches as $branch)
-                                            @if ($loop->first)
-                                                <option selected value="{{ data_get($branch, 'name') }}">
-                                                    {{ data_get($branch, 'name') }}
-                                                </option>
-                                            @else
-                                                <option value="{{ data_get($branch, 'name') }}">
-                                                    {{ data_get($branch, 'name') }}
-                                                </option>
-                                            @endif
-                                        @endforeach
-                                    </x-forms.select>
-                                    <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
-                                        <option value="nixpacks">Nixpacks</option>
-                                        <option value="railpack">Railpack (Beta)</option>
-                                        <option value="static">Static</option>
-                                        <option value="dockerfile">Dockerfile</option>
-                                        <option value="dockercompose">Docker Compose</option>
-                                    </x-forms.select>
-                                    @if ($is_static)
-                                        <x-forms.input id="publish_directory" label="Publish Directory"
-                                            helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
-                                    @endif
-                                </div>
-                                @if ($build_pack === 'dockercompose')
-                                    <div x-data="{
-                                        baseDir: '{{ $base_directory }}',
-                                        composeLocation: '{{ $docker_compose_location }}',
-                                        normalizePath(path) {
-                                            if (!path || path.trim() === '') return '/';
-                                            path = path.trim();
-                                            // Remove trailing slashes
-                                            path = path.replace(/\/+$/, '');
-                                            // Ensure leading slash
-                                            if (!path.startsWith('/')) {
-                                                path = '/' + path;
-                                            }
-                                            return path;
-                                        },
-                                        normalizeBaseDir() {
-                                            this.baseDir = this.normalizePath(this.baseDir);
-                                        },
-                                        normalizeComposeLocation() {
-                                            this.composeLocation = this.normalizePath(this.composeLocation);
-                                        }
-                                    }" class="gap-2 flex flex-col">
-                                        <x-forms.input placeholder="/" wire:model.defer="base_directory"
-                                            label="Base Directory"
-                                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir"
-                                            @blur="normalizeBaseDir()" />
-                                        <x-forms.input placeholder="/docker-compose.yaml"
-                                            wire:model.defer="docker_compose_location" label="Docker Compose Location"
-                                            helper="It is calculated together with the Base Directory."
-                                            x-model="composeLocation" @blur="normalizeComposeLocation()" />
-                                        <div class="pt-2">
-                                            <span>
-                                                Compose file location in your repository: </span><span
-                                                class='dark:text-warning'
-                                                x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></span>
-                                        </div>
-                                    </div>
-                                @else
-                                    <x-forms.input wire:model="base_directory" label="Base Directory"
-                                        helper="Directory to use as root. Useful for monorepos." />
-                                @endif
-                                @if ($show_is_static)
-                                    <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
-                                        helper="The port your application listens on." />
-                                    <div class="w-52">
-                                        <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                                            helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-                                    </div>
-                                @endif
+            </div>
+        </section>
+
+        @if ($branches->isNotEmpty())
+            <form wire:submit="submit">
+                <section class="application-settings-section">
+                    <div class="application-settings-section-header">
+                        <div>
+                            <h2>Build configuration</h2>
+                            <p>Choose the branch and build strategy for this application.</p>
+                        </div>
+                        <x-forms.button type="submit" wire:target="submit" isHighlighted>Continue</x-forms.button>
+                    </div>
+                    <div class="application-settings-section-body space-y-5">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.searchable-listbox id="selected_branch_name" label="Branch" required
+                                searchPlaceholder="Search branches…"
+                                :options="$branches->map(fn ($branch) => [
+                                    'value' => data_get($branch, 'name'),
+                                    'label' => data_get($branch, 'name'),
+                                ])->values()->all()" />
+                            <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
+                                ['value' => 'railpack', 'label' => 'Railpack'],
+                                ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                                ['value' => 'static', 'label' => 'Static'],
+                                ['value' => 'dockerfile', 'label' => 'Dockerfile'],
+                                ['value' => 'dockercompose', 'label' => 'Docker Compose'],
+                            ]" />
+                            @if ($show_is_static)
+                                <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
+                                    :options="[
+                                        ['value' => false, 'label' => 'Web application'],
+                                        ['value' => true, 'label' => 'Static site'],
+                                    ]" />
+                                <x-forms.input type="number" id="port" label="Port"
+                                    :readonly="$is_static || $build_pack === 'static'"
+                                    helper="Port the application listens on." />
+                            @endif
+                            @if ($is_static)
+                                <x-forms.input id="publish_directory" label="Publish directory"
+                                    helper="Directory containing the generated static assets." />
+                            @endif
+                        </div>
+
+                        @if ($build_pack === 'dockercompose')
+                            <div x-data="{
+                                baseDir: @js($base_directory),
+                                composeLocation: @js($docker_compose_location),
+                                normalize(path) {
+                                    if (!path || path.trim() === '') return '/';
+                                    const normalized = path.trim().replace(/\/+$/, '');
+                                    return normalized.startsWith('/') ? normalized : '/' + normalized;
+                                },
+                            }" class="grid gap-4 sm:grid-cols-2">
+                                <x-forms.input placeholder="/" wire:model.defer="base_directory"
+                                    label="Base directory" helper="Repository directory used as the build root."
+                                    x-model="baseDir" @blur="baseDir = normalize(baseDir)" />
+                                <x-forms.input placeholder="/docker-compose.yaml"
+                                    wire:model.defer="docker_compose_location" label="Compose file"
+                                    helper="Path relative to the base directory." x-model="composeLocation"
+                                    @blur="composeLocation = normalize(composeLocation)" />
+                                <p class="sm:col-span-2 text-xs text-neutral-500 dark:text-fg-dim">
+                                    Resolved file:
+                                    <code class="font-mono text-coollabs dark:text-warning"
+                                        x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></code>
+                                </p>
                             </div>
-                            <x-forms.button type="submit">
-                                Continue
-                            </x-forms.button>
-                @endif
-            @endif
-        </div>
-    @else
-        <div class="hero">
-            No GitHub Application found. Please create a new GitHub Application.
-        </div>
+                        @else
+                            <x-forms.input wire:model="base_directory" label="Base directory"
+                                helper="Repository directory used as the build root." />
+                        @endif
+                    </div>
+                </section>
+            </form>
+        @endif
     @endif
 </div>

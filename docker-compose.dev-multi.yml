@@ -1,0 +1,220 @@
+# Multi-instance Coolify (isolated project/network/volumes per instance).
+#
+#   ./scripts/dev-instances up          # a + b
+#   ./scripts/dev-instances urls
+#   ./scripts/dev-instances down
+#
+# Manual:
+#   docker compose -p coolify-a -f docker-compose.dev-multi.yml --env-file .dev-instances/a.env up -d
+#
+# Optional profiles: vite, mailpit, minio, testing-host
+#   ./scripts/dev-instances up a --with vite mailpit
+#
+# Ports (a / b): app 8000/8001, db 5432/5433, redis 6379/6380, soketi 6001/6011
+
+services:
+  coolify:
+    image: coolify:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/development/Dockerfile
+      args:
+        - USER_ID=${USERID:-1000}
+        - GROUP_ID=${GROUPID:-1000}
+    ports:
+      - "${APP_PORT:-8000}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      AUTORUN_ENABLED: "${AUTORUN_ENABLED:-false}"
+      APP_NAME: "${APP_NAME:-Coolify}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_ENV: "${APP_ENV:-local}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: "${DB_DATABASE:-coolify}"
+      DB_USERNAME: "${DB_USERNAME:-coolify}"
+      DB_PASSWORD: "${DB_PASSWORD:-password}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+      COOLIFY_CONTAINER_ROLE: all
+      PUSHER_HOST: ""
+      PUSHER_PORT: ""
+      PUSHER_SCHEME: http
+      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      BROADCAST_CONNECTION: pusher
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+    healthcheck:
+      test: curl -sf http://127.0.0.1:8080/api/health || exit 1
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - .:/var/www/html/:cached
+      - backups_data:/var/www/html/storage/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - coolify
+
+  postgres:
+    image: postgres:15-alpine
+    pull_policy: always
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-password}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - coolify
+
+  redis:
+    image: redis:7-alpine
+    pull_policy: always
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    volumes:
+      - redis_data:/data
+    networks:
+      - coolify
+
+  soketi:
+    image: coolify-realtime:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/coolify-realtime/Dockerfile
+    ports:
+      - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "${FORWARD_SOKETI_PORT_ALT:-6002}:6002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
+      - ./docker/coolify-realtime/terminal-utils.js:/terminal/terminal-utils.js
+    environment:
+      SOKETI_DEBUG: "false"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      SOKETI_HOST: "0.0.0.0"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:6001/ready && curl -fsS http://127.0.0.1:6002/ready || exit 1"]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
+    networks:
+      - coolify
+
+  vite:
+    profiles: ["vite"]
+    image: node:24-alpine
+    pull_policy: always
+    working_dir: /var/www/html
+    environment:
+      VITE_HOST: localhost
+      VITE_PORT: "${VITE_PORT:-5173}"
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    volumes:
+      - .:/var/www/html/:cached
+    command: sh -c "npm install && npm run dev -- --port ${VITE_PORT:-5173} --host"
+    networks:
+      - coolify
+
+  testing-host:
+    profiles: ["testing-host"]
+    image: coolify-testing-host:dev
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: ./docker/testing-host/Dockerfile
+    init: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - coolify_data:/data/coolify
+      - backups_data:/data/coolify/backups
+      - postgres_data:/data/coolify/_volumes/database
+      - redis_data:/data/coolify/_volumes/redis
+      - minio_data:/data/coolify/_volumes/minio
+    networks:
+      - coolify
+
+  mailpit:
+    profiles: ["mailpit"]
+    image: axllent/mailpit:latest
+    pull_policy: always
+    ports:
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+    networks:
+      - coolify
+
+  minio:
+    profiles: ["minio"]
+    image: coollabsio/maxio:latest
+    pull_policy: always
+    ports:
+      - "${FORWARD_MINIO_PORT:-9000}:9000"
+      - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - coolify
+
+  minio-init:
+    profiles: ["minio"]
+    image: minio/mc:latest
+    pull_policy: always
+    restart: "no"
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin 2>/dev/null; do sleep 2; done;
+      mc mb local/local --ignore-existing;
+      "
+    networks:
+      - coolify
+
+volumes:
+  backups_data:
+  postgres_data:
+  redis_data:
+  coolify_data:
+  minio_data:
+
+networks:
+  coolify:
+    driver: bridge

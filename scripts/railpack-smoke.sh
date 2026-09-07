@@ -9,7 +9,7 @@
 # build inputs landed correctly. Optionally curls the FQDN.
 #
 # Requires:
-#   - Dev stack running: spin up (or docker compose -f docker-compose.dev.yml up -d)
+#   - Dev stack running: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #   - Seeder run:        php artisan db:seed --class=DevelopmentRailpackExamplesSeeder
 #   - Personal token:    PersonalAccessTokenSeeder run (creates Bearer 'root')
 #   - jq, curl available on host

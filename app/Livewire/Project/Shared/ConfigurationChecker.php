@@ -21,6 +21,10 @@ class ConfigurationChecker extends Component
 
     public array $configurationDiff = [];
 
+    public int $missingRequiredEnvironmentVariableCount = 0;
+
+    public array $missingRequiredEnvironmentVariableNames = [];
+
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
     public function getListeners(): array
@@ -30,6 +34,7 @@ class ConfigurationChecker extends Component
         return [
             "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'configurationChanged',
             'configurationChanged' => 'configurationChanged',
+            'envsUpdated' => 'configurationChanged',
         ];
     }
 
@@ -41,11 +46,6 @@ class ConfigurationChecker extends Component
     public function render(): View
     {
         return view('livewire.project.shared.configuration-checker');
-    }
-
-    public function refreshConfigurationChanges(): void
-    {
-        $this->configurationChanged();
     }
 
     /**
@@ -81,17 +81,28 @@ class ConfigurationChecker extends Component
 
     public function configurationChanged(): void
     {
+        $this->loadConfigurationState();
+    }
+
+    private function loadConfigurationState(): void
+    {
         $this->resource->refresh();
+
+        if ($this->resource instanceof Service) {
+            $missingVariables = $this->resource->missingRequiredEnvironmentVariables();
+            $this->missingRequiredEnvironmentVariableCount = $missingVariables->count();
+            $this->missingRequiredEnvironmentVariableNames = $missingVariables->pluck('key')->all();
+        }
 
         if ($this->resource instanceof Application) {
             $diff = $this->resource->pendingDeploymentConfigurationDiff();
-            // Fail closed: only owners/admins may see unlocked env values.
-            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            $this->isConfigurationChanged = $diff->isChanged();
 
             $array = $diff->toArray();
-            $array['changes'] = $this->redactEnvironmentChanges($array['changes'] ?? [], $redactEnvironment);
 
-            $this->isConfigurationChanged = $diff->isChanged();
+            // Fail closed: only owners/admins may see unlocked env values.
+            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            $array['changes'] = $this->redactEnvironmentChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 
             return;

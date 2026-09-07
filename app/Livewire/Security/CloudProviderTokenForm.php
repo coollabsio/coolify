@@ -18,18 +18,23 @@ class CloudProviderTokenForm extends Component
 
     public string $provider = 'hetzner';
 
+    public bool $provider_locked = false;
+
     public string $token = '';
 
     public string $name = '';
 
     public ?string $description = null;
 
-    public function mount()
+    public function mount(?string $provider = null): void
     {
+        $this->provider_locked = filled($provider);
+        $this->provider = $provider ?? 'hetzner';
+
         try {
             $this->authorize('create', CloudProviderToken::class);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 
@@ -89,6 +94,7 @@ class CloudProviderTokenForm extends Component
 
     public function addToken()
     {
+        $this->authorize('create', CloudProviderToken::class);
         $this->validate();
 
         try {

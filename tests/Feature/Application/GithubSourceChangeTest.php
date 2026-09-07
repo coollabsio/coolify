@@ -653,4 +653,161 @@ describe('GitHub Source Change Component', function () {
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.github.ghe.com/app');
     });
+
+    test('isConnected is true only when app and installation are present', function () {
+        $incomplete = GithubApp::create([
+            'name' => 'Incomplete App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $connected = GithubApp::create([
+            'name' => 'Connected App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $public = new GithubApp([
+            'is_public' => true,
+        ]);
+
+        expect($incomplete->isConnected())->toBeFalse()
+            ->and($connected->isConnected())->toBeTrue()
+            ->and($public->isConnected())->toBeTrue();
+    });
+
+    test('shows connected badge and test connection for installed github apps', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Connected GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('isConnected', true)
+            ->assertSee('Connected')
+            ->assertSee('Test Connection');
+    });
+
+    test('testConnection succeeds when github app credentials are valid', function () {
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Connected GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
+                'date' => now()->toRfc7231String(),
+            ]),
+            'https://api.github.com/app' => Http::response([
+                'name' => 'Coolify GitHub App',
+                'slug' => 'coolify-github-app',
+            ]),
+            'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
+                'token' => 'ghs_test_installation_token',
+            ]),
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->call('testConnection')
+            ->assertDispatched('success', 'Connection successful! Authenticated as GitHub App: Coolify GitHub App');
+    });
+
+    test('testConnection fails when github app is not fully installed', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSuccessful()
+            ->assertSet('isConnected', false)
+            ->call('testConnection')
+            ->assertDispatched('error', 'GitHub App is not fully set up. Please complete installation first.');
+    });
+
+    test('sources list shows Connected for finished github apps', function () {
+        GithubApp::create([
+            'name' => 'Finished GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+            'is_public' => false,
+        ]);
+
+        $this->get(route('source.all'))
+            ->assertSuccessful()
+            ->assertSee('Finished GitHub App')
+            ->assertSee('Connected')
+            ->assertSee('Incomplete GitHub App')
+            ->assertSee('Setup required');
+    });
 });

@@ -229,6 +229,7 @@ if [ "$WARNING_SPACE" = true ]; then
 fi
 
 mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
+mkdir -p /data/coolify/images
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
@@ -834,7 +835,7 @@ update_env_var() {
     # If variable "key=" doesn't exist, append it to the file with value
     elif ! grep -q "^${key}=" "$ENV_FILE"; then
         printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
-        echo " - Added ${key} and it's value as the variable was missing"
+        echo " - Added ${key} and its value as the variable was missing"
     fi
 }
 

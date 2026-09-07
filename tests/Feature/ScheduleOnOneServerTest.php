@@ -48,3 +48,25 @@ it('schedules every production job with onOneServer', function () {
         );
     });
 });
+
+it('does not schedule Stripe subscription reconciliation automatically', function () {
+    $schedule = app(Schedule::class);
+
+    $event = collect($schedule->events())->first(
+        fn ($event) => str_contains((string) $event->description, 'SyncStripeSubscriptions')
+    );
+
+    expect($event)->toBeNull();
+});
+
+it('schedules stuck resource cleanup once per day on one server', function () {
+    $schedule = app(Schedule::class);
+
+    $event = collect($schedule->events())->first(
+        fn ($event) => str_contains($event->command, 'cleanup:stucked-resources')
+    );
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('0 0 * * *')
+        ->and($event->onOneServer)->toBeTrue();
+});
