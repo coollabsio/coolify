@@ -275,7 +275,7 @@
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
-                        <div x-cloak x-show="open" x-collapse
+                        <div x-cloak x-show="open" x-collapse.duration.200ms
                             class="mt-3 grid gap-4 rounded-lg border border-neutral-200 p-3 lg:grid-cols-2 dark:border-white/[0.08]">
                             <x-forms.input id="htmlUrl" label="GitLab URL"
                                 helper="Only change this for self-hosted GitLab (e.g. https://gitlab.example.com)." />

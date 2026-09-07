@@ -16,15 +16,19 @@ x-init="$watch('slideOverOpen', value => {
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
             class="relative z-99 ">
             <div x-show="slideOverOpen" @if (!$closeWithX) @click="slideOverOpen = false" @endif
+                x-transition:enter="transition-opacity ease-out duration-300"
+                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                x-transition:leave="transition-opacity ease-in duration-200"
+                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="fixed inset-0 dark:bg-black/60 backdrop-blur-xs"></div>
             <div class="fixed inset-0 overflow-hidden">
                 <div class="absolute inset-0 overflow-hidden ">
                     <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
                         <div x-show="slideOverOpen"
                             @if (!$closeWithX) @click.away="slideOverOpen = false" @endif
-                            x-transition:enter="transform transition ease-in-out duration-100 sm:duration-300"
+                            x-transition:enter="transform transition ease-[cubic-bezier(0.32,0.72,0,1)] duration-200 sm:duration-300"
                             x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-                            x-transition:leave="transform transition ease-in-out duration-100 sm:duration-300"
+                            x-transition:leave="transform transition ease-in duration-200"
                             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
                             @class([
                                 'max-w-xl w-screen' => !$fullScreen,

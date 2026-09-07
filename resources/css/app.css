@@ -77,6 +77,47 @@
        command palette. Lighter and consistent, replacing the old scattered
        0.45 / 0.35 / shadow-lg / shadow-sm mix. Modals keep --shadow-modal. */
     --shadow-dropdown: 0 4px 12px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.08);
+
+    /* Shared motion curves (stronger than the built-in CSS easings). Use these
+       for consistency: --ease-out for UI enter/press, --ease-drawer for
+       drawers/sheets, --ease-in-out for on-screen movement. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Shared press feedback: every button-like control dips slightly on press and
+   eases back, so pressable elements feel responsive and consistent app-wide. */
+.button,
+.icon-button,
+.app-tab,
+.split-action-main,
+.split-action-caret {
+    transition-property: color, background-color, border-color, box-shadow, transform;
+    transition-timing-function: var(--ease-out);
+    transition-duration: 120ms;
+}
+
+.button:not(:disabled):active,
+.icon-button:not(:disabled):active,
+.app-tab:active,
+.split-action-main:not(:disabled):active,
+.split-action-caret:not(:disabled):active {
+    transform: scale(0.97);
+}
+
+/* Focus border/ring on any form control should ease, not snap. The accent
+   focus indicator is a border-color and/or box-shadow (ring) change, which the
+   utilities' `transition-colors` did not fully animate. Target the elements
+   themselves (covers bespoke search fields too) plus the div-based controls. */
+input,
+textarea,
+select,
+.listbox-trigger,
+.chip-input {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-timing-function: var(--ease-out);
+    transition-duration: 120ms;
 }
 
 /*
@@ -1641,7 +1682,7 @@ html[data-theme="custom"] textarea:disabled {
 .application-settings-form .input:focus-visible,
 .application-settings-form .select:focus-visible {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent) !important;
+    box-shadow: none !important;
 }
 
 .application-settings-workspace textarea.input,
@@ -1951,6 +1992,61 @@ html[data-theme="custom"] textarea:disabled {
     flex-shrink: 0;
 }
 
+.split-action {
+    display: inline-flex;
+}
+
+.split-action-main,
+.split-action-caret {
+    @apply button-highlighted;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2rem;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.split-action-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 0.625rem;
+    border-radius: 6px 0 0 6px;
+}
+
+.split-action-caret {
+    flex-shrink: 0;
+    width: 1.75rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0 6px 6px 0;
+}
+
+.split-action > .split-action-main:only-of-type {
+    border-radius: 6px;
+}
+
+.split-action-main:disabled,
+.split-action-caret:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.split-action-main:focus-visible,
+.split-action-caret:focus-visible {
+    outline: none;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 40%, transparent);
+}
+
+.application-heading-actions .split-action-main,
+.application-heading-actions .split-action-caret {
+    height: 1.75rem;
+}
+
 /* Custom listbox (replaces native <select>) */
 .listbox-trigger {
     display: flex;
@@ -2000,7 +2096,7 @@ html[data-theme="custom"] textarea:disabled {
 .listbox-trigger:focus-visible {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 .listbox-panel {
@@ -2121,7 +2217,7 @@ html[data-theme="custom"] textarea:disabled {
 .searchable-listbox-search-input:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 /* Hide native WebKit search clear so custom clear buttons are not doubled */
@@ -3687,7 +3783,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .chip-input:focus-within {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 .chip-input input {

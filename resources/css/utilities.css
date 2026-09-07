@@ -83,12 +83,12 @@
 
     &:focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:where(.dark, .dark *):focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:read-only {
@@ -116,12 +116,12 @@
 
     &:focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:where(.dark, .dark *):focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 }
 

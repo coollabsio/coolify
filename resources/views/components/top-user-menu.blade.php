@@ -93,8 +93,13 @@
         </svg>
     </button>
 
-    <div x-show="open" x-cloak @class([
-            'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
+    <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+        @class([
+            'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
             'right-0! left-auto!' => ! $sidebar,
             'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
             'origin-bottom-left' => $sidebar,
@@ -124,7 +129,7 @@
                     stroke-linejoin="round" />
             </svg>
         </button>
-        <div x-show="appearanceOpen" x-collapse class="mx-1 grid gap-0.5 pb-1 pl-6">
+        <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 grid gap-0.5 pb-1 pl-6">
             @foreach ([
                 ['value' => 'light', 'label' => 'Light'],
                 ['value' => 'system', 'label' => 'System'],

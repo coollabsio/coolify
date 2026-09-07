@@ -315,7 +315,7 @@
                                         </svg>
                                     </button>
                                     <div>
-                                        <div x-show="open" x-collapse x-cloak
+                                        <div x-show="open" x-collapse.duration.200ms x-cloak
                                             class="nav-children flex flex-col gap-0.5 py-1">
                                             @foreach ($sections as $section)
                                                 <a class="menu-subitem"
