@@ -1141,44 +1141,93 @@ html:not(.dark) {
    --theme-base-color is enough to generate a complete dark surface ladder. */
 html[data-theme="custom"] {
     --theme-base-color: oklch(49.65% 0.2709 289.33);
-    --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, white);
+    --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, oklch(100% 0 0));
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
-    --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, #52525b);
-    --theme-placeholder-color: color-mix(in srgb, white 20%, var(--theme-base-color));
+    --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, oklch(44.19% 0.0146 285.79));
+    /* Accent text/icons sit directly on dark surfaces. Force the lightness into a
+       readable band (and tame chroma) so any picked hue keeps enough contrast. */
+    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.72, l, 0.86) min(c, 0.13) h);
+    /* Placeholders read as a light, near-neutral hint of the hue - never the raw
+       (possibly dark) base color, which is invisible on the dark input. */
+    --theme-placeholder-color: oklch(from var(--theme-base-color) 0.62 min(c, 0.03) h);
     --color-accent: var(--theme-bright-color);
     --color-coollabs: var(--theme-bright-color);
-    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, white);
-    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, black);
-    --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, black);
+    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(0% 0 0));
+    --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
     --color-accent-foreground: var(--theme-accent-foreground);
-    --color-app: color-mix(in oklab, var(--theme-base-color) 12%, #09090a);
-    --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, #0c0c0d);
-    --color-surface: color-mix(in oklab, var(--theme-base-color) 18%, #101011);
-    --color-raised: color-mix(in oklab, var(--theme-base-color) 24%, #141416);
-    --color-selected: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --color-app: color-mix(in oklab, var(--theme-base-color) 12%, oklch(14.03% 0.0022 286.11));
+    --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, oklch(15.48% 0.0021 286.15));
+    --color-surface: color-mix(in oklab, var(--theme-base-color) 18%, oklch(17.35% 0.0020 286.18));
+    --color-raised: color-mix(in oklab, var(--theme-base-color) 24%, oklch(19.21% 0.0040 286.02));
+    --color-selected: color-mix(in oklab, var(--theme-base-color) 32%, oklch(20.99% 0.0039 286.06));
     --color-coolgray-100: var(--color-surface);
     --color-coolgray-200: var(--color-raised);
     --color-coolgray-300: var(--color-selected);
-    --color-coolgray-400: color-mix(in oklab, var(--theme-base-color) 28%, #1b1b1e);
-    --color-coolgray-500: color-mix(in oklab, var(--theme-base-color) 32%, #202024);
+    --color-coolgray-400: color-mix(in oklab, var(--theme-base-color) 28%, oklch(22.34% 0.0058 285.92));
+    --color-coolgray-500: color-mix(in oklab, var(--theme-base-color) 32%, oklch(24.52% 0.0075 285.83));
     --coollabs-canvas: var(--color-app);
     --coollabs-elevated: var(--color-surface);
     --coollabs-recessed: var(--color-raised);
-    --coollabs-base: color-mix(in oklab, var(--theme-base-color) 22%, #111112);
+    --coollabs-base: color-mix(in oklab, var(--theme-base-color) 22%, oklch(17.81% 0.0020 286.19));
     --color-content-surface: var(--coollabs-base);
-    --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, oklch(20.99% 0.0039 286.06));
     --coollabs-line: var(--theme-border-color);
     --coollabs-hairline: color-mix(in srgb, var(--theme-border-color) 55%, var(--color-panel));
     --color-nav-text: oklch(91.08% 0.0157 306.4);
     --color-nav-muted: oklch(87.24% 0.0188 306.63);
     --color-nav-active: oklch(100.0% 0 0);
-    --color-log: color-mix(in oklab, var(--theme-base-color) 20%, #080809);
-    --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, #101011);
+    --color-log: color-mix(in oklab, var(--theme-base-color) 20%, oklch(13.49% 0.0024 286.07));
+    --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, oklch(17.35% 0.0020 286.18));
     --color-fg-dim: oklch(91.08% 0.0157 306.4);
     --color-fg-faint: oklch(87.24% 0.0188 306.63);
     --coollabs-subtle: oklch(87.24% 0.0188 306.63);
+}
+
+/* Light custom theme: the same single brand color, but surfaces tint toward
+   white and every foreground token flips to a dark, readable band. This selector
+   outranks the plain html:not(.dark) light palette, so it wins where they meet.
+   Accent fills (--theme-bright-color, --color-warning/coollabs) are inherited from
+   the block above so the JS-computed --theme-accent-foreground stays consistent. */
+html[data-theme="custom"]:not(.dark) {
+    --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-base-color) 45%, oklch(60% 0 0));
+    /* Accent text/icons on light surfaces: force lightness into a dark band. */
+    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.30, l, 0.48) min(c, 0.16) h);
+    /* Placeholder: medium-dark, near-neutral hint of the hue. */
+    --theme-placeholder-color: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    /* Surfaces hold a fixed high lightness (stays light, keeps dark text readable)
+       while injecting the base hue's chroma, so the tint is actually visible.
+       color-mix into white coupled lightness to the base and washed the tint out
+       (a 4% mix of any color into near-white is imperceptible). */
+    --color-app: oklch(from var(--theme-base-color) 96.5% min(c, 0.035) h);
+    --color-panel: oklch(from var(--theme-base-color) 98.5% min(c, 0.025) h);
+    --color-surface: oklch(from var(--theme-base-color) 98% min(c, 0.03) h);
+    --color-raised: oklch(from var(--theme-base-color) 95.5% min(c, 0.04) h);
+    --color-selected: oklch(from var(--theme-base-color) 92% min(c, 0.05) h);
+    --color-coolgray-100: var(--color-surface);
+    --color-coolgray-200: var(--color-raised);
+    --color-coolgray-300: var(--color-selected);
+    --color-coolgray-400: oklch(from var(--theme-base-color) 90% min(c, 0.05) h);
+    --color-coolgray-500: oklch(from var(--theme-base-color) 87% min(c, 0.055) h);
+    --coollabs-canvas: var(--color-app);
+    --coollabs-elevated: oklch(from var(--theme-base-color) 98.5% min(c, 0.025) h);
+    --coollabs-recessed: var(--color-raised);
+    --coollabs-base: oklch(from var(--theme-base-color) 99.3% min(c, 0.018) h);
+    --color-content-surface: var(--coollabs-base);
+    --coollabs-fill: oklch(from var(--theme-base-color) 91% min(c, 0.05) h);
+    --coollabs-line: oklch(from var(--theme-base-color) 82% min(c, 0.055) h);
+    --coollabs-hairline: oklch(from var(--theme-base-color) 88% min(c, 0.04) h);
+    --color-nav-text: oklch(from var(--theme-base-color) 0.40 min(c, 0.04) h);
+    --color-nav-muted: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    --color-nav-active: oklch(from var(--theme-base-color) 0.22 min(c, 0.05) h);
+    --color-log: oklch(from var(--theme-base-color) 96.5% min(c, 0.035) h);
+    --color-log-toolbar: oklch(from var(--theme-base-color) 93% min(c, 0.045) h);
+    --color-fg: oklch(from var(--theme-base-color) 0.22 min(c, 0.04) h);
+    --color-fg-dim: oklch(from var(--theme-base-color) 0.40 min(c, 0.04) h);
+    --color-fg-faint: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    --coollabs-subtle: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
 }
 
 html[data-theme="custom"] .control-selected,
@@ -1237,7 +1286,55 @@ html[data-theme="custom"] [class~="dark:bg-white/[0.025]"] {
 html[data-theme="custom"] input::placeholder,
 html[data-theme="custom"] textarea::placeholder {
     color: var(--theme-placeholder-color) !important;
-    opacity: 0.7;
+    /* The token is already a readable light tone; no extra opacity dampening,
+       which would drop it back below the contrast floor. */
+    opacity: 1;
+}
+
+/* Accent text/icons (links, badges, "update available" pill, check marks) use the
+   brand color as foreground on dark surfaces. Route them to the clamped, always
+   readable token; fills (bg-*) keep the brighter accent + its computed foreground. */
+html[data-theme="custom"] :is(
+    [class~="text-coollabs"],
+    [class~="text-warning"],
+    [class~="text-accent"],
+    [class~="dark:text-coollabs"],
+    [class~="dark:text-warning"]
+) {
+    color: var(--theme-fg-on-surface) !important;
+}
+
+html[data-theme="custom"] [class~="hover:text-coollabs"]:hover,
+html[data-theme="custom"] [class~="hover:text-warning"]:hover,
+html[data-theme="custom"] [class~="dark:hover:text-warning"]:hover,
+html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
+    color: var(--theme-fg-on-surface) !important;
+}
+
+/* Light custom theme reaches raw neutral utilities too. Dark mode tints
+   everything through the pervasive dark:bg-*/dark:border-* utilities (which
+   resolve to --color-* vars the block overrides); light mode has no equivalent,
+   so components fall back to hardcoded neutrals. Remap the dominant light
+   surface/border utilities to the tinted custom vars so the color reaches the
+   whole UI, not just design-system classes. */
+html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]) {
+    background-color: var(--coollabs-elevated) !important;
+}
+
+html[data-theme="custom"]:not(.dark) [class~="bg-neutral-50"] {
+    background-color: var(--coollabs-canvas) !important;
+}
+
+html[data-theme="custom"]:not(.dark) :is([class~="bg-neutral-100"], [class~="bg-neutral-200"]) {
+    background-color: var(--coollabs-fill) !important;
+}
+
+html[data-theme="custom"]:not(.dark) [class~="border-neutral-200"] {
+    border-color: var(--coollabs-hairline) !important;
+}
+
+html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
+    border-color: var(--coollabs-line) !important;
 }
 
 html[data-theme="custom"] input:read-only,

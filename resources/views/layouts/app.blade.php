@@ -70,10 +70,9 @@
             </header>
 
             {{-- ============ MOBILE SLIDE-OVER SIDEBAR (shadcn-style sheet) ============ --}}
-            <div class="mobile-sidebar-sheet relative z-[1000] lg:hidden" role="dialog" aria-modal="true"
+            <div class="mobile-sidebar-sheet relative z-[1000] lg:hidden"
                 x-on:keydown.escape.window="open = false"
-                x-on:livewire:navigated.window="open = false"
-                x-effect="document.body.classList.toggle('overflow-hidden', open)">
+                x-on:livewire:navigated.window="open = false">
                 {{-- Scrim: fades in/out --}}
                 <div class="fixed inset-0 bg-black/50" x-show="open" x-cloak x-on:click="open = false"
                     x-transition:enter="transition-opacity ease-out duration-300"
@@ -82,7 +81,8 @@
                     x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
                 {{-- Panel: slides in from the right (iOS drawer curve), exits faster --}}
                 <div class="fixed inset-y-0 right-0 flex" :class="!open && 'pointer-events-none'">
-                    <div x-show="open" x-cloak
+                    <div x-show="open" x-cloak x-trap.inert.noscroll="open"
+                        role="dialog" aria-modal="true" aria-label="Navigation menu"
                         x-transition:enter="transform transition ease-[cubic-bezier(0.32,0.72,0,1)] duration-300"
                         x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
                         x-transition:leave="transform transition ease-in duration-200"

@@ -11,10 +11,6 @@
 <div @class(['relative', 'min-w-0' => $sidebar]) x-data="{
     open: false,
     appearanceOpen: false,
-    theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
-    pageWidth: localStorage.getItem('pageWidth') || 'full',
-    themeColor: localStorage.getItem('themeColor') || '#6b16ed',
-    themeColorFrame: null,
     avatarUrl: @js($user?->avatar_path ? profile_avatar_url($user) : null),
     openPanel() {
         this.appearanceOpen = false;
@@ -22,51 +18,6 @@
     },
     closePanel() {
         this.open = false;
-    },
-    setTheme(type, closeMenu = true) {
-        this.theme = type;
-        localStorage.setItem('theme', type);
-
-        if (closeMenu) {
-            this.closePanel();
-        }
-
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = type === 'dark' || type === 'custom' || (type === 'system' && prefersDark);
-        document.documentElement.classList.toggle('dark', isDark);
-        document.documentElement.dataset.theme = type === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-        document.documentElement.style.setProperty('--theme-base-color', localStorage.themeColor || '#6b16ed');
-        document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-        document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
-    },
-    setWidth(width) {
-        this.pageWidth = width;
-        localStorage.setItem('pageWidth', width);
-        window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
-    },
-    previewThemeColor(color) {
-        this.themeColor = color;
-
-        if (this.theme !== 'custom') {
-            this.theme = 'custom';
-            document.documentElement.classList.add('dark');
-            document.documentElement.dataset.theme = 'custom';
-        }
-
-        if (this.themeColorFrame) {
-            return;
-        }
-
-        this.themeColorFrame = requestAnimationFrame(() => {
-            document.documentElement.style.setProperty('--theme-base-color', this.themeColor);
-            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-            this.themeColorFrame = null;
-        });
-    },
-    saveThemeColor(color) {
-        this.previewThemeColor(color);
-        localStorage.setItem('themeColor', color);
-        localStorage.setItem('theme', 'custom');
     },
 }" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
     @click.outside="closePanel()">
@@ -129,63 +80,8 @@
                     stroke-linejoin="round" />
             </svg>
         </button>
-        <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 grid gap-0.5 pb-1 pl-6">
-            @foreach ([
-                ['value' => 'light', 'label' => 'Light'],
-                ['value' => 'system', 'label' => 'System'],
-                ['value' => 'dark', 'label' => 'Dark'],
-                ['value' => 'custom', 'label' => 'Custom'],
-            ] as $option)
-                @if ($option['value'] === 'custom')
-                    <div
-                        class="relative flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <span class="flex items-center gap-2">
-                            <span class="size-3.5 rounded-full border border-white/20"
-                                :style="`background: ${themeColor}`"></span>
-                            Custom
-                        </span>
-                        <svg x-show="theme === 'custom'" class="size-3.5 text-coollabs dark:text-warning"
-                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <input type="color" :value="themeColor" @input="previewThemeColor($event.target.value)"
-                            @change="saveThemeColor($event.target.value)"
-                            aria-label="Custom theme color"
-                            class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
-                    </div>
-                @else
-                    <button type="button" @click="setTheme('{{ $option['value'] }}')"
-                        class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <span>{{ $option['label'] }}</span>
-                        <svg x-show="theme === '{{ $option['value'] }}'"
-                            class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
-                            aria-hidden="true">
-                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                @endif
-            @endforeach
-            <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
-            <div class="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
-                Page width
-            </div>
-            @foreach ([
-                ['value' => 'full', 'label' => 'Full width'],
-                ['value' => 'centered', 'label' => 'Centered'],
-            ] as $option)
-                <button type="button" @click="setWidth('{{ $option['value'] }}')"
-                    class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                    <span>{{ $option['label'] }}</span>
-                    <svg x-show="pageWidth === '{{ $option['value'] }}'"
-                        class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
-                        aria-hidden="true">
-                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </button>
-            @endforeach
+        <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 pb-1 pl-6">
+            <x-theme-controls variant="menu" />
         </div>
 
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
