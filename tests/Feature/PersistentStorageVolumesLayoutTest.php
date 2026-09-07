@@ -33,7 +33,6 @@ it('keeps storage backup schedule tables horizontally scrollable on mobile', fun
         ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
 });
 
-
 it('keeps nested storage component keys stable when mounts are added or deleted', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
 
@@ -43,7 +42,6 @@ it('keeps nested storage component keys stable when mounts are added or deleted'
         ->not->toContain('wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"')
         ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
 });
-
 
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;

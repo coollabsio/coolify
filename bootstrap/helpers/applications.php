@@ -207,6 +207,11 @@ function clone_application(Application $source, $destination, array $overrides =
         throw new RuntimeException('Destination does not belong to the current team.');
     }
 
+    $sourceServer = $source->destination->server;
+    foreach ($source->persistentStorages as $volume) {
+        $volume->ensureCloneTargetIsAvailable($cloneVolumeData, $sourceServer, $server);
+    }
+
     // Prepare name and URL
     $name = $overrides['name'] ?? 'clone-of-'.str($source->name)->limit(20).'-'.$uuid;
     $applicationSettings = $source->settings;
@@ -303,7 +308,9 @@ function clone_application(Application $source, $destination, array $overrides =
     $persistentVolumes = $source->persistentStorages()->get();
     foreach ($persistentVolumes as $volume) {
         $newName = '';
-        if (str_starts_with($volume->name, $source->uuid)) {
+        if ($volume->is_external || $volume->is_name_as_is) {
+            $newName = $volume->name;
+        } elseif (str_starts_with($volume->name, $source->uuid)) {
             $newName = str($volume->name)->replace($source->uuid, $newApplication->uuid);
         } else {
             $newName = $newApplication->uuid.'-'.str($volume->name)->afterLast('-');
@@ -320,13 +327,13 @@ function clone_application(Application $source, $destination, array $overrides =
         ]);
         $newPersistentVolume->save();
 
-        if ($cloneVolumeData) {
+        $sourceServer = $source->destination->server;
+        $targetServer = $newApplication->destination->server;
+        if ($volume->shouldCopyDataWhenCloning($cloneVolumeData, $sourceServer, $targetServer)) {
             try {
                 StopApplication::dispatch($source, false, false);
                 $sourceVolume = $volume->name;
                 $targetVolume = $newPersistentVolume->name;
-                $sourceServer = $source->destination->server;
-                $targetServer = $newApplication->destination->server;
 
                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 

@@ -13,11 +13,17 @@ class DeleteService
             $commands = [];
             foreach ($service->applications()->get() as $application) {
                 foreach ($application->persistentStorages()->get() as $storage) {
+                    if ($storage->is_external || $storage->is_name_as_is) {
+                        continue;
+                    }
                     $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
                 }
             }
             foreach ($service->databases()->get() as $database) {
                 foreach ($database->persistentStorages()->get() as $storage) {
+                    if ($storage->is_external || $storage->is_name_as_is) {
+                        continue;
+                    }
                     $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
                 }
             }

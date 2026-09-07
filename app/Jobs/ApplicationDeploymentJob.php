@@ -1992,7 +1992,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
                 throw new \InvalidArgumentException('Invalid build-time environment variable key.');
-
             }
 
             return $key;
@@ -3733,7 +3732,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $volume_name = $persistentStorage->name;
             }
             $isPreviewSuffixEnabled = (bool) data_get($persistentStorage, 'is_preview_suffix_enabled', true);
-            if ($this->pull_request_id !== 0 && $isPreviewSuffixEnabled) {
+            $isNameAsIs = (bool) data_get($persistentStorage, 'is_name_as_is', false);
+            if ($this->pull_request_id !== 0 && $isPreviewSuffixEnabled && ! $isNameAsIs) {
                 $volume_name = addPreviewDeploymentSuffix($volume_name, $this->pull_request_id);
             }
             $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
@@ -3752,14 +3752,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $name = $persistentStorage->name;
 
             $isPreviewSuffixEnabled = (bool) data_get($persistentStorage, 'is_preview_suffix_enabled', true);
-            if ($this->pull_request_id !== 0 && $isPreviewSuffixEnabled) {
+            $isNameAsIs = (bool) data_get($persistentStorage, 'is_name_as_is', false);
+            if ($this->pull_request_id !== 0 && $isPreviewSuffixEnabled && ! $isNameAsIs) {
                 $name = addPreviewDeploymentSuffix($name, $this->pull_request_id);
             }
 
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition($name);
         }
 
         return $local_persistent_volumes_names;

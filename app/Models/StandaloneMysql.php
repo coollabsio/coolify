@@ -15,9 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMysql extends BaseModel
 {
-
     use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasRestartLimit, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
-
 
     protected $fillable = [
         'uuid',
@@ -200,6 +198,9 @@ class StandaloneMysql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->is_external || $storage->is_name_as_is) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }

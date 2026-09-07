@@ -855,19 +855,32 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    $composeVolumeSource = $source->value();
+                    $volumeIdentity = 'compose-'.hash('sha256', "{$serviceName}:{$composeVolumeSource}");
+                    $composeVolumeName = $composeVolumeSource;
+                    $topLevelVolume = null;
                     if ($topLevel->get('volumes')->has($source->value())) {
-                        $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
+                        $topLevelVolume = $topLevel->get('volumes')->get($source->value());
+                        if (data_get($topLevelVolume, 'driver_opts.type') === 'cifs') {
                             continue;
                         }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
+                        if (data_get($topLevelVolume, 'driver_opts.type') === 'nfs') {
                             continue;
                         }
+                        $composeVolumeName = (string) (data_get($topLevelVolume, 'name') ?: $composeVolumeName);
                     }
+                    $existingVolume = $originalResource->persistentStorages()
+                        ->where('container_id', $volumeIdentity)
+                        ->first()
+                        ?? $originalResource->persistentStorages()
+                            ->whereNull('container_id')
+                            ->whereMountPath($target)
+                            ->first();
+                    $isNameAsIs = (bool) data_get($existingVolume, 'is_name_as_is', false);
                     $slugWithoutUuid = Str::slug($source, '-');
-                    $name = "{$uuid}_{$slugWithoutUuid}";
+                    $name = $isNameAsIs ? $composeVolumeName : "{$uuid}_{$slugWithoutUuid}";
 
-                    if ($isPullRequest) {
+                    if ($isPullRequest && ! $isNameAsIs) {
                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                     }
                     if (is_string($volume)) {
@@ -884,18 +897,23 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
                     $topLevel->get('volumes')->put($name, [
                         'name' => $name,
+                        'external' => (bool) data_get($topLevelVolume, 'external', false),
                     ]);
                     LocalPersistentVolume::updateOrCreate(
-                        [
-                            'name' => $name,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ],
+                        $existingVolume
+                            ? ['id' => $existingVolume->id]
+                            : [
+                                'container_id' => $volumeIdentity,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ],
                         [
                             'name' => $name,
                             'mount_path' => $target,
+                            'container_id' => $volumeIdentity,
                             'resource_id' => $originalResource->id,
                             'resource_type' => get_class($originalResource),
+                            'is_external' => (bool) data_get($topLevelVolume, 'external', false),
                         ]
                     );
                 }
@@ -2245,17 +2263,30 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    $composeVolumeSource = $source->value();
+                    $volumeIdentity = 'compose-'.hash('sha256', "{$serviceName}:{$composeVolumeSource}");
+                    $composeVolumeName = $composeVolumeSource;
+                    $topLevelVolume = null;
                     if ($topLevel->get('volumes')->has($source->value())) {
-                        $temp = $topLevel->get('volumes')->get($source->value());
-                        if (data_get($temp, 'driver_opts.type') === 'cifs') {
+                        $topLevelVolume = $topLevel->get('volumes')->get($source->value());
+                        if (data_get($topLevelVolume, 'driver_opts.type') === 'cifs') {
                             continue;
                         }
-                        if (data_get($temp, 'driver_opts.type') === 'nfs') {
+                        if (data_get($topLevelVolume, 'driver_opts.type') === 'nfs') {
                             continue;
                         }
+                        $composeVolumeName = (string) (data_get($topLevelVolume, 'name') ?: $composeVolumeName);
                     }
+                    $existingVolume = $originalResource->persistentStorages()
+                        ->where('container_id', $volumeIdentity)
+                        ->first()
+                        ?? $originalResource->persistentStorages()
+                            ->whereNull('container_id')
+                            ->whereMountPath($target)
+                            ->first();
+                    $isNameAsIs = (bool) data_get($existingVolume, 'is_name_as_is', false);
                     $slugWithoutUuid = Str::slug($source, '-');
-                    $name = "{$uuid}_{$slugWithoutUuid}";
+                    $name = $isNameAsIs ? $composeVolumeName : "{$uuid}_{$slugWithoutUuid}";
 
                     if (is_string($volume)) {
                         $parsed = parseDockerVolumeString($volume);
@@ -2271,18 +2302,23 @@ function serviceParser(Service $resource): Collection
                     }
                     $topLevel->get('volumes')->put($name, [
                         'name' => $name,
+                        'external' => (bool) data_get($topLevelVolume, 'external', false),
                     ]);
                     LocalPersistentVolume::updateOrCreate(
-                        [
-                            'name' => $name,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ],
+                        $existingVolume
+                            ? ['id' => $existingVolume->id]
+                            : [
+                                'container_id' => $volumeIdentity,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ],
                         [
                             'name' => $name,
                             'mount_path' => $target,
+                            'container_id' => $volumeIdentity,
                             'resource_id' => $originalResource->id,
                             'resource_type' => get_class($originalResource),
+                            'is_external' => (bool) data_get($topLevelVolume, 'external', false),
                         ]
                     );
                 }

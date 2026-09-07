@@ -259,10 +259,7 @@ class StartPostgresql
                 continue;
             }
             $name = $persistentStorage->name;
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition();
         }
 
         return $local_persistent_volumes_names;

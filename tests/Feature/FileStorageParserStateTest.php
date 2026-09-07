@@ -31,6 +31,34 @@ services:
       - ./data:/app/data
 YAML;
 
+const NAMED_VOLUME_COMPOSE = <<<'YAML'
+services:
+  app:
+    image: nginx:latest
+    volumes:
+      - app-data:/app/data
+volumes:
+  app-data:
+    name: shared-app-data
+YAML;
+
+const SAME_TARGET_NAMED_VOLUMES_COMPOSE = <<<'YAML'
+services:
+  database:
+    image: postgres:latest
+    volumes:
+      - database-data:/data
+  cache:
+    image: redis:latest
+    volumes:
+      - cache-data:/data
+volumes:
+  database-data:
+    name: shared-database-data
+  cache-data:
+    name: shared-cache-data
+YAML;
+
 beforeEach(function () {
     Bus::fake();
 
@@ -168,4 +196,74 @@ it('defaults new service bind mounts to directories', function () {
 
     expect($fileVolume->content)->toBeNull()
         ->and($fileVolume->is_directory)->toBeTrue();
+});
+
+it('preserves a Docker Compose application volume name when enabled', function () {
+    $application = makeComposeApplication(NAMED_VOLUME_COMPOSE);
+
+    applicationParser($application);
+
+    $storage = $application->persistentStorages()->sole();
+    $storage->update(['is_name_as_is' => true]);
+
+    applicationParser($application->fresh());
+
+    $storage = $application->persistentStorages()->sole();
+
+    expect($storage->name)->toBe('shared-app-data')
+        ->and($storage->is_name_as_is)->toBeTrue();
+});
+
+it('preserves a Docker Compose service volume name when enabled', function () {
+    [$service, $serviceApplication] = makeComposeService(NAMED_VOLUME_COMPOSE);
+
+    serviceParser($service);
+
+    $storage = $serviceApplication->persistentStorages()->sole();
+    $storage->update(['is_name_as_is' => true]);
+
+    serviceParser($service->fresh());
+
+    $storage = $serviceApplication->persistentStorages()->sole();
+
+    expect($storage->name)->toBe('shared-app-data')
+        ->and($storage->is_name_as_is)->toBeTrue();
+});
+
+it('keeps settings separate for application volumes mounted to the same target by different services', function () {
+    $application = makeComposeApplication(SAME_TARGET_NAMED_VOLUMES_COMPOSE);
+
+    applicationParser($application);
+
+    expect($application->persistentStorages()->count())->toBe(2);
+
+    $databaseStorage = $application->persistentStorages()
+        ->where('name', $application->uuid.'_database-data')
+        ->sole();
+    $databaseStorage->update(['is_name_as_is' => true]);
+
+    applicationParser($application->fresh());
+
+    $storages = $application->persistentStorages()->get();
+
+    expect($storages)->toHaveCount(2)
+        ->and($storages->where('name', 'shared-database-data')->sole()->is_name_as_is)->toBeTrue()
+        ->and($storages->where('name', $application->uuid.'_cache-data')->sole()->is_name_as_is)->toBeFalse();
+});
+
+it('stores a bounded identity for long Compose service and volume names', function () {
+    $volumeName = str_repeat('v', 255);
+    $application = makeComposeApplication(<<<YAML
+services:
+  application-service-with-a-long-name:
+    image: nginx:latest
+    volumes:
+      - {$volumeName}:/data
+volumes:
+  {$volumeName}: {}
+YAML);
+
+    applicationParser($application);
+
+    expect(strlen($application->persistentStorages()->sole()->container_id))->toBeLessThanOrEqual(255);
 });

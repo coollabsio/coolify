@@ -52,7 +52,8 @@
                                     x-transition.origin.top.left
                                     class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!">
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-                                        @click="volumeModalOpen = true; dropdownOpen = false">
+                                        @click="volumeModalOpen = true; dropdownOpen = false"
+                                        wire:click="loadExistingVolumes">
                                         <x-reicon name="storages" class="size-3.5 shrink-0 opacity-70" />
                                         Volume mount
                                     </button>
@@ -117,8 +118,32 @@
                                                     Mount a Docker volume inside the container.
                                                 </p>
                                                 <div class="flex flex-col gap-4">
-                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
-                                                        id="name" label="Name" required helper="Volume name." />
+                                                    <div wire:key="existing-volumes-{{ md5(json_encode($existingVolumes)) }}">
+                                                        <x-forms.datalist canGate="update" :canResource="$resource"
+                                                            id="existing_volume" wire:model.live="existing_volume"
+                                                            label="Existing Volume"
+                                                            placeholder="Search volumes on this server..."
+                                                            helper="Select an existing Docker volume, or leave this empty to create a new one."
+                                                            autofocus>
+                                                            <option value="">Create a new volume instead</option>
+                                                            @foreach ($existingVolumes as $volume)
+                                                                <option value="{{ $volume }}">{{ $volume }}</option>
+                                                            @endforeach
+                                                        </x-forms.datalist>
+                                                    </div>
+                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400"
+                                                        wire:loading wire:target="loadExistingVolumes">
+                                                        Loading volumes from the server...
+                                                    </div>
+                                                    <x-callout type="warning" title="Data corruption risk" class="p-3">
+                                                        Attaching an existing volume that is already used by another container can cause data corruption.
+                                                        Only attach it when you understand how it is used and no other container will write to it at the same time.
+                                                    </x-callout>
+                                                    @if (blank($existing_volume))
+                                                        <x-forms.input canGate="update" :canResource="$resource"
+                                                            placeholder="pv-name" id="name" label="Name" required
+                                                            helper="Name for the new volume." />
+                                                    @endif
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/tmp/root" id="mount_path" label="Destination Path"
                                                         required helper="Directory inside the container." />

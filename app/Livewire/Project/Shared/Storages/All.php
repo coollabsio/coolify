@@ -22,7 +22,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isNameAsIs: bool, isReadOnly: bool, canDeleteStale: bool}>
      */
     public array $forms = [];
 
@@ -142,6 +142,32 @@ class All extends Component
         }
     }
 
+    public function saveNameAsIs(int $storageId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        if ($storageId <= 0 || ! isset($this->forms[$storageId])) {
+            return;
+        }
+
+        $storage = $this->findStorageOrFail($storageId);
+        if (! $storage->isServiceResource() && ! $storage->isDockerComposeResource()) {
+            $this->forms[$storageId]['isNameAsIs'] = false;
+
+            return;
+        }
+
+        $this->validate([
+            "forms.{$storageId}.isNameAsIs" => 'required|boolean',
+        ]);
+
+        $storage->is_name_as_is = (bool) $this->forms[$storageId]['isNameAsIs'];
+        $storage->save();
+
+        $this->dispatch('configurationChanged');
+        $this->dispatch('success', 'Storage updated successfully');
+    }
+
     public function delete(int $storageId, $password = '', $selectedActions = [])
     {
         $this->authorize('update', $this->resource);
@@ -214,6 +240,7 @@ class All extends Component
                 'mountPath' => $storage->mount_path,
                 'hostPath' => $storage->host_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
+                'isNameAsIs' => (bool) ($storage->is_name_as_is ?? false),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
@@ -325,8 +352,9 @@ class All extends Component
                 ->where('resource_id', $this->resource->id)
                 ->where('resource_type', $this->resource->getMorphClass())
                 ->firstOrFail();
-            $storage->setRelation('resource', $this->resource);
         }
+
+        $storage->setRelation('resource', $this->resource);
 
         return $storage;
     }

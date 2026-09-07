@@ -102,6 +102,23 @@ class CloneMe extends Component
             if (! $selectedDestination) {
                 throw new \Exception('Destination not found.');
             }
+            foreach ($this->environment->applications as $application) {
+                foreach ($application->persistentStorages as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $application->destination->server, $selectedDestination->server);
+                }
+            }
+            foreach ($this->environment->databases() as $database) {
+                foreach ($database->persistentStorages as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $database->destination->server, $selectedDestination->server);
+                }
+            }
+            foreach ($this->environment->services as $service) {
+                foreach ($service->applications()->get()->merge($service->databases()->get()) as $resource) {
+                    foreach ($resource->persistentStorages as $volume) {
+                        $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $service->server, $selectedDestination->server);
+                    }
+                }
+            }
             auditLog('ui.project.clone_started', [
                 'team_id' => $this->project->team_id,
                 'project_uuid' => $this->project->uuid,
@@ -174,7 +191,9 @@ class CloneMe extends Component
                     $originalName = $volume->name;
                     $newName = '';
 
-                    if (str_starts_with($originalName, 'postgres-data-')) {
+                    if ($volume->is_external || $volume->is_name_as_is) {
+                        $newName = $originalName;
+                    } elseif (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
                         $newName = 'mysql-data-'.$newDatabase->uuid;
@@ -209,14 +228,13 @@ class CloneMe extends Component
                     ]);
                     $newPersistentVolume->save();
 
-                    if ($this->cloneVolumeData) {
+                    $sourceServer = $database->destination->server;
+                    $targetServer = $newDatabase->destination->server;
+                    if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                         try {
                             StopDatabase::dispatch($database);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $database->destination->server;
-                            $targetServer = $newDatabase->destination->server;
-
                             VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             StartDatabase::dispatch($database);
@@ -323,7 +341,9 @@ class CloneMe extends Component
                     $persistentVolumes = $application->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $application->uuid)) {
+                        if ($volume->is_external || $volume->is_name_as_is) {
+                            $newName = $volume->name;
+                        } elseif (str_starts_with($volume->name, $application->uuid)) {
                             $newName = str($volume->name)->replace($application->uuid, $application->uuid);
                         } else {
                             $newName = $application->uuid.'-'.$volume->name;
@@ -340,14 +360,13 @@ class CloneMe extends Component
                         ]);
                         $newPersistentVolume->save();
 
-                        if ($this->cloneVolumeData) {
+                        $sourceServer = $application->service->destination->server;
+                        $targetServer = $newService->destination->server;
+                        if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                             try {
                                 StopService::dispatch($application);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $application->service->destination->server;
-                                $targetServer = $newService->destination->server;
-
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($application);
@@ -378,7 +397,9 @@ class CloneMe extends Component
                     $persistentVolumes = $database->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $database->uuid)) {
+                        if ($volume->is_external || $volume->is_name_as_is) {
+                            $newName = $volume->name;
+                        } elseif (str_starts_with($volume->name, $database->uuid)) {
                             $newName = str($volume->name)->replace($database->uuid, $database->uuid);
                         } else {
                             $newName = $database->uuid.'-'.$volume->name;
@@ -395,14 +416,13 @@ class CloneMe extends Component
                         ]);
                         $newPersistentVolume->save();
 
-                        if ($this->cloneVolumeData) {
+                        $sourceServer = $database->service->destination->server;
+                        $targetServer = $newService->destination->server;
+                        if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                             try {
                                 StopService::dispatch($database->service);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $database->service->destination->server;
-                                $targetServer = $newService->destination->server;
-
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($database->service);

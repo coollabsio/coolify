@@ -65,6 +65,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
     {
         $srcVol = escapeshellarg($this->sourceVolume);
         $tgtVol = escapeshellarg($this->targetVolume);
+        $this->persistentVolume->ensureCloneTargetIsAvailable(true, $this->sourceServer, $this->targetServer);
         $sourceCloneDir = "{$this->cloneDir}/{$this->sourceVolume}";
         $targetCloneDir = "{$this->cloneDir}/{$this->targetVolume}";
         $srcDir = escapeshellarg($sourceCloneDir);

@@ -7,6 +7,45 @@ servers:
     url: 'https://app.coolify.io/api/v1'
     description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
 paths:
+  '/applications/{uuid}/secret-manager':
+    patch:
+      tags:
+        - 'Secret Managers'
+      summary: 'Configure Application Secret Manager'
+      description: 'Configure the secret manager source used by an application.'
+      operationId: configure-application-secret-manager
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - integration_token_uuid
+              properties:
+                integration_token_uuid:
+                  type: string
+                settings:
+                  type: object
+              type: object
+      responses:
+        '200':
+          description: 'Secret manager configured.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /applications:
     get:
       tags:
@@ -2307,6 +2346,99 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Preview Deployment'
+      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
+      operationId: delete-preview-deployment-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview to delete.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Preview deletion queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Preview Domains'
+      description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.'
+      operationId: update-preview-domains-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                domains:
+                  type: [string, 'null']
+                  example: 'https://pr.example.com:3000'
+                docker_compose_domains:
+                  type: [array, 'null']
+                  items: { properties: { name: { type: string }, domain: { type: [string, 'null'] }, redirect: { type: [string, 'null'], enum: [www, non-www, both] } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+              type: object
+      responses:
+        '200':
+          description: 'Preview domains updated.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflict.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/envs':
     get:
       tags:
@@ -2957,48 +3089,6 @@ paths:
       responses:
         '200':
           description: 'Storage deleted.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
-  '/applications/{uuid}/previews/{pull_request_id}':
-    delete:
-      tags:
-        - Applications
-      summary: 'Delete Preview Deployment'
-      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
-      operationId: delete-preview-deployment-by-pull-request-id
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-        -
-          name: pull_request_id
-          in: path
-          description: 'Pull request ID of the preview to delete.'
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: 'Preview deletion queued.'
           content:
             application/json:
               schema:
@@ -7490,12 +7580,86 @@ paths:
       security:
         -
           bearerAuth: []
+  /settings/email:
+    get:
+      tags:
+        - Settings
+      summary: 'Get instance email settings'
+      description: 'Get instance-wide SMTP and Resend settings. Requires a root-team token belonging to a root-team admin or owner. Sensitive fields require the `read:sensitive` or `root` token ability.'
+      operationId: get-instance-email-settings
+      responses:
+        '200':
+          description: 'Instance email settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Settings
+      summary: 'Update instance email settings'
+      description: 'Update instance-wide SMTP and Resend settings. Requires `write:sensitive` and a root-team token belonging to a root-team admin or owner.'
+      operationId: update-instance-email-settings
+      responses:
+        '200':
+          description: 'Updated instance email settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /security/integration-tokens:
+    post:
+      tags:
+        - 'Secret Managers'
+      summary: 'Create Secret Manager Token'
+      description: 'Create and validate a Doppler, Infisical, or Vault integration token.'
+      operationId: create-secret-manager-integration-token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - provider
+                - name
+                - token
+              properties:
+                provider:
+                  type: string
+                  enum: [doppler, infisical, vault]
+                name:
+                  type: string
+                token:
+                  type: string
+                metadata:
+                  type: object
+              type: object
+      responses:
+        '201':
+          description: 'Integration token created.'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /notifications/email:
     get:
       tags:
         - Notifications
       summary: 'Get email notification settings'
-      description: 'Get the current team email notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
+      description: 'Get the current team email notification settings, including `smtp_ehlo_domain`, the hostname sent with SMTP EHLO. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
       operationId: get-current-team-email-notifications
       responses:
         '200':
@@ -7511,7 +7675,7 @@ paths:
       tags:
         - Notifications
       summary: 'Update email notification settings'
-      description: 'Update the current team email notification settings.'
+      description: 'Update the current team email notification settings. Set `smtp_ehlo_domain` to a valid hostname to control the SMTP EHLO domain, or `null` to use the system default.'
       operationId: update-current-team-email-notifications
       responses:
         '200':
@@ -10658,6 +10822,8 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                is_force_https_enabled:
+                  type: [boolean, 'null']
               type: object
       responses:
         '200':
@@ -13659,7 +13825,7 @@ components:
           minimum: 0
         timeout:
           type: integer
-          default: 3600
+          default: 36000
           maximum: 36000
           minimum: 60
       type: object
@@ -14429,6 +14595,8 @@ components:
           type: integer
         deployment_queue_limit:
           type: integer
+        backup_compression_cpu_percentage:
+          type: integer
         dynamic_timeout:
           type: integer
         force_disabled:
@@ -14504,6 +14672,22 @@ components:
         connection_timeout:
           type: integer
           description: 'SSH connection timeout in seconds.'
+        docker_version:
+          type: string
+          nullable: true
+          description: 'Detected Docker Engine version on the server.'
+        docker_version_checked_at:
+          type: string
+          nullable: true
+          description: 'When Docker Engine version was last detected.'
+        compose_version:
+          type: string
+          nullable: true
+          description: 'Detected Docker Compose plugin version on the server.'
+        compose_version_checked_at:
+          type: string
+          nullable: true
+          description: 'When Docker Compose version was last detected.'
       type: object
     Service:
       description: 'Service model'
@@ -14734,6 +14918,9 @@ components:
       scheme: bearer
 tags:
   -
+    name: 'Secret Managers'
+    description: 'Secret Managers'
+  -
     name: Applications
     description: Applications
   -
@@ -14763,6 +14950,9 @@ tags:
   -
     name: Hetzner
     description: Hetzner
+  -
+    name: Settings
+    description: Settings
   -
     name: Notifications
     description: Notifications

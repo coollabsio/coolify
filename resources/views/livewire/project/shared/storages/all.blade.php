@@ -57,6 +57,12 @@
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
+                                @if ($isComposeOrService && $canUpdate)
+                                    <x-forms.checkbox id="forms.{{ $id }}.isNameAsIs"
+                                        instantSave="saveNameAsIs({{ $id }})"
+                                        label="Use volume name as-is"
+                                        helper="Use the Docker Compose volume name without adding a resource UUID or preview suffix. Shared access can corrupt data." />
+                                @endif
                             </div>
 
                             <div class="volumes-col-source min-w-0">

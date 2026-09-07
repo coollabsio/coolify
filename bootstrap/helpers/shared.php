@@ -2774,14 +2774,29 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
+                            $composeVolumeSource = $source->value();
+                            $volumeIdentity = 'compose-'.hash('sha256', "{$savedService->name}:{$composeVolumeSource}");
+                            $composeVolumeName = $composeVolumeSource;
+                            $topLevelVolume = null;
                             if ($topLevelVolumes->has($source->value())) {
-                                $v = $topLevelVolumes->get($source->value());
-                                if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                $topLevelVolume = $topLevelVolumes->get($source->value());
+                                if (data_get($topLevelVolume, 'driver_opts.type') === 'cifs') {
                                     return $volume;
                                 }
+                                $composeVolumeName = (string) (data_get($topLevelVolume, 'name') ?: $composeVolumeName);
                             }
+                            $existingVolume = $savedService->persistentStorages()
+                                ->where('container_id', $volumeIdentity)
+                                ->first()
+                                ?? $savedService->persistentStorages()
+                                    ->whereNull('container_id')
+                                    ->whereMountPath($target)
+                                    ->first();
+                            $isNameAsIs = (bool) data_get($existingVolume, 'is_name_as_is', false);
                             $slugWithoutUuid = Str::slug($source, '-');
-                            $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
+                            $name = $isNameAsIs
+                                ? $composeVolumeName
+                                : "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
                                 $source = str($volume)->before(':');
                                 $target = str($volume)->after(':')->beforeLast(':');
@@ -2792,18 +2807,23 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $topLevelVolumes->put($name, [
                                 'name' => $name,
+                                'external' => (bool) data_get($topLevelVolume, 'external', false),
                             ]);
                             LocalPersistentVolume::updateOrCreate(
-                                [
-                                    'mount_path' => $target,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ],
+                                $existingVolume
+                                    ? ['id' => $existingVolume->id]
+                                    : [
+                                        'container_id' => $volumeIdentity,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService),
+                                    ],
                                 [
                                     'name' => $name,
                                     'mount_path' => $target,
+                                    'container_id' => $volumeIdentity,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
+                                    'is_external' => (bool) data_get($topLevelVolume, 'external', false),
                                 ]
                             );
                         }
