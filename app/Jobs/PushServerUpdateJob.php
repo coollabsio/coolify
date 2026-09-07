@@ -17,6 +17,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -519,6 +520,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneCassandra::class,
         ])->flatMap(function (string $databaseClass) use ($databaseColumns, $standaloneDockerIds, $swarmDockerIds) {
             return $databaseClass::query()
                 ->select($databaseColumns)

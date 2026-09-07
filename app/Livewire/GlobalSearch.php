@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -202,6 +203,7 @@ class GlobalSearch extends Component
             'new mongodb' => 'mongodb',
             'new mongo' => 'mongodb',
             'new clickhouse' => 'clickhouse',
+            'new cassandra' => 'cassandra',
         ];
 
         foreach ($resourceMap as $command => $type) {
@@ -237,7 +239,7 @@ class GlobalSearch extends Component
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
-            'dragonfly', 'mongodb', 'clickhouse',
+            'dragonfly', 'mongodb', 'clickhouse', 'cassandra',
         ]) || str_starts_with($type, 'one-click-service-')) {
             return $user->can('createAnyResource');
         }
@@ -509,6 +511,27 @@ class GlobalSearch extends Component
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
                             'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
+                        ];
+                    })
+            );
+
+            // Cassandra
+            $databases = $databases->merge(
+                StandaloneCassandra::ownedByCurrentTeam()
+                    ->with(['environment.project'])
+                    ->get()
+                    ->map(function ($db) {
+                        return [
+                            'id' => $db->id,
+                            'name' => $db->name,
+                            'type' => 'database',
+                            'subtype' => 'cassandra',
+                            'uuid' => $db->uuid,
+                            'description' => $db->description,
+                            'link' => $db->link(),
+                            'project' => $db->environment->project->name ?? null,
+                            'environment' => $db->environment->name ?? null,
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' cassandra '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -1122,6 +1145,16 @@ class GlobalSearch extends Component
                 'type' => 'clickhouse',
                 'category' => 'Databases',
                 'logo' => 'svgs/clickhouse-icon.svg',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'Cassandra',
+                'description' => 'Distributed wide-column NoSQL database',
+                'quickcommand' => '(type: new cassandra)',
+                'type' => 'cassandra',
+                'category' => 'Databases',
+                'logo' => 'svgs/cassandra-icon.svg',
                 'resourceType' => 'database',
             ]);
         }

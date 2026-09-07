@@ -7,6 +7,7 @@ use App\Models\LocalFileVolume;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -26,7 +27,7 @@ class FileStorage extends Component
 
     public LocalFileVolume $fileStorage;
 
-    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneCassandra|ServiceDatabase|Application $resource;
 
     public string $fs_path;
 

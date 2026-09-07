@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -10,7 +11,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 
 const REDACTED = '<REDACTED>';
-const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'cassandra'];
 const STANDALONE_DATABASE_MODELS = [
     'postgresql' => StandalonePostgresql::class,
     'redis' => StandaloneRedis::class,
@@ -20,6 +21,7 @@ const STANDALONE_DATABASE_MODELS = [
     'keydb' => StandaloneKeydb::class,
     'dragonfly' => StandaloneDragonfly::class,
     'clickhouse' => StandaloneClickhouse::class,
+    'cassandra' => StandaloneCassandra::class,
 ];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
@@ -69,6 +71,7 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
+    'cassandra',
     'timescaledb/timescaledb',
     'timescaledb',  // Matches timescale/timescaledb
     'timescaledb-ha',  // Matches timescale/timescaledb-ha

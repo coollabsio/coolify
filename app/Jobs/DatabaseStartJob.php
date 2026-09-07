@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Database\StartCassandra;
 use App\Actions\Database\StartClickhouse;
 use App\Actions\Database\StartDragonfly;
 use App\Actions\Database\StartKeydb;
@@ -12,6 +13,7 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -62,6 +64,7 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneKeydb::class => StartKeydb::run($database, $activity),
             StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
+            StandaloneCassandra::class => StartCassandra::run($database, $activity),
         };
 
         event(new DatabaseStatusChanged($this->userId));

@@ -9,6 +9,7 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -154,6 +155,7 @@ class ScheduledJobs extends Component
                 ->loadMorph('database', [
                     ServiceDatabase::class => ['service.environment.project'],
                     StandaloneClickhouse::class => ['environment.project'],
+                    StandaloneCassandra::class => ['environment.project'],
                     StandaloneDragonfly::class => ['environment.project'],
                     StandaloneKeydb::class => ['environment.project'],
                     StandaloneMariadb::class => ['environment.project'],

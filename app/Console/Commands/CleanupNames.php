@@ -10,6 +10,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -49,6 +50,7 @@ class CleanupNames extends Command
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneCassandra' => StandaloneCassandra::class,
         'S3Storage' => S3Storage::class,
         'Tag' => Tag::class,
         'PrivateKey' => PrivateKey::class,

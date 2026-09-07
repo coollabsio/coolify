@@ -70,6 +70,7 @@ class DatabasesController extends Controller
                 'mongo_initdb_root_password',
                 'keydb_password',
                 'clickhouse_admin_password',
+                'cassandra_admin_password',
                 'mysql_password',
                 'mysql_root_password',
                 'mariadb_password',
@@ -521,6 +522,13 @@ class DatabasesController extends Controller
                 $validator = customApiValidator($request->all(), [
                     'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
                     'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
+                ]);
+                break;
+            case 'standalone-cassandra':
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'cassandra_admin_user', 'cassandra_admin_password'];
+                $validator = customApiValidator($request->all(), [
+                    'cassandra_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'cassandra_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
                 ]);
                 break;
             case 'standalone-dragonfly':
@@ -1340,6 +1348,75 @@ class DatabasesController extends Controller
     public function create_database_clickhouse(Request $request)
     {
         return $this->create_database($request, NewDatabaseTypes::CLICKHOUSE);
+    }
+
+    #[OA\Post(
+        summary: 'Create (Cassandra)',
+        description: 'Create a new Cassandra database.',
+        path: '/databases/cassandra',
+        operationId: 'create-database-cassandra',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'destination_uuid' => ['type' => 'string',  'description' => 'UUID of the destination if the server has multiple destinations'],
+                        'cassandra_admin_user' => ['type' => 'string', 'description' => 'Cassandra admin user'],
+                        'cassandra_admin_password' => ['type' => 'string', 'description' => 'Cassandra admin password'],
+                        'name' => ['type' => 'string', 'description' => 'Name of the database'],
+                        'description' => ['type' => 'string', 'description' => 'Description of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'is_public' => ['type' => 'boolean', 'description' => 'Is the database public?'],
+                        'public_port' => ['type' => 'integer', 'description' => 'Public port of the database'],
+                        'public_port_timeout' => ['type' => 'integer', 'description' => 'Public port timeout in seconds (default: 3600)'],
+                        'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
+                        'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
+                        'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
+                        'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation of the database'],
+                        'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit of the database'],
+                        'limits_cpuset' => ['type' => 'string', 'description' => 'CPU set of the database'],
+                        'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares of the database'],
+                        'instant_deploy' => ['type' => 'boolean', 'description' => 'Instant deploy the database'],
+                        'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the database.'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_database_cassandra(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::CASSANDRA);
     }
 
     #[OA\Post(
@@ -2303,6 +2380,55 @@ class DatabasesController extends Controller
             }
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_clickhouse($environment->id, $destination, $request->only($allowedFields));
+            if ($instantDeploy) {
+                StartDatabase::dispatch($database);
+            }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($database, $tagNames, $teamId);
+            }
+
+            $database->refresh();
+            $payload = [
+                'uuid' => $database->uuid,
+                'internal_db_url' => $database->internal_db_url,
+            ];
+            if ($database->is_public && $database->public_port) {
+                $payload['external_db_url'] = $database->external_db_url;
+            }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
+            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::CASSANDRA) {
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'cassandra_admin_user', 'cassandra_admin_password', 'tags'];
+            $validator = customApiValidator($request->all(), [
+                'cassandra_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                'cassandra_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            removeUnnecessaryFieldsFromRequest($request);
+            $database = create_standalone_cassandra($environment->id, $destination, $request->only($allowedFields));
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }

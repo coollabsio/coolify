@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -37,6 +38,7 @@ class CanUpdateResource
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneCassandra::class,
             StandaloneMongodb::class,
         ],
         'stack_service_uuid' => [ServiceApplication::class, ServiceDatabase::class],
