@@ -83,7 +83,10 @@
                 @endif
             @endforeach
         @endif
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @if (! $isLocked && ! $isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen">
@@ -153,8 +156,10 @@
                                             defaultClass="input input-with-password-toggle" />
                                     @else
                                         <x-forms.env-var-input id="value" type="password"
+                                            canGate="manageEnvironment" :canResource="$this->resource"
                                             :required="$is_redis_credential" :disabled="!$canEditValue"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                                            :hasVaultSource="$this->hasSecretManagerSource()"
                                             :projectUuid="data_get($parameters, 'project_uuid')"
                                             :environmentUuid="data_get($parameters, 'environment_uuid')"
                                             :serverUuid="data_get($parameters, 'server_uuid')" />

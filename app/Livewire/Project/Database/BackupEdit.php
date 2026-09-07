@@ -207,10 +207,18 @@ class BackupEdit extends Component
                 }
             }
 
+            $database = $this->backup->database;
+            $backupUuid = $this->backup->uuid;
             $this->backup->delete();
+            auditLog('ui.database.backup_schedule_deleted', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $backupUuid,
+            ]);
 
-            if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
-                $serviceDatabase = $this->backup->database;
+            if ($database->getMorphClass() === ServiceDatabase::class) {
+                $serviceDatabase = $database;
 
                 return redirectRoute($this, 'project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
@@ -238,9 +246,14 @@ class BackupEdit extends Component
             $this->authorize('manageBackups', $this->backup->database);
 
             DatabaseBackupJob::dispatch($this->backup);
-            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
-
             $database = $this->backup->database;
+            auditLog('ui.database.backup_started', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $this->backup->uuid,
+            ]);
+            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
 
             if ($database instanceof ServiceDatabase) {
                 return redirect()->route('project.service.database.backup.executions', [

@@ -49,6 +49,7 @@ use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
 use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenShow;
 use App\Livewire\Security\CloudTokens;
+use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Advanced as ServerAdvanced;
@@ -98,6 +99,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\AuditLog as TeamAuditLog;
 use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
@@ -168,6 +170,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/oauth/{provider}', SettingsOauth::class)
+        ->where('provider', '[A-Za-z0-9_-]+')
+        ->name('settings.oauth.provider');
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
@@ -207,6 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });
@@ -391,6 +397,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+    Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
     Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
     Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');

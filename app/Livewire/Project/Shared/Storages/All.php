@@ -108,6 +108,25 @@ class All extends Component
         $this->submit($storageId);
     }
 
+    public function clearHostPath(int $storageId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $storage = $this->findStorageOrFail($storageId);
+        if ($storage->shouldBeReadOnlyInUI()) {
+            $this->dispatch('error', 'This volume is read-only.');
+
+            return;
+        }
+
+        $storage->host_path = null;
+        $storage->save();
+        $this->forms[$storageId]['hostPath'] = null;
+
+        $this->dispatch('configurationChanged');
+        $this->dispatch('success', 'Source path removed. Use a directory mount for host directory bindings.');
+    }
+
     /**
      * Livewire listbox onChange cannot pass args; PR suffix fields call this via updatedForms.
      */
