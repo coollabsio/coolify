@@ -52,7 +52,7 @@ create_data_directory() {
 
 # Run only after the checks and downloads succeed, so a failed run does not change the data directories (#11973).
 create_coolify_directories() {
-    for COOLIFY_DIRECTORY in /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
+    for COOLIFY_DIRECTORY in /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel,themes}; do
         create_data_directory "$COOLIFY_DIRECTORY"
     done
     mkdir -p /data/coolify/images /data/coolify/ssh/{keys,mux}

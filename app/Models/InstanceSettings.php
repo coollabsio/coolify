@@ -74,6 +74,8 @@ class InstanceSettings extends Model
         'file_download_s3_storage_id',
         'is_dashboard_force_https_enabled',
         'is_passkey_enabled',
+        'theme_preset',
+        'custom_css',
     ];
 
     protected $hidden = [

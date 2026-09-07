@@ -10,6 +10,7 @@
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
             ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
+            ['label' => 'Theme', 'route' => 'settings.theme', 'icon' => 'eye'],
         ],
     ];
 @endphp
