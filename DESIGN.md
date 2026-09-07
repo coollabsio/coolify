@@ -638,8 +638,9 @@ Current toast behavior:
 - Reicon status tile for success, info, warning, danger, or default;
 - title plus optional description;
 - dismiss and copy-details actions;
-- up to four stacked notifications;
+- normally up to four stacked notifications, without evicting persistent notices;
 - four-second dismissal, paused while hovered;
+- `persistent: true` disables automatic dismissal, including after hover; users close these notices with the dismiss button;
 - support for all six screen positions and sanitized custom HTML.
 
 Do not bring back the old oversized dark rectangle.
