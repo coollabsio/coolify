@@ -65,7 +65,13 @@
                             <div class="flex min-w-0 items-start gap-3">
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="projects" class="size-4" />
+                                    @if ($project->icon_path)
+                                        <img src="{{ project_icon_url($project) }}"
+                                            alt="{{ $project->name }} icon"
+                                            class="h-full w-full rounded-lg object-cover">
+                                    @else
+                                        <x-reicon name="projects" class="size-4" />
+                                    @endif
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h3
@@ -169,24 +175,30 @@
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardServers as $server)
                         @php
+                            $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
+                            $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
+
                             [$serverStatus, $serverStatusType] = match (true) {
                                 $server->settings->force_disabled => ['Disabled', 'error'],
                                 ! $server->settings->is_reachable && ! $server->settings->is_usable => ['Unavailable', 'error'],
                                 ! $server->settings->is_reachable => ['Unreachable', 'error'],
                                 ! $server->settings->is_usable => ['Not ready', 'warning'],
+                                $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
                                 default => ['Ready', 'success'],
                             };
                         @endphp
 
-                        <article
+                        <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
+                            {{ wireNavigate() }} aria-label="Open {{ $server->name }}"
                             class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
-                            <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
-                                {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
-                                aria-label="Open {{ $server->name }}"></a>
+                            @if ($server->isMetricsEnabled())
+                                <livewire:dashboard.server-metrics-chart :server="$server"
+                                    :key="'dashboard-server-metrics-'.$server->uuid" />
+                            @endif
 
-                            <div class="flex min-w-0 items-start gap-3">
+                            <div class="relative z-10 flex min-w-0 items-start gap-3">
                                 <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
                                 <div class="min-w-0 flex-1">
@@ -198,12 +210,19 @@
                                         {{ $server->description ?: 'No description' }}
                                     </p>
                                 </div>
+                                @if ($serverStatusType !== 'success')
+                                    <span data-tooltip="{{ $serverStatus }}"
+                                        aria-label="Server status: {{ $serverStatus }}"
+                                        @class([
+                                            'flex size-6 shrink-0 items-center justify-center rounded-md',
+                                            'text-orange-500 dark:text-warning' => $serverStatusType === 'warning',
+                                            'text-red-500 dark:text-red-400' => $serverStatusType === 'error',
+                                        ])>
+                                        <x-reicon name="alert-triangle" class="size-4" />
+                                    </span>
+                                @endif
                             </div>
-
-                            <div class="mt-auto flex items-center pt-4">
-                                <x-status-badge :status="$serverStatus" :type="$serverStatusType" />
-                            </div>
-                        </article>
+                        </a>
                     @endforeach
                 </div>
             @endif

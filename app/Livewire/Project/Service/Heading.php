@@ -5,8 +5,11 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Service\StopServiceApplication;
 use App\Enums\ProcessStatus;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -113,6 +116,7 @@ class Heading extends Component
         try {
             $this->authorizeService('deploy');
             $activity = StartService::run($this->service, pullLatestImages: true);
+            $this->auditServiceAction('ui.service.started');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -146,6 +150,7 @@ class Heading extends Component
         try {
             $this->authorizeService('stop');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
+            $this->auditServiceAction('ui.service.stopped');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -162,11 +167,35 @@ class Heading extends Component
                 return;
             }
             $activity = StartService::run($this->service, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function removeSelectedResourceContainer(): void
+    {
+        $resource = $this->selectedResource();
+        if (! $resource) {
+            return;
+        }
+
+        $this->authorize('update', $resource);
+        StopServiceApplication::run($resource, true, true);
+        $this->dispatch('success', 'Container removed.');
+    }
+
+    private function selectedResource(): ServiceApplication|ServiceDatabase|null
+    {
+        $uuid = data_get($this->parameters, 'stack_service_uuid');
+        if (! $uuid) {
+            return null;
+        }
+
+        return $this->service->applications()->whereUuid($uuid)->first()
+            ?? $this->service->databases()->whereUuid($uuid)->first();
     }
 
     public function pullAndRestartEvent()
@@ -180,6 +209,7 @@ class Heading extends Component
                 return;
             }
             $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -194,6 +224,15 @@ class Heading extends Component
             ->firstOrFail();
 
         $this->authorize($ability, $this->service);
+    }
+
+    private function auditServiceAction(string $event): void
+    {
+        auditLog($event, [
+            'team_id' => $this->service->team()?->id,
+            'service_uuid' => $this->service->uuid,
+            'service_name' => $this->service->name,
+        ]);
     }
 
     public function render()

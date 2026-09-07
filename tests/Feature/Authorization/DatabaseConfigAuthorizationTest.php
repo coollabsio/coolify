@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Database\Heading;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -10,11 +11,12 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['id' => 0]));
 
     $this->team = Team::factory()->create();
 
@@ -87,6 +89,18 @@ test('admin can update database', function () {
 
 test('member cannot update database', function () {
     expect($this->member->can('update', $this->database))->toBeFalse();
+});
+
+test('member cannot persist database activity status', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Heading::class, ['database' => $this->database])
+        ->call('activityFinished')
+        ->assertSuccessful()
+        ->assertDispatched('refresh');
+
+    expect($this->database->fresh()->started_at)->toBeNull();
 });
 
 // --- Database Policy: delete ---

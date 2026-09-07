@@ -131,7 +131,7 @@ class CleanupDocker
 
         $commands[] = "docker images --format '{{.Repository}}:{{.Tag}}' | ".
             $grepCommands.' | '.
-            "xargs -r -I {} sh -c 'docker inspect --format \"{{{{index .Config.Labels \\\"coolify.managed\\\"}}}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
+            "xargs -r -I {} sh -c 'docker inspect --format \"{{index .Config.Labels \\\"coolify.managed\\\"}}\" \"{}\" 2>/dev/null | grep -q true || docker rmi \"{}\" 2>/dev/null' || true";
 
         return implode(' && ', $commands);
     }

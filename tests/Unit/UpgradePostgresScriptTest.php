@@ -44,29 +44,6 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
-it('does not provision a flux laravel api token before v5 production activation', function (string $path) {
-    $source = file_get_contents(getcwd().'/'.$path);
-
-    expect($source)->not->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN');
-})->with([
-    'production env' => '.env.production',
-    'stable install' => 'scripts/install.sh',
-    'nightly install' => 'other/nightly/install.sh',
-    'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
-]);
-
-it('does not provision flux storage before v5 production activation', function (string $path) {
-    $source = file_get_contents(getcwd().'/'.$path);
-
-    expect($source)->not->toContain('/data/coolify/flux');
-})->with([
-    'stable install' => 'scripts/install.sh',
-    'nightly install' => 'other/nightly/install.sh',
-    'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
-]);
-
 it('uses the selected registry url when extracting upgrade images', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 
@@ -80,6 +57,35 @@ it('persists the selected registry url during upgrades', function (string $path)
     $script = file_get_contents(getcwd().'/'.$path);
 
     expect($script)->toContain('set_env_var "REGISTRY_URL" "$REGISTRY_URL"');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('persists the target image and runtime version before recreating containers', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+    if ($script === false) {
+        throw new RuntimeException("Unable to read {$path}");
+    }
+
+    $position = static function (string $needle) use ($script): int {
+        $offset = strpos($script, $needle);
+        if ($offset === false) {
+            throw new RuntimeException("Missing marker: {$needle}");
+        }
+
+        return $offset;
+    };
+
+    $latestImagePosition = $position('set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
+    $coolifyVersionPosition = $position('set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+    $imagesPulledPosition = $position('log "All images pulled successfully"');
+    $composeUpPosition = $position('docker compose --env-file /data/coolify/source/.env');
+
+    expect($latestImagePosition)->toBeGreaterThan($imagesPulledPosition)
+        ->and($coolifyVersionPosition)->toBeGreaterThan($imagesPulledPosition)
+        ->and($latestImagePosition)->toBeLessThan($composeUpPosition)
+        ->and($coolifyVersionPosition)->toBeLessThan($composeUpPosition);
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
     'nightly upgrade' => 'other/nightly/upgrade.sh',

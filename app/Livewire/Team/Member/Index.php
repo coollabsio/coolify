@@ -22,6 +22,11 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.team.member.index');
+        $members = currentTeam()->members;
+
+        return view('livewire.team.member.index', [
+            'members' => $members,
+            'membersWithoutTwoFactorCount' => $members->whereNull('two_factor_confirmed_at')->count(),
+        ]);
     }
 }

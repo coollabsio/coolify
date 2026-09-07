@@ -7,8 +7,8 @@
         :title="$destination->name" subtitle="Applications, databases, and services on this network"
         :mobileTitleOnly="true" />
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             @include('livewire.destination.sidebar', ['destination' => $destination])
 
             <div class="min-w-0">

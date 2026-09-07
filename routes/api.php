@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\ApplicationsController;
+use App\Http\Controllers\Api\ApplicationSecretManagerController;
+use App\Http\Controllers\Api\AuditEventsController;
 use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
@@ -11,7 +13,8 @@ use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\HostingerController;
-use App\Http\Controllers\Api\Internal\FluxResourceStatusController;
+use App\Http\Controllers\Api\InstanceEmailSettingsController;
+use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
@@ -36,7 +39,6 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
 use App\Http\Controllers\Api\VultrController;
 use App\Http\Middleware\ApiAllowed;
-use App\Support\V5\V5Feature;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
@@ -66,6 +68,7 @@ Route::group([
 ], function () {
 
     Route::get('/version', [OtherController::class, 'version'])->middleware(['api.ability:read']);
+    Route::get('/audit-events', [AuditEventsController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/teams', [TeamController::class, 'teams'])->middleware(['api.ability:read']);
     // Token's team
@@ -86,6 +89,8 @@ Route::group([
     Route::patch('/notifications/pushover', [NotificationsController::class, 'update_pushover'])->middleware(['api.ability:write']);
     Route::get('/notifications/webhook', [NotificationsController::class, 'webhook'])->middleware(['api.ability:read']);
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
+    Route::get('/settings/email', [InstanceEmailSettingsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/settings/email', [InstanceEmailSettingsController::class, 'update'])->middleware(['api.ability:write:sensitive']);
     Route::get('/team/envs', [SharedEnvironmentVariablesController::class, 'team_envs'])->middleware(['api.ability:read']);
     Route::post('/team/envs', [SharedEnvironmentVariablesController::class, 'team_create_env'])->middleware(['api.ability:write']);
     Route::patch('/team/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'team_update_env'])->middleware(['api.ability:write']);
@@ -120,6 +125,7 @@ Route::group([
     Route::get('/security/keys/{uuid}', [SecurityController::class, 'key_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/security/keys/{uuid}', [SecurityController::class, 'update_key'])->middleware(['api.ability:write']);
     Route::delete('/security/keys/{uuid}', [SecurityController::class, 'delete_key'])->middleware(['api.ability:write']);
+    Route::post('/security/integration-tokens', [IntegrationTokensController::class, 'store'])->middleware(['api.ability:write']);
 
     Route::get('/cloud-tokens', [CloudProviderTokensController::class, 'index'])->middleware(['api.ability:read']);
     Route::post('/cloud-tokens', [CloudProviderTokensController::class, 'store'])->middleware(['api.ability:write']);
@@ -242,6 +248,7 @@ Route::group([
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::patch('/applications/{uuid}', [ApplicationsController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}', [ApplicationsController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
+    Route::patch('/applications/{uuid}/secret-manager', [ApplicationSecretManagerController::class, 'update'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}/envs', [ApplicationsController::class, 'envs'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/envs', [ApplicationsController::class, 'create_env'])->middleware(['api.ability:write']);
@@ -282,6 +289,7 @@ Route::group([
     Route::post('/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/applications/{uuid}/stop', [ApplicationsController::class, 'action_stop'])->middleware(['api.ability:deploy']);
 
+    Route::patch('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'update_preview_by_pull_request_id'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/previews/{pull_request_id}', [ApplicationsController::class, 'delete_preview_by_pull_request_id'])->middleware(['api.ability:write']);
 
     Route::get('/github-apps', [GithubController::class, 'list_github_apps'])->middleware(['api.ability:read']);
@@ -430,10 +438,6 @@ Route::group([
 Route::group([
     'prefix' => 'v1',
 ], function () {
-    if (V5Feature::enabled()) {
-        Route::post('/internal/flux/resource-status', FluxResourceStatusController::class);
-    }
-
     Route::post('/sentinel/push', [SentinelController::class, 'push']);
 });
 

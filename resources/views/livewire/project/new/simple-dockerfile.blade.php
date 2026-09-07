@@ -1,4 +1,4 @@
-<div class="mt-8 w-full max-w-[1180px] lg:mt-3">
+<div class="mt-8 w-full max-w-none lg:mt-3">
     <form wire:submit="submit">
         <section class="application-settings-section">
             <div class="application-settings-section-header">

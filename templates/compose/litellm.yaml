@@ -40,6 +40,7 @@ services:
         content: |
           general_settings:
             proxy_batch_write_at: 60
+            store_prompts_in_spend_logs: false
 
           router_settings:
             redis_host: os.environ/REDIS_HOST
@@ -50,15 +51,15 @@ services:
           litellm_settings:
             set_verbose: false
             json_logs: true
-            log_raw_request_response: true
+            log_raw_request_response: false
             # turn_off_message_logging: false
             # redact_user_api_key_info: false
             service_callback: ["prometheus_system"]
             drop_params: true
             # max_budget: 100
             # budget_duration: 30d
-            num_retries: 3
-            request_timeout: 600
+            num_retries: 1
+            request_timeout: 120
             telemetry: false
             cache: true
             cache_params:
@@ -131,17 +132,21 @@ services:
         - CMD
         - python
         - "-c"
-        - "import requests as r;r.get('http://127.0.0.1:4000/health/liveliness').raise_for_status()"
-      interval: 5s
+        - "import urllib.request;urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness',timeout=5)"
+      interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     command:
       - "--config"
       - /app/config.yaml
       - "--port"
       - "4000"
       - "--num_workers"
-      - "8"
+      - "2"
+      - "--run_gunicorn"
+      - "--max_requests_before_restart"
+      - "1000"
   postgres:
     image: "postgres:16-alpine"
     environment:

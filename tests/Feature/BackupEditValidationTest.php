@@ -318,6 +318,10 @@ it('queues instance database backup without redirecting when project context is 
         'backup' => $backup->fresh(),
         'availableS3Storages' => collect(),
     ])
+        ->assertSee('Retention')
+        ->assertSee('S3 storage')
+        ->assertSee('Local backups')
+        ->assertSee('S3 backups')
         ->call('backupNow')
         ->assertDispatched('success', 'Backup queued. It will be available in a few minutes.')
         ->assertNoRedirect()

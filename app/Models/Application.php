@@ -7,10 +7,16 @@ use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Support\DomainPortOverrides;
+use App\Support\DomainUrlParts;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
+use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -34,6 +40,7 @@ use Symfony\Component\Yaml\Yaml;
         'uuid' => ['type' => 'string', 'description' => 'The application UUID.'],
         'name' => ['type' => 'string', 'description' => 'The application name.'],
         'fqdn' => ['type' => 'string', 'nullable' => true, 'description' => 'The application domains.'],
+        'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header.'],
         'config_hash' => ['type' => 'string', 'description' => 'Configuration hash.'],
         'git_repository' => ['type' => 'string', 'description' => 'Git repository URL.'],
         'git_branch' => ['type' => 'string', 'description' => 'Git branch.'],
@@ -118,7 +125,10 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    /** @use HasFactory<ApplicationFactory> */
+    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+
+    public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
     private static $parserVersion = '5';
 
@@ -126,6 +136,8 @@ class Application extends BaseModel
         'name',
         'description',
         'fqdn',
+        'noindex_domains',
+        'domain_port_overrides',
         'git_repository',
         'git_branch',
         'git_commit_sha',
@@ -204,6 +216,8 @@ class Application extends BaseModel
         'last_online_at',
         'restart_count',
         'max_restart_count',
+        'restart_limit_reached',
+        'container_present',
         'last_restart_at',
         'last_restart_type',
         'uuid',
@@ -235,6 +249,7 @@ class Application extends BaseModel
         'docker_compose_raw',
         'custom_labels',
         'domain_dns_statuses',
+        'domain_port_overrides',
     ];
 
     protected function casts(): array
@@ -245,9 +260,13 @@ class Application extends BaseModel
             'manual_webhook_secret_gitlab' => 'encrypted',
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
+            'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
+            'domain_port_overrides' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
+            'restart_limit_reached' => 'boolean',
+            'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
         ];
     }
@@ -272,7 +291,11 @@ class Application extends BaseModel
                 if ($application->fqdn === '') {
                     $application->fqdn = null;
                 }
+                $normalized = DomainPortOverrides::normalize($application->fqdn, $application->domain_port_overrides);
+                $application->fqdn = $normalized['fqdn'];
+                $application->domain_port_overrides = $normalized['overrides'];
                 $payload['fqdn'] = $application->fqdn;
+                $application->syncNoindexDomains();
             }
             if ($application->isDirty('install_command')) {
                 $payload['install_command'] = str($application->install_command)->trim();
@@ -371,6 +394,7 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
+            $application->secretManagerLink()->delete();
             foreach ($application->scheduled_tasks as $task) {
                 $task->delete();
             }
@@ -594,10 +618,8 @@ class Application extends BaseModel
     public function stoppedAfterRestartLimit(): bool
     {
         return str($this->status)->startsWith('exited')
-            && ($this->restart_count ?? 0) > 0
-            && ($this->max_restart_count ?? 0) > 0
-            && $this->restart_count >= $this->max_restart_count
-            && $this->last_restart_type === 'crash';
+            && $this->container_present === true
+            && $this->restart_limit_reached === true;
     }
 
     public function taskLink($task_uuid)
@@ -728,24 +750,20 @@ class Application extends BaseModel
 
             return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
         }
-        if (str($this->git_repository)->contains('bitbucket')) {
-            $git_repository = str_replace('.git', '', $this->git_repository);
-            $url = Url::fromString($git_repository);
-            $url = $url->withUserInfo('');
-            $url = $url->withPath($url->getPath().'/commits/'.$link);
 
-            return $url->__toString();
-        }
+        $git_repository = $this->git_repository;
         if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-            if (data_get($this, 'source.html_url')) {
-                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
-            }
-
-            return "{$git_repository}/commit/{$link}";
+            $git_repository = preg_replace('/^git@([^:]+):/', 'https://$1/', $git_repository);
+        } elseif (str($this->git_repository)->startsWith('ssh://')) {
+            $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
 
-        return $this->git_repository;
+        $url = Url::fromString(Str::replaceEnd('.git', '', $git_repository));
+        $url = $url->withUserInfo('');
+        $commitPath = str($git_repository)->contains('bitbucket') ? 'commits' : 'commit';
+        $url = $url->withPath(Str::finish($url->getPath(), '/').$commitPath.'/'.$link);
+
+        return $url->__toString();
     }
 
     public function dockerfileLocation(): Attribute
@@ -963,6 +981,46 @@ class Application extends BaseModel
     public function main_port()
     {
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
+    }
+
+    /**
+     * Ports the container is expected to listen on: Ports Exposes plus ports already used by application domains.
+     *
+     * @return list<int>
+     */
+    public function availableInternalPorts(): array
+    {
+        $ports = collect($this->settings?->is_static ? [80] : $this->ports_exposes_array)
+            ->filter(fn (mixed $port): bool => is_numeric($port) && (int) $port > 0)
+            ->map(fn (mixed $port): int => (int) $port);
+
+        foreach ($this->domain_port_overrides ?? [] as $port) {
+            if (is_numeric($port) && (int) $port > 0) {
+                $ports->push((int) $port);
+            }
+        }
+
+        foreach (explode(',', (string) $this->fqdn) as $url) {
+            $url = trim($url);
+            if ($url === '') {
+                continue;
+            }
+            $legacyPort = DomainUrlParts::split($url)['port'] ?? '';
+            if ($legacyPort !== '' && is_numeric($legacyPort) && (int) $legacyPort > 0) {
+                $ports->push((int) $legacyPort);
+            }
+        }
+
+        return $ports->unique()->sort()->values()->all();
+    }
+
+    public function portRequiresConfirmation(?int $port): bool
+    {
+        if ($port === null || $port <= 0) {
+            return false;
+        }
+
+        return ! in_array($port, $this->availableInternalPorts(), true);
     }
 
     public function detectPortFromEnvironment(?bool $isPreview = false): ?int
@@ -1378,7 +1436,7 @@ class Application extends BaseModel
 
     private function legacyConfigurationHash(): string
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
+        $newConfigHash = base64_encode($this->fqdn.json_encode($this->noindexDomains()->all()).$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
         } else {
@@ -2104,6 +2162,9 @@ class Application extends BaseModel
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
+        $composeFilePath = escapeshellarg(".$workdir$composeFile");
+        $composeReadLimit = self::MAX_DOCKER_COMPOSE_SIZE_BYTES + 1;
+        $readComposeFile = "if [ \"$(wc -c < {$composeFilePath})\" -gt ".self::MAX_DOCKER_COMPOSE_SIZE_BYTES." ]; then echo '__COOLIFY_COMPOSE_TOO_LARGE__'; else head -c {$composeReadLimit} {$composeFilePath}; fi";
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
             throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
@@ -2134,7 +2195,7 @@ class Application extends BaseModel
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
+                $readComposeFile,
             ]);
         } else {
             $commands = collect([
@@ -2146,11 +2207,14 @@ class Application extends BaseModel
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
+                $readComposeFile,
             ]);
         }
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
+            if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
+                throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
+            }
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
@@ -2165,6 +2229,9 @@ class Application extends BaseModel
                     throw new RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
                 }
                 throw new RuntimeException('Repository does not exist. Please check your repository URL and try again.');
+            }
+            if (str($e->getMessage())->contains('exceeds the 5 MiB size limit')) {
+                throw $e;
             }
             throw new RuntimeException('Failed to read the Docker Compose file from the repository.');
         } finally {

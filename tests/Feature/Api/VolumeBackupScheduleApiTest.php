@@ -130,6 +130,7 @@ it('updates the existing backup schedule instead of creating another one', funct
         'save_s3' => true,
         'disable_local_backup' => true,
         's3_storage_id' => $this->s3Storage->id,
+        'timeout' => 7200,
     ]);
 
     $response = $this->withHeaders($this->headers)
@@ -146,7 +147,8 @@ it('updates the existing backup schedule instead of creating another one', funct
         ->and($backup->enabled)->toBeFalse()
         ->and($backup->save_s3)->toBeFalse()
         ->and($backup->disable_local_backup)->toBeFalse()
-        ->and($backup->s3_storage_id)->toBeNull();
+        ->and($backup->s3_storage_id)->toBeNull()
+        ->and($backup->timeout)->toBe(7200);
 });
 
 it('sets a directory backup schedule through the API', function () {

@@ -15,11 +15,11 @@
 
     <section @class([
         'application-settings-workspace w-full',
-        'mt-4 max-w-[1180px] lg:mt-0' => ! $embedded,
+        'mt-4 max-w-none lg:mt-0' => ! $embedded,
     ])>
         <div @class([
             'min-w-0',
-            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10' => ! $embedded,
+            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8' => ! $embedded,
         ])>
             @unless ($embedded)
                 <x-application.configuration-sidebar :application="$application"
@@ -213,39 +213,43 @@
                             $commitMessage = $deployment->commitMessage()
                                 ? Str::before($deployment->commitMessage(), "\n")
                                 : null;
+                            $deploymentUrl = $current_url . '/' . data_get($deployment, 'deployment_uuid');
+                            $commitUrl = data_get($deployment, 'commit')
+                                ? $application->gitCommitLink(data_get($deployment, 'commit'))
+                                : null;
                         @endphp
-                        <a wire:key="deployment-{{ data_get($deployment, 'deployment_uuid') }}"
-                            href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
-                            {{ wireNavigate() }}
+                        <div wire:key="deployment-{{ data_get($deployment, 'deployment_uuid') }}"
                             @class([
                                 'data-table-row deployment-table-grid border-b border-neutral-200 text-[13px] text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim',
                                 'data-table-row-active' => $selectedDeploymentUuid === data_get($deployment, 'deployment_uuid'),
                             ])>
-                            <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>{{ $sourceLabel }}</span>
+                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }}><x-status-badge :status="$statusLabel" :type="$statusType" /></a>
+                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }}>{{ $sourceLabel }}</a>
                             <span class="min-w-0">
                                 @if (data_get($deployment, 'commit'))
                                     <span class="flex min-w-0 items-center gap-2">
-                                        <span class="shrink-0 font-mono text-xs text-neutral-950 dark:text-fg">
+                                        <a href="{{ $commitUrl }}" target="_blank" rel="noopener noreferrer"
+                                            class="shrink-0 font-mono text-xs text-neutral-950 underline decoration-neutral-400 underline-offset-2 dark:text-fg dark:decoration-neutral-600">
                                             {{ substr(data_get($deployment, 'commit'), 0, 7) }}
-                                        </span>
+                                        </a>
                                         @if ($commitMessage)
-                                            <span class="truncate text-neutral-500 dark:text-fg-faint"
-                                                title="{{ $commitMessage }}">{{ $commitMessage }}</span>
+                                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }}
+                                                class="truncate text-neutral-500 dark:text-fg-faint"
+                                                title="{{ $commitMessage }}">{{ $commitMessage }}</a>
                                         @endif
                                     </span>
                                 @else
                                     <span class="text-neutral-400 dark:text-fg-faint">-</span>
                                 @endif
                             </span>
-                            <span title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
+                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }} title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
                                 {{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans() }}
-                            </span>
-                            <span class="tabular-nums">{{ $duration }}</span>
-                            <span class="truncate">
+                            </a>
+                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }} class="tabular-nums">{{ $duration }}</a>
+                            <a href="{{ $deploymentUrl }}" {{ wireNavigate() }} class="truncate">
                                 {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
-                            </span>
-                        </a>
+                            </a>
+                        </div>
                         @endforeach
                     </div>
 
@@ -253,7 +257,13 @@
                         :current-page="$currentPage" :last-page="$lastPage"
                         wire-target="goToPage,previousPage,nextPage" first-action="goToPage(1)"
                         previous-action="previousPage" next-action="nextPage"
-                        last-action="goToPage({{ $lastPage }})" />
+                        last-action="goToPage({{ $lastPage }})">
+                        @unless ($embedded)
+                            <x-slot:pageSize>
+                                <x-page-size-select model="defaultTake" livewire storage-key="coolify.page-size.deployments" />
+                            </x-slot:pageSize>
+                        @endunless
+                    </x-table-pagination>
                 </div>
             @else
                 <x-empty size="sm" title="No deployments found"

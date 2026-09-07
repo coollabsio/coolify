@@ -1,22 +1,29 @@
 <?php
 
+use App\Events\ApplicationConfigurationChanged;
+use App\Livewire\Project\Service\Configuration;
 use App\Livewire\Project\Shared\ConfigurationChecker;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -75,7 +82,9 @@ it('renders the changed configuration labels without a second backend request', 
 
     expect($view)
         ->toContain(':compact-after="5000"')
+        ->toContain('position="top-right"')
         ->toContain(':compact-storage-key="$compactStorageKey"')
+        ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
         ->toContain('x-on:click="configurationDiffModalOpen = true"')
         ->not->toContain('$wire.refreshConfigurationChanges()');
 });
@@ -84,6 +93,7 @@ it('supports timed compact popup notifications', function () {
     $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
 
     expect($view)
+        ->toContain("\$position === 'top-right' ? 'top-16' : 'bottom-4'")
         ->toContain('compactAfter')
         ->toContain('compactStorageKey')
         ->toContain("localStorage.setItem(this.storageKey, 'compact')")
@@ -93,9 +103,13 @@ it('supports timed compact popup notifications', function () {
         ->toContain('compact = true')
         ->toContain('@click="restore()"')
         ->toContain('@click.stop="minimizeToIcon()"')
-        ->toContain('x-show="!iconOnly"')
+        ->toContain('<template x-if="iconOnly">')
+        ->toContain('<template x-if="!iconOnly">')
+        ->not->toContain('<button x-show="iconOnly"')
+        ->not->toContain('<div x-show="!iconOnly"')
+        ->not->toContain(':class="iconOnly')
         ->toContain('x-show="!compact"')
-        ->toContain("'w-[calc(100%-2rem)] sm:w-auto sm:max-w-[calc(100%-2rem)]'");
+        ->toContain("'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'");
 });
 
 it('warns when a service has missing required environment variables', function () {
@@ -112,6 +126,39 @@ it('warns when a service has missing required environment variables', function (
         ->assertSee('PLUNK_API_KEY')
         ->assertSee('Open environment variables');
 
+});
+
+it('broadcasts a configuration update after a required service variable is set', function () {
+    Event::fake([ApplicationConfigurationChanged::class]);
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $server->id,
+    ]);
+    $environmentVariable = $service->environment_variables()->create([
+        'key' => 'PLUNK_API_KEY',
+        'value' => '',
+        'is_required' => true,
+    ]);
+
+    Livewire::test(Show::class, ['env' => $environmentVariable, 'type' => 'service'])
+        ->call('loadValues')
+        ->set('value', 'secret')
+        ->call('submit');
+
+    Event::assertDispatched(
+        ApplicationConfigurationChanged::class,
+        fn (ApplicationConfigurationChanged $event): bool => $event->teamId === $this->team->id,
+    );
+});
+
+it('refreshes the service configuration when a websocket configuration event arrives', function () {
+    $listeners = app(Configuration::class)->getListeners();
+
+    expect($listeners)
+        ->toHaveKey("echo-private:team.{$this->team->id},ApplicationConfigurationChanged", 'refreshServices')
+        ->toHaveKey('configurationChanged', 'refreshServices');
 });
 
 it('marks the service environment variables menu when required values are missing', function () {
@@ -157,6 +204,26 @@ it('shows domain changes when the domain page dispatches a configuration change'
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('Domains')
         ->assertSee('https://changed.example.com');
+});
+
+it('shows noindex changes when the domains page dispatches a configuration change', function () {
+    $application = configurationCheckerApplication($this->environment, [
+        'fqdn' => 'https://example.com,https://staging.example.com',
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    $application->setNoindexDomains(['https://staging.example.com']);
+    $application->save();
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('The latest configuration has not been applied')
+        ->assertSee('Search engine indexing')
+        ->assertSee('Redeploy to apply.');
 });
 
 it('shows an unapplied configuration warning after a directory mount is added', function () {

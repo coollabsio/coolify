@@ -95,6 +95,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         $isComplexPipeCommand = (
             $line->contains(' | sh') ||
             $line->contains(' | bash') ||
+            $line->contains(' sh -c ') ||
             ($line->contains(' | ') && ($line->contains('||') || $line->contains('&&')))
         );
 

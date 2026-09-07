@@ -2,17 +2,18 @@
 
 namespace App\Providers;
 
+use App\Auth\Oidc\OidcDiscoveryService;
+use App\Auth\Oidc\OidcTokenValidator;
+use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
-use App\Models\V5\Application;
-use App\Support\V5\V5Feature;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
+use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,17 +26,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureCommands();
-
-        if (V5Feature::enabled()) {
-            $this->loadMigrationsFrom(database_path('migrations-v5'));
-            $this->configureMorphMap();
-        }
-
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
-
+        $this->configureOidcSocialite();
     }
 
     private function configureCommands(): void
@@ -43,18 +38,6 @@ class AppServiceProvider extends ServiceProvider
         if (App::isProduction()) {
             DB::prohibitDestructiveCommands();
         }
-    }
-
-    /**
-     * Map v5 models to stable morph aliases so polymorphic rows survive class
-     * renames. Deliberately NOT enforced: v4 polymorphic relations store FQCNs
-     * and must keep resolving them.
-     */
-    private function configureMorphMap(): void
-    {
-        Relation::morphMap([
-            'v5.application' => Application::class,
-        ]);
     }
 
     private function configureModels(): void
@@ -82,6 +65,24 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
     }
 
+    private function configureOidcSocialite(): void
+    {
+        if (! $this->app->bound(SocialiteFactory::class)) {
+            return;
+        }
+
+        $this->app->make(SocialiteFactory::class)->extend('oidc', function ($app) {
+            return new OidcProvider(
+                $app['request'],
+                $app->make(OidcDiscoveryService::class),
+                $app->make(OidcTokenValidator::class),
+                '',
+                '',
+                '',
+            );
+        });
+    }
+
     private function configureGitHubHttp(): void
     {
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
@@ -96,17 +97,6 @@ class AppServiceProvider extends ServiceProvider
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
-        });
-
-        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
-            $client = Http::withHeaders([
-                'Accept' => 'application/json',
-            ])->baseUrl($api_url);
-            if ($access_token) {
-                $client = $client->withToken($access_token);
-            }
-
-            return $client;
         });
     }
 }

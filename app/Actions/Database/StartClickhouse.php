@@ -3,12 +3,14 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneClickhouse;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartClickhouse
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneClickhouse $database;
 
@@ -16,7 +18,11 @@ class StartClickhouse
 
     public string $configuration_dir;
 
-    public function handle(StandaloneClickhouse $database)
+    private string $resolvedClickhouseUser;
+
+    private string $resolvedClickhousePassword;
+
+    public function handle(StandaloneClickhouse $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -51,7 +57,7 @@ class StartClickhouse
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'clickhouse-client', '--user', (string) $this->database->clickhouse_admin_user, '--password', (string) $this->database->clickhouse_admin_password, '--query', 'SELECT 1',
+                        'CMD', 'clickhouse-client', '--user', $this->resolvedClickhouseUser, '--password', $this->resolvedClickhousePassword, '--query', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -104,12 +110,12 @@ class StartClickhouse
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -147,8 +153,17 @@ class StartClickhouse
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedClickhouseUser = (string) $this->database->clickhouse_admin_user;
+        $this->resolvedClickhousePassword = (string) $this->database->clickhouse_admin_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'CLICKHOUSE_USER') {
+                $this->resolvedClickhouseUser = $rawValue;
+            } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
+                $this->resolvedClickhousePassword = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_USER'))->isEmpty()) {

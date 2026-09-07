@@ -56,7 +56,16 @@ class VolumeBackups extends Component
 
     public string $timezone = '';
 
-    public int $timeout = 3600;
+    public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
+
+    public int $perPage = 10;
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->resetPage();
+    }
 
     public bool $delete_backup_s3 = false;
 
@@ -195,6 +204,12 @@ class VolumeBackups extends Component
         }
 
         VolumeBackupJob::dispatch($this->backup);
+        auditLog('ui.volume_backup.started', [
+            'team_id' => $this->resource->team()?->id,
+            'resource_uuid' => $this->resource->uuid,
+            'resource_name' => $this->resource->name,
+            'backup_uuid' => $this->backup->uuid,
+        ]);
         $this->dispatch('success', 'Storage backup queued.');
 
         return redirect()->route($this->routeName('executions'), $this->routeParameters());
@@ -316,7 +331,7 @@ class VolumeBackups extends Component
 
     public function render()
     {
-        $executions = $this->backup?->executions()->paginate(10);
+        $executions = $this->backup?->executions()->paginate($this->perPage);
 
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),

@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
         // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
@@ -30,132 +30,89 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-summary :status="$application->status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$application->status" />
+                    <x-applications.links :application="$application" compact />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
-                <div id="application-mobile-actions" class="relative mb-3"
-                    x-data="{ open: false }" @click.outside="open = false"
-                    @keydown.escape.window="open = false">
-                    <button type="button" class="button w-full justify-between" @click="open = !open"
-                        :aria-expanded="open" aria-haspopup="menu">
-                        <span class="inline-flex items-center gap-2">
-                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
-                            Actions
-                        </span>
-                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
-                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
-                        </span>
-                    </button>
-
-                    <div x-cloak x-show="open" x-transition.origin.top.left
-                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
-                        @if (!str($application->status)->startsWith('exited'))
+                @can('deploy', $application)
+                    <x-split-action id="application-mobile-actions" class="mb-3 flex w-full">
+                        @if (str($application->status)->startsWith('exited'))
+                            <x-slot:main wire:click="deploy">
+                                <x-reicon name="play-circle" class="size-3.5" />
+                                {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
+                            </x-slot:main>
                             @if (!$application->destination->server->isSwarm())
-                                @can('deploy', $application)
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        wire:click="deploy" @click="open = false" role="menuitem">
-                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                        Redeploy
-                                    </button>
-                                @else
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                        role="menuitem">
-                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                        Redeploy
-                                    </button>
-                                @endcan
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                    @click="open = false" role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
+                                </button>
                             @endif
-                            @if ($application->build_pack !== 'dockercompose')
-                                @if ($application->destination->server->isSwarm())
-                                    @can('deploy', $application)
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                            wire:click="deploy" @click="open = false" role="menuitem">
-                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Update Service
-                                        </button>
-                                    @else
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                            role="menuitem">
-                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Update Service
-                                        </button>
-                                    @endcan
+                            @if ($application->container_present !== false)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()" role="menuitem">
+                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                    Remove container
+                                </button>
+                            @endif
+                        @else
+                            @if ($application->destination->server->isSwarm())
+                                @if ($application->build_pack !== 'dockercompose')
+                                    <x-slot:main wire:click="deploy">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                        Update Service
+                                    </x-slot:main>
                                 @else
-                                    @can('deploy', $application)
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                            @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
-                                            role="menuitem">
-                                            <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                            Restart
-                                        </button>
-                                    @else
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                            role="menuitem">
-                                            <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                            Restart
-                                        </button>
-                                    @endcan
+                                    <x-slot:main @click="document.getElementById('application-mobile-stop-trigger')?.click()">
+                                        <x-reicon name="stop-circle" class="size-3.5" />
+                                        Stop
+                                    </x-slot:main>
+                                @endif
+                            @else
+                                <x-slot:main wire:click="deploy">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Redeploy
+                                </x-slot:main>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                    @click="open = false" role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    {{ str($application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)' }}
+                                </button>
+                                @if ($application->build_pack !== 'dockercompose')
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
+                                        role="menuitem">
+                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                        Restart
+                                    </button>
                                 @endif
                             @endif
-                            @can('deploy', $application)
+                            @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                     Stop
                                 </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
-                                    Stop
-                                </button>
-                            @endcan
-                        @else
-                            @can('deploy', $application)
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="deploy" @click="open = false" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Deploy
-                                </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Deploy
-                                </button>
-                            @endcan
+                            @endunless
                         @endif
-                        @if (!$application->destination->server->isSwarm())
-                            @can('deploy', $application)
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
-                                    @click="open = false" role="menuitem">
-                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Force deploy without cache
-                                </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Force deploy without cache
-                                </button>
-                            @endcan
-                        @endif
-                    </div>
-                </div>
+                    </x-split-action>
+                @endcan
             @endif
-            <div class="resource-heading-menus w-full">
-                <x-applications.links :application="$application" full-width />
-            </div>
             <div class="hidden" aria-hidden="true">
-                <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
+                <x-modal-confirmation
+                    canGate="deploy" :canResource="$application"
+                    title="{{ str($application->status)->startsWith('exited') ? 'Confirm Container Removal?' : 'Confirm Application Stopping?' }}"
+                    buttonTitle="{{ str($application->status)->startsWith('exited') ? 'Remove container' : 'Stop' }}"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
-                        'This application will be stopped.',
-                        'All non-persistent data of this application will be deleted.',
+                        str($application->status)->startsWith('exited') ? 'The exited application container will be removed.' : 'This application will be stopped.',
+                        str($application->status)->startsWith('exited') ? 'Anonymous volumes may become eligible for Docker cleanup.' : 'All non-persistent data of this application will be deleted.',
                     ]" :confirmWithText="false" :confirmWithPassword="false"
                     step1ButtonText="Continue" step2ButtonText="Confirm">
                     <x-slot:trigger>
@@ -183,90 +140,74 @@
                     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                         <span class="px-2 text-[13px] text-neutral-500 dark:text-fg-dim">Load a Compose file to deploy.</span>
                     @else
-                        @if (!$application->destination->server->isSwarm())
-                            <x-applications.advanced :application="$application" />
-                        @endif
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />
                         </div>
-                        @if (str($application->status)->startsWith('exited'))
-                            <x-forms.button id="application-desktop-deploy" canGate="deploy" :canResource="$application"
-                                wire:click="deploy">
-                                <x-reicon name="play-circle" class="size-4 opacity-70" />
-                                Deploy
-                            </x-forms.button>
-                        @else
-                            <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
-                            @click.outside="open = false" @keydown.escape.window="open = false">
-                            <button type="button" class="button" @click="open = !open" :aria-expanded="open"
-                                aria-haspopup="menu">
-                                <x-reicon name="play-circle" class="size-3.5 text-warning" />
-                                Actions
-                                <x-reicon name="chevron-down" class="size-3 opacity-55" />
-                            </button>
-
-                            <div x-cloak x-show="open" x-transition.origin.top.right
-                                class="listbox-panel top-full! right-0! left-auto! mt-1! w-60! min-w-0!" role="menu">
+                        @can('deploy', $application)
+                            <x-split-action id="application-desktop-actions">
+                                @if (str($application->status)->startsWith('exited'))
+                                    <x-slot:main wire:click="deploy">
+                                        <x-reicon name="play-circle" class="size-3.5" />
+                                        {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
+                                    </x-slot:main>
                                     @if (!$application->destination->server->isSwarm())
-                                        @can('deploy', $application)
-                                            <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                                wire:click="deploy" @click="open = false" role="menuitem">
-                                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                Redeploy
-                                            </button>
-                                        @else
-                                            <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
-                                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                Redeploy
-                                            </button>
-                                        @endcan
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                            @click="open = false" role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                            {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
+                                        </button>
                                     @endif
-                                    @if ($application->build_pack !== 'dockercompose')
-                                        @if ($application->destination->server->isSwarm())
-                                            @can('deploy', $application)
-                                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                                    wire:click="deploy" @click="open = false" role="menuitem">
-                                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                    Update Service
-                                                </button>
-                                            @else
-                                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
-                                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                    Update Service
-                                                </button>
-                                            @endcan
+                                    @if ($application->container_present !== false)
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()" role="menuitem">
+                                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                            Remove container
+                                        </button>
+                                    @endif
+                                @else
+                                    @if ($application->destination->server->isSwarm())
+                                        @if ($application->build_pack !== 'dockercompose')
+                                            <x-slot:main wire:click="deploy">
+                                                <x-reicon name="refresh" class="size-3.5" />
+                                                Update Service
+                                            </x-slot:main>
                                         @else
-                                            @can('deploy', $application)
-                                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                                    @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
-                                                    role="menuitem">
-                                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                                    Restart
-                                                </button>
-                                            @else
-                                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
-                                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                                    Restart
-                                                </button>
-                                            @endcan
+                                            <x-slot:main @click="document.getElementById('application-mobile-stop-trigger')?.click()">
+                                                <x-reicon name="stop-circle" class="size-3.5" />
+                                                Stop
+                                            </x-slot:main>
+                                        @endif
+                                    @else
+                                        <x-slot:main wire:click="deploy">
+                                            <x-reicon name="refresh" class="size-3.5" />
+                                            Redeploy
+                                        </x-slot:main>
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @click="open = false" role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                            {{ str($application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)' }}
+                                        </button>
+                                        @if ($application->build_pack !== 'dockercompose')
+                                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                                @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
+                                                role="menuitem">
+                                                <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                                Restart
+                                            </button>
                                         @endif
                                     @endif
-                                    @can('deploy', $application)
+                                    @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">
-                                            <x-reicon name="stop" class="size-3.5 text-error" />
+                                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                             Stop
                                         </button>
-                                    @else
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
-                                            <x-reicon name="stop" class="size-3.5 opacity-70" />
-                                            Stop
-                                        </button>
-                                    @endcan
-                                </div>
-                            </div>
-                        @endif
+                                    @endunless
+                                @endif
+                            </x-split-action>
+                        @endcan
                     @endif
                 </div>
             </div>

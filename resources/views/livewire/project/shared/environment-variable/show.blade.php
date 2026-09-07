@@ -24,8 +24,12 @@
                     </g>
                 </svg>
             @endif
-            <span class="env-key-label min-w-0 truncate font-mono text-[13px] text-black dark:text-fg"
-                title="{{ $env->key }}">{{ $env->key }}</span>
+            <button type="button" data-env-name-trigger
+                class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
+                title="{{ $env->key }}"
+                @click="$el.closest('.data-table-row').querySelector('[data-env-settings-trigger]').click()">
+                {{ $env->key }}
+            </button>
             @if (! $isSharedVariable && filled($comment))
                 <x-helper :helper="e($comment)" />
             @endif
@@ -79,12 +83,15 @@
                 @endif
             @endforeach
         @endif
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @if (! $isLocked && ! $isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen">
                 <x-slot:content>
-                    <button type="button" wire:click="loadValues" class="icon-button shrink-0"
+                    <button type="button" wire:click="loadValues" data-env-settings-trigger class="icon-button shrink-0"
                         title="Edit environment variable" aria-label="Edit environment variable">
                         <x-reicon name="settings" class="size-3.5" />
                     </button>
@@ -145,14 +152,14 @@
                                 </label>
                                 <div class="relative">
                                     @if (!$valuesLoaded)
-                                        <div class="input input-with-password-toggle flex w-full items-center text-neutral-500 dark:text-fg-dim"
-                                            aria-busy="true">
-                                            <x-loading text="Loading value..." />
-                                        </div>
+                                        <x-forms.input loading loadingText="Loading value..."
+                                            defaultClass="input input-with-password-toggle" />
                                     @else
                                         <x-forms.env-var-input id="value" type="password"
+                                            canGate="manageEnvironment" :canResource="$this->resource"
                                             :required="$is_redis_credential" :disabled="!$canEditValue"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                                            :hasVaultSource="$this->hasSecretManagerSource()"
                                             :projectUuid="data_get($parameters, 'project_uuid')"
                                             :environmentUuid="data_get($parameters, 'environment_uuid')"
                                             :serverUuid="data_get($parameters, 'server_uuid')" />

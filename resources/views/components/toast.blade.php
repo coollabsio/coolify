@@ -6,7 +6,7 @@
                     type: options.type ?? 'default',
                     message,
                     description: options.description ?? '',
-                    position: options.position ?? 'top-center',
+                    position: options.position ?? 'bottom-right',
                     html: options.html ?? '',
                 },
             }));
@@ -17,9 +17,9 @@
     <template x-teleport="body">
         <ul x-data="{
             toasts: [],
-            position: 'top-center',
+            position: 'bottom-right',
             addToast(event) {
-                this.position = event.detail.position || 'top-center';
+                this.position = event.detail.position || 'bottom-right';
 
                 const toast = {
                     id: `toast-${Math.random().toString(16).slice(2)}`,
@@ -29,6 +29,8 @@
                     type: event.detail.type,
                     html: event.detail.html ? window.sanitizeHTML(event.detail.html) : '',
                     timeout: null,
+                    copied: false,
+                    copiedTimeout: null,
                 };
 
                 this.toasts.unshift(toast);
@@ -55,12 +57,21 @@
             resumeToast(toast) {
                 this.scheduleToast(toast);
             },
+            async copyToast(toast) {
+                await navigator.clipboard.writeText(toast.description);
+                toast.copied = true;
+                clearTimeout(toast.copiedTimeout);
+                toast.copiedTimeout = setTimeout(() => {
+                    toast.copied = false;
+                }, 2000);
+            },
             removeToast(id) {
                 const toast = this.toasts.find(item => item.id === id);
                 if (!toast) return;
 
                 toast.visible = false;
                 clearTimeout(toast.timeout);
+                clearTimeout(toast.copiedTimeout);
                 setTimeout(() => {
                     this.toasts = this.toasts.filter(item => item.id !== id);
                 }, 150);
@@ -124,13 +135,15 @@
                     </template>
 
                     <button type="button" x-show="toast.description && !toast.html"
-                        @click="navigator.clipboard.writeText(toast.description)" title="Copy details"
-                        class="absolute right-10 top-2.5 flex size-7 items-center justify-center rounded-md text-neutral-400 opacity-0 transition-colors hover:bg-black/5 hover:text-neutral-700 group-hover:opacity-100 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        @click="copyToast(toast)" :title="toast.copied ? 'Copied' : 'Copy details'"
+                        class="absolute right-10 top-2.5 flex size-7 items-center justify-center rounded-md text-neutral-400 opacity-0 transition-colors hover:bg-black/5 hover:text-neutral-700 group-hover:opacity-100 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                        :class="{ 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400': toast.copied }">
+                        <svg x-show="!toast.copied" class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
                             viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M8.25 7.5V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0120.25 6v7.5A2.25 2.25 0 0118 15.75h-1.5m-8.25-8.25H6A2.25 2.25 0 003.75 9.75v7.5A2.25 2.25 0 006 19.5h7.5a2.25 2.25 0 002.25-2.25V15m-7.5-7.5h5.25A2.25 2.25 0 0115.75 9.75V15" />
                         </svg>
+                        <x-reicon name="check" x-show="toast.copied" class="size-3.5" />
                     </button>
 
                     <button type="button" @click="removeToast(toast.id)" aria-label="Dismiss"

@@ -358,6 +358,19 @@ function parseDockerVolumeString(string $volumeString): array
     ];
 }
 
+function addTraefikDockerNetworkLabel(Collection $labels, string $network): Collection
+{
+    $hasUserDefinedNetwork = $labels->contains(
+        fn ($label): bool => is_string($label) && str($label)->before('=')->is('traefik.docker.network')
+    );
+
+    if (! $hasUserDefinedNetwork) {
+        $labels->push("traefik.docker.network={$network}");
+    }
+
+    return $labels;
+}
+
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
@@ -1252,24 +1265,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $fqdns = collect([]);
                     }
                 } else {
-                    $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId, $resource) {
-                        $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pullRequestId);
-                        $url = Url::fromString($fqdn);
-                        $template = $resource->preview_url_template;
-                        $host = $url->getHost();
-                        $schema = $url->getScheme();
-                        $portInt = $url->getPort();
-                        $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new_public_id();
-                        $preview_fqdn = str_replace('{{random}}', $random, $template);
-                        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                        $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
-                        $preview_fqdn = "$schema://$preview_fqdn{$port}";
-                        $preview->fqdn = $preview_fqdn;
-                        $preview->save();
-
-                        return $preview_fqdn;
-                    });
+                    $generatedDomains = $fqdns->map(
+                        fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                    );
+                    $fqdns = $generatedDomains->pluck('url');
+                    $preview->fqdn = $fqdns->implode(',');
+                    $preview->domain_port_overrides = $generatedDomains
+                        ->filter(fn (array $generated): bool => filled($generated['port']))
+                        ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                        ->all();
+                    $preview->save();
                 }
             }
         }
@@ -1340,11 +1345,23 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             if ($isPullRequest) {
                 $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
+            $noindexDomains = $isPullRequest ? $fqdns : $originalResource->noindexDomains();
             $domainServiceName = findComposeServiceName((string) $serviceName, $domains->keys());
             $composeRedirect = data_get($domains->get($domainServiceName), 'redirect');
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';
+            $previewForPorts = $isPullRequest
+                ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+                : null;
+            $domainPortOverrides = $isPullRequest
+                ? ($previewForPorts?->domain_port_overrides ?? [])
+                : ($originalResource->domain_port_overrides ?? []);
+            $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
+            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+            if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
+                $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
+            }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
@@ -1357,7 +1374,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            redirect_direction: $redirectDirection
+                            onlyPort: $onlyPort,
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1371,8 +1391,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
-                            redirect_direction: $redirectDirection
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                 }
@@ -1386,7 +1409,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    redirect_direction: $redirectDirection
+                    onlyPort: $onlyPort,
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1398,8 +1424,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
-                    redirect_direction: $redirectDirection
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
             }
         }
@@ -1828,11 +1857,7 @@ function serviceParser(Service $resource): Collection
                 // Only save fqdn to ServiceApplication, not ServiceDatabase
                 if ($isServiceApplication && is_null($savedService->fqdn)) {
                     // Save URL (with scheme) to database, not FQDN
-                    if ((int) $resource->compose_parsing_version >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
-                        $savedService->fqdn = $urlWithPort;
-                    } else {
-                        $savedService->fqdn = $urlWithPort;
-                    }
+                    $savedService->fqdn = $url;
                     $savedService->save();
                 }
 
@@ -2545,6 +2570,10 @@ function serviceParser(Service $resource): Collection
         } else {
             $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         }
+        // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
+        $noindexDomains = $savedService instanceof ServiceApplication
+            ? $savedService->noindexDomains()
+            : collect([]);
 
         $defaultLabels = defaultLabels(
             id: $resource->id,
@@ -2611,18 +2640,27 @@ function serviceParser(Service $resource): Collection
             $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
                 ? data_get($originalResource, 'redirect')
                 : 'both';
+            $onlyPort = $originalResource instanceof ServiceApplication
+                ? ($originalResource->getRequiredPort() ?? $predefinedPort)
+                : $predefinedPort;
+            if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
+                $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
+            }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $uuid,
                             domains: $fqdns,
-                            is_force_https_enabled: true,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -2631,13 +2669,16 @@ function serviceParser(Service $resource): Collection
                             network: $network,
                             uuid: $uuid,
                             domains: $fqdns,
-                            is_force_https_enabled: true,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -2646,25 +2687,31 @@ function serviceParser(Service $resource): Collection
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                     uuid: $uuid,
                     domains: $fqdns,
-                    is_force_https_enabled: true,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
                     uuid: $uuid,
                     domains: $fqdns,
-                    is_force_https_enabled: true,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
             }

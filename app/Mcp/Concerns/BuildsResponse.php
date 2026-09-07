@@ -47,6 +47,18 @@ trait BuildsResponse
         // app/env secrets
         'value', 'real_value', 'http_basic_auth_password',
 
+        // free-form commands / configurations can embed credentials
+        'git_full_url',
+        'install_command', 'build_command', 'start_command',
+        'health_check_command', 'health_check_response_text',
+        'custom_docker_run_options', 'pre_deployment_command', 'post_deployment_command',
+        'docker_compose_custom_start_command', 'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+
+        // raw database configuration blobs
+        'postgres_conf', 'mysql_conf', 'mariadb_conf', 'mongo_conf',
+        'redis_conf', 'keydb_conf',
+
         // database connection strings embed credentials
         'internal_db_url', 'external_db_url', 'init_scripts',
 
@@ -58,6 +70,7 @@ trait BuildsResponse
 
         // bulky / unsafe blobs
         'dockerfile', 'docker_compose', 'docker_compose_raw',
+        'last_saved_proxy_configuration',
         'custom_labels', 'environment_variables',
         'environment_variables_preview', 'validation_logs',
         'server_metadata', 'logs', 'configuration_snapshot',

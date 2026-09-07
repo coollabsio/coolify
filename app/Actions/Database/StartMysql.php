@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMysql;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartMysql
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneMysql $database;
 
@@ -20,7 +22,9 @@ class StartMysql
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneMysql $database)
+    private string $resolvedMysqlRootPassword;
+
+    public function handle(StandaloneMysql $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -104,7 +108,7 @@ class StartMysql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}",
+                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->resolvedMysqlRootPassword}",
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -209,18 +213,16 @@ class StartMysql
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        if ($this->database->enable_ssl) {
+            $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
+        }
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
 
-        if ($this->database->enable_ssl) {
-            $mysqlUser = escapeshellarg($this->database->mysql_user);
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$mysqlUser}:{$mysqlUser} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
-        }
-
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -258,8 +260,14 @@ class StartMysql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMysqlRootPassword = (string) $this->database->mysql_root_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MYSQL_ROOT_PASSWORD') {
+                $this->resolvedMysqlRootPassword = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {

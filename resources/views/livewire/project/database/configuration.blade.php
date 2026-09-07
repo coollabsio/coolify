@@ -6,8 +6,8 @@
     <livewire:project.database.heading :database="$database" />
 
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-database.configuration-sidebar :database="$database" :current-route="$currentRoute" />
 
             <div class="min-w-0">
@@ -31,6 +31,7 @@
                     @endif
                 @elseif ($currentRoute === 'project.database.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$database" />
+                    <livewire:project.shared.secret-manager-links :resource="$database" />
                 @elseif ($currentRoute === 'project.database.servers')
                     <livewire:project.shared.destination :resource="$database" />
                 @elseif ($currentRoute === 'project.database.persistent-storage')

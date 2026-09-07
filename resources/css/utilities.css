@@ -1,5 +1,5 @@
 @utility apexcharts-tooltip {
-    @apply dark:text-white! dark:border-coolgray-300! dark:bg-coolgray-200! shadow-none!;
+    @apply overflow-visible! rounded-none! border-0! bg-transparent! shadow-none! dark:text-white!;
 }
 
 @utility apexcharts-tooltip-title {
@@ -126,16 +126,15 @@
 }
 
 @utility button {
-    /* h-9 matches input-select; nowrap + shrink-0 keep side-by-side action rows equal height */
-    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-9 min-h-9 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
+    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-8 min-h-8 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
 }
 
 @utility button-highlighted {
-    @apply border-2 text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
+    @apply border-coollabs-200 bg-linear-to-b from-coollabs-100 to-coollabs-200 text-accent-foreground! hover:from-coollabs-100 hover:to-coollabs hover:text-accent-foreground!;
 }
 
 @utility control-selected {
-    @apply bg-coollabs text-white dark:bg-coollabs dark:text-white;
+    @apply bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white;
 }
 
 @utility loading-indicator {
@@ -163,7 +162,7 @@
 }
 
 @utility auth-tooltip {
-    @apply fixed z-[99] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-lg dark:text-fg dark:bg-raised dark:border-white/10;
+    @apply fixed z-[10000] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-lg dark:text-fg dark:bg-raised dark:border-white/10;
 }
 
 @utility alert-success {
@@ -273,7 +272,7 @@
 }
 
 @utility scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-thumb-warning dark:scrollbar-track-coolgray-200 scrollbar-thin;
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-thin;
 }
 
 @utility main {

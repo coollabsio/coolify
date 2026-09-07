@@ -1,11 +1,14 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Livewire\Project\Shared\Danger;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\OauthIdentity;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -18,7 +21,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Queue::fake();
 
     $this->user = User::factory()->create([
@@ -61,12 +64,42 @@ test('delete returns error string when password is incorrect', function () {
     expect(Application::find($this->application->id))->not->toBeNull();
 });
 
-test('delete succeeds with correct password and redirects', function () {
-    Livewire::test(Danger::class, ['resource' => $this->application])
+test('delete redirects before dispatching resource cleanup after the response', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $component = Livewire::test(Danger::class, ['resource' => $service])
+        ->set('projectUuid', $this->project->uuid)
+        ->set('environmentUuid', $this->environment->uuid)
         ->call('delete', 'test-password')
+        ->assertHasNoErrors()
+        ->assertRedirectToRoute('project.resource.index', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+        ]);
+
+    expect($component->effects)->toHaveKey('redirectUsingNavigate', true);
+
+    expect(Service::find($service->id))->not->toBeNull();
+    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
+});
+
+test('delete succeeds without password for an oauth user', function () {
+    OauthIdentity::create([
+        'user_id' => $this->user->id,
+        'provider' => 'oidc',
+        'issuer' => 'https://idp.example.com',
+        'provider_user_id' => 'oauth-user-id',
+    ]);
+
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', '')
         ->assertHasNoErrors();
 
-    // Resource should be soft-deleted
     expect(Application::find($this->application->id))->toBeNull();
 });
 

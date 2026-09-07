@@ -242,6 +242,13 @@ class ServiceApplicationsController extends Controller
                             nullable: true,
                             description: 'Comma-separated list of URLs (e.g. "http://app.example.com:8080,https://app2.example.com"). Stored as fqdn.'
                         ),
+                        'noindex_domains' => new OA\Property(
+                            property: 'noindex_domains',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            description: 'The subset of the service application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the domains are ignored.',
+                            nullable: true,
+                        ),
                         'human_name' => new OA\Property(property: 'human_name', type: 'string', nullable: true),
                         'description' => new OA\Property(property: 'description', type: 'string', nullable: true),
                         'image' => new OA\Property(property: 'image', type: 'string', nullable: true),
@@ -249,6 +256,7 @@ class ServiceApplicationsController extends Controller
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
+                        'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                     ]
                 )
             )
@@ -313,6 +321,7 @@ class ServiceApplicationsController extends Controller
 
         $allowedFields = [
             'url',
+            'noindex_domains',
             'human_name',
             'description',
             'image',
@@ -320,10 +329,13 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled',
             'is_gzip_enabled',
             'is_stripprefix_enabled',
+            'is_force_https_enabled',
         ];
 
         $validationRules = [
             'url' => 'nullable|string',
+            'noindex_domains' => 'sometimes|array|nullable',
+            'noindex_domains.*' => 'string',
             'human_name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'image' => 'nullable|string',
@@ -331,6 +343,7 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
+            'is_force_https_enabled' => 'sometimes|boolean',
         ];
 
         $validator = Validator::make($payload, $validationRules);

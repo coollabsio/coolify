@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidS3BucketName;
+use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Validator;
 
 class S3Storage extends BaseModel
 {
-    use HasFactory, HasSafeStringAttribute;
+    use Auditable, HasFactory, HasSafeStringAttribute;
 
     private const CONNECTION_TIMEOUT_SECONDS = 15;
 
@@ -198,7 +199,7 @@ class S3Storage extends BaseModel
                 try {
                     $mail = new MailMessage;
                     $mail->subject('Coolify: S3 Storage Connection Error');
-                    $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $exception->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
+                    $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => base_url().'/storages/'.$this->uuid]);
 
                     // Load the team with its members and their roles explicitly
                     $team = $this->team()->with(['members' => function ($query) {

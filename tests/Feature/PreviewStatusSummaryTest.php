@@ -8,14 +8,25 @@ it('aggregates preview container and health check status', function () {
     expect($html)
         ->toContain('Preview status')
         ->toContain('Container')
-        ->toContain('Running (no health check)')
-        ->toContain('Health check')
+        ->toContain('Running (no healthcheck)')
+        ->toContain('Healthcheck')
         ->toContain('Not configured')
-        ->toContain('aria-label="About unconfigured health checks"')
+        ->toContain('aria-label="About unconfigured healthchecks"')
+        ->toContain('class="relative inline-flex align-middle"')
         ->toContain('Traffic can still be routed to the container')
         ->toContain('aria-haspopup="menu"')
         ->toContain('right-auto! left-0!')
         ->toContain('w-[min(16rem,calc(100vw-1.5rem))]!');
+});
+
+it('shows degraded aggregate service status as a warning', function () {
+    $html = Blade::render('<x-status-summary status="degraded:unhealthy" title="Service status" container-name="Containers" />');
+    $summaryButton = str($html)->between('<button', '</button>')->toString();
+
+    expect($summaryButton)
+        ->toContain('Degraded')
+        ->toContain('bg-warning')
+        ->not->toContain('bg-error');
 });
 
 it('uses the aggregated preview status in the previews list', function () {
@@ -41,7 +52,7 @@ it('uses the aggregated status badge for databases and services', function () {
     expect($databaseStatus)
         ->toContain('<x-status-summary :status="$database->status" title="Database status" />')
         ->and($serviceStatus)
-        ->toContain('<x-status-summary :status="$service->status" title="Service status" container-name="Containers" />');
+        ->toContain('<x-status-summary :status="$displayStatus" :title="$selectedResource ? \'Resource status\' : \'Service status\'"');
 });
 
 it('groups preview deployment actions in a dropdown', function () {
@@ -75,4 +86,23 @@ it('places links and logs dropdowns beside preview actions', function () {
         ->toContain('title="Preview links"')
         ->toContain('title="Preview logs"')
         ->toContain('title="Preview actions"');
+});
+
+it('uses the shared domain list treatment for preview domains', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
+    $domainsView = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+
+    expect($view)
+        ->toContain('<livewire:project.application.preview-domains')
+        ->and($domainsView)
+        ->toContain('Recheck DNS')
+        ->toContain('Add domain')
+        ->toContain('data-table-header')
+        ->toContain('domains-table-grid-service')
+        ->toContain('class="env-table-item"')
+        ->toContain('No domains configured')
+        ->toContain('class="data-table-row')
+        ->toContain('DNS OK')
+        ->toContain('Edit domain')
+        ->toContain('Remove domain');
 });

@@ -1,5 +1,30 @@
 <?php
 
+function service_logo_urls(mixed $logo): array
+{
+    $defaultLogo = 'svgs/default.webp';
+
+    if (! is_string($logo) || $logo === '' || basename($logo) === basename($defaultLogo)) {
+        return [
+            'logo' => asset($defaultLogo),
+            'logo_cdn_url' => asset($defaultLogo),
+            'logo_default_url' => asset($defaultLogo),
+        ];
+    }
+
+    if (str_starts_with($logo, 'svg/')) {
+        $logo = 'svgs/'.str($logo)->after('svg/');
+    }
+
+    $logo = ltrim($logo, '/');
+
+    return [
+        'logo' => asset($logo),
+        'logo_cdn_url' => 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo,
+        'logo_default_url' => asset($defaultLogo),
+    ];
+}
+
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -167,13 +192,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
-                // If its a file & exists
-                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                if ($fileVolume->is_based_on_git) {
-                    $fileVolume->content = $filesystemContent;
-                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->loadStorageOnServer();
+                }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
@@ -235,7 +258,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
         $serviceConfig = data_get($dockerCompose, "services.{$name}");
-        $environment = data_get($serviceConfig, 'environment', []);
+        $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
         foreach ($environment as $key => $value) {

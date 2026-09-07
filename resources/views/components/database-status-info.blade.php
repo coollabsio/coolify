@@ -65,7 +65,7 @@
                 </div>
             @endif
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="enableSsl" label="SSL"
+                <x-forms.listbox canGate="update" :canResource="$database" id="enableSsl" label="SSL"
                     onChange="instantSaveSSL"
                     :disabled="! $isExited || ! auth()->user()?->can('update', $database)"
                     :options="[
@@ -73,7 +73,7 @@
                         ['value' => false, 'label' => 'Disabled'],
                     ]" />
                 @if ($sslModeOptions)
-                    <x-forms.listbox id="sslMode" label="SSL mode" :helper="$sslModeHelper"
+                    <x-forms.listbox canGate="update" :canResource="$database" id="sslMode" label="SSL mode" :helper="$sslModeHelper"
                         onChange="instantSaveSSL"
                         :disabled="! $enableSsl || ! $isExited || ! auth()->user()?->can('update', $database)"
                         :options="collect($sslModeOptions)->map(fn ($option, $value) => [

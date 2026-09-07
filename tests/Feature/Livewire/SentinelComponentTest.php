@@ -36,3 +36,12 @@ it('does not repeat a disabled status badge in the sentinel empty state', functi
 
     expect($view)->not->toContain("? 'Disabled'");
 });
+
+it('tells the user that saving sentinel settings initiates a restart', function () {
+    $componentSource = file_get_contents(app_path('Livewire/Server/Sentinel.php'));
+
+    preg_match('/public function submit\([^)]*\).*?\{(?<body>.*?)\n    \}/s', $componentSource, $matches);
+
+    expect($matches['body'] ?? '')
+        ->toContain("\$this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');");
+});

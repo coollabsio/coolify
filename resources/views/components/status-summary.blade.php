@@ -23,7 +23,7 @@
 
     $containerType = match (true) {
         str($containerStatus)->startsWith('running') => 'success',
-        str($containerStatus)->startsWith(['starting', 'restarting']) => 'warning',
+        str($containerStatus)->startsWith(['starting', 'restarting', 'degraded']) => 'warning',
         default => 'error',
     };
 
@@ -36,11 +36,12 @@
 
     [$summaryLabel, $summaryType] = match (true) {
         $containerType === 'error' => [$containerLabel, 'error'],
+        str($containerStatus)->startsWith('degraded') => ['Degraded', 'warning'],
         $healthType === 'error' => ['Degraded', 'error'],
         $containerType === 'warning' => [$containerLabel, 'warning'],
         $monitoringExcluded => ["{$containerLabel} (monitoring disabled)", 'warning'],
-        $healthStatus === 'starting' => ["{$containerLabel} (health check starting)", 'warning'],
-        $healthType === 'warning' => ["{$containerLabel} (no health check)", 'warning'],
+        $healthStatus === 'starting' => ["{$containerLabel} (healthcheck starting)", 'warning'],
+        $healthType === 'warning' => ["{$containerLabel} (no healthcheck)", 'warning'],
         default => [$containerLabel, 'success'],
     };
 @endphp
@@ -81,12 +82,12 @@
                 'bg-warning' => $healthType === 'warning',
                 'bg-error' => $healthType === 'error',
             ])></span>
-            <span class="flex-1">Health check</span>
+            <span class="flex-1">Healthcheck</span>
             <span class="inline-flex items-center gap-1.5">
                 {{ $healthLabel }}
                 @if ($healthLabel === 'Not configured')
-                    <x-helper label="About unconfigured health checks"
-                        helper="No health check is configured, so Coolify can only report the container state. Traffic can still be routed to the container, but Coolify cannot verify that the application inside it is ready to receive requests." />
+                    <x-helper label="About unconfigured healthchecks"
+                        helper="No healthcheck is configured, so Coolify can only report the container state. Traffic can still be routed to the container, but Coolify cannot verify that the application inside it is ready to receive requests." />
                 @endif
             </span>
         </div>

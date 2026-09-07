@@ -5,7 +5,7 @@
 
     <livewire:server.navbar :server="$server" />
 
-    <div class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <div class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="resources" />
         <div class="application-settings-form min-w-0 w-full">
         <x-application.settings-section id="server-resources-section" title="Resources"
@@ -61,10 +61,14 @@
                                     {{ str($resource->type())->headline() }}
                                 </div>
                                 <div>
-                                    <x-status-badge :status="str($resourceStatus)->headline()"
-                                        :type="str($resourceStatus)->contains('running')
-                                            ? 'success'
-                                            : (str($resourceStatus)->contains(['failed', 'exited']) ? 'error' : 'neutral')" />
+                                    @if (method_exists($resource, 'stoppedAfterRestartLimit') && $resource->stoppedAfterRestartLimit())
+                                        <x-application.restart-limit-warning :application="$resource" />
+                                    @else
+                                        <x-status-badge :status="str($resourceStatus)->headline()"
+                                            :type="str($resourceStatus)->contains('running')
+                                                ? 'success'
+                                                : (str($resourceStatus)->contains(['failed', 'exited']) ? 'error' : 'neutral')" />
+                                    @endif
                                 </div>
                             </div>
                         @endforeach

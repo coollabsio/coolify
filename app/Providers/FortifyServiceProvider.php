@@ -9,10 +9,8 @@ use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
@@ -48,7 +46,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $settings->isPasswordRegistrationAllowed()) {
                 return redirect()->route('login');
             }
 
@@ -61,13 +59,13 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0) {
-                // If there are no users, redirect to registration
+            if ($users == 0 && $settings->isPasswordRegistrationAllowed()) {
+                // If there are no users and password registration is allowed, redirect to registration.
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -121,39 +119,6 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::twoFactorChallengeView(function () {
             return view('auth.two-factor-challenge');
-        });
-
-        RateLimiter::for('force-password-reset', function (Request $request) {
-            return Limit::perMinute(15)->by($request->user()->id);
-        });
-
-        RateLimiter::for('forgot-password', function (Request $request) {
-            // Use real client IP (not spoofable forwarded headers)
-            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
-
-            $limits = [
-                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1($realIp)),
-            ];
-
-            $emailIdentity = normalize_email_identity($request->input('email'));
-            if ($emailIdentity !== null) {
-                $limits[] = Limit::perHour(3)->by('forgot-password:email-identity:'.sha1($emailIdentity));
-            }
-
-            return $limits;
-        });
-
-        RateLimiter::for('login', function (Request $request) {
-            $email = (string) $request->email;
-            // Use email + real client IP (not spoofable forwarded headers)
-            // server('REMOTE_ADDR') gives the actual connecting IP before proxy headers
-            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
-
-            return Limit::perMinute(5)->by($email.'|'.$realIp);
-        });
-
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
     }
 }

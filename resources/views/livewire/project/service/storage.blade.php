@@ -116,25 +116,9 @@
                                                 <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
                                                     Mount a Docker volume inside the container.
                                                 </p>
-                                                @if ($isSwarm)
-                                                    <div class="text-warning">Swarm Mode detected: You need to set a shared
-                                                        volume
-                                                        (EFS/NFS/etc) on all the worker nodes if you would like to use a
-                                                        persistent
-                                                        volumes.</div>
-                                                @endif
                                                 <div class="flex flex-col gap-4">
                                                     <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
                                                         id="name" label="Name" required helper="Volume name." />
-                                                    @if ($isSwarm)
-                                                        <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path" required
-                                                            helper="Directory on the host system." />
-                                                    @else
-                                                        <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path"
-                                                            helper="Directory on the host system." />
-                                                    @endif
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/tmp/root" id="mount_path" label="Destination Path"
                                                         required helper="Directory inside the container." />
@@ -382,7 +366,7 @@
                 icon-name="storages" />
         @elseif ($activeTab === 'volumes')
             @if ($hasVolumes)
-                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}"
                     :resource="$resource" />
             @else
                 <x-empty size="sm" title="No volumes configured"
@@ -449,7 +433,7 @@
             @elseif ($activeTab === 'volumes')
                 @if ($hasVolumes)
                     <livewire:project.shared.storages.all
-                        wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                        wire:key="svc-volumes-{{ $resource->id }}"
                         :resource="$resource" />
                 @else
                     <x-empty size="sm" title="No volumes configured"

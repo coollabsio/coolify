@@ -53,6 +53,8 @@ class ValidateAndInstall extends Component
 
     public function init(int $data = 0)
     {
+        $this->authorize('update', $this->server);
+
         if (! $this->server->canBeValidated()) {
             $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
             $this->server->update([
@@ -172,6 +174,8 @@ class ValidateAndInstall extends Component
 
     public function validateOS()
     {
+        $this->authorize('update', $this->server);
+
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
@@ -186,6 +190,8 @@ class ValidateAndInstall extends Component
 
     public function validatePrerequisites()
     {
+        $this->authorize('update', $this->server);
+
         $validationResult = $this->server->validatePrerequisites();
         $this->prerequisites_installed = $validationResult['success'];
         if (! $validationResult['success']) {
@@ -224,6 +230,8 @@ class ValidateAndInstall extends Component
 
     public function validateDockerEngine()
     {
+        $this->authorize('update', $this->server);
+
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
@@ -260,6 +268,8 @@ class ValidateAndInstall extends Component
 
     public function validateDockerVersion()
     {
+        $this->authorize('update', $this->server);
+
         if ($this->server->isSwarm()) {
             $swarmInstalled = $this->server->validateDockerSwarm();
             if ($swarmInstalled) {

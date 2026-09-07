@@ -18,7 +18,7 @@
                     <x-forms.input id="name" label="Name" required canGate="update" :canResource="$team" />
                     <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
                     <div class="lg:col-span-2">
-                        <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
+                        <x-forms.listbox canGate="update" :canResource="$team" id="is_mcp_server_enabled" label="MCP server"
                             helper="Controls whether this team's API tokens can use the instance MCP endpoint."
                             :disabled="! auth()->user()->can('update', $team)" :options="[
                                 ['value' => false, 'label' => 'Disabled for this team'],

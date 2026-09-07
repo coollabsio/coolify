@@ -1,12 +1,19 @@
-name: Release Coolify
+name: Release Coolify Stable
+run-name: ${{ inputs.tag }}
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag (for example, v4.3.1)
+        required: true
+        type: string
 
-permissions:
-  contents: read
-  packages: write
+permissions: {}
+
+concurrency:
+  group: coolify-fix-release
+  cancel-in-progress: false
 
 env:
   GITHUB_REGISTRY: ghcr.io
@@ -14,14 +21,116 @@ env:
   IMAGE_NAME: coollabsio/coolify
 
 jobs:
-  promote-image:
+  validate:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+      version: ${{ steps.version.outputs.version }}
     steps:
+      - name: Reject releases outside the production branch
+        if: ${{ github.ref_name != 'main' }}
+        run: |
+          echo "Stable releases must run from main, not ${{ github.ref_name }}."
+          exit 1
+
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event.release.tag_name }}
+
+      - name: Validate version
+        id: version
+        env:
+          TAG_NAME: ${{ inputs.tag }}
+        run: |
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unsupported fix release tag: ${TAG_NAME}"
+            exit 1
+          fi
+
+          VERSION="${TAG_NAME#v}"
+          CONFIG_VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)
+
+          if [[ "${CONFIG_VERSION}" != "${VERSION}" ]]; then
+            echo "Release tag ${VERSION} does not match config version ${CONFIG_VERSION}."
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate and pin draft release
+        id: draft
+        uses: actions/github-script@v8
+        env:
+          TAG_NAME: ${{ inputs.tag }}
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === process.env.TAG_NAME);
+
+            if (!release) {
+              core.setFailed(`Create a draft release for ${process.env.TAG_NAME} before running this workflow.`);
+              return;
+            }
+            if (!release.draft) {
+              core.setFailed(`Release ${process.env.TAG_NAME} must still be a draft.`);
+              return;
+            }
+            if (release.prerelease) {
+              core.setFailed(`Fix release ${process.env.TAG_NAME} cannot be marked as a prerelease.`);
+              return;
+            }
+            if (!release.body?.trim()) {
+              core.setFailed(`Draft release ${process.env.TAG_NAME} must contain reviewed release notes.`);
+              return;
+            }
+
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+              core.setFailed(`Git tag ${process.env.TAG_NAME} already exists.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              tag_name: process.env.TAG_NAME,
+              target_commitish: context.sha,
+            });
+            core.setOutput('release_id', release.id);
+
+  build:
+    needs: validate
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@v3
 
@@ -39,69 +148,112 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve release image
-        id: release
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
-        run: |
-          if [[ ! "${TAG_NAME}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Unsupported release tag: ${TAG_NAME}"
-            exit 1
-          fi
-
-          VERSION="${TAG_NAME#v}"
-          RELEASE_SHA=$(git rev-list -n 1 "${TAG_NAME}")
-          CONFIG_VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)
-
-          if [[ "${CONFIG_VERSION}" != "${VERSION}" ]]; then
-            echo "Release tag ${VERSION} does not match config version ${CONFIG_VERSION}."
-            exit 1
-          fi
-
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Promote version on ${{ env.GITHUB_REGISTRY }}
-        env:
-          REGISTRY: ${{ env.GITHUB_REGISTRY }}
-          VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          SOURCE_TAG="sha-${RELEASE_SHA}"
-          docker buildx imagetools create "${IMAGE}:${SOURCE_TAG}" --tag "${IMAGE}:${VERSION}"
-
-      - name: Promote version on ${{ env.DOCKER_REGISTRY }}
-        env:
-          REGISTRY: ${{ env.DOCKER_REGISTRY }}
-          VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          SOURCE_TAG="sha-${RELEASE_SHA}"
-          docker buildx imagetools create "${IMAGE}:${SOURCE_TAG}" --tag "${IMAGE}:${VERSION}"
-
-      - name: Promote latest on ${{ env.GITHUB_REGISTRY }}
-        if: ${{ ! github.event.release.prerelease }}
-        env:
-          REGISTRY: ${{ env.GITHUB_REGISTRY }}
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          SOURCE_TAG="sha-${RELEASE_SHA}"
-          docker buildx imagetools create "${IMAGE}:${SOURCE_TAG}" --tag "${IMAGE}:latest"
-
-      - name: Promote latest on ${{ env.DOCKER_REGISTRY }}
-        if: ${{ ! github.event.release.prerelease }}
-        env:
-          REGISTRY: ${{ env.DOCKER_REGISTRY }}
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          SOURCE_TAG="sha-${RELEASE_SHA}"
-          docker buildx imagetools create "${IMAGE}:${SOURCE_TAG}" --tag "${IMAGE}:latest"
-
-      - uses: sarisia/actions-status-discord@v1
-        if: always()
+      - name: Build and push release image (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL }}
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            COOLIFY_VERSION=${{ needs.validate.outputs.version }}
+          tags: |
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:release-${{ needs.validate.outputs.version }}-${{ github.sha }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:release-${{ needs.validate.outputs.version }}-${{ github.sha }}-${{ matrix.arch }}
+
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish version and latest on ${{ env.GITHUB_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          SOURCE="release-${VERSION}-${GITHUB_SHA}"
+          docker buildx imagetools create \
+            "${IMAGE}:${SOURCE}-amd64" \
+            "${IMAGE}:${SOURCE}-aarch64" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:latest"
+
+      - name: Publish version and latest on ${{ env.DOCKER_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          SOURCE="release-${VERSION}-${GITHUB_SHA}"
+          docker buildx imagetools create \
+            "${IMAGE}:${SOURCE}-amd64" \
+            "${IMAGE}:${SOURCE}-aarch64" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:latest"
+
+      - name: Publish reviewed draft release
+        uses: actions/github-script@v8
+        env:
+          RELEASE_ID: ${{ needs.validate.outputs.release_id }}
+          TAG_NAME: ${{ inputs.tag }}
+        with:
+          script: |
+            const releaseId = Number(process.env.RELEASE_ID);
+            const { data: release } = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: releaseId,
+            });
+
+            if (release.tag_name !== process.env.TAG_NAME || !release.draft || release.prerelease) {
+              core.setFailed(`Draft release ${process.env.TAG_NAME} changed while the images were building.`);
+              return;
+            }
+            if (!release.body?.trim()) {
+              core.setFailed(`Draft release ${process.env.TAG_NAME} no longer contains release notes.`);
+              return;
+            }
+            if (release.target_commitish !== context.sha) {
+              core.setFailed(`Draft release ${process.env.TAG_NAME} no longer targets ${context.sha}.`);
+              return;
+            }
+
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${process.env.TAG_NAME}`,
+              });
+              core.setFailed(`Git tag ${process.env.TAG_NAME} was created while the images were building.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: Number(process.env.RELEASE_ID),
+              tag_name: process.env.TAG_NAME,
+              target_commitish: context.sha,
+              draft: false,
+            });

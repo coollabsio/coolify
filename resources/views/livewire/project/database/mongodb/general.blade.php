@@ -83,7 +83,7 @@
             <div class="grid gap-4 lg:grid-cols-2">
                 <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
                     <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
-                        :disabled="! auth()->user()->can('update', $database)" :options="[
+                        :disabled="! auth()->user()->can('update', $database)" canGate="update" :canResource="$database" :options="[
                             ['value' => false, 'label' => 'Private'],
                             ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
                         ]" />
@@ -104,7 +104,7 @@
 
         <x-application.settings-section title="Log delivery"
             description="Forward container logs to the drain configured on the server.">
-            <x-forms.listbox id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+            <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                 :disabled="! auth()->user()->can('update', $database)" :options="[
                     ['value' => false, 'label' => 'Do not forward logs'],
                     ['value' => true, 'label' => 'Forward logs to the server drain'],

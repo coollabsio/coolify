@@ -94,7 +94,7 @@
     }
 }" @pointerdown.window="closeWhenPointerIsOutside($event)" @keydown.window.escape="close"
     @resize.window="open && position()" @scroll.window="open && position()"
-    {{ $attributes->merge(['class' => 'relative inline-block align-middle']) }}>
+    {{ $attributes->merge(['class' => 'relative inline-flex align-middle']) }}>
     {{-- button (not div) so label-for associations do not steal the click on mobile --}}
     <button type="button" x-ref="trigger" data-icon-tooltip-ignore
         @class([
@@ -122,7 +122,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         :style="style"
-        class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))] whitespace-normal"
+        class="info-helper-popup fixed z-[10000] w-max max-w-[min(20rem,calc(100vw-2rem))] whitespace-normal"
         @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
         <div class="px-3 py-2.5 text-[13px] leading-5">
             {!! $helper !!}

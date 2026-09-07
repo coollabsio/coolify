@@ -22,7 +22,11 @@
             @endif
         </div>
     @endif
-    @if ($type === 'password')
+    @if ($loading)
+        <div class="{{ $defaultClass }} flex w-full items-center text-neutral-500 dark:text-fg-dim" aria-busy="true">
+            <x-loading :text="$loadingText" />
+        </div>
+    @elseif ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 x-bind:type="type"
@@ -33,7 +37,7 @@
                 @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
-                @if ($autofocus) x-ref="autofocusInput" @endif>
+                @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
             @if ($allowToPeak)
                 <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
                     class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
@@ -56,14 +60,25 @@
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
-            @if ($autofocus) x-ref="autofocusInput" @endif>
+            @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif
     @error($modelBinding)
         <label class="label">
-            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+            @php
+                preg_match('/(https?:\/\/\S+)$/', $message, $validationLinkMatches);
+                $validationLink = $validationLinkMatches[1] ?? null;
+            @endphp
+            <span class="text-red-500 label-text-alt">
+                @if ($validationLink)
+                    {{ str($message)->beforeLast($validationLink)->trim() }}
+                    <a class="font-medium underline" href="{{ $validationLink }}">Set them here.</a>
+                @else
+                    {{ $message }}
+                @endif
+            </span>
         </label>
     @enderror
 </div>

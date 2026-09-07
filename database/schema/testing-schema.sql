@@ -1311,146 +1311,6 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email_change_code_expires_at" TEXT
 );
 
-CREATE TABLE IF NOT EXISTS "v5_clusters" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "team_id" INTEGER NOT NULL,
-    "created_by_user_id" INTEGER NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "wireguard_interface" TEXT DEFAULT 'wg0' NOT NULL,
-    "wireguard_management_pool" TEXT DEFAULT '100.64.0.0/16' NOT NULL,
-    "wireguard_listen_port" INTEGER DEFAULT '51820' NOT NULL,
-    "container_network_pool" TEXT DEFAULT '10.210.0.0/16' NOT NULL,
-    "container_network_prefix" INTEGER DEFAULT '24' NOT NULL,
-    "namespaces" JSON,
-    "default_deny_containers" INTEGER DEFAULT true NOT NULL,
-    "coold_version" TEXT DEFAULT 'nightly' NOT NULL,
-    "corrosion_version" TEXT DEFAULT 'v1.0.0' NOT NULL,
-    "corrosion_gossip_port" INTEGER DEFAULT '8787' NOT NULL,
-    "corrosion_api_port" INTEGER DEFAULT '8080' NOT NULL,
-    "builder_enabled" INTEGER DEFAULT true NOT NULL,
-    "builder_capacity" INTEGER DEFAULT '2' NOT NULL,
-    "builder_cpu_quota" TEXT DEFAULT '200%' NOT NULL,
-    "builder_memory_max" TEXT DEFAULT '2G' NOT NULL,
-    "builder_timeout_secs" INTEGER NOT NULL DEFAULT '1800',
-    "last_cli_action" TEXT,
-    "last_cli_status" TEXT,
-    "last_cli_summary" TEXT,
-    "last_cli_ran_at" TEXT,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_servers" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "uuid" TEXT,
-    "team_id" INTEGER NOT NULL,
-    "cluster_id" INTEGER,
-    "created_by_user_id" INTEGER NOT NULL,
-    "private_key_id" INTEGER,
-    "name" TEXT NOT NULL,
-    "host" TEXT NOT NULL,
-    "ssh_user" TEXT NOT NULL,
-    "ssh_port" INTEGER DEFAULT '22' NOT NULL,
-    "status" TEXT DEFAULT 'installed' NOT NULL,
-    "ingress_type" TEXT,
-    "ingress_status" TEXT,
-    "capabilities" TEXT,
-    "builder_enabled" INTEGER DEFAULT false NOT NULL,
-    "builder_capacity" INTEGER DEFAULT '0' NOT NULL,
-    "builder_cpu_quota" TEXT DEFAULT '200%' NOT NULL,
-    "node_address" TEXT,
-    "wireguard_listen_port_override" INTEGER,
-    "wireguard_endpoint_override" TEXT,
-    "wireguard_management_ip" TEXT,
-    "wireguard_public_key" TEXT,
-    "container_subnets" JSON,
-    "canvas_x" INTEGER,
-    "canvas_y" INTEGER,
-    "last_bootstrapped_at" TEXT,
-    "last_bootstrap_action" TEXT,
-    "last_bootstrap_status" TEXT,
-    "last_bootstrap_output" TEXT,
-    "last_bootstrap_ran_at" TEXT,
-    "last_status_check" TEXT,
-    "last_status_output" TEXT,
-    "last_status_checked_at" TEXT,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_container_statuses" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "team_id" INTEGER NOT NULL,
-    "server_id" INTEGER NOT NULL,
-    "container_id" TEXT NOT NULL,
-    "container_name" TEXT,
-    "image" TEXT,
-    "status" TEXT DEFAULT 'unknown' NOT NULL,
-    "status_message" TEXT,
-    "last_seen_at" TEXT,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_applications" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "team_id" INTEGER NOT NULL,
-    "project_id" INTEGER NOT NULL,
-    "environment_id" INTEGER NOT NULL,
-    "server_id" INTEGER,
-    "created_by_user_id" INTEGER NOT NULL,
-    "name" TEXT NOT NULL,
-    "image" TEXT NOT NULL,
-    "container_name" TEXT NOT NULL,
-    "status" TEXT DEFAULT 'creating' NOT NULL,
-    "status_message" TEXT,
-    "runtime_container_id" TEXT,
-    "mesh_namespace" TEXT DEFAULT 'default' NOT NULL,
-    "ingress_enabled" INTEGER DEFAULT false NOT NULL,
-    "internal_port" INTEGER,
-    "canvas_x" INTEGER DEFAULT '0' NOT NULL,
-    "canvas_y" INTEGER DEFAULT '0' NOT NULL,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_application_domains" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "application_id" INTEGER NOT NULL,
-    "domain" TEXT NOT NULL,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_resource_connections" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "team_id" INTEGER NOT NULL,
-    "project_id" INTEGER NOT NULL,
-    "environment_id" INTEGER NOT NULL,
-    "resource_one_type" TEXT NOT NULL,
-    "resource_one_id" INTEGER NOT NULL,
-    "resource_two_type" TEXT NOT NULL,
-    "resource_two_id" INTEGER NOT NULL,
-    "resource_pair_key" TEXT NOT NULL,
-    "created_by_user_id" INTEGER NOT NULL,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS "v5_resource_connection_rules" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "connection_id" INTEGER NOT NULL,
-    "source_resource_type" TEXT NOT NULL,
-    "source_resource_id" INTEGER NOT NULL,
-    "target_resource_type" TEXT NOT NULL,
-    "target_resource_id" INTEGER NOT NULL,
-    "protocol" TEXT DEFAULT 'tcp' NOT NULL,
-    "port" INTEGER NOT NULL,
-    "created_at" TEXT,
-    "updated_at" TEXT
-);
-
 CREATE TABLE IF NOT EXISTS "webhook_notification_settings" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "team_id" INTEGER NOT NULL,
@@ -1559,11 +1419,6 @@ CREATE INDEX IF NOT EXISTS "user_changelog_reads_release_tag_index" ON "user_cha
 CREATE INDEX IF NOT EXISTS "user_changelog_reads_user_id_index" ON "user_changelog_reads" (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_unique" ON "user_changelog_reads" (user_id, release_tag);
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_unique" ON "users" (email);
-CREATE UNIQUE INDEX IF NOT EXISTS "v5_applications_container_name_unique" ON "v5_applications" (container_name);
-CREATE UNIQUE INDEX IF NOT EXISTS "v5_application_domains_application_id_domain_unique" ON "v5_application_domains" (application_id, domain);
-CREATE UNIQUE INDEX IF NOT EXISTS "v5_resource_connections_team_id_resource_pair_key_unique" ON "v5_resource_connections" (team_id, resource_pair_key);
-CREATE UNIQUE INDEX IF NOT EXISTS "v5_resource_connection_rules_unique_direction_port" ON "v5_resource_connection_rules" (connection_id, source_resource_type, source_resource_id, target_resource_type, target_resource_id, protocol, port);
-CREATE UNIQUE INDEX IF NOT EXISTS "v5_servers_uuid_unique" ON "v5_servers" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique" ON "webhook_notification_settings" (team_id);
 
 -- Migration records
@@ -1881,8 +1736,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (312, '2025_12_15_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (313, '2025_12_17_000001_add_is_wire_navigate_enabled_to_instance_settings_table', 313);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (314, '2025_12_17_000002_add_restart_tracking_to_standalone_databases', 314);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (315, '2026_06_03_000000_add_oauth_fields_to_gitlab_apps_table', 315);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (316, '2026_06_16_130649_v5_create_clusters_table', 316);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_130650_v5_create_servers_table', 317);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_19_140000_v5_create_applications_table', 318);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_142000_v5_create_resource_connections_table', 319);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_182231_create_container_statuses_table', 320);

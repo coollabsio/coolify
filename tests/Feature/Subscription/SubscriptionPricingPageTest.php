@@ -62,6 +62,35 @@ test('unsubscribed cloud sidebar does not expose global search', function () {
     $response->assertDontSee('>Search</span>', false);
 });
 
+test('subscribed cloud sidebar shows subscription link for team admins', function () {
+    Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_subscription_id' => 'sub_active',
+        'stripe_customer_id' => 'cus_active',
+        'stripe_invoice_paid' => true,
+        'stripe_plan_id' => 'price_active',
+        'stripe_cancel_at_period_end' => false,
+        'stripe_past_due' => false,
+    ]);
+
+    Once::flush();
+    session(['currentTeam' => $this->team->fresh()]);
+
+    $html = view('components.navbar')->render();
+
+    expect($html)
+        ->toContain('title="Subscription"')
+        ->toContain(route('subscription.show'));
+});
+
+test('subscription adjustment modal is protected from livewire morphing', function () {
+    $view = file_get_contents(resource_path('views/livewire/subscription/actions.blade.php'));
+
+    expect($view)
+        ->toContain('<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6" x-data="{')
+        ->toContain('<template x-teleport="body" wire:ignore>');
+});
+
 test('subscription pricing page does not render a single-item pricing tab strip', function () {
     $html = view('components.dashboard.navbar', [
         'section' => 'subscription',

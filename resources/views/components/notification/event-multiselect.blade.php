@@ -34,7 +34,14 @@
             </svg>
         </button>
 
-        <div class="listbox-panel" x-show="open" x-cloak role="listbox" aria-multiselectable="true">
+        <div class="listbox-panel" x-show="open" x-cloak
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-75"
+            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+            x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+            role="listbox" aria-multiselectable="true">
             @foreach ($events as $event)
                 <button wire:key="{{ $id }}-{{ $event['property'] }}" type="button" class="listbox-option"
                     role="option" aria-selected="{{ $event['enabled'] ? 'true' : 'false' }}"

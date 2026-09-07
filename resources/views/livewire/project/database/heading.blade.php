@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $databasePageItems = [
             [
@@ -63,71 +63,37 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $database->name }}
                 </h1>
-                <x-status-summary :status="$database->status" title="Database status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$database->status" title="Database status" />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    <x-application.restart-limit-warning :application="$database" />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if ($database->destination->server->isFunctional())
-                <div id="database-mobile-actions" class="relative mb-3"
-                    x-data="{ open: false }" @click.outside="open = false"
-                    @keydown.escape.window="open = false">
-                    <button type="button" class="button w-full justify-between" @click="open = !open"
-                        :aria-expanded="open" aria-haspopup="menu">
-                        <span class="inline-flex items-center gap-2">
-                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
-                            Actions
-                        </span>
-                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
-                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
-                        </span>
-                    </button>
-
-                    <div x-cloak x-show="open" x-transition.origin.top.left
-                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                @can('manage', $database)
+                    <x-split-action id="database-mobile-actions" class="mb-3 flex w-full">
                         @if (! $databaseStatus->startsWith('exited'))
-                            @can('manage', $database)
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    @click="open = false; document.getElementById('database-restart-trigger')?.click()"
-                                    role="menuitem">
-                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                    Restart
-                                </button>
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    @click="open = false; document.getElementById('database-stop-trigger')?.click()"
-                                    role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 text-error" />
-                                    Stop
-                                </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                    Restart
-                                </button>
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
-                                    Stop
-                                </button>
-                            @endcan
+                            <x-slot:main @click="document.getElementById('database-restart-trigger')?.click()">
+                                <x-reicon name="restart" class="size-3.5" />
+                                Restart
+                            </x-slot:main>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
+                                <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                Stop
+                            </button>
                         @else
-                            @can('manage', $database)
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    @click="open = false; $wire.dispatch('startEvent')" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Start
-                                </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Start
-                                </button>
-                            @endcan
+                            <x-slot:main @click="$wire.dispatch('startEvent')">
+                                <x-reicon name="play-circle" class="size-3.5" />
+                                Start
+                            </x-slot:main>
                         @endif
-                    </div>
-                </div>
+                    </x-split-action>
+                @endcan
             @endif
 
         </div>
@@ -138,37 +104,26 @@
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     @if ($database->destination->server->isFunctional())
-                        @if (! $databaseStatus->startsWith('exited'))
-                            <div id="database-desktop-actions" class="relative" x-data="{ open: false }"
-                                @click.outside="open = false" @keydown.escape.window="open = false">
-                                <button type="button" class="button" @click="open = !open" :aria-expanded="open">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
-                                    Actions
-                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
-                                </button>
-                                <div x-cloak x-show="open" x-transition.origin.top.right
-                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-52! min-w-0!" role="menu">
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        @disabled(!auth()->user()->can('manage', $database))
-                                        @click="open = false; document.getElementById('database-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
+                        @can('manage', $database)
+                            <x-split-action id="database-desktop-actions">
+                                @if (! $databaseStatus->startsWith('exited'))
+                                    <x-slot:main @click="document.getElementById('database-restart-trigger')?.click()">
+                                        <x-reicon name="restart" class="size-3.5" />
                                         Restart
-                                    </button>
+                                    </x-slot:main>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        @disabled(!auth()->user()->can('manage', $database))
-                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()">
-                                        <x-reicon name="stop" class="size-3.5 text-error" />
+                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
+                                        <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                         Stop
                                     </button>
-                                </div>
-                            </div>
-                        @else
-                            <x-forms.button canGate="manage" :canResource="$database"
-                                @click="$wire.dispatch('startEvent')">
-                                <x-reicon name="play-circle" class="size-4 opacity-70" />
-                                Start
-                            </x-forms.button>
-                        @endif
+                                @else
+                                    <x-slot:main @click="$wire.dispatch('startEvent')">
+                                        <x-reicon name="play-circle" class="size-3.5" />
+                                        Start
+                                    </x-slot:main>
+                                @endif
+                            </x-split-action>
+                        @endcan
                     @else
                         <x-status-badge status="Server unavailable" type="error" />
                     @endif

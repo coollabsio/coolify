@@ -10,9 +10,6 @@
     <testsuite name="v4">
       <directory suffix="Test.php">./tests/v4</directory>
     </testsuite>
-    <testsuite name="v5">
-      <directory suffix="Test.php">./tests/v5</directory>
-    </testsuite>
   </testsuites>
   <coverage/>
   <php>
@@ -27,9 +24,6 @@
     <env name="NIGHTWATCH_ENABLED" value="false"/>
     <!-- Host-side Pest browser runs cannot resolve docker DNS (coolify-realtime). -->
     <env name="BROADCAST_DRIVER" value="null" force="true"/>
-    <!-- The v5 bootstrap endpoint refuses to queue without a Flux URL; tests
-         that exercise the unconfigured path blank it via Config::set. -->
-    <env name="COOLIFY_COOLD_FLUX_URL" value="http://flux.testing:6443" force="true"/>
   </php>
   <source>
     <include>

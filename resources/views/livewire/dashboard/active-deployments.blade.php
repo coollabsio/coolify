@@ -70,7 +70,7 @@
 
                             <a wire:key="dashboard-active-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025]">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}
@@ -139,7 +139,7 @@
 
                             <a wire:key="dashboard-recent-deployment-{{ $deployment->deployment_uuid }}"
                                 href="{{ $deployment->deployment_url }}" {{ wireNavigate() }}
-                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025]">
+                                class="dashboard-deployment-table-grid group block border-b border-neutral-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-neutral-50 focus-visible:z-10 focus-visible:bg-warning/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-warning focus-visible:ring-offset-0 md:grid md:items-center md:gap-4 dark:border-white/[0.08] dark:hover:bg-white/[0.025] dark:focus-visible:bg-warning/10">
                                 <div class="min-w-0">
                                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">
                                         {{ $deployment->application_name }}

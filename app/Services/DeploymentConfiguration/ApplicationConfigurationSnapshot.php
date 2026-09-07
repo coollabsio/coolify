@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
+use App\Support\DomainPortOverrides;
 use Illuminate\Support\Arr;
 
 class ApplicationConfigurationSnapshot
@@ -194,6 +195,8 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('domain_port_overrides', 'Domain port overrides', DomainPortOverrides::sorted($this->application->domain_port_overrides), 'redeploy'),
+            $this->item('noindex_domains', 'Search engine indexing', $this->application->noindexDomains()->all(), 'redeploy'),
             $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),
             $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->decodeCustomLabels($this->application->custom_labels)), displayFull: $this->decodeCustomLabels($this->application->custom_labels), diffMode: 'lines'),

@@ -4,12 +4,11 @@ namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
-use App\Jobs\V5TeardownTeamJob;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
-use App\Support\V5\V5Feature;
+use App\Traits\Auditable;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -41,7 +40,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
+    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
     protected $fillable = [
         'name',
@@ -81,20 +80,6 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::deleting(function (Team $team) {
-            // Best-effort on-host teardown of this team's v5 resources BEFORE the
-            // DB cascade removes the servers/applications/private keys. Captured
-            // synchronously into a queued job so an unreachable host cannot block
-            // or fail the team deletion (see V5TeardownTeamJob). Guarded so a v5
-            // teardown problem never breaks v4 team deletion. This is disabled
-            // with the rest of v5 outside development environments.
-            if (V5Feature::enabled()) {
-                try {
-                    V5TeardownTeamJob::dispatchForTeam($team);
-                } catch (\Throwable $exception) {
-                    report($exception);
-                }
-            }
-
             RevokeUserTeamTokens::forTeam($team->id);
 
             foreach ($team->privateKeys as $key) {
@@ -102,12 +87,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             }
 
             // Transfer instance-wide sources to root team so they remain available
-            GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
-            GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
+                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
+            foreach ($systemWideSources as $source) {
+                $source->update(['team_id' => 0]);
+            }
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->merge(GitlabApp::where('team_id', $team->id)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->get());
             foreach ($teamSources as $source) {
                 $source->delete();
             }
@@ -291,13 +279,22 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(TeamInvitation::class);
     }
 
-    public function isEmpty()
+    /**
+     * @return array<string, int>
+     */
+    public function deletionBlockers(): array
     {
-        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
-            return true;
-        }
+        return array_filter([
+            'projects' => $this->projects()->count(),
+            'servers' => $this->servers()->count(),
+            'sources' => GithubApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
+                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
+        ]);
+    }
 
-        return false;
+    public function isEmpty(): bool
+    {
+        return $this->deletionBlockers() === [];
     }
 
     public function projects()
@@ -318,6 +315,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);
+    }
+
+    public function integrationTokens()
+    {
+        return $this->hasMany(IntegrationToken::class);
     }
 
     public function sources()

@@ -4,8 +4,11 @@ namespace App\Models;
 
 use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
+use App\Support\DomainPortOverrides;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -43,7 +46,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -92,10 +95,18 @@ class Service extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $applications = $this->applications()->get();
+        $domains = $applications->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $applications->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $domainPortOverrides = $applications
+            ->mapWithKeys(fn (ServiceApplication $application): array => [
+                $application->id => DomainPortOverrides::sorted($application->domain_port_overrides),
+            ])
+            ->sortKeys()
+            ->all();
 
-        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $applicationImages = $applications->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
@@ -104,7 +115,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1179,6 +1190,27 @@ class Service extends BaseModel
                     }
                     $fields->put('Openclaw', $data->toArray());
                     break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
@@ -1474,7 +1506,7 @@ class Service extends BaseModel
     {
         try {
             $services = get_service_templates();
-            $serviceName = str($this->name)->beforeLast('-')->value();
+            $serviceName = $this->service_type ?: str($this->name)->beforeLast('-')->value();
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 
@@ -1609,7 +1641,7 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            $envs->push("{$env->key}={$this->resolveSecretManagerEnvironmentVariable($env)}");
         }
         if ($envs->count() === 0) {
             $commands[] = 'touch .env';

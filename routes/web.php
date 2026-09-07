@@ -3,6 +3,7 @@
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
+use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -10,6 +11,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
+use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -35,6 +37,7 @@ use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
+use App\Livewire\Project\Service\ImportBackup as ServiceImportBackup;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Service\VolumeBackup\Index;
 use App\Livewire\Project\Service\VolumeBackup\Show;
@@ -46,6 +49,7 @@ use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
 use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenShow;
 use App\Livewire\Security\CloudTokens;
+use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Advanced as ServerAdvanced;
@@ -95,6 +99,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\AuditLog as TeamAuditLog;
 use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
@@ -111,15 +116,21 @@ Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('p
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
-Route::middleware(['throttle:login'])->group(function () {
-    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
-});
+Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
-// Local-only previews for redesigned HTTP error pages (never registered in production).
-if (app()->environment('local')) {
+// Local/testing previews for HTTP error pages and the Laravel debug renderer (never in production).
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/__livewire-request-failure', LivewireRequestFailurePreview::class)
+        ->name('dev.livewire-request-failure-preview');
+
+    Route::get('/__exception', function () {
+        throw new RuntimeException('Testing Laravel exception page');
+    })->name('dev.exception-preview');
+
     Route::get('/__error/{code}', function (string $code) {
         $allowed = ['400', '401', '402', '403', '404', '419', '429', '500', '503'];
         abort_unless(in_array($code, $allowed, true), 404);
@@ -159,6 +170,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/oauth/{provider}', SettingsOauth::class)
+        ->where('provider', '[A-Za-z0-9_-]+')
+        ->name('settings.oauth.provider');
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
@@ -198,6 +212,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });
@@ -242,6 +257,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
+    Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
@@ -313,6 +329,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
+        Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
         Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
         Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
         Route::get('/storage-backups/{backup_uuid}/s3', Show::class)->name('project.service.volume-backups.s3');
@@ -331,7 +349,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/retention', ServiceDatabaseBackups::class)->name('project.service.database.backup.retention');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
-        Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
+        Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
@@ -379,6 +397,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+    Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
     Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
     Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');

@@ -64,3 +64,25 @@ it('creates a failed execution record when server is force disabled', function (
         ->and($execution->status)->toBe('failed')
         ->and($execution->message)->toContain('not functional');
 });
+
+it('finishes the latest running execution when the job fails after a timeout', function () {
+    $user = User::factory()->create();
+    $team = $user->teams()->first();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $olderExecution = DockerCleanupExecution::create([
+        'server_id' => $server->id,
+    ]);
+    $timedOutExecution = DockerCleanupExecution::create([
+        'server_id' => $server->id,
+    ]);
+
+    $job = new DockerCleanupJob($server);
+    $job->failed(new RuntimeException('Docker cleanup job has timed out.'));
+
+    expect($timedOutExecution->refresh()->status)->toBe('failed')
+        ->and($timedOutExecution->message)->toBe('Docker cleanup job has timed out.')
+        ->and($timedOutExecution->finished_at)->not->toBeNull()
+        ->and($olderExecution->refresh()->status)->toBe('running')
+        ->and($olderExecution->finished_at)->toBeNull();
+});

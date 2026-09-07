@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.maintenance.driver' => 'file']);
+
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -136,6 +138,80 @@ test('proxy settings regenerate managed labels', function () {
     expect(base64_decode($this->application->fresh()->custom_labels))->not->toContain('sentinel-label=true');
 });
 
+test('changing a domain port regenerates managed labels with the requested port', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'ports_exposes' => '80',
+        'domain_port_overrides' => [
+            'https://app.example.com' => 3000,
+        ],
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://app.example.com:8080',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->fqdn)->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 8080,
+        ])
+        ->and($labels)->toContain('loadbalancer.server.port=8080')
+        ->and($labels)->not->toContain('loadbalancer.server.port=3000');
+});
+
+test('http basic auth updates regenerate managed labels', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => false,
+        'http_basic_auth_username' => null,
+        'http_basic_auth_password' => null,
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_http_basic_auth_enabled' => true,
+            'http_basic_auth_username' => 'api-user',
+            'http_basic_auth_password' => 'api-password',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect((bool) $application->is_http_basic_auth_enabled)->toBeTrue()
+        ->and($application->http_basic_auth_username)->toBe('api-user')
+        ->and($application->http_basic_auth_password)->toBe('api-password')
+        ->and($labels)->toContain('basicauth')
+        ->and($labels)->toContain('api-user')
+        ->and($labels)->not->toContain('sentinel-label=true');
+});
+
+test('http basic auth updates preserve user-managed labels', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_http_basic_auth_enabled' => true,
+            'http_basic_auth_username' => 'api-user',
+            'http_basic_auth_password' => 'api-password',
+        ])
+        ->assertOk();
+
+    expect(base64_decode($this->application->fresh()->custom_labels))->toBe('sentinel-label=true');
+});
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -229,6 +305,34 @@ test('PATCH /api/v1/applications/{uuid} updates preview_url_template and max_res
     expect($application->preview_url_template)->toBe('{{pr_id}}.preview.example.com')
         ->and($application->max_restart_count)->toBe(5);
 });
+
+test('PATCH /api/v1/applications/{uuid} clears ports_exposes with null or an empty string', function (mixed $portsExposes) {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->ports_exposes)->toBeNull();
+})->with([
+    'null' => null,
+    'empty string' => '',
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects invalid exposed ports', function (string $portsExposes) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ports_exposes');
+})->with([
+    'not numeric' => '80,abc',
+    'zero' => '0',
+    'above TCP range' => '65536',
+]);
 
 test('GET /api/v1/applications/{uuid} includes advanced settings', function () {
     $this->application->settings->update(advancedApplicationSettingsPayload());

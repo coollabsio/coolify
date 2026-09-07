@@ -21,6 +21,7 @@ class EmailNotificationSettings extends Model
         'smtp_username',
         'smtp_password',
         'smtp_timeout',
+        'smtp_ehlo_domain',
 
         'resend_enabled',
         'resend_api_key',
@@ -30,6 +31,7 @@ class EmailNotificationSettings extends Model
         'deployment_success_email_notifications',
         'deployment_failure_email_notifications',
         'status_change_email_notifications',
+        'restart_limit_reached_email_notifications',
         'backup_success_email_notifications',
         'backup_failure_email_notifications',
         'scheduled_task_success_email_notifications',
@@ -72,6 +74,7 @@ class EmailNotificationSettings extends Model
         'deployment_success_email_notifications' => 'boolean',
         'deployment_failure_email_notifications' => 'boolean',
         'status_change_email_notifications' => 'boolean',
+        'restart_limit_reached_email_notifications' => 'boolean',
         'backup_success_email_notifications' => 'boolean',
         'backup_failure_email_notifications' => 'boolean',
         'scheduled_task_success_email_notifications' => 'boolean',

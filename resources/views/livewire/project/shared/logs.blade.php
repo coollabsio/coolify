@@ -3,9 +3,8 @@
         {{ data_get_str($resource, 'name')->limit(10) }} > Logs | Coolify
     </x-slot>
 
-    <livewire:project.shared.configuration-checker :resource="$resource" />
-
     @if ($type === 'application')
+        <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.application.heading :application="$resource" wire:key="application-heading-logs" />
     @elseif ($type === 'database')
         <livewire:project.database.heading :database="$resource" />
@@ -25,8 +24,8 @@
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service'], true))
-        <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
                 @if ($type === 'application')
                     <x-application.configuration-sidebar :application="$resource" current-route="project.application.logs" />
                 @elseif ($type === 'database')

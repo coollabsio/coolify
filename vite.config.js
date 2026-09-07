@@ -1,8 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
 import laravel from "laravel-vite-plugin";
-import react from "@vitejs/plugin-react";
-import inertia from "@inertiajs/vite";
-import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "");
@@ -16,13 +13,13 @@ export default defineConfig(({ mode }) => {
         viteHost
     ).trim();
     const vitePort = Number(process.env.VITE_PORT || env.VITE_PORT || 5173);
+    const viteProtocol = (
+        process.env.VITE_PROTOCOL ||
+        env.VITE_PROTOCOL ||
+        "http"
+    ).trim();
 
     return {
-        resolve: {
-            alias: {
-                "@": fileURLToPath(new URL("./resources/js/v5", import.meta.url)),
-            },
-        },
         server: {
             watch: {
                 ignored: ["**/dev_*_data/**", "**/storage/**"],
@@ -34,10 +31,11 @@ export default defineConfig(({ mode }) => {
             allowedHosts: true,
             // App (:8000) and Vite (:5173) are different origins; allow any host in dev
             cors: true,
-            origin: `http://${viteHost}:${vitePort}`,
+            origin: `${viteProtocol}://${viteHost}:${vitePort}`,
             hmr: {
                 host: viteHmrHost,
                 clientPort: vitePort,
+                protocol: viteProtocol === "https" ? "wss" : "ws",
             },
         },
         plugins: [
@@ -45,12 +43,9 @@ export default defineConfig(({ mode }) => {
                 input: [
                     "resources/css/app.css",
                     "resources/js/app.js",
-                    "resources/js/v5/app.tsx",
                 ],
                 refresh: true,
             }),
-            inertia({ ssr: false }),
-            react(),
         ],
     };
 });

@@ -45,3 +45,30 @@ it('only adds Grafana extra fields for Grafana server images', function (string 
     'promtail' => ['grafana/promtail:latest', false],
     'tempo' => ['grafana/tempo:latest', false],
 ]);
+
+it('exposes Jean Server authentication and access settings', function () {
+    $service = serviceExtraFieldsTestServiceWithApplicationImage('ghcr.io/coollabsio/jean-server:latest');
+
+    $service->environment_variables()->createMany([
+        ['key' => 'SERVICE_PASSWORD_64_JEAN', 'value' => 'secret-token', 'is_preview' => false],
+        ['key' => 'JEAN_ALLOWED_ORIGINS', 'value' => 'https://jean.example.com', 'is_preview' => false],
+    ]);
+
+    $fields = $service->extraFields();
+
+    expect($fields)->toHaveKey('')
+        ->and($fields[''])->toMatchArray([
+            'Token' => [
+                'key' => 'SERVICE_PASSWORD_64_JEAN',
+                'value' => 'secret-token',
+                'rules' => 'required',
+                'isPassword' => true,
+                'sortOrder' => 1,
+            ],
+            'Allowed Origins' => [
+                'key' => 'JEAN_ALLOWED_ORIGINS',
+                'value' => 'https://jean.example.com',
+                'sortOrder' => 2,
+            ],
+        ]);
+});

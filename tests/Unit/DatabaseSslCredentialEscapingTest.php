@@ -21,6 +21,43 @@ it('escapeshellarg wraps postgres_user in single quotes for chown command', func
         ->toContain('chown');
 });
 
+it('sets postgres SSL file ownership before replacing the database container', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Actions/Database/StartPostgresql.php');
+
+    $permissionCommandPosition = strpos($source, '--entrypoint chown');
+    $stopCommandPosition = strpos($source, 'dockerStopCommand');
+    $startCommandPosition = strpos($source, 'docker-compose.yml up -d');
+
+    expect($permissionCommandPosition)->not->toBeFalse()
+        ->and($stopCommandPosition)->not->toBeFalse()
+        ->and($startCommandPosition)->not->toBeFalse()
+        ->and($permissionCommandPosition)->toBeLessThan($stopCommandPosition)
+        ->and($permissionCommandPosition)->toBeLessThan($startCommandPosition)
+        ->and($source)->toContain('/var/lib/postgresql/certs/server.crt < /dev/null')
+        ->and($source)->toContain('postgres:postgres /var/lib/postgresql/certs/server.key')
+        ->not->toContain('chown {$postgresUser}:{$postgresUser}');
+});
+
+it('sets database SSL file ownership before replacing the container', function (string $action, string $owner, string $keyPath, string $lastCertificatePath) {
+    $source = file_get_contents(__DIR__."/../../app/Actions/Database/{$action}.php");
+
+    $permissionCommandPosition = strpos($source, '--entrypoint chown');
+    $stopCommandPosition = strpos($source, 'dockerStopCommand');
+    $startCommandPosition = strpos($source, 'docker-compose.yml up -d');
+
+    expect($permissionCommandPosition)->not->toBeFalse()
+        ->and($stopCommandPosition)->not->toBeFalse()
+        ->and($startCommandPosition)->not->toBeFalse()
+        ->and($permissionCommandPosition)->toBeLessThan($stopCommandPosition)
+        ->and($permissionCommandPosition)->toBeLessThan($startCommandPosition)
+        ->and($source)->toContain("{$lastCertificatePath} < /dev/null")
+        ->and($source)->toContain("{$owner} {$keyPath}");
+})->with([
+    'mysql' => ['StartMysql', 'mysql:mysql', '/etc/mysql/certs/server.key', '/etc/mysql/certs/server.crt'],
+    'mariadb' => ['StartMariadb', 'mysql:mysql', '/etc/mysql/certs/server.key', '/etc/mysql/certs/server.crt'],
+    'mongodb' => ['StartMongodb', 'mongodb:mongodb', '/etc/mongo/certs/server.pem', '/etc/mongo/certs/server.pem'],
+]);
+
 it('advisory PoC postgres_user payload is contained by escapeshellarg in chown command', function () {
     // Simulates a legacy row that bypassed validation
     $maliciousUser = 'root; touch /tmp/pwned_rce; #';

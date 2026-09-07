@@ -28,7 +28,16 @@ it('uses shared sidebar navigation for every team settings page', function () {
     expect(file_get_contents(resource_path('views/livewire/team/danger-zone.blade.php')))
         ->toContain('Delete team')
         ->toContain('status="Permanent"')
-        ->toContain('border-red-300');
+        ->toContain('border-red-300')
+        ->toContain('<table class="w-full text-left text-sm">')
+        ->toContain('wire:click="refreshResources"')
+        ->not->toContain('wire:loading.class="animate-spin"')
+        ->toContain("route('project.show', ['project_uuid' => \$project->uuid])")
+        ->toContain("route('server.show', ['server_uuid' => \$server->uuid])")
+        ->toContain('target="_blank" rel="noopener noreferrer"')
+        ->toContain('Delete every server owned by this team before deleting it.')
+        ->toContain('currentTeam()->servers->isEmpty()')
+        ->not->toContain('currentTeam()->isEmpty()');
     expect(file_get_contents(resource_path('views/livewire/switch-team.blade.php')))
         ->toContain('New team')
         ->toContain('team-switcher-create-expanded')
