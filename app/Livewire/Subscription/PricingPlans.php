@@ -3,6 +3,7 @@
 namespace App\Livewire\Subscription;
 
 use App\Actions\Stripe\CreateCheckoutSession;
+use App\Exceptions\CheckoutUnavailableException;
 use Livewire\Component;
 use RuntimeException;
 use Stripe\Exception\ApiErrorException;
@@ -42,8 +43,17 @@ class PricingPlans extends Component
             $this->dispatch('error', 'Unable to confirm checkout with Stripe. Please try again shortly.');
 
             return null;
+        } catch (CheckoutUnavailableException $exception) {
+            $message = $exception->getMessage();
+            if ($exception->billingPortalUrl) {
+                $message .= ' <a href="'.e($exception->billingPortalUrl).'" target="_blank" rel="noopener noreferrer" class="underline">Open billing portal</a>';
+            }
+            $this->dispatch('error', $message);
+
+            return null;
         } catch (RuntimeException $exception) {
-            $this->dispatch('error', $exception->getMessage());
+            report($exception);
+            $this->dispatch('error', 'Unable to start checkout. Please try again shortly.');
 
             return null;
         }

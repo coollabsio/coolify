@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Stripe\CreateCheckoutSession;
+use App\Exceptions\CheckoutUnavailableException;
 use App\Jobs\ServerLimitCheckJob;
 use App\Livewire\Subscription\Index;
 use App\Livewire\Subscription\PricingPlans;
@@ -9,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
@@ -152,6 +154,58 @@ test('Stripe API failures show an error without redirecting or retrying checkout
         ->call('subscribeStripe', 'dynamic-monthly')
         ->assertDispatched('error', 'Unable to confirm checkout with Stripe. Please try again shortly.')
         ->assertNoRedirect();
+});
+
+test('expected checkout unavailable errors keep their user-facing messages', function (string $message) {
+    config()->set('subscription.stripe_price_id_dynamic_monthly', 'price_monthly');
+    Exceptions::fake();
+    $this->mock(CreateCheckoutSession::class)
+        ->shouldReceive('execute')->once()
+        ->andThrow(new CheckoutUnavailableException($message));
+
+    Livewire::test(PricingPlans::class)
+        ->call('subscribeStripe', 'dynamic-monthly')
+        ->assertDispatched('error', $message)
+        ->assertNoRedirect();
+
+    Exceptions::assertNothingReported();
+})->with([
+    'lock' => 'A subscription checkout is already being created for this team.',
+    'active' => 'Team already has an active subscription.',
+    'past_due' => "This team's subscription payment is past due. Update the payment method or settle the outstanding invoice in the billing portal.",
+    'incomplete' => "This team's subscription payment is incomplete. Complete the payment in the billing portal.",
+    'unpaid' => "This team's subscription is unpaid. Settle the outstanding invoice in the billing portal.",
+]);
+
+test('pricing plans links recoverable checkout blocks to the billing portal', function () {
+    config()->set('subscription.stripe_price_id_dynamic_monthly', 'price_monthly');
+    $message = "This team's subscription payment is past due. Update the payment method or settle the outstanding invoice in the billing portal.";
+    $this->mock(CreateCheckoutSession::class)
+        ->shouldReceive('execute')->once()
+        ->andThrow(new CheckoutUnavailableException($message, 'https://billing.stripe.test/session'));
+
+    Livewire::test(PricingPlans::class)
+        ->call('subscribeStripe', 'dynamic-monthly')
+        ->assertDispatched(
+            'error',
+            $message.' <a href="https://billing.stripe.test/session" target="_blank" rel="noopener noreferrer" class="underline">Open billing portal</a>'
+        )
+        ->assertNoRedirect();
+});
+
+test('unexpected checkout RuntimeExceptions are reported without exposing internal messages', function () {
+    config()->set('subscription.stripe_price_id_dynamic_monthly', 'price_monthly');
+    Exceptions::fake();
+    $this->mock(CreateCheckoutSession::class)
+        ->shouldReceive('execute')->once()
+        ->andThrow(new RuntimeException('SQLSTATE[HY000]: General error: 1 table subscriptions has no column named foo'));
+
+    Livewire::test(PricingPlans::class)
+        ->call('subscribeStripe', 'dynamic-monthly')
+        ->assertDispatched('error', 'Unable to start checkout. Please try again shortly.')
+        ->assertNoRedirect();
+
+    Exceptions::assertReported(RuntimeException::class);
 });
 
 test('subscription status check restores an active subscription after a missed webhook', function (int $quantity, int $expectedLimit, string $lookupKey) {

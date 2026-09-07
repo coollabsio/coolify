@@ -9,6 +9,7 @@ it('preserves the root ID and lets the database generate normal user IDs', funct
         $this->markTestSkipped('Set TEST_POSTGRES_SEEDER=1 to test PostgreSQL using the configured pgsql connection.');
     }
 
+    $originalConnectionName = config('database.default');
     config()->set('database.default', $connectionName);
     $connection = (new User)->getConnection();
     $connection->beginTransaction();
@@ -42,5 +43,6 @@ it('preserves the root ID and lets the database generate normal user IDs', funct
         });
     } finally {
         $connection->rollBack();
+        config()->set('database.default', $originalConnectionName);
     }
 })->with(['testing', 'pgsql'])->with([0, 5]);

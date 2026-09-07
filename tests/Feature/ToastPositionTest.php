@@ -29,7 +29,13 @@ test('toast copy button shows temporary success feedback', function () {
 
 test('subscription success uses a persistent standard toast instead of a banner', function () {
     $view = file_get_contents(resource_path('views/livewire/layout-popups.blade.php'));
-    preg_match("/@if \\(request\\(\\)->query->get\\('success'\\)\\)(.*?)@endif/s", $view, $match);
+    if ($view === false) {
+        throw new RuntimeException('Could not read layout popups view.');
+    }
+
+    if (preg_match("/@if \\(request\\(\\)->query->get\\('success'\\)\\)(.*?)@endif/s", $view, $match) !== 1 || ! isset($match[1])) {
+        throw new RuntimeException('Could not locate the subscription success block.');
+    }
 
     expect($match[1])->toContain("window.toast('Welcome onboard!'")
         ->toContain('persistent: true')

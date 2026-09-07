@@ -234,6 +234,8 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     );
                     if (! $subscription->stripe_subscription_id && $subscription->stripe_customer_id === $customerId) {
                         $subscription->update(['stripe_subscription_id' => $subscriptionId]);
+                    } elseif ($subscription->stripe_customer_id !== $customerId) {
+                        throw new \RuntimeException("Stripe customer ID mismatch for team {$teamId}: stored {$subscription->stripe_customer_id}, event {$customerId}.");
                     }
                     break;
                 case 'customer.subscription.updated':

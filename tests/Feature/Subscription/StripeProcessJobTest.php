@@ -58,6 +58,10 @@ describe('customer.subscription.created does not fall through to updated', funct
     test('created event cannot overwrite a different recorded subscription', function () {
         Queue::fake();
 
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
+
         Subscription::create([
             'team_id' => $this->team->id,
             'stripe_subscription_id' => 'sub_old',
@@ -87,6 +91,43 @@ describe('customer.subscription.created does not fall through to updated', funct
         expect($subscription->stripe_subscription_id)->toBe('sub_old');
         expect($subscription->stripe_customer_id)->toBe('cus_old');
         expect($subscription->stripe_invoice_paid)->toBeTruthy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_old')
+                && str_contains($notification->message, 'cus_new_123');
+        });
+    });
+
+    test('created event rejects a pending record with a different stripe customer id', function () {
+        Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_pending',
+            'stripe_invoice_paid' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.created', 'data' => ['object' => [
+            'id' => 'sub_other',
+            'customer' => 'cus_other',
+            'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+        ]]]))->handle();
+
+        $subscription = $this->team->subscription()->first();
+        expect($subscription->stripe_subscription_id)->toBeNull()
+            ->and($subscription->stripe_customer_id)->toBe('cus_pending')
+            ->and($subscription->stripe_invoice_paid)->toBeFalsy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_pending')
+                && str_contains($notification->message, 'cus_other');
+        });
     });
 });
 

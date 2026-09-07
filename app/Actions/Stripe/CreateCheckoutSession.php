@@ -2,14 +2,15 @@
 
 namespace App\Actions\Stripe;
 
+use App\Exceptions\CheckoutUnavailableException;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Stripe\Stripe;
 use Stripe\StripeClient;
+use Throwable;
 
 class CreateCheckoutSession
 {
@@ -19,6 +20,13 @@ class CreateCheckoutSession
         'past_due',
         'paused',
         'trialing',
+        'unpaid',
+    ];
+
+    private const RECOVERABLE_SUBSCRIPTION_STATUSES = [
+        'incomplete',
+        'past_due',
+        'paused',
         'unpaid',
     ];
 
@@ -37,7 +45,7 @@ class CreateCheckoutSession
         $lock = Cache::lock(self::lockKey($team->id), 30);
 
         if (! $lock->get()) {
-            throw new RuntimeException('A subscription checkout is already being created for this team.');
+            throw new CheckoutUnavailableException('A subscription checkout is already being created for this team.');
         }
 
         $previousMaxNetworkRetries = Stripe::getMaxNetworkRetries();
@@ -75,29 +83,24 @@ class CreateCheckoutSession
             ]);
         }
 
-        $stripeSubscriptions = $this->stripe->subscriptions->all([
+        $blockingSubscription = null;
+        foreach ($this->stripe->subscriptions->all([
             'customer' => $customerId,
             'limit' => 10,
             'status' => 'all',
-        ]);
-        $blockingSubscription = collect($stripeSubscriptions->data)->first(
-            fn (object $stripeSubscription): bool => in_array($stripeSubscription->status, self::BLOCKING_SUBSCRIPTION_STATUSES, true)
-        );
-
-        if ($blockingSubscription) {
-            Log::warning('Stripe subscription checkout blocked by existing subscription.', [
-                'team_id' => $team->id,
-                'stripe_customer_id' => $customerId,
-                'stripe_subscription_id' => $blockingSubscription->id,
-                'stripe_subscription_status' => $blockingSubscription->status,
-            ]);
-
-            throw new RuntimeException('Team already has an active subscription.');
+        ])->autoPagingIterator() as $stripeSubscription) {
+            if (in_array($stripeSubscription->status, self::BLOCKING_SUBSCRIPTION_STATUSES, true)) {
+                $blockingSubscription = $stripeSubscription;
+                break;
+            }
         }
+
+        $this->throwIfBlockingSubscription($team, $customerId, $blockingSubscription);
 
         $sessions = $this->stripe->checkout->sessions->all([
             'customer' => $customerId,
             'limit' => 10,
+            'status' => 'open',
         ]);
         $subscriptionSessions = collect($sessions->data)->filter(
             fn (object $session): bool => ($session->mode ?? null) === 'subscription'
@@ -153,7 +156,7 @@ class CreateCheckoutSession
             ],
             'payment_method_collection' => 'if_required',
             'mode' => 'subscription',
-            'expires_at' => now()->addMinutes(30)->timestamp,
+            'expires_at' => now()->addMinutes(35)->timestamp,
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ]);
@@ -166,5 +169,53 @@ class CreateCheckoutSession
         ]);
 
         return $session;
+    }
+
+    private function throwIfBlockingSubscription(Team $team, string $customerId, ?object $blockingSubscription): void
+    {
+        if (! $blockingSubscription) {
+            return;
+        }
+
+        Log::warning('Stripe subscription checkout blocked by existing subscription.', [
+            'team_id' => $team->id,
+            'stripe_customer_id' => $customerId,
+            'stripe_subscription_id' => $blockingSubscription->id,
+            'stripe_subscription_status' => $blockingSubscription->status,
+        ]);
+
+        $portalUrl = in_array($blockingSubscription->status, self::RECOVERABLE_SUBSCRIPTION_STATUSES, true)
+            ? $this->billingPortalUrl($customerId)
+            : null;
+
+        throw new CheckoutUnavailableException(
+            $this->blockingSubscriptionMessage($blockingSubscription->status),
+            $portalUrl,
+        );
+    }
+
+    private function blockingSubscriptionMessage(string $status): string
+    {
+        return match ($status) {
+            'incomplete' => "This team's subscription payment is incomplete. Complete the payment in the billing portal.",
+            'past_due' => "This team's subscription payment is past due. Update the payment method or settle the outstanding invoice in the billing portal.",
+            'unpaid' => "This team's subscription is unpaid. Settle the outstanding invoice in the billing portal.",
+            'paused' => "This team's subscription is paused. Resume it in the billing portal.",
+            default => 'Team already has an active subscription.',
+        };
+    }
+
+    private function billingPortalUrl(string $customerId): ?string
+    {
+        try {
+            $session = $this->stripe->billingPortal->sessions->create([
+                'customer' => $customerId,
+                'return_url' => route('subscription.show'),
+            ]);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($session->url ?? null) ? $session->url : null;
     }
 }
