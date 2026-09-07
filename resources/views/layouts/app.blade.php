@@ -87,7 +87,7 @@
                         x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
                         x-transition:leave="transform transition ease-in duration-200"
                         x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-                        class="relative flex h-full w-72 max-w-[85vw] min-w-0 flex-col border-l border-neutral-200 bg-white shadow-2xl dark:border-white/[0.12] dark:bg-panel">
+                        class="relative flex h-full w-72 max-w-[85vw] min-w-0 flex-col overflow-hidden rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-panel dark:shadow-[-8px_0_30px_-4px_rgba(0,0,0,0.5)]">
                         <div data-mobile-sidebar-brand
                             class="flex h-12 shrink-0 items-center justify-between gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
                             <div class="flex min-w-0 items-baseline gap-1.5">

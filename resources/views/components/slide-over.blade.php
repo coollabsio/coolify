@@ -35,7 +35,7 @@ x-init="$watch('slideOverOpen', value => {
                                 'max-w-4xl w-screen' => $fullScreen,
                             ])>
                             <div
-                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-neutral-50 dark:bg-base dark:border-neutral-800 border-neutral-200">
+                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-modal bg-neutral-50 dark:bg-base dark:border-neutral-800 border-neutral-200">
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
                                         <h2 class="text-2xl leading-6" id="slide-over-title">

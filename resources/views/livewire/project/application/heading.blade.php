@@ -32,7 +32,7 @@
                     {{ $application->name }}
                 </h1>
                 <div class="flex shrink-0 items-center gap-2">
-                    <x-status-summary :status="$application->status" />
+                    <x-status-summary :status="$application->status" align="right" />
                     <x-applications.links :application="$application" compact />
                 </div>
                 <div class="flex w-full flex-wrap gap-1">
