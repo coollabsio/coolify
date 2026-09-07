@@ -26,11 +26,12 @@
     @endphp
     <div>
         <div class="mb-3 w-full xl:hidden">
-            <div class="flex min-w-0 flex-col items-start gap-2">
-                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+            {{-- Identity row: name truncates, status + links stay pinned right. --}}
+            <div class="flex w-full min-w-0 items-center gap-3">
+                <h1 class="min-w-0 flex-1 truncate text-[22px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <div class="relative flex w-full min-w-0 items-center gap-2">
+                <div class="flex shrink-0 items-center gap-2">
                     <x-status-summary :status="$application->status" />
                     <x-applications.links :application="$application" compact />
                 </div>

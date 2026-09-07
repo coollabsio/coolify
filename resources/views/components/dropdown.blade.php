@@ -68,7 +68,7 @@
         ]) x-cloak>
         <div @class([
             'border border-neutral-300 bg-white p-1 dark:border-coolgray-300',
-            'shadow-sm dark:bg-coolgray-200' => ! $inline,
+            'shadow-[var(--shadow-dropdown)] dark:bg-coolgray-200' => ! $inline,
             'border-0 bg-transparent shadow-none dark:border-0 dark:bg-transparent' => $inline,
             $panelClass,
         ])>

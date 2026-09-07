@@ -59,7 +59,7 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-white dark:bg-surface dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
+    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-[var(--coollabs-recessed)] dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
     box-shadow: none;
 
     &:where(.dark, .dark *) {
@@ -77,7 +77,7 @@
 
 /* Readonly */
 @utility input {
-    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 read-only:text-neutral-500 read-only:bg-neutral-200;
     @apply input-select;
     @apply focus-visible:outline-none;
 

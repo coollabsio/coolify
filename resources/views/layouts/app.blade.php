@@ -69,28 +69,41 @@
                 </div>
             </header>
 
-            {{-- ============ MOBILE SLIDE-OVER SIDEBAR ============ --}}
-            <div class="relative z-[1000] lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
-                <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
-                <div class="fixed inset-y-0 right-0 flex h-full">
-                    <div
-                        class="relative flex h-full w-full max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel">
-                        <div class="absolute top-0 right-full flex w-16 justify-center pt-5">
-                            <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
-                                <span class="sr-only">Close sidebar</span>
-                                <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+            {{-- ============ MOBILE SLIDE-OVER SIDEBAR (shadcn-style sheet) ============ --}}
+            <div class="mobile-sidebar-sheet relative z-[1000] lg:hidden" role="dialog" aria-modal="true"
+                x-on:keydown.escape.window="open = false"
+                x-on:livewire:navigated.window="open = false"
+                x-effect="document.body.classList.toggle('overflow-hidden', open)">
+                {{-- Scrim: fades in/out --}}
+                <div class="fixed inset-0 bg-black/50" x-show="open" x-cloak x-on:click="open = false"
+                    x-transition:enter="transition-opacity ease-out duration-300"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition-opacity ease-in duration-200"
+                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
+                {{-- Panel: slides in from the right (iOS drawer curve), exits faster --}}
+                <div class="fixed inset-y-0 right-0 flex" :class="!open && 'pointer-events-none'">
+                    <div x-show="open" x-cloak
+                        x-transition:enter="transform transition ease-[cubic-bezier(0.32,0.72,0,1)] duration-300"
+                        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transform transition ease-in duration-200"
+                        x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                        class="relative flex h-full w-72 max-w-[85vw] min-w-0 flex-col border-l border-neutral-200 bg-white shadow-2xl dark:border-white/[0.12] dark:bg-panel">
+                        <div data-mobile-sidebar-brand
+                            class="flex h-12 shrink-0 items-center justify-between gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
+                            <div class="flex min-w-0 items-baseline gap-1.5">
+                                <a href="/" {{ wireNavigate() }} title="Coolify"
+                                    class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
+                                    Coolify
+                                </a>
+                                <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
+                            </div>
+                            <button type="button" x-on:click="open = false" aria-label="Close menu"
+                                class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black active:scale-95 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75"
                                     stroke="currentColor" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
-                        </div>
-                        <div data-mobile-sidebar-brand
-                            class="flex h-12 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
-                            <a href="/" {{ wireNavigate() }} title="Coolify"
-                                class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
-                                Coolify
-                            </a>
-                            <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
                         </div>
                         <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
@@ -128,7 +141,8 @@
                         <livewire:upgrade key="mobile-upgrade" />
                     @endif
                     <x-top-user-menu />
-                    <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
+                    <button type="button" x-on:click="open = !open"
+                        class="-mr-1 flex size-9 items-center justify-center rounded-md text-neutral-500 transition-transform duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-90 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
                         <span class="sr-only">Open sidebar</span>
                         <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -140,7 +154,7 @@
 
             {{-- ============ MAIN ============ --}}
             <main
-                class="min-h-screen bg-white dark:bg-panel px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
+                class="min-h-screen bg-neutral-50 dark:bg-app px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
                 :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
                 <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
                     {{ $slot }}

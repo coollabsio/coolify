@@ -238,52 +238,98 @@
         ];
     @endphp
 
+@php
+    $activeMenuLabel = collect($groupedMenuItems)->flatMap(fn ($items) => $items)->firstWhere('active', true)['label'] ?? 'Settings';
+@endphp
 <aside @class([
     'application-settings-navigation min-w-0 xl:self-start',
     'is-flush' => $flush,
-])>
-                <nav aria-label="Configuration sections"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+])
+    x-data="{
+        menuOpen: false,
+        desktop: window.matchMedia('(min-width: 1280px)').matches,
+        init() {
+            const mq = window.matchMedia('(min-width: 1280px)');
+            mq.addEventListener('change', (e) => { this.desktop = e.matches; if (e.matches) { this.menuOpen = false; } });
+        },
+    }"
+    x-on:click.outside="menuOpen = false"
+    x-on:keydown.escape.window="menuOpen = false">
+                {{-- Mobile disclosure: tap to reveal the full grouped nav; hidden at xl (the pinned rail). --}}
+                <button type="button" x-show="!desktop" x-cloak x-on:click="menuOpen = !menuOpen"
+                    :aria-expanded="menuOpen" aria-label="Configuration menu"
+                    :class="menuOpen && 'ring-1 ring-black/10 dark:ring-white/15'"
+                    class="flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-[13px] font-medium text-black transition-transform duration-100 ease-out hover:bg-neutral-50 active:scale-[0.985] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg dark:hover:bg-white/[0.08]">
+                    <span class="flex min-w-0 items-center gap-2">
+                        <x-reicon name="settings" class="size-4 shrink-0 text-nav-muted" />
+                        <span class="truncate">{{ $activeMenuLabel }}</span>
+                    </span>
+                    <svg class="size-3.5 shrink-0 text-nav-muted transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                        :class="menuOpen && 'rotate-180'" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                        <path d="m3.5 4.75 2.5 2.5 2.5-2.5" stroke="currentColor" stroke-width="1.25"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+
+                <nav aria-label="Configuration sections" x-show="desktop || menuOpen" x-collapse.duration.200ms x-cloak
+                    class="mt-2 flex flex-col gap-0.5 rounded-xl border border-neutral-200 bg-white p-2 shadow-[var(--shadow-dropdown)] dark:border-white/[0.08] dark:bg-white/[0.03] xl:mt-0 xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:dark:bg-transparent">
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="hidden xl:block my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
+                            <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
                         @endunless
-                        <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
+                        <div class="nav-section">{{ $groupLabel }}</div>
                         @foreach ($groupItems as $menuItem)
-                            <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
-                                @class([
-                                    'menu-item',
-                                    'menu-item-active' => $menuItem['active'],
-                                ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                                href="{{ route($menuItem['route'], $applicationRouteParameters) }}">
-                                <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
-                                <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                                @if ($menuItem['badge'] ?? false)
-                                    <span class="shrink-0">
-                                        <livewire:project.application.server-status-badge :application="$application"
-                                            :key="'application-server-status-'.$application->uuid" />
-                                    </span>
+                            @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
+                            <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}"
+                                @if (filled($sections)) x-data="{ open: @js($menuItem['active']), activeSection: '' }" @endif
+                                class="relative">
+                                <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
+                                    @class([
+                                        'menu-item',
+                                        'menu-item-active' => $menuItem['active'],
+                                        'pr-9' => filled($sections),
+                                    ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}"
+                                    x-on:click="menuOpen = false">
+                                    <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
+                                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                    @if ($menuItem['badge'] ?? false)
+                                        <span class="shrink-0">
+                                            <livewire:project.application.server-status-badge :application="$application"
+                                                :key="'application-server-status-'.$application->uuid" />
+                                        </span>
+                                    @endif
+                                </a>
+                                @if (filled($sections))
+                                    {{-- Expand/collapse the page's sub-sections. Active page opens by
+                                         default; the label still navigates, the chevron only toggles. --}}
+                                    <button type="button"
+                                        class="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-nav-muted transition-colors hover:bg-black/[0.04] hover:text-nav-active dark:hover:bg-white/[0.06]"
+                                        x-on:click.stop.prevent="open = !open" :aria-expanded="open"
+                                        aria-label="Toggle {{ $menuItem['label'] }} sections">
+                                        <svg class="size-3.5 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                                            :class="open && 'rotate-90'" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m4.5 3 3 3-3 3" stroke="currentColor" stroke-width="1.25"
+                                                stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                    <div>
+                                        <div x-show="open" x-collapse x-cloak
+                                            class="nav-children flex flex-col gap-0.5 py-1">
+                                            @foreach ($sections as $section)
+                                                <a class="menu-subitem"
+                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
+                                                    {{ wireNavigate() }}
+                                                    x-on:click="menuOpen = false; if (document.getElementById('{{ $section['id'] }}')) { $event.preventDefault(); activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}'); }">
+                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 @endif
-                            </a>
-                            @if ($menuItem['active'] && count($pageSections[$menuItem['route']] ?? []) >= 4)
-                                <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
-                                    x-data="{
-                                        activeSection: '',
-                                        scrollToSection(id) {
-                                            this.activeSection = id;
-                                            window.scrollToSettingsSection?.(id);
-                                        },
-                                    }">
-                                    @foreach ($pageSections[$menuItem['route']] as $section)
-                                        <button type="button" class="menu-subitem"
-                                            :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                            @click="scrollToSection('{{ $section['id'] }}')">
-                                            <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
+                            </div>
                         @endforeach
                     @endforeach
                 </nav>

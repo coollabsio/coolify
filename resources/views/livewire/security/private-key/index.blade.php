@@ -68,7 +68,7 @@
             icon-name="keys" />
     @else
         <div>
-            <div class="grid grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+            <div class="grid grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                 <div class="pl-11">Private key</div>
                 <div class="hidden sm:block">Description</div>
                 <div class="text-center">Status</div>
@@ -115,7 +115,7 @@
                         title="You do not have permission to view this private key">
                         <div class="flex items-start gap-3">
                             <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                                 <x-reicon name="keys" class="size-4" />
                             </div>
                             <div class="min-w-0 flex-1">

@@ -20,51 +20,63 @@
     --font-geist-sans: 'Geist Sans', Inter, sans-serif;
     --font-logs: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 
-    --color-base: #101010;
-    --color-warning: #fcd452;
-    --color-warning-50: #fefce8;
-    --color-warning-100: #fef9c3;
-    --color-warning-200: #fef08a;
-    --color-warning-300: #fde047;
-    --color-warning-400: #fcd452;
-    --color-warning-500: #facc15;
-    --color-warning-600: #ca8a04;
-    --color-warning-700: #a16207;
-    --color-warning-800: #854d0e;
-    --color-warning-900: #713f12;
-    --color-success: #22C55E;
-    --color-error: #dc2626;
-    --color-coollabs-50: #f5f0ff;
-    --color-coollabs: #6b16ed;
-    --color-coollabs-100: #7317ff;
-    --color-coollabs-200: #5a12c7;
-    --color-coollabs-300: #4a0fa3;
-    --color-coolgray-100: #181818;
-    --color-coolgray-200: #202020;
-    --color-coolgray-300: #242424;
-    --color-coolgray-400: #282828;
-    --color-coolgray-500: #323232;
+    --color-base: oklch(17.3% 0 0);
+    --color-warning: oklch(88.13% 0.1507 91.7);
+    --color-warning-50: oklch(98.73% 0.0262 102.21);
+    --color-warning-100: oklch(97.29% 0.0693 103.19);
+    --color-warning-200: oklch(94.51% 0.1243 101.54);
+    --color-warning-300: oklch(90.52% 0.1657 98.11);
+    --color-warning-400: oklch(88.13% 0.1507 91.7);
+    --color-warning-500: oklch(86.06% 0.1731 91.94);
+    --color-warning-600: oklch(68.06% 0.1423 75.83);
+    --color-warning-700: oklch(55.38% 0.1207 66.44);
+    --color-warning-800: oklch(47.62% 0.1034 61.91);
+    --color-warning-900: oklch(42.1% 0.0897 57.71);
+    --color-success: oklch(72.27% 0.192 149.58);
+    --color-error: oklch(57.71% 0.2152 27.33);
+    --color-coollabs-50: oklch(96.33% 0.0206 301.15);
+    --color-coollabs: oklch(49.65% 0.2709 289.33);
+    --color-coollabs-100: oklch(52.34% 0.287 289.16);
+    --color-coollabs-200: oklch(43.76% 0.2369 289.82);
+    --color-coollabs-300: oklch(38.04% 0.2031 290.47);
+    --color-coolgray-100: oklch(20.9% 0 0);
+    --color-coolgray-200: oklch(24.35% 0 0);
+    --color-coolgray-300: oklch(26.03% 0 0);
+    --color-coolgray-400: oklch(27.68% 0 0);
+    --color-coolgray-500: oklch(31.71% 0 0);
 
     /* Graphite design language (ported from ref/frontend). Layered neutral
        surfaces + translucent hairlines. See DESIGN.md. */
-    --color-app: #0c0c0d;
-    /* Canvas: neutral near-black (oklch), not pure black */
-    --color-panel: oklch(10% 0 0);
-    --color-surface: #161618;
-    --color-raised: #1c1c1e;
-    --color-selected: #26262a;
-    --color-fg: #f2f2f2;
-    --color-fg-dim: #b4b4b8;
-    --color-fg-faint: #6e6e74;
-    --color-accent: #6b16ed;
-    --color-accent-foreground: #ffffff;
-    --color-hairline: rgba(255, 255, 255, 0.08);
-    --color-nav-text: #525252;
-    --color-nav-muted: #666666;
-    --color-nav-active: #171717;
-    --color-log: #0d0d0d;
+    /* Content canvas: the darkest shell layer (sRGB ~10). Hex, not oklch:
+       oklch lightness compresses to near-black below ~15%, so oklch(7.5%)
+       renders as sRGB 1 with no visible step. */
+    --color-app: oklch(14.48% 0 0);
+    /* Sidebar + topbar chrome (sRGB ~20): a clear step lighter than the content
+       canvas so the shell chrome separates from the content area. */
+    --color-panel: oklch(19.13% 0 0);
+    /* Pure neutral (r=g=b). Were cool-tinted (#161618/#1c1c1e/#26262a, b>r),
+       which clashed with the neutral panel ladder. */
+    --color-surface: oklch(20.02% 0 0);
+    --color-raised: oklch(22.64% 0 0);
+    --color-selected: oklch(26.86% 0 0);
+    --color-fg: oklch(96.12% 0 0);
+    --color-fg-dim: oklch(76.99% 0 0);
+    /* Tertiary text. Raised from #6e6e74 (3.78:1 on base, failed WCAG AA)
+       to #7e7e84 so 13-14px text clears 4.5:1 on the dark surface ladder. */
+    --color-fg-faint: oklch(59.31% 0 0);
+    --color-accent: oklch(49.65% 0.2709 289.33);
+    --color-accent-foreground: oklch(100.0% 0 0);
+    --color-hairline: oklch(100.0% 0 0 / 0.08);
+    --color-nav-text: oklch(43.86% 0 0);
+    --color-nav-muted: oklch(51.03% 0 0);
+    --color-nav-active: oklch(20.46% 0 0);
+    --color-log: oklch(15.91% 0 0);
 
     --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.4);
+    /* One restrained lift shared by every dropdown/menu/listbox panel and the
+       command palette. Lighter and consistent, replacing the old scattered
+       0.45 / 0.35 / shadow-lg / shadow-sm mix. Modals keep --shadow-modal. */
+    --shadow-dropdown: 0 4px 12px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.08);
 }
 
 /*
@@ -258,7 +270,7 @@
 */
 html,
 body {
-    @apply w-full min-h-full bg-gray-50 dark:bg-app dark:text-fg-dim;
+    @apply w-full min-h-full bg-neutral-50 dark:bg-app dark:text-fg-dim;
 }
 
 body {
@@ -505,8 +517,8 @@ html[data-theme="custom"] #nprogress .spinner-icon {
 
 .application-console-shell[data-console-theme="system"],
 .terminal-fullscreen-shell[data-console-theme="system"] {
-    --console-theme-background: #fff;
-    --console-theme-border: #d4d4d8;
+    --console-theme-background: oklch(100.0% 0 0);
+    --console-theme-border: oklch(87.11% 0.0055 286.29);
     --console-theme-opacity: 1;
 }
 
@@ -517,13 +529,20 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .applica
     backdrop-filter: none;
 }
 
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"] {
+html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"],
+/* Session toolbar (selected-target trigger + label) sits over the white
+   system console in light mode. Without this its text-white/* stayed white on
+   white and the selected server was invisible (issue #11532). */
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-toolbar[class*="text-white"],
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-toolbar [class*="text-white"],
+html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-toolbar[class*="text-white"],
+html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-toolbar [class*="text-white"] {
     color: #52525b !important;
 }
 
 html.dark .application-console-shell[data-console-theme="system"],
 html.dark .terminal-fullscreen-shell[data-console-theme="system"] {
-    --console-theme-background: #121214;
+    --console-theme-background: oklch(18.31% 0.004 285.99);
     --console-theme-border: rgb(255 255 255 / 0.08);
 }
 
@@ -851,7 +870,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     color: #52525b;
     background: #fff;
     border-color: #d4d4d8;
-    box-shadow: 0 18px 50px rgb(0 0 0 / 0.18);
+    box-shadow: var(--shadow-dropdown);
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker [class*="text-white"] {
@@ -924,37 +943,53 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 * utility classes placed in the card markup.
 */
 :root {
-    --coollabs-canvas: oklch(98.75% 0 0);
+    /* Page canvas is a faint off-white so white/elevated cards lift off it
+       (shadcn pattern), instead of card and page reading as one flat color. */
+    --coollabs-canvas: oklch(97% 0 0);
     --coollabs-elevated: oklch(98% 0 0);
     --coollabs-recessed: oklch(96% 0 0);
-    --coollabs-base: #ffffff;
+    --coollabs-base: oklch(100.0% 0 0);
     --coollabs-fill: oklch(92.2% 0 0);
     --coollabs-line: oklch(14.5% 0 0 / 0.1);
-    --coollabs-hairline: oklch(93.5% 0 0);
-    --coollabs-subtle: oklch(55.6% 0 0);
+    /* Card/table edge ring. Crisped from 93.5% (1.17:1 on canvas, invisible)
+       to 85.5% (1.51:1) so surfaces read as bordered cards, not flat fills. */
+    --coollabs-hairline: oklch(85.5% 0 0);
+    /* Muted labels/titles. Darkened from 55.6% (failed WCAG AA on elevated
+       4.46, recessed 4.24, fill 3.76) to 50% so muted text clears 4.5:1 on
+       every light surface above white. Dark stays 70.8% (already passes). */
+    --coollabs-subtle: oklch(50% 0 0);
 }
 
 .dark {
-    --color-accent: #fcd452;
-    --coollabs-canvas: oklch(10% 0 0);
-    /* elevated (card shells/headers) and recessed (input fills) sit a touch
-       above the canvas so they read lighter than near-black */
-    --coollabs-elevated: oklch(15% 0 0);
-    --coollabs-recessed: oklch(20% 0 0);
-    --coollabs-base: oklch(17% 0 0);
-    --coollabs-fill: oklch(26.9% 0 0);
+    --color-accent: oklch(88.13% 0.1507 91.7);
+    /* Dark surface ladder in hex (sRGB), not oklch: oklch lightness compresses
+       to near-black below ~15%, so oklch(15%) rendered as sRGB 11 and cards
+       could not lift off the content canvas (sRGB 10). These give clear,
+       visible steps: content 10 -> elevated 22 -> base 28 -> recessed 34.
+       Pure neutral (r=g=b), matching the neutral borders/text and the light
+       ladder, so every panel shares one temperature (no blue cast). */
+    --coollabs-canvas: oklch(14.48% 0 0);
+    --coollabs-elevated: oklch(20.02% 0 0);
+    --coollabs-recessed: oklch(25.2% 0 0);
+    --coollabs-base: oklch(22.64% 0 0);
+    --coollabs-fill: oklch(29.31% 0 0);
     --coollabs-line: oklch(32% 0 0);
-    --coollabs-hairline: oklch(26.9% 0 0);
+    /* Crisped from 26.9% (1.36:1 on canvas) to 32% (1.63:1) so dark cards
+       and tables show a visible edge instead of blending into the canvas. */
+    --coollabs-hairline: oklch(32% 0 0);
     --coollabs-subtle: oklch(70.8% 0 0);
-    --color-nav-text: #a8a8b0;
-    --color-nav-muted: #7a7a84;
-    --color-nav-active: #f2f2f2;
+    /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
+       the same neutral temperature as the content text, so the sidebar no longer
+       reads cooler than the panels/cards. */
+    --color-nav-text: oklch(73.8% 0 0);
+    --color-nav-muted: oklch(58.97% 0 0);
+    --color-nav-active: oklch(96.12% 0 0);
 }
 
 /* Theme surfaces are derived from one brand color. Changing
    --theme-base-color is enough to generate a complete dark surface ladder. */
 html[data-theme="custom"] {
-    --theme-base-color: #6b16ed;
+    --theme-base-color: oklch(49.65% 0.2709 289.33);
     --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, white);
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
     --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, #52525b);
@@ -985,14 +1020,14 @@ html[data-theme="custom"] {
     --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
     --coollabs-line: var(--theme-border-color);
     --coollabs-hairline: color-mix(in srgb, var(--theme-border-color) 55%, var(--color-panel));
-    --color-nav-text: #e4dfea;
-    --color-nav-muted: #d8d2df;
-    --color-nav-active: #ffffff;
+    --color-nav-text: oklch(91.08% 0.0157 306.4);
+    --color-nav-muted: oklch(87.24% 0.0188 306.63);
+    --color-nav-active: oklch(100.0% 0 0);
     --color-log: color-mix(in oklab, var(--theme-base-color) 20%, #080809);
     --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, #101011);
-    --color-fg-dim: #e4dfea;
-    --color-fg-faint: #d8d2df;
-    --coollabs-subtle: #d8d2df;
+    --color-fg-dim: oklch(91.08% 0.0157 306.4);
+    --color-fg-faint: oklch(87.24% 0.0188 306.63);
+    --coollabs-subtle: oklch(87.24% 0.0188 306.63);
 }
 
 html[data-theme="custom"] .control-selected,
@@ -1349,7 +1384,9 @@ html[data-theme="custom"] textarea:disabled {
     border-radius: 8px;
     border: none;
     background: var(--coollabs-elevated);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+    /* crisp ring + a restrained lift so the card separates from the canvas
+       (shadcn-style), not a heavy floating shadow */
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 1px 2px 0 rgb(0 0 0 / 0.05);
     /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar + layer-2 nav */
     scroll-margin-top: 7rem;
 }
@@ -1471,16 +1508,49 @@ html[data-theme="custom"] textarea:disabled {
 @media (min-width: 1280px) {
     .application-settings-navigation {
         position: sticky;
-        top: calc(3rem + 1.75rem);
+        top: calc(3rem + 1rem);
         align-self: start;
-        max-height: calc(100dvh - 5.5rem);
-        padding-right: 0.375rem;
+        max-height: calc(100dvh - 5rem);
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior: contain;
+        /* Thin, subtle overlay scrollbar so it does not fight the card's rounded
+           edge. Gutter stays stable so content does not shift when it appears. */
         scrollbar-width: thin;
+        scrollbar-color: var(--coollabs-fill) transparent;
+        scrollbar-gutter: stable;
+        /* Contained card: a distinct elevated surface with a hairline ring and a
+           restrained lift, so the settings nav reads as a structured panel that
+           floats above the content canvas instead of loose links on the page. */
+        padding: 0.5rem;
+        background: var(--coollabs-elevated);
+        border: 1px solid var(--coollabs-hairline);
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
     }
 
+    .application-settings-navigation::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: var(--coollabs-fill);
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-thumb:hover {
+        background: var(--coollabs-line);
+    }
+
+    /* Resource settings rail: pinned as a stacked second sidebar, flush to the
+       main sidebar's right edge (left tracks its collapsed width via --rail-left).
+       A subtle step lighter than the main sidebar chrome, with a hairline divider,
+       so the two rails read as a cohesive stacked pair and the content is the
+       distinct surface to their right. */
     /* Resource pages have a second fixed header row below the main header. */
     .application-settings-workspace > .application-settings-navigation {
         top: 4rem;
@@ -1491,6 +1561,17 @@ html[data-theme="custom"] textarea:disabled {
         position: static;
         max-height: none;
         overflow: visible;
+    }
+}
+
+/* Honor reduced-motion for the settings nav disclosure/accordion and the mobile
+   sidebar sheet: keep open/close functional but drop the height/slide/fade. */
+@media (prefers-reduced-motion: reduce) {
+    .application-settings-navigation,
+    .application-settings-navigation *,
+    .mobile-sidebar-sheet * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
     }
 }
 
@@ -1603,7 +1684,7 @@ html[data-theme="custom"] textarea:disabled {
  * Circular chevrons sit over gradient fades when more tabs are off-screen.
  */
 .resource-heading-tabs-scroller {
-    --resource-heading-tabs-fade: #f5f5f5; /* neutral-100, matches pill track */
+    --resource-heading-tabs-fade: oklch(97.02% 0 0); /* neutral-100, matches pill track */
 }
 
 .dark .resource-heading-tabs-scroller {
@@ -1944,7 +2025,7 @@ html[data-theme="custom"] textarea:disabled {
     border-radius: 10px;
     border: 1px solid var(--coollabs-line);
     background: var(--coollabs-recessed);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-dropdown);
 }
 
 @media (max-width: 767px) {

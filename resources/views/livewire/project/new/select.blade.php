@@ -111,7 +111,7 @@
                             <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
                                 @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
                                 @keydown.space.self.prevent="setType(application.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -157,7 +157,7 @@
                             <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
                                 @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
                                 @keydown.space.self.prevent="setType(application.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -206,7 +206,7 @@
                             <article role="button" tabindex="0" :aria-label="'Deploy ' + database.name"
                                 @click="setType(database.id)" @keydown.enter.self.prevent="setType(database.id)"
                                 @keydown.space.self.prevent="setType(database.id)"
-                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -283,7 +283,7 @@
                                     @click="setType('one-click-service-' + service.id)"
                                     @keydown.enter.self.prevent="setType('one-click-service-' + service.id)"
                                     @keydown.space.self.prevent="setType('one-click-service-' + service.id)"
-                                    class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                    class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                     <div class="flex min-w-0 items-start gap-3">
                                         <div
                                             class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
