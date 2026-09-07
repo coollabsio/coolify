@@ -593,6 +593,19 @@ html[data-theme="custom"] .terminal-fullscreen-shell[data-console-theme="system"
     --console-theme-border: var(--coollabs-line);
 }
 
+/* Docked System console only: the fill behind the terminal panel is the
+   elevated (header) surface, so the panel's rounded-corner notch reads as the
+   header colour — the card's figure/ground. The panel paints its own base
+   surface over this fill, so only the notch shows it. The fullscreen shell has
+   no panel, so it is intentionally excluded and keeps its plain terminal fill. */
+.application-console-shell[data-console-theme="system"] {
+    --console-theme-background: var(--coollabs-elevated);
+}
+
+html.dark .application-console-shell[data-console-theme="system"] {
+    --console-theme-background: var(--coollabs-elevated);
+}
+
 .console-theme-selector {
     scrollbar-color: rgb(161 161 170) transparent;
     scrollbar-width: thin;
@@ -716,6 +729,10 @@ html.dark .console-theme-selector::-webkit-scrollbar-thumb {
     flex: 1 1 0%;
     flex-direction: column;
     overflow: hidden;
+    /* Breathing room so the console's box-shadow ring + lift are not clipped by
+       this overflow-hidden, viewport-height container (the card gets this from
+       the scrollable page around it). */
+    padding: 6px;
 }
 
 .terminal-page-console > .application-console-shell {
@@ -777,6 +794,73 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     z-index: 2;
     background: rgb(0 0 0 / 0.24);
     backdrop-filter: blur(20px);
+}
+
+/* Session header band: an attached card-style header on top of the console,
+   mirroring the page card header (elevated surface + hairline divider). The
+   System theme uses the neutral card surface in both modes; colorful themes
+   fall back to a translucent dark band so the white controls stay legible. */
+.terminal-session-toolbar {
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    /* No border-radius: the shell is overflow-hidden + rounded and clips the
+       header's top corners, so rounding here only risks a sub-pixel seam. */
+    border-bottom: 1px solid var(--terminal-header-border, rgb(255 255 255 / 0.1));
+    background: var(--terminal-header-bg, rgb(0 0 0 / 0.28));
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+/* System header has no bottom border: the body panel's ring is the divider, and
+   its rounded top corners tuck under the header — the same merge the
+   target-picker card uses (elevated header meeting a base body panel). */
+.application-console-shell[data-console-theme="system"] .terminal-session-toolbar {
+    --terminal-header-bg: var(--coollabs-elevated);
+    --terminal-header-border: transparent;
+    /* Shell no longer clips (overflow: visible), so the header rounds its own
+       top corners — matching the card header. */
+    border-radius: 8px 8px 0 0;
+    /* Drop the z-index:2 stacking context: it painted the header OVER the body
+       panel, hiding the panel's ring (the divider). The header only had z-2 to
+       beat ::before, but its dropdowns sit in their own .relative wrappers, so
+       z:auto is safe and lets the body panel's ring paint over the header —
+       exactly how the card body overlaps the card header. */
+    z-index: auto;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* System console body: the terminal panel, a full rounded box-shadow ring like
+   the card body. Its base surface is the terminal fill; the elevated surface
+   behind it (::before) shows only through the rounded-corner notch, reading as
+   the header colour — the card's figure/ground. */
+.application-console-shell[data-console-theme="system"] .terminal-session-panel {
+    background: var(--coollabs-base);
+    /* The body panel is a full rounded ring (like the card body). position:
+       relative puts it (and its ring) above ::before AND, because it comes
+       after the now-z:auto header in the DOM, above the header — so the ring's
+       top edge is the divider and its rounded top corners connect down into the
+       side ring, which coincides with the shell's ring (one hairline, no
+       doubling). A box-shadow ring rounds and connects cleanly; a border-top
+       cannot (square corners, or a disconnected transparent edge). */
+    position: relative;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+}
+
+/* Connected System console frame = the target-picker card recipe: a hairline
+   box-shadow ring + a restrained lift. overflow stays visible so the ring is
+   not clipped (the .terminal-page-console padding gives it room inside the
+   viewport-locked, overflow-hidden page). Colorful themes keep the themed,
+   overflow-hidden shell. */
+.application-console-shell[data-console-theme="system"] {
+    overflow: visible;
+    box-shadow:
+        0 0 0 1px var(--coollabs-hairline),
+        0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .terminal-loading-label {
@@ -884,7 +968,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-panel {
-    background: transparent;
+    background: var(--coollabs-base);
 }
 
 .terminal-target-list {

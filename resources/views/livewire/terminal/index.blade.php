@@ -176,11 +176,11 @@
             </div>
         @else
         <div wire:key="terminal-session-canvas" data-terminal-session-canvas
-            class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
+            class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
             :data-console-theme="consoleTheme"
             :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
             <header
-                class="terminal-session-toolbar absolute top-3 right-3 left-3 z-20 flex items-center gap-3 text-white select-none">
+                class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
                 <div class="relative flex min-w-0 flex-1 items-center gap-2"
                     x-on:click.outside="targetOpen = false">
                     @if ($isLoadingContainers)
@@ -264,7 +264,7 @@
                         :theme-accents="$consoleThemeAccents" />
             </header>
 
-            <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
             <div class="application-console-block min-h-0 flex-1 overflow-hidden">
                 @if ($isLoadingContainers)
                     <div class="flex h-full min-h-0 items-center justify-center">

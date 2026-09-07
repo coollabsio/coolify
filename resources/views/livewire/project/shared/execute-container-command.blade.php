@@ -106,11 +106,11 @@
                 },
             }">
             <div data-terminal-session-canvas
-                class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
+                class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
                 :data-console-theme="consoleTheme"
                 :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
                 <header
-                    class="terminal-session-toolbar absolute top-3 right-3 left-3 z-20 flex items-center gap-3 text-white select-none">
+                    class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
                     @if ($type === 'server')
                         <div class="terminal-session-target-trigger flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70"
                             x-data="{ autoConnected: false }"
@@ -175,7 +175,7 @@
                         :theme-accents="$consoleThemeAccents" />
                 </header>
 
-                <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
                 <div class="application-console-block min-h-0 flex-1">
                     @if ($type !== 'server' && $containers->count() > 1)
                         <div x-cloak x-show="!targetChosen" data-terminal-target-picker="launcher"
