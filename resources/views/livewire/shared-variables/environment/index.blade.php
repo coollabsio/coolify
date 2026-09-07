@@ -22,10 +22,7 @@
                             $project->description,
                             ...$project->environments->flatMap(fn ($environment) => [$environment->name, $environment->description])->all(),
                         ]))">
-                            <div class="mb-3">
-                                <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">{{ $project->name }}</h2>
-                                <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">{{ $project->description ?: 'Project environments' }}</p>
-                            </div>
+                            <x-section-heading :title="$project->name" :subtitle="$project->description ?: 'Project environments'" />
                             @if ($project->environments->isEmpty())
                                 <x-empty title="No environments in this project." size="sm" />
                             @else

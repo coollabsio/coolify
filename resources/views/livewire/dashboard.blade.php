@@ -17,21 +17,8 @@
         <livewire:dashboard.active-deployments />
 
         <section class="mb-0! min-w-0">
-            <div class="mb-3 flex items-end justify-between gap-4">
-                <div>
-                    <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
-                        Projects
-                    </h2>
-                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                        Your deployment workspaces
-                    </p>
-                </div>
-                <a href="{{ route('project.index') }}" {{ wireNavigate() }}
-                    class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
-                    View all
-                    <x-reicon name="arrow-right" class="size-3" />
-                </a>
-            </div>
+            <x-section-heading title="Projects" subtitle="Your deployment workspaces"
+                :href="route('project.index')" />
 
             @if ($dashboardProjects->isEmpty())
                 <x-empty title="No projects yet"
@@ -125,21 +112,8 @@
         </section>
 
         <section class="mb-0! min-w-0">
-            <div class="mb-3 flex items-end justify-between gap-4">
-                <div>
-                    <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
-                        Servers
-                    </h2>
-                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                        Infrastructure available for deployments
-                    </p>
-                </div>
-                <a href="{{ route('server.index') }}" {{ wireNavigate() }}
-                    class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
-                    View all
-                    <x-reicon name="arrow-right" class="size-3" />
-                </a>
-            </div>
+            <x-section-heading title="Servers" subtitle="Infrastructure available for deployments"
+                :href="route('server.index')" />
 
             @if ($dashboardServers->isEmpty())
                 @if ($privateKeys->isEmpty())
