@@ -99,8 +99,8 @@ class Create extends Component
             $label = str($resource->name)->headline();
             $targets->push(...$resource->persistentStorages()->orderBy('name')->get()->map(fn (LocalPersistentVolume $volume): array => [
                 'key' => 'volume:'.$volume->id,
-                'type' => 'Volume · '.$label,
-                'name' => $volume->name,
+                'type' => $label,
+                'name' => str($volume->name)->after($this->service->uuid.'_')->value(),
             ]));
             $targets->push(...$resource->fileStorages()
                 ->where('is_directory', true)
@@ -109,8 +109,8 @@ class Create extends Component
                 ->get()
                 ->map(fn (LocalFileVolume $directory): array => [
                     'key' => 'directory:'.$directory->id,
-                    'type' => 'Directory · '.$label,
-                    'name' => $directory->fs_path,
+                    'type' => $label,
+                    'name' => $directory->fs_path.' (directory)',
                 ]));
         }
 

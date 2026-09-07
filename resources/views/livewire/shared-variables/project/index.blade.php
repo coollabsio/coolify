@@ -24,7 +24,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                                     @if ($project->icon_path)
-                                        <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                        <img src="{{ project_icon_url($project) }}"
                                             alt="{{ $project->name }} icon"
                                             class="h-full w-full rounded-lg object-cover">
                                     @else
@@ -49,7 +49,7 @@
                             href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
                             class="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                             @if ($project->icon_path)
-                                <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                <img src="{{ project_icon_url($project) }}"
                                     alt="{{ $project->name }} icon" class="size-4 shrink-0 rounded object-cover">
                             @else
                                 <x-reicon name="projects" class="size-4 shrink-0 text-neutral-500 dark:text-fg-dim" />

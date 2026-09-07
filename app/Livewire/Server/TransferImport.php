@@ -123,6 +123,15 @@ class TransferImport extends Component
             $this->lastWarnings = array_values((array) data_get($result, 'warnings', []));
             $this->importedServerUuid = $dryRun ? null : data_get($result, 'server_uuid');
 
+            if (! $dryRun) {
+                auditLog('ui.server.imported', [
+                    'team_id' => $teamId,
+                    'server_uuid' => $this->importedServerUuid,
+                    'claimed' => (bool) data_get($result, 'claimed'),
+                    'adopt_mode' => $this->adoptMode,
+                ]);
+            }
+
             if ($dryRun) {
                 $this->dispatch('success', 'Dry run completed — nothing was written.');
             } elseif (data_get($result, 'claimed')) {

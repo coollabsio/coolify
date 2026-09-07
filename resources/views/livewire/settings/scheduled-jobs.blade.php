@@ -216,7 +216,7 @@
                                 <span>Skipped</span>
                             </div>
                             @foreach ($managerRuns as $run)
-                                <div wire:key="run-{{ $loop->index }}"
+                                <div wire:key="run-{{ md5(serialize($run)) }}"
                                     x-show="{{ $loop->index }} >= (page - 1) * perPage && {{ $loop->index }} < page * perPage"
                                     class="data-table-row scheduler-runs-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                                     <div class="font-mono text-[11px] text-neutral-500 dark:text-fg-dim">
@@ -272,7 +272,7 @@
                                     default => ucfirst(str_replace('_', ' ', $skip['reason'])),
                                 };
                             @endphp
-                            <div wire:key="skip-{{ $loop->index }}"
+                            <div wire:key="skip-{{ md5(serialize($skip)) }}"
                                 class="data-table-row skipped-jobs-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                                 <div class="font-mono text-[11px] text-neutral-500 dark:text-fg-dim">
                                     {{ $skip['timestamp'] }}

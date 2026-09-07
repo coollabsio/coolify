@@ -1,6 +1,7 @@
 name: Coolify Helper Image
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:

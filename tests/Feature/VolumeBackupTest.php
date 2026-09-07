@@ -6,7 +6,9 @@ use App\Jobs\VolumeBackupJob;
 use App\Jobs\VolumeBackupRecoveryJob;
 use App\Livewire\Project\Application\Backup\Create as CreateScheduledVolumeBackup;
 use App\Livewire\Project\Service\FileStorage;
-use App\Livewire\Project\Shared\Storages\Show;
+use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
+use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
+use App\Livewire\Project\Shared\Storages\All;
 use App\Livewire\Project\Shared\Storages\VolumeBackups;
 use App\Models\Application;
 use App\Models\Environment;
@@ -20,10 +22,12 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -41,6 +45,14 @@ use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
+
+it('types service backup S3 storage state as a nullable Eloquent collection', function () {
+    $property = new ReflectionProperty(ServiceVolumeBackupIndex::class, 's3s');
+
+    expect($property->getType()?->getName())->toBe(Collection::class)
+        ->and($property->getType()?->allowsNull())->toBeTrue()
+        ->and($property->getDefaultValue())->toBeNull();
+});
 
 it('provides the volume backup domain classes and relationship', function () {
     expect(class_exists(ScheduledVolumeBackup::class))->toBeTrue()
@@ -185,6 +197,45 @@ it('creates a scheduled backup with a preselected volume from the shared modal',
         ->and($backup->enabled)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse()
         ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('shows readable service storage backup target labels', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application] = createVolumeBackupApplication($team);
+    $service = Service::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $resource = ServiceApplication::create([
+        'uuid' => new_public_id(),
+        'name' => 'directus',
+        'service_id' => $service->id,
+    ]);
+    LocalPersistentVolume::create([
+        'name' => $service->uuid.'_directus-templates',
+        'mount_path' => '/directus/templates',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+    LocalFileVolume::unguarded(fn () => LocalFileVolume::withoutEvents(fn () => LocalFileVolume::create([
+        'uuid' => new_public_id(),
+        'fs_path' => './uploads',
+        'mount_path' => '/directus/uploads',
+        'is_directory' => true,
+        'is_based_on_git' => false,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ])));
+
+    Livewire::test(CreateServiceVolumeBackup::class, ['service' => $service])
+        ->assertSet('targets.0.name', 'directus-templates')
+        ->assertSet('targets.0.type', 'Directus')
+        ->assertSet('targets.1.name', './uploads (directory)')
+        ->assertSet('targets.1.type', 'Directus')
+        ->assertSee('Directus: directus-templates');
 });
 
 it('handles scheduled backup persistence failures', function () {
@@ -432,11 +483,8 @@ it('shows the configure backup modal trigger inside the volume card instead of i
     signInForVolumeBackups($this, $team);
     [$application, $volume] = createVolumeBackupApplication($team);
 
-    $component = Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])
-        ->set('isReadOnly', true)
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.isReadOnly", true)
         ->assertSee('Backup')
         ->assertDontSee('Backups made while the application is writing');
 
@@ -446,6 +494,7 @@ it('shows the configure backup modal trigger inside the volume card instead of i
     expect($html)
         ->toContain('Configure Volume Backup')
         ->toContain('data-table-row')
+        ->not->toContain('wire:submit="submit('.$volume->id.')"')
         ->toContain('Backup');
 });
 
@@ -461,10 +510,10 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
         'enabled' => false,
     ]);
 
-    $component = Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])->assertDontSee('table-badge-success', false);
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->assertDontSee('Volume backup is enabled');
+
+    expect($component->get("volumeBackupMeta.{$volume->id}.enabled"))->toBeFalse();
 
     $backup->update(['enabled' => true]);
 
@@ -477,17 +526,10 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
 
     $component
         ->dispatch('refreshVolumeBackups')
-        ->assertSee('table-badge-success', false)
         ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 
-    Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-        'isFirst' => false,
-    ])
-        ->assertSee('table-badge-success', false)
-        ->assertSee('Volume backup is enabled');
+    expect($component->get("volumeBackupMeta.{$volume->id}.url"))->toBe($backupUrl);
 });
 
 it('links the backup enabled badge to a filtered backup list when the application has multiple schedules', function () {
@@ -513,11 +555,7 @@ it('links the backup enabled badge to a filtered backup list when the applicatio
         'search' => $volume->name,
     ]);
 
-    Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])
-        ->assertSee('table-badge-success', false)
+    Livewire::test(All::class, ['resource' => $application])
         ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 });
