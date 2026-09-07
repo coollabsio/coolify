@@ -4396,3 +4396,63 @@ a.command-palette-item:focus-visible {
 .dark .command-palette-arch-badge {
     color: #fcd34d;
 }
+
+/* Service domains prioritize public addresses; configuration lives in settings. */
+#service-domains-section,
+.domains-overview-container {
+    container: service-domains / inline-size;
+}
+
+.service-domains-overview-grid {
+    grid-template-columns: minmax(0, 1fr) 7.25rem 7.5rem 5.5rem 6.5rem 8rem 6.5rem;
+    column-gap: 0.75rem;
+}
+
+.data-table-row.service-domains-overview-grid {
+    padding-block: 0.5rem;
+}
+
+.service-domain-detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.service-domains-overview-grid > span:not(:first-child):not(:last-child) {
+    text-align: center;
+}
+
+.service-domain-detail-label {
+    display: none;
+}
+
+.service-domains-https .listbox-trigger {
+    min-width: 7rem;
+}
+
+@container service-domains (max-width: 980px) {
+    .data-table-header.service-domains-overview-grid {
+        display: none;
+    }
+
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .service-domain-detail {
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .service-domain-detail-label {
+        display: inline;
+        color: var(--coollabs-fg-dim);
+    }
+}

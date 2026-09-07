@@ -19,6 +19,10 @@ class Previews extends Component
 
     public Application $application;
 
+    public bool $isPreviewDeploymentsEnabled = false;
+
+    public bool $isPrDeploymentsPublicEnabled = false;
+
     public string $deployment_uuid;
 
     public array $parameters;
@@ -41,9 +45,27 @@ class Previews extends Component
 
     public function mount()
     {
+        $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
+        $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
         $this->syncDockerTags();
+    }
+
+    public function savePreviewSettings(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate([
+            'isPreviewDeploymentsEnabled' => 'boolean',
+            'isPrDeploymentsPublicEnabled' => 'boolean',
+        ]);
+
+        $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
+        $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->application->settings->save();
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
     }
 
     private function syncDockerTags(): void

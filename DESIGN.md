@@ -520,7 +520,10 @@ Do not restore the old full-width footer.
 Deferred fields in one Livewire component use one floating unsaved bar and one
 submit action. Do not add a separate “Save configuration” button to every
 card. Selectors that are safe to persist independently should use the existing
-instant-save pattern.
+instant-save pattern. When those requests share a component with a modal draft,
+pass the unsaved bar a `dirty` Alpine expression comparing that draft with its
+initial values, so unrelated saves do not hide pending changes. Mount modal save
+bars only while the modal is open to avoid inactive keyboard shortcuts.
 
 ---
 
