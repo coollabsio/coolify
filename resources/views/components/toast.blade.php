@@ -8,6 +8,7 @@
                     description: options.description ?? '',
                     position: options.position ?? 'bottom-right',
                     html: options.html ?? '',
+                    persistent: options.persistent ?? false,
                 },
             }));
         } catch (error) {
@@ -29,14 +30,19 @@
                     type: event.detail.type,
                     html: event.detail.html ? window.sanitizeHTML(event.detail.html) : '',
                     timeout: null,
+                    persistent: event.detail.persistent === true,
                     copied: false,
                     copiedTimeout: null,
                 };
 
                 this.toasts.unshift(toast);
                 if (this.toasts.length > 4) {
-                    const removed = this.toasts.pop();
-                    clearTimeout(removed?.timeout);
+                    const index = this.toasts.findLastIndex(item => !item.persistent);
+                    if (index !== -1) {
+                        const [removed] = this.toasts.splice(index, 1);
+                        clearTimeout(removed.timeout);
+                        clearTimeout(removed.copiedTimeout);
+                    }
                 }
 
                 this.$nextTick(() => {
@@ -49,6 +55,7 @@
             },
             scheduleToast(toast, delay = 2000) {
                 clearTimeout(toast.timeout);
+                if (toast.persistent) return;
                 toast.timeout = setTimeout(() => this.removeToast(toast.id), delay);
             },
             pauseToast(toast) {
