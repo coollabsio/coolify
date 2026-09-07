@@ -1765,39 +1765,30 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 @media (min-width: 1280px) {
+    /* Flat rail welded to the main sidebar: full height (3rem → bottom), surface
+       bled left across <main>'s gutter. Negative margins cancel main's pt breathing
+       and the 2.5rem gutter (lg:px-10). */
     .application-settings-navigation {
         position: sticky;
-        /* Clear the fixed 3rem topbar and match <main>'s pt (3rem + 1.75rem) so
-           the pinned rail aligns with the content and has breathing room at the
-           top instead of hugging the header when the page scrolls. */
-        top: calc(3rem + 1.75rem);
+        top: 3rem;
+        margin-top: -1.75rem;
+        margin-left: -2.5rem;
         align-self: start;
-        max-height: calc(100dvh - 5.75rem);
+        height: calc(100dvh - 3rem);
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior: contain;
-        /* Thin, subtle overlay scrollbar so it does not fight the card's rounded
-           edge. Gutter stays stable so content does not shift when it appears. */
         scrollbar-width: thin;
         scrollbar-color: var(--coollabs-fill) transparent;
         scrollbar-gutter: stable;
-        /* Contained card: a distinct surface with a hairline ring and a restrained
-           lift, so the settings nav reads as a structured panel that stands off
-           the content canvas. In dark mode --coollabs-elevated is a clear lighter
-           step above the canvas; the light-mode fill is overridden below. */
+        --rail-fill: var(--coollabs-elevated);
         padding: 0.5rem;
-        background: var(--coollabs-elevated);
-        border: 1px solid var(--coollabs-hairline);
-        border-radius: 12px;
-        box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+        background: var(--rail-fill);
+        border-right: 1px solid var(--coollabs-hairline);
     }
 
-    /* Light mode: a bright white rail on the light-gray page canvas (neutral-50,
-       ~98.5%). Fill contrast to the canvas is small, so separation comes from the
-       hairline ring + soft lift rather than a darker gray fill — the standard
-       "white rail on gray canvas" hierarchy (Linear/Vercel), not a gray rail. */
     html:not(.dark) .application-settings-navigation {
-        background: var(--coollabs-base);
+        --rail-fill: var(--coollabs-base);
     }
 
     .application-settings-navigation::-webkit-scrollbar {
@@ -1817,21 +1808,13 @@ html[data-theme="custom"] textarea:disabled {
         background: var(--coollabs-line);
     }
 
-    /* Resource settings rail: pinned as a stacked second sidebar, flush to the
-       main sidebar's right edge (left tracks its collapsed width via --rail-left).
-       A subtle step lighter than the main sidebar chrome, with a hairline divider,
-       so the two rails read as a cohesive stacked pair and the content is the
-       distinct surface to their right. */
-    /* Resource pages have a second fixed header row below the main header. */
-    .application-settings-workspace > .application-settings-navigation {
-        top: 4rem;
-        max-height: calc(100dvh - 5rem);
-    }
-
+    /* Embeds: keep the surface, drop the weld/full-height. */
     .application-settings-navigation.is-flush {
         position: static;
-        max-height: none;
+        height: auto;
         overflow: visible;
+        margin-top: 0;
+        margin-left: 0;
     }
 }
 

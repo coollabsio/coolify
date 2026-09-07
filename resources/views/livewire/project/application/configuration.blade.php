@@ -6,7 +6,7 @@
     <livewire:project.application.heading :application="$application" :wire:key="'application-heading-'.$currentRoute" />
 
     <section class="application-settings-workspace w-full max-w-none">
-        <div class="grid min-w-0 gap-4 xl:grid-cols-[236px_minmax(0,1fr)] xl:gap-8">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-application.configuration-sidebar :application="$application" :current-route="$currentRoute" />
 
             <div class="min-w-0">
