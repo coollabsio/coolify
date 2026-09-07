@@ -129,9 +129,17 @@ class Domains extends Component
 
     public function refreshDomains(): void
     {
+        $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
+
         $this->service->refresh();
         $this->service->load(['applications', 'server']);
         $this->loadDomainState();
+
+        if ($editingRow !== null) {
+            $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
+                && (int) $row['service_application_id'] === (int) $editingRow['service_application_id']);
+            $this->editingIndex = $index === false ? null : (int) $index;
+        }
     }
 
     public function pollDnsChecks(): void
@@ -239,9 +247,14 @@ class Domains extends Component
             ])
             ->all();
 
+        $pendingRedirect = $this->serviceRedirects[$this->pendingRedirectServiceApplicationId] ?? null;
         $this->serviceRedirects = [];
         foreach ($this->service->applications as $app) {
-            $this->serviceRedirects[$app->id] = $this->normalizeRedirect($app->redirect ?? null);
+            $this->serviceRedirects[$app->id] = $this->normalizeRedirect(
+                $this->pendingAction === 'redirect' && $app->id === $this->pendingRedirectServiceApplicationId
+                    ? $pendingRedirect
+                    : $app->redirect
+            );
         }
 
         if ($this->newServiceApplicationId === null && count($this->serviceApps) > 0) {
@@ -924,6 +937,7 @@ class Domains extends Component
         }
 
         $toAdd = collect();
+        $portOverrides = $app->domain_port_overrides ?? [];
         foreach ($current as $url) {
             $counterpart = $this->wwwCounterpartUrl($url, forRedirectPairing: true);
             if ($counterpart === null) {
@@ -940,6 +954,11 @@ class Domains extends Component
                 continue;
             }
 
+            $port = $this->effectiveDomainInternalPort($url, $app);
+            if ($port['has_port_override']) {
+                $portOverrides[DomainPortOverrides::withoutPort($counterpart)] = $port['internal_port'];
+            }
+
             $knownHosts[$hostKey] = true;
             $toAdd->push($counterpart);
         }
@@ -948,12 +967,13 @@ class Domains extends Component
             return true;
         }
 
+        $app->domain_port_overrides = $portOverrides ?: null;
         $merged = $current->merge($toAdd)->unique()->values();
         $this->pendingAction = 'redirect';
         $this->pendingRedirectServiceApplicationId = $app->id;
 
-        // Skip DNS: pairing for redirects must still be configured even when DNS is not ready.
-        if (! $this->saveDomainListForApp($app, $merged)) {
+        // Counterparts inherit an existing port, so only domain conflicts need confirmation.
+        if (! $this->saveDomainListForApp($app, $merged, checkPorts: false)) {
             return false;
         }
 
@@ -980,11 +1000,24 @@ class Domains extends Component
             return;
         }
 
+        if ($this->pendingAction === 'redirect' && $this->pendingRedirectServiceApplicationId) {
+            $this->setServiceRedirect($this->pendingRedirectServiceApplicationId);
+
+            return;
+        }
+
         $this->addDomain();
     }
 
     public function cancelRemovePort(): void
     {
+        $this->authorize('update', $this->service);
+
+        if ($this->pendingAction === 'redirect' && $this->pendingRedirectServiceApplicationId) {
+            $app = $this->findServiceApp($this->pendingRedirectServiceApplicationId);
+            $this->serviceRedirects[$this->pendingRedirectServiceApplicationId] = $this->normalizeRedirect($app?->redirect);
+        }
+        $this->pendingRedirectServiceApplicationId = null;
         $this->showPortWarningModal = false;
         $this->forceSaveDomains = false;
         $this->forceRemovePort = false;
@@ -1421,6 +1454,7 @@ class Domains extends Component
         ServiceApplication $app,
         Collection $domains,
         bool $checkConflicts = true,
+        bool $checkPorts = true,
     ): bool {
         $domainString = $domains->filter()->unique()->implode(',');
         $domainString = $domainString === '' ? null : ValidationPatterns::normalizeApplicationDomains($domainString);
@@ -1447,7 +1481,7 @@ class Domains extends Component
             }
         }
 
-        if (! $this->forceRemovePort) {
+        if ($checkPorts && ! $this->forceRemovePort) {
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null && $domainString) {
                 $previousFqdn = $app->getOriginal('fqdn');

@@ -242,6 +242,14 @@ class BackupEdit extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
+            $database = $this->backup->database->refresh();
+            $this->status = $database->status;
+            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
+                $this->dispatch('error', 'The database must be running to start a backup.');
+
+                return;
+            }
+
             DatabaseBackupJob::dispatch($this->backup);
             $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
 

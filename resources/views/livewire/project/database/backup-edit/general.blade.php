@@ -19,9 +19,9 @@
                         Disable backup
                     </x-forms.button>
                 @endif
-                @if (str($status)->startsWith('running'))
-                    <x-forms.button type="button" wire:click="backupNow">Back up now</x-forms.button>
-                @endif
+                <x-forms.button type="button" wire:click="backupNow"
+                    :disabled="! str($status)->startsWith('running')"
+                    :tooltip="! str($status)->startsWith('running') ? 'The database must be running to start a backup.' : null">Back up now</x-forms.button>
             </div>
         </div>
 

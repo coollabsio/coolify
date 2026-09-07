@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
@@ -208,4 +210,87 @@ it('shows danger zone for application deletion', function () {
     $page->assertSee('Danger')
         ->assertSee('Config App')
         ->screenshot(filename: 'application-danger-zone');
+});
+
+it('uses compact application domains with unified settings and a floating save bar', function () {
+    config()->set('app.maintenance.store', 'array');
+    InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
+    Cache::forget('instance_settings');
+    $this->application->update(['fqdn' => 'https://first.example.com,https://second.example.com', 'redirect' => 'both']);
+    loginAndSkipBoarding();
+    $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
+    $page = visit($url);
+    $page->click('Accept and close')
+        ->assertSee('Check all DNS')
+        ->assertSee('Protocol redirect')
+        ->assertSee('Search indexing')
+        ->assertDontSee('Search engine indexing')
+        ->fill('[aria-label="Search services or domains"]', 'missing.example.com')
+        ->assertSee('No domains found')
+        ->fill('[aria-label="Search services or domains"]', '')
+        ->click('[aria-label="Settings for https://first.example.com"]')
+        ->assertSee('Domain settings')
+        ->assertValue('#editingDomainParts-host', 'first.example.com')
+        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->fill('#editingDomainParts-path', '/blog')
+        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->click('[id^="application-domain-indexing-"][id$="-trigger"]')
+        ->click('Noindex')
+        ->assertSee('Search engine indexing updated.')
+        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->screenshot(filename: 'application-domain-unified-settings')
+        ->click('[wire\\:click="updateDomain"]')
+        ->assertDontSee('Domain settings')
+        ->assertSee('https://first.example.com/blog')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-domains-compact');
+
+    $page->click('[aria-label="Settings for https://second.example.com"]')
+        ->fill('#editingDomainParts-path', '/discard')
+        ->click('Reset')
+        ->assertDontSee('Domain settings')
+        ->click('[aria-label="Settings for https://second.example.com"]')
+        ->assertValue('#editingDomainParts-path', '')
+        ->click('[aria-label="Close"]:visible')
+        ->click('[wire\\:key="domain-row-'.md5('https://first.example.com/blog|').'"] [aria-label="Remove domain"]')
+        ->assertSee('Remove domain?')
+        ->click('button:has([x-text="step2ButtonText"]):visible')
+        ->assertDontSee('https://first.example.com/blog')
+        ->click('[aria-label="Settings for https://second.example.com"]')
+        ->assertValue('#editingDomainParts-host', 'second.example.com')
+        ->click('[aria-label="Close"]:visible')
+        ->resize(390, 844)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-domains-mobile');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+});
+
+it('edits Compose application domain redirects in the unified settings dialog', function () {
+    config()->set('app.maintenance.store', 'array');
+    InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
+    Cache::forget('instance_settings');
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web.api:\n    image: nginx:alpine\n    expose:\n      - '8080'\n",
+        'docker_compose_domains' => json_encode(['web.api' => ['domain' => 'https://web.example.com', 'redirect' => 'both']]),
+    ]);
+    loginAndSkipBoarding();
+    $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
+    $page = visit($url);
+    $page->click('Accept and close')
+        ->assertSee('web.api')
+        ->assertSee('Domain redirect')
+        ->click('[aria-label="Settings for https://web.example.com"]')
+        ->assertSee('Domain settings')
+        ->click('[id^="application-domain-direction-"][id$="-trigger"]')
+        ->click('Redirect to www')
+        ->assertDontSee('Use a different port?')
+        ->assertSee('Redirect updated for web.api.')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-compose-domain-settings');
+
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('www');
+    $page->click('[aria-label="Close"]:visible')
+        ->assertSee('https://www.web.example.com')
+        ->screenshot(filename: 'application-compose-domain-overview');
 });

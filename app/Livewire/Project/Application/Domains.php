@@ -150,7 +150,15 @@ class Domains extends Component
 
     public function refreshDomains(): void
     {
+        $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
+
         $this->loadDomainState();
+
+        if ($editingRow !== null) {
+            $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
+                && ($row['service'] ?? null) === ($editingRow['service'] ?? null));
+            $this->editingIndex = $index === false ? null : (int) $index;
+        }
     }
 
     public function pollDnsChecks(): void
@@ -227,7 +235,9 @@ class Domains extends Component
 
         $this->isCompose = $this->application->build_pack === 'dockercompose';
         $this->labelsAreWritable = $this->application->settings->is_container_label_readonly_enabled === false;
-        $this->redirect = $this->application->redirect ?? 'both';
+        if ($this->pendingAction !== 'redirect' || $this->isCompose) {
+            $this->redirect = $this->application->redirect ?? 'both';
+        }
         $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
 
         $settings = instanceSettings();
@@ -254,6 +264,9 @@ class Domains extends Component
         }
 
         $this->composeServices = [];
+        $pendingRedirect = $this->pendingRedirectService !== null
+            ? ($this->serviceRedirects[$this->serviceRedirectWireKey($this->pendingRedirectService)] ?? null)
+            : null;
         $this->serviceRedirects = [];
         if ($this->isCompose) {
             try {
@@ -290,7 +303,9 @@ class Domains extends Component
                 $serviceEntry = $domains[$serviceName] ?? null;
                 $storedRedirect = is_array($serviceEntry) ? ($serviceEntry['redirect'] ?? null) : null;
                 $this->serviceRedirects[$this->serviceRedirectWireKey($serviceName)] = $this->normalizeRedirect(
-                    is_string($storedRedirect) ? $storedRedirect : null
+                    $this->pendingAction === 'redirect' && $serviceName === $this->pendingRedirectService
+                        ? $pendingRedirect
+                        : (is_string($storedRedirect) ? $storedRedirect : null)
                 );
             }
         }
@@ -973,7 +988,13 @@ class Domains extends Component
             return;
         }
 
+        $this->authorize('update', $this->application);
+        $wasRedirect = $this->pendingAction === 'redirect';
         $this->pendingAction = null;
+        $this->pendingRedirectService = null;
+        if ($wasRedirect) {
+            $this->refreshDomains();
+        }
     }
 
     public function addDomain(): void
