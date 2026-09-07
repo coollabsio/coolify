@@ -2524,7 +2524,7 @@ it('stores compose domain port overrides without wiping other services', functio
         'build_pack' => 'dockercompose',
         'fqdn' => null,
         'ports_exposes' => '3000,8080',
-        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n",
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [8080]\n  api:\n    image: node:alpine\n",
         'docker_compose_domains' => json_encode([
             'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
         ]),
@@ -2772,4 +2772,118 @@ it('does not warn when editing an application domain to a port already used by a
         ->call('updateDomain')
         ->assertSet('showPortWarningModal', false)
         ->assertDispatched('success');
+});
+
+it('does not inherit the application port for single-service compose domains', function (string $extraService, bool $isPreview, bool $isStatic) {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: httpd:2.4-alpine\n".$extraService,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://apache.example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    $this->application->settings()->update(['is_static' => $isStatic]);
+
+    if ($isPreview) {
+        $preview = ApplicationPreview::create([
+            'application_id' => $this->application->id,
+            'pull_request_id' => 1,
+            'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/1',
+            'docker_compose_domains' => $this->application->docker_compose_domains,
+        ]);
+        $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+    } else {
+        $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    }
+
+    $component->assertSet('domainRows.0.internal_port', null)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertDontSee('Internal port 3000');
+})->with([
+    'web only' => '',
+    'web and database' => "  database:\n    image: postgres:16-alpine\n",
+])->with([false, true])->with([false, true]);
+
+it('checks compose ports against the selected service when saving domains', function (string $action, int $port, bool $warn) {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - 8080
+      - 8081
+    ports:
+      - target: 8082
+        published: 18082
+      - "18083:8083"
+  api:
+    image: nginx:alpine
+    expose:
+      - 9090
+YAML,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://existing.example.com'],
+            'api' => ['domain' => 'https://api.example.com:9090'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    if ($action === 'add') {
+        $component->set('newDomainService', 'web')
+            ->set('newDomainParts.host', 'new.example.com')
+            ->set('newDomainParts.port', (string) $port)
+            ->call('addDomain');
+        $domain = 'https://new.example.com';
+    } else {
+        $component->call('startEdit', 0)
+            ->set('editingDomainParts.port', (string) $port)
+            ->call('updateDomain');
+        $domain = 'https://existing.example.com';
+    }
+
+    $component->assertHasNoErrors()->assertSet('showPortWarningModal', $warn);
+
+    if ($warn) {
+        expect($this->application->fresh()->domain_port_overrides ?? [])->not->toHaveKey($domain);
+        $component->assertSet('unrecognizedPort', $port)
+            ->call('confirmUseUnknownPort')
+            ->assertSet('showPortWarningModal', false);
+    }
+
+    $component->assertDispatched('success');
+    expect($this->application->fresh()->domain_port_overrides[$domain] ?? null)->toBe($port);
+})->with(['add', 'edit'])->with([
+    'first exposed port' => [8080, false],
+    'second exposed port' => [8081, false],
+    'long syntax target' => [8082, false],
+    'short syntax target' => [8083, false],
+    'global port' => [3000, true],
+    'another service port' => [9090, true],
+    'published host port' => [18082, true],
+]);
+
+it('keeps an existing custom compose port without another warning', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [8080]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://existing.example.com:7070']]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '7070')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->domain_port_overrides['https://existing.example.com'] ?? null)->toBe(7070);
 });

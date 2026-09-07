@@ -74,7 +74,7 @@ class PreviewDomains extends Component
 
             return;
         }
-        if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+        if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts), serviceName: $this->newDomainService)) {
             $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
 
             return;
@@ -173,7 +173,7 @@ class PreviewDomains extends Component
             return;
         }
         $oldUrl = $this->domainRows[$this->editingIndex]['url'];
-        if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+        if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl), $this->domainRows[$this->editingIndex]['service'])) {
             $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
             return;
@@ -478,7 +478,7 @@ class PreviewDomains extends Component
         return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
     }
 
-    private function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    private function shouldConfirmPort(?int $port, ?int $currentPort = null, ?string $serviceName = null): bool
     {
         if ($this->forceUseUnknownPort || $port === null) {
             return false;
@@ -487,7 +487,7 @@ class PreviewDomains extends Component
             return false;
         }
 
-        return $this->preview->application->portRequiresConfirmation($port);
+        return $this->preview->application->portRequiresConfirmation($port, $serviceName);
     }
 
     private function openPortWarning(?int $port, string $action): void
@@ -522,13 +522,6 @@ class PreviewDomains extends Component
             ];
         }
 
-        if ($this->preview->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
-        }
-
         $composePort = dockerComposeServicePort($this->preview->application->docker_compose_raw, $service);
         if ($composePort !== null) {
             return [
@@ -537,9 +530,16 @@ class PreviewDomains extends Component
             ];
         }
 
-        if ($this->preview->application->build_pack === 'dockercompose' && $service !== null && count($this->composeServices()) > 1) {
+        if ($this->preview->application->build_pack === 'dockercompose' && $service !== null) {
             return [
                 'internal_port' => null,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->preview->application->settings?->is_static) {
+            return [
+                'internal_port' => 80,
                 'has_port_override' => false,
             ];
         }

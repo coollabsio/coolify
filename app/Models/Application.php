@@ -964,12 +964,16 @@ class Application extends BaseModel
     }
 
     /**
-     * Ports the container is expected to listen on: Ports Exposes plus ports already used by application domains.
+     * Ports declared by the selected Compose service, or exposed and previously used application ports.
      *
      * @return list<int>
      */
-    public function availableInternalPorts(): array
+    public function availableInternalPorts(?string $serviceName = null): array
     {
+        if ($this->build_pack === 'dockercompose') {
+            return dockerComposeServicePorts($this->docker_compose_raw, $serviceName);
+        }
+
         $ports = collect($this->settings?->is_static ? [80] : $this->ports_exposes_array)
             ->filter(fn (mixed $port): bool => is_numeric($port) && (int) $port > 0)
             ->map(fn (mixed $port): int => (int) $port);
@@ -994,13 +998,13 @@ class Application extends BaseModel
         return $ports->unique()->sort()->values()->all();
     }
 
-    public function portRequiresConfirmation(?int $port): bool
+    public function portRequiresConfirmation(?int $port, ?string $serviceName = null): bool
     {
         if ($port === null || $port <= 0) {
             return false;
         }
 
-        return ! in_array($port, $this->availableInternalPorts(), true);
+        return ! in_array($port, $this->availableInternalPorts($serviceName), true);
     }
 
     public function detectPortFromEnvironment(?bool $isPreview = false): ?int
