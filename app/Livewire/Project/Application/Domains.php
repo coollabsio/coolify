@@ -554,13 +554,6 @@ class Domains extends Component
             ];
         }
 
-        if ($this->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
-        }
-
         $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
         if ($composePort !== null) {
             return [
@@ -569,9 +562,16 @@ class Domains extends Component
             ];
         }
 
-        if ($this->isCompose && $service !== null && count($this->composeServices) > 1) {
+        if ($this->isCompose && $service !== null) {
             return [
                 'internal_port' => null,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->application->settings?->is_static) {
+            return [
+                'internal_port' => 80,
                 'has_port_override' => false,
             ];
         }
@@ -613,7 +613,7 @@ class Domains extends Component
         return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
     }
 
-    protected function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    protected function shouldConfirmPort(?int $port, ?int $currentPort = null, ?string $serviceName = null): bool
     {
         if ($this->forceUseUnknownPort || $port === null) {
             return false;
@@ -622,7 +622,7 @@ class Domains extends Component
             return false;
         }
 
-        return $this->application->portRequiresConfirmation($port);
+        return $this->application->portRequiresConfirmation($port, $serviceName);
     }
 
     protected function openPortWarning(?int $port, string $action): void
@@ -1018,7 +1018,7 @@ class Domains extends Component
                 }
             }
 
-            if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+            if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts), serviceName: $this->newDomainService)) {
                 $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
 
                 return;
@@ -1415,7 +1415,7 @@ class Domains extends Component
                 return;
             }
 
-            if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+            if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl), $service)) {
                 $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
                 return;

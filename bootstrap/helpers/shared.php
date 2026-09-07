@@ -2486,7 +2486,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } catch (Exception $e) {
                 throw new RuntimeException($e->getMessage());
             }
-            $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $topLevelConfigs = collect(data_get($yaml, 'configs', []));
@@ -2512,25 +2511,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices, $envComments) {
-                // Workarounds for beta users.
-                if ($serviceName === 'registry') {
-                    $tempServiceName = 'docker-registry';
-                } else {
-                    $tempServiceName = $serviceName;
-                }
-                if (str(data_get($service, 'image'))->contains('glitchtip')) {
-                    $tempServiceName = 'glitchtip';
-                }
-                if ($serviceName === 'supabase-kong') {
-                    $tempServiceName = 'supabase';
-                }
-                $serviceDefinition = data_get($allServices, $tempServiceName);
-                $predefinedPort = data_get($serviceDefinition, 'port');
-                if ($serviceName === 'plausible') {
-                    $predefinedPort = '8000';
-                }
-                // End of workarounds for beta users.
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $envComments) {
+                $predefinedPort = $resource->getRequiredPort();
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3107,7 +3089,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ? ($savedService->domain_port_overrides ?? [])
                             : [];
                         $onlyPort = $savedService instanceof ServiceApplication
-                            ? ($savedService->getRequiredPort() ?? $predefinedPort)
+                            ? $savedService->getRequiredPort()
                             : $predefinedPort;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
@@ -3139,7 +3121,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
                                         onlyPort: $onlyPort,
-                                        predefinedPort: $predefinedPort,
+                                        predefinedPort: $onlyPort,
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
@@ -3172,7 +3154,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
                                 onlyPort: $onlyPort,
-                                predefinedPort: $predefinedPort,
+                                predefinedPort: $onlyPort,
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
@@ -3318,10 +3300,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $usesSharedApplicationPort = collect($services)
-            ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
-            ->count() === 1;
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $usesSharedApplicationPort) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3918,9 +3897,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $domainPortOverrides = $pull_request_id === 0
                             ? ($resource->domain_port_overrides ?? [])
                             : ($preview?->domain_port_overrides ?? []);
-                        $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
-                        $onlyPort = firstDockerComposeServicePort($service)
-                            ?? ($usesSharedApplicationPort ? ($exposedPorts[0] ?? null) : null);
+                        $onlyPort = firstDockerComposeServicePort($service);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
