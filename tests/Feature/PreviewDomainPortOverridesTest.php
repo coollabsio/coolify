@@ -1,7 +1,10 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Application\PreviewDomains;
+use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -12,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -975,3 +979,108 @@ it('preserves readonly compose preview redirects when saving an address', functi
         'api' => ['domain' => '', 'redirect' => 'www'],
     ]);
 });
+
+it('keeps saved HTTPS preview routing when a deployment starts', function (int $parsingVersion, bool $forceHttps, bool $keepHttpDomain) {
+    $compose = $parsingVersion > 0;
+    $this->application->update([
+        'fqdn' => 'http://app.example.com',
+        'build_pack' => $compose ? 'dockercompose' : 'nixpacks',
+        'compose_parsing_version' => (string) $parsingVersion,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [3000]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'http://app.example.com']]),
+    ]);
+    $this->application->settings()->update(['is_force_https_enabled' => $forceHttps]);
+    $domain = 'https://17.app.example.com';
+    $domains = $keepHttpDomain ? 'http://17.app.example.com,'.$domain : $domain;
+    $preview = createPreviewForPortTests($this->application, 17, [
+        'fqdn' => $domains,
+        'domain_port_overrides' => [$domain => 8080],
+        'docker_compose_domains' => $compose ? json_encode(['web' => ['domain' => $domains]]) : null,
+    ]);
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => (string) Str::uuid(),
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'pull_request_id' => 17,
+        'commit' => 'HEAD',
+    ]);
+
+    new ApplicationDeploymentJob($deployment->id);
+
+    $preview->refresh();
+    expect($preview->fqdn)->toBe($domains)
+        ->and($preview->domain_port_overrides)->toBe([$domain => 8080]);
+
+    $labels = $compose
+        ? collect(data_get($this->application->fresh()->parse(17, $preview->id), 'services.web-pr-17.labels'))->implode("\n")
+        : implode("\n", generateLabelsApplication($this->application->fresh(), $preview));
+
+    expect($labels)->toContain('tls.certresolver=letsencrypt')
+        ->toContain('loadbalancer.server.port=8080')
+        ->toContain('Host(`17.app.example.com`)')
+        ->and((bool) preg_match('/\.middlewares=[^\n]*redirect-to-https/', $labels))->toBe($forceHttps);
+
+    if ($forceHttps) {
+        preg_match_all('/traefik\.http\.routers\.([^=\n]+)\.entryPoints=http$/m', $labels, $httpRouters);
+        foreach ($httpRouters[1] as $router) {
+            expect($labels)->toMatch('/traefik\.http\.routers\.'.preg_quote($router, '/').'\.middlewares=[^\n]*redirect-to-https/');
+        }
+    }
+})->with([0, 2, 3])->with([false, true])->with([false, true]);
+
+it('explains preview domain activation and the inherited redirect policy', function () {
+    $preview = createPreviewForPortTests($this->application, 150, ['fqdn' => 'https://preview.example.com']);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSee('Redeploy the preview to apply domain changes and request HTTPS certificates.')
+        ->assertSee('HTTP to HTTPS redirects inherit the application setting.');
+});
+
+it('keeps saved preview domains when configuring an existing pull request', function (bool $compose) {
+    $domain = 'https://custom-preview.example.com';
+    $this->application->update([
+        'fqdn' => 'http://app.example.com',
+        'build_pack' => $compose ? 'dockercompose' : 'nixpacks',
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'http://app.example.com']]),
+    ]);
+    $preview = createPreviewForPortTests($this->application, 151, [
+        'fqdn' => $domain,
+        'domain_port_overrides' => [$domain => 8080],
+        'docker_compose_domains' => $compose ? json_encode(['web' => ['domain' => $domain]]) : null,
+    ]);
+
+    URL::defaults([
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]);
+
+    Livewire::test(Previews::class, ['application' => $this->application])
+        ->call('add', 151)
+        ->assertHasNoErrors();
+
+    expect($preview->fresh()->fqdn)->toBe($domain)
+        ->and($preview->fresh()->domain_port_overrides)->toBe([$domain => 8080]);
+})->with([false, true]);
+
+it('still generates domains when a preview deployment has none', function (bool $compose) {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'build_pack' => $compose ? 'dockercompose' : 'nixpacks',
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://app.example.com']]),
+    ]);
+    $preview = createPreviewForPortTests($this->application, 152);
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => (string) Str::uuid(),
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'pull_request_id' => 152,
+        'commit' => 'HEAD',
+    ]);
+
+    new ApplicationDeploymentJob($deployment->id);
+
+    expect($preview->fresh()->fqdn)->toBe('https://152.app.example.com');
+})->with([false, true]);

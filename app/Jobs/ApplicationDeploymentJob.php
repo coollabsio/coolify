@@ -279,7 +279,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->build_pack === 'dockerimage' && str($this->dockerImagePreviewTag)->isEmpty()) {
                 $this->dockerImagePreviewTag = $this->preview?->docker_registry_image_tag;
             }
-            if ($this->preview) {
+            if ($this->preview && blank($this->preview->fqdn)) {
                 if ($this->application->build_pack === 'dockercompose') {
                     $this->preview->generate_preview_fqdn_compose();
                 } else {

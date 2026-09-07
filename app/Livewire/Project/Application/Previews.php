@@ -138,7 +138,9 @@ class Previews extends Component
                         'docker_compose_domains' => $this->application->docker_compose_domains,
                     ]);
                 }
-                $found->generate_preview_fqdn_compose();
+                if (blank($found->fqdn)) {
+                    $found->generate_preview_fqdn_compose();
+                }
                 $this->application->refresh();
                 $this->syncDockerTags();
             } else {
@@ -156,7 +158,9 @@ class Previews extends Component
                     $found->docker_registry_image_tag = $docker_registry_image_tag;
                     $found->save();
                 }
-                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
+                if (blank($found->fqdn)) {
+                    $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
+                }
                 $this->application->refresh();
                 $this->syncDockerTags();
                 $this->dispatch('update_links');

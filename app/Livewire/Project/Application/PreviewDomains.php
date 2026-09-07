@@ -108,7 +108,7 @@ class PreviewDomains extends Component
                 $checkId,
                 $this->preview->application->additional_servers->count() > 0,
             );
-            $this->dispatch('success', 'Domain added. DNS check started.');
+            $this->dispatch('success', 'Domain added. DNS check started. Redeploy the preview to apply the changes.');
         } catch (\Throwable) {
             $this->domainRows[$index]['dns_status'] = 'skipped';
             $this->domainRows[$index]['dns_message'] = 'DNS check could not be started.';
@@ -145,7 +145,7 @@ class PreviewDomains extends Component
             $this->preview->generate_preview_fqdn(generateWithoutApplicationDomain: true);
         }
         $this->refreshDomains();
-        $this->dispatch('success', 'Domain generated.');
+        $this->dispatch('success', 'Domain generated. Redeploy the preview to apply the changes.');
     }
 
     public function startEdit(int $index): void
@@ -197,7 +197,7 @@ class PreviewDomains extends Component
         }
         $this->forceUseUnknownPort = false;
         $this->dispatch('close-preview-domain-edit', previewId: $this->preview->id);
-        $this->dispatch('success', 'Domain updated.');
+        $this->dispatch('success', 'Domain updated. Redeploy the preview to apply the changes.');
         $this->checkDomainDns($index);
     }
 
@@ -243,7 +243,7 @@ class PreviewDomains extends Component
         if (! $this->persistDomains()) {
             return;
         }
-        $this->dispatch('success', 'Domain removed.');
+        $this->dispatch('success', 'Domain removed. Redeploy the preview to apply the changes.');
     }
 
     public function removeDomainByKey(string $domainKey): void

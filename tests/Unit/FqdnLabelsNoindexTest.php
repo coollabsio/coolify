@@ -284,3 +284,27 @@ test('fqdnLabelsForCaddy keeps routing a legacy port-bearing FQDN without an ove
         ->toContain('caddy_0=https://legacy.example.com')
         ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
 });
+
+test('forced HTTPS does not leave a competing explicit HTTP route', function (bool $forceHttps) {
+    $domains = ['http://example.com:3000/api', 'https://example.com:8080/api', 'http://example.com/other', 'http://other.example.com/api'];
+    $traefik = traefikLabels($domains, forceHttps: $forceHttps);
+    $caddy = caddyLabels($domains, forceHttps: $forceHttps);
+
+    expect($traefik)->toContain('traefik.http.routers.https-1-testuuid.tls.certresolver=letsencrypt')
+        ->toContain('traefik.http.services.https-1-testuuid.loadbalancer.server.port=8080')
+        ->toContain('traefik.http.routers.http-2-testuuid.rule=Host(`example.com`) && PathPrefix(`/other`)')
+        ->toContain('traefik.http.routers.http-3-testuuid.rule=Host(`other.example.com`) && PathPrefix(`/api`)')
+        ->and($caddy)->toContain('caddy_2=http://example.com')
+        ->toContain('caddy_3=http://other.example.com');
+
+    if ($forceHttps) {
+        expect($traefik)->not->toContain('traefik.http.routers.http-0-testuuid.entryPoints=http')
+            ->toContain('traefik.http.routers.http-1-testuuid.middlewares=redirect-to-https')
+            ->and($caddy)->not->toContain('caddy_0=http://example.com')
+            ->toContain('caddy_1=https://example.com');
+    } else {
+        expect($traefik)->toContain('traefik.http.routers.http-0-testuuid.entryPoints=http')
+            ->and($caddy)->toContain('caddy_0=http://example.com')
+            ->toContain('caddy_1=http://example.com, https://example.com');
+    }
+})->with([false, true]);

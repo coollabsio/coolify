@@ -530,8 +530,25 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
+function filterHttpDomainsWithHttpsCounterpart(Collection $domains): Collection
+{
+    $httpsRoutes = $domains->map(fn (string $domain) => parseDomainUrlParts($domain))
+        ->filter(fn (?array $parts) => ($parts['scheme'] ?? null) === 'https')
+        ->mapWithKeys(fn (array $parts) => [strtolower($parts['host']).'|'.$parts['path'] => true]);
+
+    return $domains->reject(function (string $domain) use ($httpsRoutes): bool {
+        $parts = parseDomainUrlParts($domain);
+
+        return ($parts['scheme'] ?? null) === 'http'
+            && $httpsRoutes->has(strtolower($parts['host']).'|'.$parts['path']);
+    });
+}
+
 function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, array $domainPortOverrides = [])
 {
+    if ($is_force_https_enabled) {
+        $domains = filterHttpDomainsWithHttpsCounterpart($domains);
+    }
     $labels = collect([]);
     if ($serviceLabels) {
         $labels->push("caddy_ingress_network={$uuid}");
@@ -654,6 +671,9 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
 
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
 {
+    if ($is_force_https_enabled) {
+        $domains = filterHttpDomainsWithHttpsCounterpart($domains);
+    }
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {

@@ -3867,7 +3867,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if (count($docker_compose_domains) > 0) {
                                 $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                                 if ($found_fqdn) {
-                                    $fqdns = collect($found_fqdn);
+                                    $fqdns = str($found_fqdn)->explode(',')->map(fn ($domain) => trim($domain))->filter();
                                 } else {
                                     $fqdns = collect([]);
                                 }

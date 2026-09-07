@@ -21,6 +21,11 @@
     @if (collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking'))
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
     @endif
+    <x-callout type="info" title="Apply preview domains">
+        Redeploy the preview to apply domain changes and request HTTPS certificates.
+        HTTP to HTTPS redirects inherit the application setting.
+        Enable HTTP to HTTPS redirect in the application's Domains settings to redirect HTTP visitors.
+    </x-callout>
     <div class="flex flex-wrap items-center gap-2">
         <p class="min-w-0 flex-1 truncate text-[13px] text-neutral-500 dark:text-fg-dim">
             {{ count($domainRows) }} domain{{ count($domainRows) === 1 ? '' : 's' }}
