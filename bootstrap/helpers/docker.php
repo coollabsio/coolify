@@ -191,6 +191,17 @@ function format_docker_envs_to_json($rawOutput)
         return collect([]);
     }
 }
+/**
+ * Create an attachable bridge network with IPv6 enabled, so the proxy receives real IPv6 client addresses
+ * instead of the docker-proxy gateway IP. Falls back to IPv4-only when the daemon cannot allocate an IPv6 subnet.
+ */
+function dockerNetworkCreateCommand(string $network): string
+{
+    $safe = escapeshellarg($network);
+
+    return "docker network create --attachable --ipv6 {$safe} >/dev/null 2>&1 || docker network create --attachable {$safe} >/dev/null";
+}
+
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = (int) str($dockerVersion)->before('.')->value();
