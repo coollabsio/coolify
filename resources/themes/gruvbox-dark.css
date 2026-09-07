@@ -1,0 +1,62 @@
+/*
+ * Name: Gruvbox Dark
+ * Source palette: https://github.com/morhetz/gruvbox (MIT)
+ * Scope: html.dark  (applies in Dark, System-dark and Custom appearance; Light stays stock)
+ * Install: sudo cp gruvbox-dark.css /data/coolify/themes/custom.css && refresh
+ * Disable: sudo rm /data/coolify/themes/custom.css && refresh
+ */
+
+html.dark {
+    /* The Appearance page sets --theme-base-color inline; !important is needed to beat it. */
+    --theme-base-color: #fe8019 !important;
+    --theme-bright-color: #fe8019;
+    --theme-accent-foreground: #1d2021 !important;
+    --theme-scrollbar-thumb: #504945;
+    --theme-border-color: #504945;
+    --theme-placeholder-color: #928374;
+
+    /* accent */
+    --color-accent: #fe8019;
+    --color-accent-foreground: #1d2021;
+    --color-coollabs: #fe8019;
+    --color-coollabs-100: color-mix(in oklab, #fe8019 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #fe8019 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #fe8019 70%, black);
+    --color-warning: #fe8019; /* legacy accent utilities use "warning" as the brand color */
+
+    /* surfaces, darkest -> lightest */
+    --color-app: #1d2021;
+    --color-panel: #282828;
+    --color-surface: #32302f;
+    --color-raised: #3c3836;
+    --color-selected: #504945;
+    --color-coolgray-100: #32302f;
+    --color-coolgray-200: #3c3836;
+    --color-coolgray-300: #504945;
+    --color-coolgray-400: #504945;
+    --color-coolgray-500: color-mix(in oklab, #504945 85%, white);
+    --coollabs-canvas: #1d2021;
+    --coollabs-elevated: #32302f;
+    --coollabs-recessed: #3c3836;
+    --coollabs-base: #32302f;
+    --color-content-surface: #32302f;
+    --coollabs-fill: #504945;
+    --coollabs-line: #504945;
+    --coollabs-hairline: color-mix(in srgb, #504945 60%, #282828);
+    --color-hairline: color-mix(in srgb, #ebdbb2 10%, transparent);
+    --color-log: #1d2021;
+    --color-log-toolbar: #282828;
+
+    /* text */
+    --color-fg: #ebdbb2;
+    --color-fg-dim: #d5c4a1;
+    --color-fg-faint: #928374;
+    --coollabs-subtle: #d5c4a1;
+    --color-nav-text: #d5c4a1;
+    --color-nav-muted: #928374;
+    --color-nav-active: #ebdbb2;
+
+    /* status */
+    --color-success: #b8bb26;
+    --color-error: #fb4934;
+}

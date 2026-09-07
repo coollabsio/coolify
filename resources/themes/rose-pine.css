@@ -1,0 +1,62 @@
+/*
+ * Name: Rosé Pine
+ * Source palette: https://rosepinetheme.com (MIT)
+ * Scope: html.dark  (applies in Dark, System-dark and Custom appearance; Light stays stock)
+ * Install: sudo cp rose-pine.css /data/coolify/themes/custom.css && refresh
+ * Disable: sudo rm /data/coolify/themes/custom.css && refresh
+ */
+
+html.dark {
+    /* The Appearance page sets --theme-base-color inline; !important is needed to beat it. */
+    --theme-base-color: #c4a7e7 !important;
+    --theme-bright-color: #c4a7e7;
+    --theme-accent-foreground: #191724 !important;
+    --theme-scrollbar-thumb: #403d52;
+    --theme-border-color: #403d52;
+    --theme-placeholder-color: #6e6a86;
+
+    /* accent */
+    --color-accent: #c4a7e7;
+    --color-accent-foreground: #191724;
+    --color-coollabs: #c4a7e7;
+    --color-coollabs-100: color-mix(in oklab, #c4a7e7 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #c4a7e7 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #c4a7e7 70%, black);
+    --color-warning: #c4a7e7; /* legacy accent utilities use "warning" as the brand color */
+
+    /* surfaces, darkest -> lightest */
+    --color-app: #191724;
+    --color-panel: #1f1d2e;
+    --color-surface: #26233a;
+    --color-raised: #2a273f;
+    --color-selected: #403d52;
+    --color-coolgray-100: #26233a;
+    --color-coolgray-200: #2a273f;
+    --color-coolgray-300: #403d52;
+    --color-coolgray-400: #403d52;
+    --color-coolgray-500: color-mix(in oklab, #403d52 85%, white);
+    --coollabs-canvas: #191724;
+    --coollabs-elevated: #26233a;
+    --coollabs-recessed: #2a273f;
+    --coollabs-base: #26233a;
+    --color-content-surface: #26233a;
+    --coollabs-fill: #403d52;
+    --coollabs-line: #403d52;
+    --coollabs-hairline: color-mix(in srgb, #403d52 60%, #1f1d2e);
+    --color-hairline: color-mix(in srgb, #e0def4 10%, transparent);
+    --color-log: #191724;
+    --color-log-toolbar: #1f1d2e;
+
+    /* text */
+    --color-fg: #e0def4;
+    --color-fg-dim: #908caa;
+    --color-fg-faint: #6e6a86;
+    --coollabs-subtle: #908caa;
+    --color-nav-text: #908caa;
+    --color-nav-muted: #6e6a86;
+    --color-nav-active: #e0def4;
+
+    /* status */
+    --color-success: #9ccfd8;
+    --color-error: #eb6f92;
+}

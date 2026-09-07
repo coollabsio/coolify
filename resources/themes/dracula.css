@@ -1,0 +1,62 @@
+/*
+ * Name: Dracula
+ * Source palette: https://draculatheme.com (MIT)
+ * Scope: html.dark  (applies in Dark, System-dark and Custom appearance; Light stays stock)
+ * Install: sudo cp dracula.css /data/coolify/themes/custom.css && refresh
+ * Disable: sudo rm /data/coolify/themes/custom.css && refresh
+ */
+
+html.dark {
+    /* The Appearance page sets --theme-base-color inline; !important is needed to beat it. */
+    --theme-base-color: #bd93f9 !important;
+    --theme-bright-color: #bd93f9;
+    --theme-accent-foreground: #191a21 !important;
+    --theme-scrollbar-thumb: #44475a;
+    --theme-border-color: #44475a;
+    --theme-placeholder-color: #6272a4;
+
+    /* accent */
+    --color-accent: #bd93f9;
+    --color-accent-foreground: #191a21;
+    --color-coollabs: #bd93f9;
+    --color-coollabs-100: color-mix(in oklab, #bd93f9 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #bd93f9 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #bd93f9 70%, black);
+    --color-warning: #bd93f9; /* legacy accent utilities use "warning" as the brand color */
+
+    /* surfaces, darkest -> lightest */
+    --color-app: #191a21;
+    --color-panel: #21222c;
+    --color-surface: #282a36;
+    --color-raised: #343746;
+    --color-selected: #44475a;
+    --color-coolgray-100: #282a36;
+    --color-coolgray-200: #343746;
+    --color-coolgray-300: #44475a;
+    --color-coolgray-400: #44475a;
+    --color-coolgray-500: color-mix(in oklab, #44475a 85%, white);
+    --coollabs-canvas: #191a21;
+    --coollabs-elevated: #282a36;
+    --coollabs-recessed: #343746;
+    --coollabs-base: #282a36;
+    --color-content-surface: #282a36;
+    --coollabs-fill: #44475a;
+    --coollabs-line: #44475a;
+    --coollabs-hairline: color-mix(in srgb, #44475a 60%, #21222c);
+    --color-hairline: color-mix(in srgb, #f8f8f2 10%, transparent);
+    --color-log: #191a21;
+    --color-log-toolbar: #21222c;
+
+    /* text */
+    --color-fg: #f8f8f2;
+    --color-fg-dim: #d6d6d0;
+    --color-fg-faint: #6272a4;
+    --coollabs-subtle: #d6d6d0;
+    --color-nav-text: #d6d6d0;
+    --color-nav-muted: #6272a4;
+    --color-nav-active: #f8f8f2;
+
+    /* status */
+    --color-success: #50fa7b;
+    --color-error: #ff5555;
+}

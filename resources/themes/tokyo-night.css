@@ -1,0 +1,62 @@
+/*
+ * Name: Tokyo Night
+ * Source palette: https://github.com/enkia/tokyo-night-vscode-theme (MIT)
+ * Scope: html.dark  (applies in Dark, System-dark and Custom appearance; Light stays stock)
+ * Install: sudo cp tokyo-night.css /data/coolify/themes/custom.css && refresh
+ * Disable: sudo rm /data/coolify/themes/custom.css && refresh
+ */
+
+html.dark {
+    /* The Appearance page sets --theme-base-color inline; !important is needed to beat it. */
+    --theme-base-color: #7aa2f7 !important;
+    --theme-bright-color: #7aa2f7;
+    --theme-accent-foreground: #16161e !important;
+    --theme-scrollbar-thumb: #414868;
+    --theme-border-color: #414868;
+    --theme-placeholder-color: #565f89;
+
+    /* accent */
+    --color-accent: #7aa2f7;
+    --color-accent-foreground: #16161e;
+    --color-coollabs: #7aa2f7;
+    --color-coollabs-100: color-mix(in oklab, #7aa2f7 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #7aa2f7 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #7aa2f7 70%, black);
+    --color-warning: #7aa2f7; /* legacy accent utilities use "warning" as the brand color */
+
+    /* surfaces, darkest -> lightest */
+    --color-app: #16161e;
+    --color-panel: #1a1b26;
+    --color-surface: #1f2335;
+    --color-raised: #292e42;
+    --color-selected: #414868;
+    --color-coolgray-100: #1f2335;
+    --color-coolgray-200: #292e42;
+    --color-coolgray-300: #414868;
+    --color-coolgray-400: #414868;
+    --color-coolgray-500: color-mix(in oklab, #414868 85%, white);
+    --coollabs-canvas: #16161e;
+    --coollabs-elevated: #1f2335;
+    --coollabs-recessed: #292e42;
+    --coollabs-base: #1f2335;
+    --color-content-surface: #1f2335;
+    --coollabs-fill: #414868;
+    --coollabs-line: #414868;
+    --coollabs-hairline: color-mix(in srgb, #414868 60%, #1a1b26);
+    --color-hairline: color-mix(in srgb, #c0caf5 10%, transparent);
+    --color-log: #16161e;
+    --color-log-toolbar: #1a1b26;
+
+    /* text */
+    --color-fg: #c0caf5;
+    --color-fg-dim: #a9b1d6;
+    --color-fg-faint: #565f89;
+    --coollabs-subtle: #a9b1d6;
+    --color-nav-text: #a9b1d6;
+    --color-nav-muted: #565f89;
+    --color-nav-active: #c0caf5;
+
+    /* status */
+    --color-success: #9ece6a;
+    --color-error: #f7768e;
+}

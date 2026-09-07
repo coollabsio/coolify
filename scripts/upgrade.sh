@@ -174,6 +174,9 @@ mkdir -p /data/coolify/images/{avatars,project-icons}
 chown -R 9999:root /data/coolify/images
 chmod -R 700 /data/coolify/images
 
+# Optional custom stylesheet directory (mounted read-only into the app container)
+mkdir -p /data/coolify/themes
+
 # Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
 # Only changes owner — preserves existing group to respect custom setups
 SSH_OWNER=$(stat -c '%u' /data/coolify/ssh 2>/dev/null || echo "unknown")

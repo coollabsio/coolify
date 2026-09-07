@@ -1,0 +1,62 @@
+/*
+ * Name: Nord
+ * Source palette: https://www.nordtheme.com (MIT)
+ * Scope: html.dark  (applies in Dark, System-dark and Custom appearance; Light stays stock)
+ * Install: sudo cp nord.css /data/coolify/themes/custom.css && refresh
+ * Disable: sudo rm /data/coolify/themes/custom.css && refresh
+ */
+
+html.dark {
+    /* The Appearance page sets --theme-base-color inline; !important is needed to beat it. */
+    --theme-base-color: #88c0d0 !important;
+    --theme-bright-color: #88c0d0;
+    --theme-accent-foreground: #2e3440 !important;
+    --theme-scrollbar-thumb: #4c566a;
+    --theme-border-color: #4c566a;
+    --theme-placeholder-color: #7b88a1;
+
+    /* accent */
+    --color-accent: #88c0d0;
+    --color-accent-foreground: #2e3440;
+    --color-coollabs: #88c0d0;
+    --color-coollabs-100: color-mix(in oklab, #88c0d0 85%, white);
+    --color-coollabs-200: color-mix(in oklab, #88c0d0 85%, black);
+    --color-coollabs-300: color-mix(in oklab, #88c0d0 70%, black);
+    --color-warning: #88c0d0; /* legacy accent utilities use "warning" as the brand color */
+
+    /* surfaces, darkest -> lightest */
+    --color-app: #242933;
+    --color-panel: #2e3440;
+    --color-surface: #3b4252;
+    --color-raised: #434c5e;
+    --color-selected: #4c566a;
+    --color-coolgray-100: #3b4252;
+    --color-coolgray-200: #434c5e;
+    --color-coolgray-300: #4c566a;
+    --color-coolgray-400: #4c566a;
+    --color-coolgray-500: color-mix(in oklab, #4c566a 85%, white);
+    --coollabs-canvas: #242933;
+    --coollabs-elevated: #3b4252;
+    --coollabs-recessed: #434c5e;
+    --coollabs-base: #3b4252;
+    --color-content-surface: #3b4252;
+    --coollabs-fill: #4c566a;
+    --coollabs-line: #4c566a;
+    --coollabs-hairline: color-mix(in srgb, #4c566a 60%, #2e3440);
+    --color-hairline: color-mix(in srgb, #eceff4 10%, transparent);
+    --color-log: #242933;
+    --color-log-toolbar: #2e3440;
+
+    /* text */
+    --color-fg: #eceff4;
+    --color-fg-dim: #d8dee9;
+    --color-fg-faint: #7b88a1;
+    --coollabs-subtle: #d8dee9;
+    --color-nav-text: #d8dee9;
+    --color-nav-muted: #7b88a1;
+    --color-nav-active: #eceff4;
+
+    /* status */
+    --color-success: #a3be8c;
+    --color-error: #bf616a;
+}
