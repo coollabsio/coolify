@@ -10,13 +10,20 @@ class StartSentinel
 {
     use AsAction;
 
+    public static function trafficLogDirectory(Server $server): string
+    {
+        return isDev()
+            ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy'
+            : rtrim($server->proxyPath(), '/');
+    }
+
     public static function sentinelTrafficEnvironment(Server $server): array
     {
         if (! $server->isTrafficAnalyticsEnabled()) {
             return [];
         }
 
-        $logPath = rtrim($server->proxyPath(), '/').'/access.log';
+        $logPath = self::trafficLogDirectory($server).'/access.log';
         $settings = $server->settings;
         $env = [
             'TRAFFIC_ENABLED' => 'true',
@@ -76,8 +83,9 @@ class StartSentinel
         }
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
+        $trafficLogDirectory = self::trafficLogDirectory($server);
         $trafficMount = $server->isTrafficAnalyticsEnabled()
-            ? '-v '.escapeshellarg($server->proxyPath().':'.$server->proxyPath().':ro').' '
+            ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $dockerCommand = "docker run -d $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 

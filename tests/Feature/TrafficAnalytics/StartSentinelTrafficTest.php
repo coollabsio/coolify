@@ -40,6 +40,18 @@ it('produces traffic + geoip env when enabled', function () {
     expect($env)->toHaveKey('TRAFFIC_ACCESS_LOG_PATH');
 });
 
+it('uses the dev proxy volume for traffic logs locally', function () {
+    config()->set('app.env', 'local');
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    expect(StartSentinel::trafficLogDirectory($server->fresh()))
+        ->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy');
+    expect(StartSentinel::sentinelTrafficEnvironment($server->fresh())['TRAFFIC_ACCESS_LOG_PATH'])
+        ->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/access.log');
+});
+
 it('passes custom traffic settings as sentinel env', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $server->settings->is_traffic_analytics_enabled = true;
