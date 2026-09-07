@@ -262,9 +262,8 @@
                 @elseif (request()->user()->two_factor_confirmed_at)
                     <div class="flex flex-col gap-4">
                         <x-callout type="success" title="Two-factor authentication is enabled">
-                            Enabled {{ \Carbon\Carbon::parse(request()->user()->two_factor_confirmed_at)->diffForHumans() }}. A code from your
-                            authenticator app is required at every sign-in. Keep your recovery codes somewhere safe -
-                            they are the only way in if you lose the device.
+                            Enabled {{ \Carbon\Carbon::parse(request()->user()->two_factor_confirmed_at)->diffForHumans() }}.
+                            Keep your recovery codes somewhere safe - they are the only way in if you lose the device.
                         </x-callout>
                         <div class="flex flex-wrap items-center justify-end gap-2">
                             <form action="/user/two-factor-recovery-codes" method="POST">
