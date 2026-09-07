@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class CloudProviderToken extends BaseModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'team_id',
         'provider',
@@ -25,9 +29,19 @@ class CloudProviderToken extends BaseModel
         return $this->hasMany(Server::class);
     }
 
+    public function cloudflareDnsServerSettings()
+    {
+        return $this->hasMany(ServerSetting::class, 'cloudflare_dns_token_id');
+    }
+
     public function hasServers(): bool
     {
         return $this->servers()->exists();
+    }
+
+    public function isUsed(): bool
+    {
+        return $this->hasServers() || $this->cloudflareDnsServerSettings()->exists();
     }
 
     public static function ownedByCurrentTeam(array $select = ['*'])

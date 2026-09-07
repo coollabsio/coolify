@@ -45,6 +45,36 @@
                             helper="Maximum number of queued deployments allowed. New deployments will be rejected with a 429 status when the limit is reached." />
                     </div>
                 </div>
+
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-2">
+                        <h3>Cloudflare DNS</h3>
+                        <x-forms.button canGate="update" :canResource="$server" type="button"
+                            wire:click.prevent="checkCloudflareDns">
+                            Check DNS now
+                        </x-forms.button>
+                    </div>
+                    <div class="pb-4 text-sm text-neutral-500 dark:text-neutral-400">
+                        Let Coolify create or update A/AAAA records for application domains on this server.
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <x-forms.checkbox canGate="update" :canResource="$server" id="cloudflareDnsEnabled"
+                            label="Enable Cloudflare DNS management" />
+                        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
+                            <x-forms.select canGate="update" :canResource="$server" id="cloudflareDnsTokenId"
+                                label="Cloudflare Integration Token"
+                                helper="Create a Cloudflare token with Zone Read and DNS Write permissions.">
+                                <option value="">Select a token</option>
+                                @foreach ($cloudflareTokens as $token)
+                                    <option value="{{ $token->id }}">{{ $token->name }}</option>
+                                @endforeach
+                            </x-forms.select>
+                        </div>
+                        <x-forms.checkbox canGate="update" :canResource="$server" id="cloudflareDnsProxied"
+                            label="Enable Cloudflare proxy (orange cloud)"
+                            helper="Off by default. When enabled, Cloudflare will proxy supported DNS records." />
+                    </div>
+                </div>
             </div>
         </form>
     </div>

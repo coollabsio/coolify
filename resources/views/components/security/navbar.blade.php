@@ -8,7 +8,7 @@
             </a>
             @can('viewAny', App\Models\CloudProviderToken::class)
                 <a href="{{ route('security.cloud-tokens') }}" {{ wireNavigate() }}>
-                    <button>Cloud Tokens</button>
+                    <button>Integration Tokens</button>
                 </a>
             @endcan
             @can('viewAny', App\Models\CloudInitScript::class)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CloudProviderToken;
+use App\Services\CloudflareDnsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -37,8 +38,13 @@ class CloudProviderTokensController extends Controller
                 'digitalocean' => Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.digitalocean.com/v2/account'),
+                'cloudflare' => null,
                 default => null,
             };
+
+            if ($provider === 'cloudflare') {
+                return (new CloudflareDnsService($token))->validateToken();
+            }
 
             if ($response === null) {
                 return ['valid' => false, 'error' => 'Unsupported provider.'];
@@ -50,7 +56,7 @@ class CloudProviderTokensController extends Controller
 
             return ['valid' => false, 'error' => "Invalid {$provider} token. Please check your API token."];
         } catch (\Throwable $e) {
-            Log::error('Failed to validate cloud provider token', [
+            Log::error('Failed to validate integration token', [
                 'provider' => $provider,
                 'exception' => $e->getMessage(),
             ]);
@@ -60,18 +66,18 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Get(
-        summary: 'List Cloud Provider Tokens',
-        description: 'List all cloud provider tokens for the authenticated team.',
+        summary: 'List Integration Tokens',
+        description: 'List all integration tokens for the authenticated team.',
         path: '/cloud-tokens',
         operationId: 'list-cloud-tokens',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all cloud provider tokens.',
+                description: 'Get all integration tokens.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -82,7 +88,7 @@ class CloudProviderTokensController extends Controller
                                 properties: [
                                     'uuid' => ['type' => 'string'],
                                     'name' => ['type' => 'string'],
-                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean']],
+                                    'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'cloudflare']],
                                     'team_id' => ['type' => 'integer'],
                                     'servers_count' => ['type' => 'integer'],
                                     'created_at' => ['type' => 'string'],
@@ -120,21 +126,21 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Get(
-        summary: 'Get Cloud Provider Token',
-        description: 'Get cloud provider token by UUID.',
+        summary: 'Get Integration Token',
+        description: 'Get integration token by UUID.',
         path: '/cloud-tokens/{uuid}',
         operationId: 'get-cloud-token-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Token UUID', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get cloud provider token by UUID',
+                description: 'Get integration token by UUID',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -182,14 +188,14 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create Cloud Provider Token',
-        description: 'Create a new cloud provider token. The token will be validated before being stored.',
+        summary: 'Create Integration Token',
+        description: 'Create a new integration token. The token will be validated before being stored.',
         path: '/cloud-tokens',
         operationId: 'create-cloud-token',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Cloud provider token details',
@@ -199,7 +205,7 @@ class CloudProviderTokensController extends Controller
                     type: 'object',
                     required: ['provider', 'token', 'name'],
                     properties: [
-                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean'], 'example' => 'hetzner', 'description' => 'The cloud provider.'],
+                        'provider' => ['type' => 'string', 'enum' => ['hetzner', 'digitalocean', 'cloudflare'], 'example' => 'cloudflare', 'description' => 'The integration provider.'],
                         'token' => ['type' => 'string', 'example' => 'your-api-token-here', 'description' => 'The API token for the cloud provider.'],
                         'name' => ['type' => 'string', 'example' => 'My Hetzner Token', 'description' => 'A friendly name for the token.'],
                     ],
@@ -253,7 +259,7 @@ class CloudProviderTokensController extends Controller
         $body = $request->json()->all();
 
         $validator = customApiValidator($body, [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,cloudflare',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ]);
@@ -300,14 +306,14 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Patch(
-        summary: 'Update Cloud Provider Token',
-        description: 'Update cloud provider token name.',
+        summary: 'Update Integration Token',
+        description: 'Update integration token name.',
         path: '/cloud-tokens/{uuid}',
         operationId: 'update-cloud-token-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Token UUID', schema: new OA\Schema(type: 'string')),
         ],
@@ -411,19 +417,19 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Delete(
-        summary: 'Delete Cloud Provider Token',
-        description: 'Delete cloud provider token by UUID. Cannot delete if token is used by any servers.',
+        summary: 'Delete Integration Token',
+        description: 'Delete integration token by UUID. Cannot delete if token is used by any servers.',
         path: '/cloud-tokens/{uuid}',
         operationId: 'delete-cloud-token-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         parameters: [
             new OA\Parameter(
                 name: 'uuid',
                 in: 'path',
-                description: 'UUID of the cloud provider token.',
+                description: 'UUID of the integration token.',
                 required: true,
                 schema: new OA\Schema(
                     type: 'string',
@@ -476,8 +482,8 @@ class CloudProviderTokensController extends Controller
             return response()->json(['message' => 'Cloud provider token not found.'], 404);
         }
 
-        if ($token->hasServers()) {
-            return response()->json(['message' => 'Cannot delete token that is used by servers.'], 400);
+        if ($token->isUsed()) {
+            return response()->json(['message' => 'Cannot delete token that is used by servers or Cloudflare DNS settings.'], 400);
         }
 
         $tokenUuid = $token->uuid;
@@ -496,14 +502,14 @@ class CloudProviderTokensController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Validate Cloud Provider Token',
-        description: 'Validate a cloud provider token against the provider API.',
+        summary: 'Validate Integration Token',
+        description: 'Validate a integration token against the provider API.',
         path: '/cloud-tokens/{uuid}/validate',
         operationId: 'validate-cloud-token-by-uuid',
         security: [
             ['bearerAuth' => []],
         ],
-        tags: ['Cloud Tokens'],
+        tags: ['Integration Tokens'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Token UUID', schema: new OA\Schema(type: 'string')),
         ],

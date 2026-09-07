@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CloudProviderToken;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -159,6 +160,32 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonStructure(['uuid']);
     });
 
+    test('creates a Cloudflare integration token', function () {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true], 200),
+            'https://api.cloudflare.com/client/v4/zones*' => Http::response(['success' => true, 'result' => []], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/cloud-tokens', [
+            'provider' => 'cloudflare',
+            'token' => 'test-cloudflare-token',
+            'name' => 'My Cloudflare Token',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['uuid']);
+
+        $this->assertDatabaseHas('cloud_provider_tokens', [
+            'team_id' => $this->team->id,
+            'provider' => 'cloudflare',
+            'name' => 'My Cloudflare Token',
+        ]);
+    });
+
     test('validates provider is required', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
@@ -198,7 +225,7 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonValidationErrors(['name']);
     });
 
-    test('validates provider must be hetzner or digitalocean', function () {
+    test('validates provider must be supported', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
@@ -343,6 +370,27 @@ describe('DELETE /api/v1/cloud-tokens/{uuid}', function () {
         $response->assertStatus(404);
     });
 
+    test('cannot delete token used by Cloudflare DNS settings', function () {
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'cloudflare',
+        ]);
+        $server = Server::factory()->create([
+            'team_id' => $this->team->id,
+        ]);
+        $server->settings->update([
+            'cloudflare_dns_enabled' => true,
+            'cloudflare_dns_token_id' => $token->id,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->deleteJson("/api/v1/cloud-tokens/{$token->uuid}");
+
+        $response->assertStatus(400);
+    });
+
     test('returns 404 for non-existent token', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
@@ -400,6 +448,27 @@ describe('POST /api/v1/cloud-tokens/{uuid}/validate', function () {
 
         Http::fake([
             'https://api.digitalocean.com/v2/account' => Http::response([], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/cloud-tokens/{$token->uuid}/validate");
+
+        $response->assertStatus(200);
+        $response->assertJson(['valid' => true, 'message' => 'Token is valid.']);
+    });
+
+    test('validates a valid Cloudflare token', function () {
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'cloudflare',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true], 200),
+            'https://api.cloudflare.com/client/v4/zones*' => Http::response(['success' => true, 'result' => []], 200),
         ]);
 
         $response = $this->withHeaders([

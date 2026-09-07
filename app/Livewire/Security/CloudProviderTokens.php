@@ -3,6 +3,7 @@
 namespace App\Livewire\Security;
 
 use App\Models\CloudProviderToken;
+use App\Services\CloudflareDnsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -50,6 +51,13 @@ class CloudProviderTokens extends Component
                 } else {
                     $this->dispatch('error', 'DigitalOcean token validation failed. Please check the token.');
                 }
+            } elseif ($token->provider === 'cloudflare') {
+                $validation = (new CloudflareDnsService($token->token))->validateToken();
+                if ($validation['valid']) {
+                    $this->dispatch('success', 'Cloudflare token is valid.');
+                } else {
+                    $this->dispatch('error', $validation['error'] ?? 'Cloudflare token validation failed. Please check the token.');
+                }
             } else {
                 $this->dispatch('error', 'Unknown provider.');
             }
@@ -91,9 +99,10 @@ class CloudProviderTokens extends Component
             $this->authorize('delete', $token);
 
             // Check if any servers are using this token
-            if ($token->hasServers()) {
+            if ($token->isUsed()) {
                 $serverCount = $token->servers()->count();
-                $this->dispatch('error', "Cannot delete this token. It is currently used by {$serverCount} server(s). Please reassign those servers to a different token first.");
+                $dnsServerCount = $token->cloudflareDnsServerSettings()->count();
+                $this->dispatch('error', "Cannot delete this token. It is currently used by {$serverCount} server(s) and {$dnsServerCount} Cloudflare DNS configuration(s). Please reassign them first.");
 
                 return;
             }
@@ -101,7 +110,7 @@ class CloudProviderTokens extends Component
             $token->delete();
             $this->loadTokens();
 
-            $this->dispatch('success', 'Cloud provider token deleted successfully.');
+            $this->dispatch('success', 'Integration token deleted successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

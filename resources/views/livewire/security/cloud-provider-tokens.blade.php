@@ -1,6 +1,6 @@
 <div>
-    <h2>Cloud Provider Tokens</h2>
-    <div class="pb-4">Manage API tokens for cloud providers (Hetzner, DigitalOcean, etc.).</div>
+    <h2>Integration Tokens</h2>
+    <div class="pb-4">Manage API tokens for third-party integrations (Hetzner, DigitalOcean, Cloudflare, etc.).</div>
 
     <h3>New Token</h3>
     @can('create', App\Models\CloudProviderToken::class)
@@ -30,8 +30,8 @@
                     @can('delete', $savedToken)
                         <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete"
                             submitAction="deleteToken({{ $savedToken->id }})" :actions="[
-                                'This cloud provider token will be permanently deleted.',
-                                'Any servers using this token will need to be reconfigured.',
+                'This integration token will be permanently deleted.',
+                'Any servers or Cloudflare DNS settings using this token will need to be reconfigured.',
                             ]"
                             confirmationText="{{ $savedToken->name }}"
                             confirmationLabel="Please confirm the deletion by entering the token name below"
@@ -41,7 +41,7 @@
             </div>
         @empty
             <div>
-                <div>No cloud provider tokens found.</div>
+                <div>No integration tokens found.</div>
             </div>
         @endforelse
     </div>

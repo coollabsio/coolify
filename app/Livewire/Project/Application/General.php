@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\GenerateConfig;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Services\CloudflareDnsService;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -696,6 +697,7 @@ class General extends Component
         if ($this->fqdn) {
             $domains = str($this->fqdn)->trim()->explode(',');
             if ($this->application->additional_servers->count() === 0) {
+                $this->ensureCloudflareDns($domains->all(), $showToaster);
                 foreach ($domains as $domain) {
                     if (! validateDNSEntry($domain, $this->application->destination->server)) {
                         $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
@@ -869,6 +871,7 @@ class General extends Component
                     foreach ($this->parsedServiceDomains as $service) {
                         $domain = data_get($service, 'domain');
                         if ($domain) {
+                            $this->ensureCloudflareDns(str($domain)->explode(',')->all(), $showToaster);
                             if (! validateDNSEntry($domain, $this->application->destination->server)) {
                                 $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                             }
@@ -904,6 +907,27 @@ class General extends Component
             return handleError($e, $this);
         } finally {
             $this->dispatch('configurationChanged');
+        }
+    }
+
+    private function ensureCloudflareDns(array $domains, bool $showToaster = true): void
+    {
+        $server = $this->application->destination->server;
+        $service = CloudflareDnsService::forServer($server);
+
+        if (! $service) {
+            return;
+        }
+
+        $results = $service->ensureRecordsForDomains(
+            server: $server,
+            domains: $domains,
+            proxied: (bool) $server->settings->cloudflare_dns_proxied,
+        );
+
+        $changed = collect($results)->whereIn('action', ['created', 'updated'])->count();
+        if ($showToaster && $changed > 0) {
+            $this->dispatch('success', "Cloudflare DNS updated for {$changed} domain(s).");
         }
     }
 

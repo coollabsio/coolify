@@ -2,6 +2,7 @@
 
 use App\Livewire\Project\Application\General;
 use App\Models\Application;
+use App\Models\CloudProviderToken;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -11,6 +12,8 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -83,4 +86,61 @@ test('existing application shows railpack beta badge in build helper copy', func
         ->assertSuccessful()
         ->assertSee('Railpack')
         ->assertSee('Beta');
+});
+
+test('saving application domains creates missing Cloudflare DNS records when enabled on server', function () {
+    $token = CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+    ]);
+    $this->server->settings->update([
+        'cloudflare_dns_enabled' => true,
+        'cloudflare_dns_token_id' => $token->id,
+        'cloudflare_dns_proxied' => false,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake(function (Request $request) {
+        parse_str(parse_url($request->url(), PHP_URL_QUERY) ?: '', $query);
+        $zoneName = $query['name'] ?? null;
+
+        if (str_contains($request->url(), '/zones?') && $zoneName === 'app.example.com') {
+            return Http::response(['success' => true, 'result' => []], 200);
+        }
+
+        if (str_contains($request->url(), '/zones?') && $zoneName === 'example.com') {
+            return Http::response(['success' => true, 'result' => [['id' => 'zone-id', 'name' => 'example.com']]], 200);
+        }
+
+        if ($request->method() === 'GET' && str_contains($request->url(), '/zones/zone-id/dns_records')) {
+            return Http::response(['success' => true, 'result' => []], 200);
+        }
+
+        if ($request->method() === 'POST' && str_contains($request->url(), '/zones/zone-id/dns_records')) {
+            return Http::response(['success' => true, 'result' => ['id' => 'record-id']], 200);
+        }
+
+        return Http::response(['success' => false], 500);
+    });
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'nixpacks',
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+
+    Livewire::test(General::class, ['application' => $application])
+        ->set('fqdn', 'https://app.example.com')
+        ->call('submit')
+        ->assertDispatched('success');
+
+    Http::assertSent(fn (Request $request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/zones/zone-id/dns_records')
+        && $request['name'] === 'app.example.com'
+        && $request['content'] === $this->server->ip);
 });

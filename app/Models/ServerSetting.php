@@ -64,6 +64,9 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
+        'cloudflare_dns_enabled',
+        'cloudflare_dns_token_id',
+        'cloudflare_dns_proxied',
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
@@ -112,6 +115,8 @@ class ServerSetting extends Model
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'cloudflare_dns_enabled' => 'boolean',
+        'cloudflare_dns_proxied' => 'boolean',
     ];
 
     protected static function booted()
@@ -232,6 +237,11 @@ class ServerSetting extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function cloudflareDnsToken()
+    {
+        return $this->belongsTo(CloudProviderToken::class, 'cloudflare_dns_token_id');
     }
 
     public function dockerCleanupFrequency(): Attribute

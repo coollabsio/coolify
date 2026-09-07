@@ -3,6 +3,7 @@
 namespace App\Livewire\Security;
 
 use App\Models\CloudProviderToken;
+use App\Services\CloudflareDnsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
 use Livewire\Component;
@@ -27,7 +28,7 @@ class CloudProviderTokenForm extends Component
     protected function rules(): array
     {
         return [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,cloudflare',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
         ];
@@ -36,8 +37,8 @@ class CloudProviderTokenForm extends Component
     protected function messages(): array
     {
         return [
-            'provider.required' => 'Please select a cloud provider.',
-            'provider.in' => 'Invalid cloud provider selected.',
+            'provider.required' => 'Please select an integration provider.',
+            'provider.in' => 'Invalid integration provider selected.',
             'token.required' => 'API token is required.',
             'name.required' => 'Token name is required.',
         ];
@@ -50,13 +51,21 @@ class CloudProviderTokenForm extends Component
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-                ray($response);
 
                 return $response->successful();
             }
 
-            // Add other providers here in the future
-            // if ($provider === 'digitalocean') { ... }
+            if ($provider === 'digitalocean') {
+                $response = Http::withToken($token)
+                    ->timeout(10)
+                    ->get('https://api.digitalocean.com/v2/account');
+
+                return $response->successful();
+            }
+
+            if ($provider === 'cloudflare') {
+                return (new CloudflareDnsService($token))->validateToken()['valid'];
+            }
 
             return false;
         } catch (\Throwable $e) {
@@ -86,7 +95,7 @@ class CloudProviderTokenForm extends Component
             // Dispatch event with token ID so parent components can react
             $this->dispatch('tokenAdded', tokenId: $savedToken->id);
 
-            $this->dispatch('success', 'Cloud provider token added successfully.');
+            $this->dispatch('success', 'Integration token added successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

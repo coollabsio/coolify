@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\CloudflareDnsService;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -300,6 +301,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         try {
+            $this->ensureCloudflareDnsRecords();
+
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
             // Generate custom host<->ip mapping
@@ -403,6 +406,31 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 // Log but don't fail - event dispatch errors shouldn't prevent status updates
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
             }
+        }
+    }
+
+    private function ensureCloudflareDnsRecords(): void
+    {
+        $service = CloudflareDnsService::forServer($this->server);
+        if (! $service) {
+            return;
+        }
+
+        $domains = $service->domainsForApplication($this->application, $this->preview);
+        if (empty($domains)) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Checking Cloudflare DNS records.');
+
+        $results = $service->ensureRecordsForDomains(
+            server: $this->server,
+            domains: $domains,
+            proxied: (bool) $this->server->settings->cloudflare_dns_proxied,
+        );
+
+        foreach ($results as $result) {
+            $this->application_deployment_queue->addLogEntry("Cloudflare DNS {$result['action']}: {$result['host']} -> {$result['content']}");
         }
     }
 
