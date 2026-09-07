@@ -33,6 +33,9 @@ class DeleteService
                     }
                 }
                 foreach ($storagesToDelete as $storage) {
+                    if ($storage->is_external || $storage->is_name_as_is) {
+                        continue;
+                    }
                     $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
                 }
 

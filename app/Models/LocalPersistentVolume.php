@@ -14,10 +14,14 @@ class LocalPersistentVolume extends BaseModel
         'container_id',
         'resource_type',
         'resource_id',
+        'is_external',
+        'is_name_as_is',
         'is_preview_suffix_enabled',
     ];
 
     protected $casts = [
+        'is_external' => 'boolean',
+        'is_name_as_is' => 'boolean',
         'is_preview_suffix_enabled' => 'boolean',
     ];
 
@@ -39,6 +43,44 @@ class LocalPersistentVolume extends BaseModel
     public function database()
     {
         return $this->morphTo('resource');
+    }
+
+    /** @return array{name: string, external: bool} */
+    public function dockerComposeVolumeDefinition(?string $name = null): array
+    {
+        return [
+            'name' => $name ?? $this->name,
+            'external' => $this->is_external,
+        ];
+    }
+
+    public function shouldCopyDataWhenCloning(bool $copyData, Server $sourceServer, Server $targetServer): bool
+    {
+        if (! $copyData || $this->is_external) {
+            return false;
+        }
+
+        return ! $this->is_name_as_is || $sourceServer->id !== $targetServer->id;
+    }
+
+    public function ensureCloneTargetIsAvailable(bool $copyData, Server $sourceServer, Server $targetServer): void
+    {
+        if (! $this->is_name_as_is || ! $this->shouldCopyDataWhenCloning($copyData, $sourceServer, $targetServer)) {
+            return;
+        }
+
+        $volumeName = escapeshellarg($this->name);
+        $targetVolumeState = instant_remote_process([
+            "volume_names=\$(docker volume ls --format '{{.Name}}') || exit \$?",
+            "if printf '%s\\n' \"\$volume_names\" | grep -Fqx -- {$volumeName}; then echo __COOLIFY_VOLUME_PRESENT__; else echo __COOLIFY_VOLUME_ABSENT__; fi",
+        ], $targetServer);
+
+        if ($targetVolumeState === '__COOLIFY_VOLUME_PRESENT__') {
+            throw new \RuntimeException("Volume {$this->name} already exists on the target server.");
+        }
+        if ($targetVolumeState !== '__COOLIFY_VOLUME_ABSENT__') {
+            throw new \RuntimeException("Could not determine whether volume {$this->name} exists on the target server.");
+        }
     }
 
     protected function customizeName($value)

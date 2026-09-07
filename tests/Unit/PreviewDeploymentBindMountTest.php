@@ -115,7 +115,8 @@ describe('parser structure: bind mount handling', function () {
         $parsersFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
 
         $volumeBlockStart = strpos($parsersFile, "} elseif (\$type->value() === 'volume')");
-        $volumeBlock = substr($parsersFile, $volumeBlockStart, 1000);
+        $volumeBlockEnd = strpos($parsersFile, 'dispatch(new ServerFilesFromServerJob', $volumeBlockStart);
+        $volumeBlock = substr($parsersFile, $volumeBlockStart, $volumeBlockEnd - $volumeBlockStart);
 
         expect($volumeBlock)->toContain('addPreviewDeploymentSuffix');
     });

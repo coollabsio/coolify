@@ -88,6 +88,10 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
                 $this->resource->getMorphClass() === StandaloneClickhouse::class
             ) {
+                $sourceServer = $this->resource->destination->server;
+                foreach ($this->resource->persistentStorages as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $sourceServer, $server);
+                }
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
                     'id',
@@ -113,7 +117,9 @@ class ResourceOperations extends Component
                     $originalName = $volume->name;
                     $newName = '';
 
-                    if (str_starts_with($originalName, 'postgres-data-')) {
+                    if ($volume->is_external || $volume->is_name_as_is) {
+                        $newName = $originalName;
+                    } elseif (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
                         $newName = 'mysql-data-'.$new_resource->uuid;
@@ -148,14 +154,13 @@ class ResourceOperations extends Component
                     ]);
                     $newPersistentVolume->save();
 
-                    if ($this->cloneVolumeData) {
+                    $sourceServer = $this->resource->destination->server;
+                    $targetServer = $new_resource->destination->server;
+                    if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                         try {
                             StopDatabase::dispatch($this->resource);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $this->resource->destination->server;
-                            $targetServer = $new_resource->destination->server;
-
                             VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             StartDatabase::dispatch($this->resource);
@@ -215,6 +220,17 @@ class ResourceOperations extends Component
 
                 return redirect()->to($route);
             } elseif ($this->resource->type() === 'service') {
+                $sourceServer = $this->resource->server;
+                foreach ($this->resource->applications()->get() as $application) {
+                    foreach ($application->persistentStorages as $volume) {
+                        $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $sourceServer, $server);
+                    }
+                }
+                foreach ($this->resource->databases()->get() as $database) {
+                    foreach ($database->persistentStorages as $volume) {
+                        $volume->ensureCloneTargetIsAvailable($this->cloneVolumeData, $sourceServer, $server);
+                    }
+                }
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
                     'id',
@@ -270,7 +286,9 @@ class ResourceOperations extends Component
                     $persistentVolumes = $application->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $volume->resource->uuid)) {
+                        if ($volume->is_external || $volume->is_name_as_is) {
+                            $newName = $volume->name;
+                        } elseif (str_starts_with($volume->name, $volume->resource->uuid)) {
                             $newName = str($volume->name)->replace($volume->resource->uuid, $application->uuid);
                         } else {
                             $newName = $application->uuid.'-'.str($volume->name)->afterLast('-');
@@ -287,14 +305,13 @@ class ResourceOperations extends Component
                         ]);
                         $newPersistentVolume->save();
 
-                        if ($this->cloneVolumeData) {
+                        $sourceServer = $application->service->destination->server;
+                        $targetServer = $new_resource->destination->server;
+                        if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                             try {
                                 StopService::dispatch($application);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $application->service->destination->server;
-                                $targetServer = $new_resource->destination->server;
-
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($application);
@@ -313,7 +330,9 @@ class ResourceOperations extends Component
                     $persistentVolumes = $database->persistentStorages()->get();
                     foreach ($persistentVolumes as $volume) {
                         $newName = '';
-                        if (str_starts_with($volume->name, $volume->resource->uuid)) {
+                        if ($volume->is_external || $volume->is_name_as_is) {
+                            $newName = $volume->name;
+                        } elseif (str_starts_with($volume->name, $volume->resource->uuid)) {
                             $newName = str($volume->name)->replace($volume->resource->uuid, $database->uuid);
                         } else {
                             $newName = $database->uuid.'-'.str($volume->name)->afterLast('-');
@@ -330,14 +349,13 @@ class ResourceOperations extends Component
                         ]);
                         $newPersistentVolume->save();
 
-                        if ($this->cloneVolumeData) {
+                        $sourceServer = $database->service->destination->server;
+                        $targetServer = $new_resource->destination->server;
+                        if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData, $sourceServer, $targetServer)) {
                             try {
                                 StopService::dispatch($database->service);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $sourceServer = $database->service->destination->server;
-                                $targetServer = $new_resource->destination->server;
-
                                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($database->service);

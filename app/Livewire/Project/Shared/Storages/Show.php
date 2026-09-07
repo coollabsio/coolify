@@ -32,6 +32,10 @@ class Show extends Component
 
     public bool $isPreviewSuffixEnabled = true;
 
+    public bool $isNameAsIs = false;
+
+    public bool $canUseNameAsIs = false;
+
     protected $validationAttributes = [
         'name' => 'name',
         'mountPath' => 'mount',
@@ -45,6 +49,7 @@ class Show extends Component
             'mountPath' => ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'hostPath' => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'isPreviewSuffixEnabled' => 'required|boolean',
+            'isNameAsIs' => 'required|boolean',
         ];
     }
 
@@ -72,12 +77,14 @@ class Show extends Component
             $this->storage->mount_path = $this->mountPath;
             $this->storage->host_path = $this->hostPath;
             $this->storage->is_preview_suffix_enabled = $this->isPreviewSuffixEnabled;
+            $this->storage->is_name_as_is = $this->isNameAsIs;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->storage->name;
             $this->mountPath = $this->storage->mount_path;
             $this->hostPath = $this->storage->host_path;
             $this->isPreviewSuffixEnabled = $this->storage->is_preview_suffix_enabled ?? true;
+            $this->isNameAsIs = $this->storage->is_name_as_is ?? false;
         }
     }
 
@@ -85,12 +92,14 @@ class Show extends Component
     {
         $this->syncData(false);
         $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
+        $this->canUseNameAsIs = $this->supportsNameAsIs();
     }
 
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
         $this->validate();
+        $this->enforceNameAsIsSupport();
 
         $this->syncData(true);
         $this->storage->save();
@@ -102,6 +111,7 @@ class Show extends Component
         $this->authorize('update', $this->resource);
 
         $this->validate();
+        $this->enforceNameAsIsSupport();
         $this->syncData(true);
         $this->storage->save();
         $this->dispatch('success', 'Storage updated successfully');
@@ -119,5 +129,20 @@ class Show extends Component
         $this->dispatch('refreshStorages');
 
         return true;
+    }
+
+    private function enforceNameAsIsSupport(): void
+    {
+        $this->canUseNameAsIs = $this->supportsNameAsIs();
+        if (! $this->canUseNameAsIs) {
+            $this->isNameAsIs = false;
+        }
+    }
+
+    private function supportsNameAsIs(): bool
+    {
+        $this->storage->loadMissing('resource');
+
+        return $this->storage->isServiceResource() || $this->storage->isDockerComposeResource();
     }
 }

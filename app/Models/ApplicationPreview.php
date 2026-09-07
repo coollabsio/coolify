@@ -37,12 +37,20 @@ class ApplicationPreview extends BaseModel
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 // Docker Compose volume and network cleanup
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                $volumes = data_get($composeFile, 'volumes');
+                $volumes = collect(data_get($composeFile, 'volumes'));
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();
-                $volumeKeys = collect($volumes)->keys();
-                $volumeKeys->each(function ($key) use ($server) {
+                $protectedVolumeNames = $application->persistentStorages()
+                    ->where(function ($query) {
+                        $query->where('is_external', true)
+                            ->orWhere('is_name_as_is', true);
+                    })
+                    ->pluck('name');
+                $volumes->keys()->each(function ($key) use ($server, $volumes, $protectedVolumeNames) {
                     if (! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
+                        return;
+                    }
+                    if ($protectedVolumeNames->contains($key) || (bool) data_get($volumes->get($key), 'external', false)) {
                         return;
                     }
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);
@@ -60,6 +68,9 @@ class ApplicationPreview extends BaseModel
                 $persistentStorages = $preview->persistentStorages()->get() ?? collect();
                 if ($persistentStorages->count() > 0) {
                     foreach ($persistentStorages as $storage) {
+                        if ($storage->is_external || $storage->is_name_as_is) {
+                            continue;
+                        }
                         instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
                     }
                 }

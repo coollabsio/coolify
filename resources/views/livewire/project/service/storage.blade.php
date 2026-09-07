@@ -48,7 +48,8 @@
                                     <div
                                         class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
                                         <div class="flex flex-col gap-1">
-                                            <a class="dropdown-item" @click="volumeModalOpen = true; dropdownOpen = false">
+                                            <a class="dropdown-item" @click="volumeModalOpen = true; dropdownOpen = false"
+                                                wire:click="loadExistingVolumes">
                                                 <svg class="size-4" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -119,7 +120,7 @@
                                             x-init="$watch('volumeModalOpen', value => {
                                                 if (value) {
                                                     $nextTick(() => {
-                                                        const input = $el.querySelector('input');
+                                                        const input = $el.querySelector('input:not([type=hidden])');
                                                         input?.focus();
                                                     })
                                                 }
@@ -137,16 +138,40 @@
                                                         volumes.</div>
                                                 @endif
                                                 <div class="flex flex-col gap-2">
-                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
-                                                        id="name" label="Name" required helper="Volume name." />
-                                                    @if ($isSwarm)
+                                                    <div wire:key="existing-volumes-{{ md5(json_encode($existingVolumes)) }}">
+                                                        <x-forms.datalist canGate="update" :canResource="$resource"
+                                                            id="existing_volume" wire:model.live="existing_volume"
+                                                            label="Existing Volume"
+                                                            placeholder="Search volumes on this server..."
+                                                            helper="Select an existing Docker volume, or leave this empty to create a new one."
+                                                            autofocus>
+                                                            <option value="">Create a new volume instead</option>
+                                                            @foreach ($existingVolumes as $volume)
+                                                                <option value="{{ $volume }}">{{ $volume }}</option>
+                                                            @endforeach
+                                                        </x-forms.datalist>
+                                                    </div>
+                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400"
+                                                        wire:loading wire:target="loadExistingVolumes">
+                                                        Loading volumes from the server...
+                                                    </div>
+                                                    <x-callout type="warning" title="Data corruption risk" class="p-3">
+                                                        Attaching an existing volume that is already used by another container can cause data corruption.
+                                                        Only attach it when you understand how it is used and no other container will write to it at the same time.
+                                                    </x-callout>
+                                                    @if (blank($existing_volume))
                                                         <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path" required
-                                                            helper="Directory on the host system." />
-                                                    @else
-                                                        <x-forms.input canGate="update" :canResource="$resource"
-                                                            placeholder="/root" id="host_path" label="Source Path"
-                                                            helper="Directory on the host system." />
+                                                            placeholder="pv-name" id="name" label="Name" required
+                                                            helper="Name for the new volume." />
+                                                        @if ($isSwarm)
+                                                            <x-forms.input canGate="update" :canResource="$resource"
+                                                                placeholder="/root" id="host_path" label="Source Path" required
+                                                                helper="Directory on the host system." />
+                                                        @else
+                                                            <x-forms.input canGate="update" :canResource="$resource"
+                                                                placeholder="/root" id="host_path" label="Source Path"
+                                                                helper="Directory on the host system." />
+                                                        @endif
                                                     @endif
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/tmp/root" id="mount_path" label="Destination Path"

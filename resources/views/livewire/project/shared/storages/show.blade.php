@@ -38,6 +38,15 @@
                     <x-forms.input id="mountPath" required readonly />
                 </div>
             @endif
+            @if ($canUseNameAsIs)
+                @can('update', $resource)
+                    <div class="w-full sm:w-96">
+                        <x-forms.checkbox instantSave canGate="update" :canResource="$resource"
+                            label="Use volume name as-is" id="isNameAsIs"
+                            helper="When enabled, Coolify uses the volume name declared in Docker Compose without adding the resource UUID or a preview suffix. This can make multiple resources share the same volume, and concurrent writes can corrupt data. The change is applied on the next deployment or Compose reload."></x-forms.checkbox>
+                    </div>
+                @endcan
+            @endif
             @if (!$isService)
                 @can('update', $resource)
                     <div class="w-full sm:w-96">

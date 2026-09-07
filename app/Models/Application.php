@@ -507,17 +507,22 @@ class Application extends BaseModel
     public function deleteVolumes()
     {
         $persistentStorages = $this->persistentStorages()->get() ?? collect();
+        $server = data_get($this, 'destination.server');
         if ($this->build_pack === 'dockercompose') {
-            $server = data_get($this, 'destination.server');
-            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
-        } else {
-            if ($persistentStorages->count() === 0) {
+            if (! $persistentStorages->contains('is_name_as_is', true)) {
+                instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
+
                 return;
             }
-            $server = data_get($this, 'destination.server');
-            foreach ($persistentStorages as $storage) {
-                instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
+            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down"], $server, false);
+        } elseif ($persistentStorages->count() === 0) {
+            return;
+        }
+        foreach ($persistentStorages as $storage) {
+            if ($storage->is_external || $storage->is_name_as_is) {
+                continue;
             }
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 

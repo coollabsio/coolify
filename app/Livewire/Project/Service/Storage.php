@@ -5,8 +5,10 @@ namespace App\Livewire\Project\Service;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\Server;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class Storage extends Component
@@ -20,6 +22,11 @@ class Storage extends Component
     public $isSwarm = false;
 
     public string $name = '';
+
+    public ?string $existing_volume = null;
+
+    /** @var array<int, string> */
+    public array $existingVolumes = [];
 
     public string $mount_path = '';
 
@@ -111,17 +118,30 @@ class Storage extends Component
         try {
             $this->authorize('update', $this->resource);
 
+            if (filled($this->existing_volume)) {
+                $this->existingVolumes = $this->existingVolumesOnServer();
+                $this->host_path = null;
+            }
+
             $this->validate([
-                'name' => ValidationPatterns::volumeNameRules(),
+                'name' => ValidationPatterns::volumeNameRules(required: blank($this->existing_volume)),
+                'existing_volume' => [
+                    ...ValidationPatterns::volumeNameRules(required: false),
+                    Rule::in($this->existingVolumes),
+                ],
                 'mount_path' => 'required|string',
-                'host_path' => $this->isSwarm
+                'host_path' => $this->isSwarm && blank($this->existing_volume)
                     ? ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN]
                     : ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             ], array_merge(ValidationPatterns::volumeNameMessages(), [
+                'existing_volume.in' => 'The selected volume is not available on this server.',
+                'existing_volume.regex' => 'The selected volume has an invalid Docker volume name.',
                 'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
             ]));
 
-            $name = $this->resource->uuid.'-'.$this->name;
+            $name = filled($this->existing_volume)
+                ? $this->existing_volume
+                : $this->resource->uuid.'-'.$this->name;
 
             LocalPersistentVolume::create([
                 'name' => $name,
@@ -129,6 +149,8 @@ class Storage extends Component
                 'host_path' => $this->host_path,
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->getMorphClass(),
+                'is_external' => filled($this->existing_volume),
+                'is_preview_suffix_enabled' => blank($this->existing_volume),
             ]);
             $this->resource->refresh();
             $this->dispatch('success', 'Volume added successfully');
@@ -137,6 +159,17 @@ class Storage extends Component
             $this->refreshStorages();
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function loadExistingVolumes(): void
+    {
+        try {
+            $this->authorize('update', $this->resource);
+
+            $this->existingVolumes = $this->existingVolumesOnServer();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -243,6 +276,8 @@ class Storage extends Component
     public function clearForm()
     {
         $this->name = '';
+        $this->existing_volume = null;
+        $this->existingVolumes = [];
         $this->mount_path = '';
         $this->host_path = null;
         $this->file_storage_path = '';
@@ -256,6 +291,40 @@ class Storage extends Component
         } else {
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
+    }
+
+    private function server(): Server
+    {
+        $server = data_get($this->resource, 'service.server')
+            ?? data_get($this->resource, 'destination.server');
+
+        if (! $server instanceof Server) {
+            throw new \Exception('No server found for this resource.');
+        }
+
+        return $server;
+    }
+
+    /** @return array<int, string> */
+    private function existingVolumesOnServer(): array
+    {
+        $output = instant_remote_process(
+            ["docker volume ls --format '{{.Name}}'"],
+            $this->server(),
+            throwError: false,
+        );
+
+        if ($output === null) {
+            throw new \Exception('Could not load Docker volumes from the server.');
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', $output))
+            ->map(fn (string $volume): string => trim($volume))
+            ->filter(fn (string $volume): bool => preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $volume) === 1)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     public function fileStorageHostPath(): string
