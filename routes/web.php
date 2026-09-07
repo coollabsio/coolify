@@ -79,6 +79,7 @@ use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
+use App\Livewire\Settings\Theme as SettingsTheme;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -118,6 +119,17 @@ Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
+
+Route::get('/custom-theme.css', function () {
+    $path = customThemePath();
+    abort_if(isCloud() || ! is_file($path) || ! is_readable($path), 404);
+
+    return response(file_get_contents($path), 200, [
+        'Content-Type' => 'text/css; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=0, must-revalidate',
+        'X-Content-Type-Options' => 'nosniff',
+    ]);
+})->name('custom-theme.css');
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
@@ -166,6 +178,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
     Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
     Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+    Route::get('/settings/theme', SettingsTheme::class)->name('settings.theme');
 
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');

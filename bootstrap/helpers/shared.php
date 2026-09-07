@@ -919,6 +919,147 @@ function isCloud(): bool
     return ! config('constants.coolify.self_hosted');
 }
 
+function customThemePath(): string
+{
+    return storage_path('app/themes/custom.css');
+}
+
+function themePresets(): array
+{
+    return collect(glob(resource_path('themes/*.css')))
+        ->mapWithKeys(fn ($f) => [basename($f, '.css') => str(basename($f, '.css'))->headline()->toString()])
+        ->all();
+}
+
+function instanceThemeCss(?InstanceSettings $settings): string
+{
+    $preset = $settings?->theme_preset;
+    if (blank($preset)) {
+        return '';
+    }
+    $css = $preset === 'custom'
+        ? (string) $settings->custom_css
+        : (string) @file_get_contents(resource_path("themes/{$preset}.css"));
+
+    return str_ireplace('</style', '<\/style', $css);
+}
+
+function itermColorsToCss(string $plist): ?string
+{
+    if (! str_contains($plist, '<plist')) {
+        return null;
+    }
+    $xml = @simplexml_load_string($plist, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOBLANKS);
+    if (! $xml || ! isset($xml->dict)) {
+        return null;
+    }
+
+    $colors = [];
+    $nodes = $xml->dict->children();
+    for ($i = 0; $i < count($nodes); $i += 2) {
+        if ($nodes[$i]->getName() !== 'key' || ! isset($nodes[$i + 1]) || $nodes[$i + 1]->getName() !== 'dict') {
+            continue;
+        }
+        $c = [];
+        $inner = $nodes[$i + 1]->children();
+        for ($j = 0; $j < count($inner); $j += 2) {
+            $c[(string) $inner[$j]] = (float) $inner[$j + 1];
+        }
+        if (isset($c['Red Component'], $c['Green Component'], $c['Blue Component'])) {
+            $colors[(string) $nodes[$i]] = sprintf('#%02x%02x%02x', ...array_map(fn ($v) => (int) round(max(0, min(1, $v)) * 255), [$c['Red Component'], $c['Green Component'], $c['Blue Component']]));
+        }
+    }
+    if (! isset($colors['Background Color'], $colors['Foreground Color'])) {
+        return null;
+    }
+
+    $mix = function (string $a, string $b, float $t): string {
+        [$ar, $ag, $ab] = sscanf($a, '#%02x%02x%02x');
+        [$br, $bg, $bb] = sscanf($b, '#%02x%02x%02x');
+
+        return sprintf('#%02x%02x%02x', (int) round($ar + ($br - $ar) * $t), (int) round($ag + ($bg - $ag) * $t), (int) round($ab + ($bb - $ab) * $t));
+    };
+    $luma = function (string $hex): float {
+        [$r, $g, $b] = sscanf($hex, '#%02x%02x%02x');
+
+        return (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255;
+    };
+
+    $bg = $colors['Background Color'];
+    $fg = $colors['Foreground Color'];
+    $accent = $colors['Ansi 4 Color'] ?? $colors['Ansi 12 Color'] ?? $fg;
+
+    return themeCssFromPalette([
+        'app' => $mix($bg, '#000000', 0.25),
+        'panel' => $bg,
+        'surface' => $mix($bg, $fg, 0.05),
+        'raised' => $mix($bg, $fg, 0.09),
+        'selected' => $colors['Selection Color'] ?? $mix($bg, $fg, 0.16),
+        'fg' => $colors['Bold Color'] ?? $fg,
+        'fg_dim' => $fg,
+        'fg_faint' => $colors['Ansi 8 Color'] ?? $mix($fg, $bg, 0.45),
+        'accent' => $accent,
+        'accent_fg' => $luma($accent) > 0.55 ? '#000000' : '#ffffff',
+        'success' => $colors['Ansi 2 Color'] ?? '#22c55e',
+        'error' => $colors['Ansi 1 Color'] ?? '#dc2626',
+    ]);
+}
+
+function themeCssFromPalette(array $p): string
+{
+    return <<<CSS
+html.dark {
+    --theme-base-color: {$p['accent']} !important;
+    --theme-bright-color: {$p['accent']};
+    --theme-accent-foreground: {$p['accent_fg']} !important;
+    --theme-scrollbar-thumb: {$p['selected']};
+    --theme-border-color: {$p['selected']};
+    --theme-placeholder-color: {$p['fg_faint']};
+
+    --color-accent: {$p['accent']};
+    --color-accent-foreground: {$p['accent_fg']};
+    --color-coollabs: {$p['accent']};
+    --color-coollabs-100: color-mix(in oklab, {$p['accent']} 85%, white);
+    --color-coollabs-200: color-mix(in oklab, {$p['accent']} 85%, black);
+    --color-coollabs-300: color-mix(in oklab, {$p['accent']} 70%, black);
+    --color-warning: {$p['accent']};
+
+    --color-app: {$p['app']};
+    --color-panel: {$p['panel']};
+    --color-surface: {$p['surface']};
+    --color-raised: {$p['raised']};
+    --color-selected: {$p['selected']};
+    --color-coolgray-100: {$p['surface']};
+    --color-coolgray-200: {$p['raised']};
+    --color-coolgray-300: {$p['selected']};
+    --color-coolgray-400: {$p['selected']};
+    --color-coolgray-500: color-mix(in oklab, {$p['selected']} 85%, white);
+    --coollabs-canvas: {$p['app']};
+    --coollabs-elevated: {$p['surface']};
+    --coollabs-recessed: {$p['raised']};
+    --coollabs-base: {$p['surface']};
+    --color-content-surface: {$p['surface']};
+    --coollabs-fill: {$p['selected']};
+    --coollabs-line: {$p['selected']};
+    --coollabs-hairline: color-mix(in srgb, {$p['selected']} 60%, {$p['panel']});
+    --color-hairline: color-mix(in srgb, {$p['fg']} 10%, transparent);
+    --color-log: {$p['app']};
+    --color-log-toolbar: {$p['panel']};
+
+    --color-fg: {$p['fg']};
+    --color-fg-dim: {$p['fg_dim']};
+    --color-fg-faint: {$p['fg_faint']};
+    --coollabs-subtle: {$p['fg_dim']};
+    --color-nav-text: {$p['fg_dim']};
+    --color-nav-muted: {$p['fg_faint']};
+    --color-nav-active: {$p['fg']};
+
+    --color-success: {$p['success']};
+    --color-error: {$p['error']};
+}
+CSS;
+}
+
 /**
  * Resolve the queue used for application deployments, database starts and service starts.
  *
