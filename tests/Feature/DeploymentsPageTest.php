@@ -15,9 +15,8 @@ use Visus\Cuid2\Cuid2;
 
 uses(RefreshDatabase::class);
 
-function makeDeploymentForTeam(Team $team, string $applicationName): ApplicationDeploymentQueue
+function makeDeploymentForTeam(Team $team, string $applicationName, PrivateKey $privateKey): ApplicationDeploymentQueue
 {
-    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
     $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
     $destination = StandaloneDocker::where('server_id', $server->id)->first()
         ?? StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'net-'.$server->id]);
@@ -46,6 +45,9 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    // One key for every server: PrivateKey rejects a second row with the same fingerprint.
+    $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $this->withoutVite();
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
     InstanceSettings::unguarded(function () {
@@ -54,8 +56,8 @@ beforeEach(function () {
 });
 
 it('lists only the current team deployments', function () {
-    makeDeploymentForTeam($this->team, 'mine-app');
-    makeDeploymentForTeam(Team::factory()->create(), 'theirs-app');
+    makeDeploymentForTeam($this->team, 'mine-app', $this->privateKey);
+    makeDeploymentForTeam(Team::factory()->create(), 'theirs-app', $this->privateKey);
 
     $this->get('/deployments')
         ->assertOk()
