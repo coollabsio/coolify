@@ -24,7 +24,7 @@
         @endif
 
         <div
-            class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+            class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
             Create the token in the
             <a :href="providerConsoleUrl"
                 target="_blank" class="font-medium text-coollabs hover:underline dark:text-warning">

@@ -68,6 +68,14 @@ class Previews extends Component
         $this->dispatch('configurationChanged');
     }
 
+    public function togglePreviewDeployments(): void
+    {
+        $this->authorize('update', $this->application);
+
+        $this->isPreviewDeploymentsEnabled = ! $this->isPreviewDeploymentsEnabled;
+        $this->savePreviewSettings();
+    }
+
     private function syncDockerTags(): void
     {
         $this->previewDockerTags = [];

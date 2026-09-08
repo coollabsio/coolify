@@ -13,6 +13,7 @@
     'wireOpen' => null,
     'contentClicks' => true,
     'isLarge' => false,
+    'fixedHeight' => false,
 ])
 
 <div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
@@ -38,23 +39,24 @@
     <template x-teleport="body">
         <div x-show="modalOpen"
             x-init="$watch('modalOpen', value => { if(value) { $nextTick(() => { const firstInput = $el.querySelector('input, textarea, select'); firstInput?.focus(); }) } })"
-            class="fixed inset-0 z-99 overflow-y-auto">
-            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
+            class="fixed inset-0 z-99 overflow-hidden">
+            <div x-show="modalOpen" x-transition:enter="transition-opacity ease-out duration-200" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-in duration-150"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
             <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                    x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
                     @class([
                         'application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden',
                         'lg:w-[95vw]! lg:max-w-7xl!' => $isLarge,
                         'lg:w-auto lg:min-w-2xl lg:max-w-4xl' => ! $isLarge,
+                        'sm:h-[40rem]' => $fixedHeight,
                     ])
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                     <header class="flex-wrap! sm:flex-nowrap!">

@@ -60,7 +60,7 @@
         @php
             $selectedSchedule = $selectedDatabaseBackup ?: $selectedVolumeBackup;
         @endphp
-        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge
+        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
             canGate="update" :canResource="$service">
             <x-slot:content><span></span></x-slot:content>
 

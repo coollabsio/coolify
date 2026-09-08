@@ -209,6 +209,27 @@ it('loads every backup editor section when the modal opens and switches tabs loc
         ->not->toContain('wire:click="selectScheduleSection');
 });
 
+it('keeps the backup schedule modal height stable while switching sections', function () {
+    $modal = file_get_contents(resource_path('views/components/modal-input.blade.php'));
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($index)->toContain('isLarge fixedHeight')
+        ->and($modal)
+        ->toContain("'sm:h-[40rem]' => \$fixedHeight");
+});
+
+it('shows S3 section descriptions from the title helper', function () {
+    $volumeS3 = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/s3.blade.php'));
+    $databaseS3 = file_get_contents(resource_path('views/livewire/project/database/backup-edit/s3.blade.php'));
+
+    foreach ([$volumeS3, $databaseS3] as $view) {
+        expect($view)
+            ->toContain('<x-application.settings-section title="S3 storage"')
+            ->not->toContain('<div class="application-settings-section-header">')
+            ->not->toContain('<h2>S3 storage</h2>');
+    }
+});
+
 it('adds a back up now action to every service backup schedule row', function () {
     $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
     $styles = file_get_contents(resource_path('css/app.css'));

@@ -279,10 +279,6 @@
             @elseif ($server->isSentinelEnabled())
                 <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
                     helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-slot:actions>
-                        <x-status-badge status="Disabled" type="neutral" />
-                    </x-slot:actions>
-
                     <x-empty size="sm" title="Metrics are disabled"
                         description="Enable metrics to begin collecting CPU and memory history for this server."
                         icon-name="dashboard">

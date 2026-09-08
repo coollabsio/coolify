@@ -5,13 +5,22 @@
         @endphp
         <x-application.settings-section id="preview-settings-section" title="Preview settings"
             helper="Automatic pull request deployments and who can trigger them.">
-            <div class="grid w-full gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="isPreviewDeploymentsEnabled" label="Preview deployments" onChange="savePreviewSettings"
-                    helper="Automatically deploy Preview Deployments for all opened PRs.<br><br>Closing a PR deletes its Preview Deployment."
-                    :options="[
-                        ['value' => false, 'label' => 'Disabled'],
-                        ['value' => true, 'label' => 'Deploy opened pull requests'],
-                    ]" :disabled="! $canUpdate" />
+            <x-slot:actions>
+                @can('update', $application)
+                    @if ($isPreviewDeploymentsEnabled)
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments">
+                            Disable preview deployments
+                        </x-forms.button>
+                    @else
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments"
+                            isHighlighted>
+                            Enable preview deployments
+                        </x-forms.button>
+                    @endif
+                @endcan
+            </x-slot:actions>
+
+            <div class="w-full">
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
                     helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
                     :options="[

@@ -40,7 +40,7 @@
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
                     @else
-                        <x-forms.button disabled tooltip="You do not have permission to delete this resource.">
+                        <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
                             Delete {{ $resourceLabel }}
                         </x-forms.button>
                     @endif
