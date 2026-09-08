@@ -2262,7 +2262,7 @@ html[data-theme="custom"] textarea:disabled {
     outline: none;
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 40%, transparent);
+    box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .application-heading-actions .split-action-main,

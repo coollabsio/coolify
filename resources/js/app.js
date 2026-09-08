@@ -1,3 +1,4 @@
+import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeTerminalComponent } from './terminal.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 
@@ -17,6 +18,7 @@ document.addEventListener('livewire:navigated', () => {
 // Keeping this registration independent from the current route also makes it
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
+document.addEventListener('alpine:init', initializeCopyButtonComponent);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms

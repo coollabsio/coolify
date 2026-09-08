@@ -156,6 +156,11 @@ class Heading extends Component
 
             $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
             StopApplication::dispatch($this->application, false, $this->docker_cleanup);
+            auditLog('ui.application.stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

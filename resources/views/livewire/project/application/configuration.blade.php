@@ -20,6 +20,7 @@
                 <livewire:project.application.advanced :application="$application" />
             @elseif ($currentRoute === 'project.application.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$application" />
+                <livewire:project.shared.secret-manager-links :resource="$application" />
             @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
             @elseif ($currentRoute === 'project.application.source' && $application->git_based())

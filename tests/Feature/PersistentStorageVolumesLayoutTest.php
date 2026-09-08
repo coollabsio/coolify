@@ -43,6 +43,7 @@ it('keeps nested storage component keys stable when mounts are added or deleted'
         ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
 });
 
+use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -138,7 +139,6 @@ function createApplicationWithVolume(array $applicationAttributes = [], array $v
 
 it('renders volumes as a data table with shared column headers', function () {
     $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
     $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
 
     expect($allView)
@@ -156,16 +156,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
         ->not->toContain('table-badge table-badge-success')
-        ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('x-status-badge')
         ->not->toContain('font-mono')
         ->not->toContain('Service volume mounts are read-only here.');
-
-    // Show remains available for isolated embeds/tests but is no longer nested from All.
-    expect($showView)
-        ->toContain('data-table-row')
-        ->toContain('volumes-table-grid')
-        ->not->toContain('font-mono');
 
     // Service stack page: one settings-section card per compose service/resource.
     expect($storageView)
@@ -193,7 +186,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toMatch('/<x-callout[^>]*title="File-level consistency"[\s\S]*id="stopDuringBackup"[\s\S]*<\/x-callout>/');
     expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php')))
         ->toContain('<span>Time</span>')
-        ->toContain('x-forms.copy-button')
+        ->toContain('x-forms.copy-input')
         ->toContain('col-span-6');
 
     $css = file_get_contents(resource_path('css/app.css'));
@@ -282,6 +275,62 @@ it('uses valid block wrappers around PR suffix helpers', function () {
 
     expect(substr_count($view, '<x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />'))
         ->toBe(3);
+});
+
+it('keeps bind mount source paths out of the add volume form', function () {
+    $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+    $volumesView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($storageView)
+        ->not->toContain('id="host_path"')
+        ->not->toContain('Swarm Mode detected')
+        ->and($volumesView)
+        ->toMatch('/<x-modal-confirmation title="Remove Source Path\?"[^>]*canGate="update"[^>]*:canResource="\$resource"/')
+        ->toContain('The next deployment will use a named Docker volume instead.')
+        ->toContain('Data from the existing host directory will not be copied to the named volume.');
+});
+
+it('creates named volumes without a host path in swarm mode', function () {
+    [$application] = createApplicationWithVolume();
+    $application->persistentStorages()->delete();
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->set('isSwarm', true)
+        ->set('name', 'storage-app-data')
+        ->set('mount_path', '/data')
+        ->call('submitPersistentVolume')
+        ->assertHasNoErrors();
+
+    expect($application->persistentStorages()->first())
+        ->name->toBe($application->uuid.'-storage-app-data')
+        ->host_path->toBeNull();
+});
+
+it('uses a resource based default name for new volumes', function () {
+    [$application] = createApplicationWithVolume(['name' => 'Storage App']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'storage-app-data');
+});
+
+it('uses a valid fallback default volume name when the resource name has no slug characters', function () {
+    [$application] = createApplicationWithVolume(['name' => '---']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'volume-data');
+});
+
+it('removes existing bind mount source paths from the volume table', function () {
+    [$application, $volume] = createApplicationWithVolume(volumeAttributes: [
+        'host_path' => '/srv/storage',
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet("forms.{$volume->id}.hostPath", '/srv/storage')
+        ->call('clearHostPath', $volume->id)
+        ->assertHasNoErrors();
+
+    expect($volume->refresh()->host_path)->toBeNull();
 });
 
 it('creates and exposes volume backups for service storage', function () {
@@ -443,16 +492,13 @@ it('hides PR deployment suffix for databases', function () {
 });
 
 it('uses a compact table badge for enabled backups instead of status-badge', function () {
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
 
-    expect($showView)
-        ->toContain('table-badge-success')
+    expect($allView)
+        ->toContain("'table-badge-success' => \$hasS3Backup")
         ->toContain('Volume backup is enabled')
         ->not->toContain('x-status-badge')
         ->not->toContain('status="Backup enabled"');
-
-    // Badge label is the short "Backup" text, not the old pill-with-label that broke the input row.
-    expect(preg_match('/table-badge-success[^>]*>\s*Backup\s*</', $showView))->toBeGreaterThan(0);
 });
 
 it('gates file storage PR suffix markup behind git_based applications', function () {

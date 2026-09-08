@@ -43,7 +43,7 @@ it('hides resource action menus when the user cannot manage the resource', funct
 
     foreach (['mobile', 'desktop'] as $viewport) {
         expect($source)->toMatch(
-            "/@can\\('{$ability}', \\$".$resource."\\)[\\s\\S]*?<div id=\"{$prefix}-{$viewport}-actions\"/"
+            "/@can\\('{$ability}', \\$".$resource."\\)[\\s\\S]*?<x-split-action id=\"{$prefix}-{$viewport}-actions\"/"
         );
     }
 })->with([
