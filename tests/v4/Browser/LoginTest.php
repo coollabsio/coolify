@@ -70,7 +70,7 @@ it('fails login with invalid credentials', function () {
         ->screenshot(filename: 'login-invalid-credentials');
 });
 
-it('prevents Enter from duplicating the automatic two factor challenge submission', function () {
+it('submits the automatic two factor challenge only once', function () {
     config(['app.maintenance.driver' => 'file']);
 
     $user = createRootUser();
@@ -97,11 +97,11 @@ it('prevents Enter from duplicating the automatic two factor challenge submissio
         });
     JS);
 
-    foreach (str_split('123456') as $index => $digit) {
-        $page->keys(sprintf('[aria-label="Digit %d"]', $index + 1), $digit);
-    }
-
-    $page->keys('[aria-label="Digit 6"]', 'Enter')
+    $page->fill('code', '123456')
+        ->keys('code', 'Enter')
+        ->assertScript('window.acceptedTwoFactorSubmissions', 1)
+        ->assertDisabled('Verify and continue')
+        ->fill('code', '654321')
         ->assertScript('window.acceptedTwoFactorSubmissions', 1)
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'login-two-factor-enter-single-submission');
