@@ -25,7 +25,7 @@
             },
             targetCollapsed() {
                 this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
-                return this.autoCollapse ? this.hasSecondBar : this.userCollapsed;
+                return this.userCollapsed || (this.autoCollapse && this.hasSecondBar);
             },
             applyCollapsed(animate) {
                 const target = this.targetCollapsed();
@@ -41,10 +41,8 @@
             },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
-                if (!this.autoCollapse) {
-                    this.userCollapsed = this.collapsed;
-                    localStorage.setItem('sidebarCollapsed', this.collapsed);
-                }
+                this.userCollapsed = this.collapsed;
+                localStorage.setItem('sidebarCollapsed', this.userCollapsed);
             },
             toggleAutoCollapse() {
                 this.autoCollapse = !this.autoCollapse;

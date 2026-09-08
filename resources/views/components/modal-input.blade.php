@@ -44,7 +44,7 @@
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
             <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
-                <div id="{{ $modalId }}" x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 scale-95"
                     x-transition:enter-end="opacity-100 scale-100"

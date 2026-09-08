@@ -318,13 +318,19 @@
                                         <div x-show="open" x-collapse.duration.200ms x-cloak
                                             class="nav-children flex flex-col gap-0.5 py-1">
                                             @foreach ($sections as $section)
-                                                <a class="menu-subitem"
-                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
-                                                    {{ wireNavigate() }}
-                                                    x-on:click="menuOpen = false; if (document.getElementById('{{ $section['id'] }}')) { $event.preventDefault(); activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}'); }">
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </a>
+                                                @if ($menuItem['active'])
+                                                    <button type="button" class="menu-subitem"
+                                                        :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                        x-on:click="menuOpen = false; activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                                        <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                                    </button>
+                                                @else
+                                                    <a class="menu-subitem"
+                                                        href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
+                                                        {{ wireNavigate() }} x-on:click="menuOpen = false">
+                                                        <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                                    </a>
+                                                @endif
                                             @endforeach
                                         </div>
                                     </div>
