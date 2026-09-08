@@ -663,15 +663,13 @@ class Application extends BaseModel
 
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
+                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                if (is_string($httpsRepository)) {
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "https://{$git_repository}/src/{$this->git_branch}{$base_dir}";
+                        return "{$httpsRepository}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "https://{$git_repository}/tree/{$this->git_branch}{$base_dir}";
+                    return "{$httpsRepository}/tree/{$this->git_branch}{$base_dir}";
                 }
 
                 return $this->git_repository;
@@ -686,11 +684,9 @@ class Application extends BaseModel
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
                 }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-                    return "https://{$git_repository}/settings/hooks";
+                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                if (is_string($httpsRepository)) {
+                    return "{$httpsRepository}/settings/hooks";
                 }
 
                 return $this->git_repository;
@@ -705,11 +701,9 @@ class Application extends BaseModel
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
-                // Convert the SSH URL to HTTPS URL
-                if (strpos($this->git_repository, 'git@') === 0) {
-                    $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-
-                    return "https://{$git_repository}/commits/{$this->git_branch}";
+                $httpsRepository = $this->httpsUrlFromScpStyleGitRepository();
+                if (is_string($httpsRepository)) {
+                    return "{$httpsRepository}/commits/{$this->git_branch}";
                 }
 
                 return $this->git_repository;
@@ -728,8 +722,9 @@ class Application extends BaseModel
         }
 
         $git_repository = $this->git_repository;
-        if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = preg_replace('/^git@([^:]+):/', 'https://$1/', $git_repository);
+        $httpsRepository = scpStyleGitUrlToHttps($git_repository);
+        if (is_string($httpsRepository)) {
+            $git_repository = $httpsRepository;
         } elseif (str($this->git_repository)->startsWith('ssh://')) {
             $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
@@ -744,6 +739,17 @@ class Application extends BaseModel
         $url = $url->withPath(Str::finish($url->getPath(), '/').$commitPath.'/'.$link);
 
         return $url->__toString();
+    }
+
+    private function httpsUrlFromScpStyleGitRepository(): ?string
+    {
+        $httpsRepository = scpStyleGitUrlToHttps($this->git_repository);
+
+        if (! is_string($httpsRepository)) {
+            return null;
+        }
+
+        return Str::replaceEnd('.git', '', $httpsRepository);
     }
 
     public function dockerfileLocation(): Attribute
@@ -1477,7 +1483,7 @@ class Application extends BaseModel
             // Check if .gitmodules file exists before running submodule commands
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if [ -f .gitmodules ]; then";
             if ($public) {
-                $git_clone_command = "{$git_clone_command} sed -i \"s#git@\(.*\):#https://\\1/#g\" {$escapedBaseDir}/.gitmodules || true &&";
+                $git_clone_command = "{$git_clone_command} sed -i \"s#[A-Za-z0-9._-]*@\(.*\):#https://\\1/#g\" {$escapedBaseDir}/.gitmodules || true &&";
             }
             // Add shallow submodules flag if shallow clone is enabled
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';

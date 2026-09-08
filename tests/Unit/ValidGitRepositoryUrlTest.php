@@ -108,6 +108,8 @@ it('validates SSH URLs when allowed', function () {
         'git@gitlab.com:user/repo.git',
         'git@bitbucket.org:user/repo.git',
         'custom-user@git.example.com:organization/repository.git',
+        'custom-user@git.example.com:2222/organization/repository.git',
+        'enterprise-user@enterprise.ghe.com:organization/repository.git',
     ];
 
     foreach ($validUrls as $url) {
@@ -130,6 +132,7 @@ it('rejects SSH URLs when not allowed', function () {
     $invalidUrls = [
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
+        'custom-user@git.example.com:organization/repository.git',
     ];
 
     foreach ($invalidUrls as $url) {

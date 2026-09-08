@@ -4358,6 +4358,62 @@ NGINX;
     }
 }
 
+/**
+ * Parse an scp-style SSH Git URL (`user@host:path` or `user@host:port/path`).
+ *
+ * @return array{user: string, host: string, port: ?string, path: string}|null
+ */
+function parseScpStyleGitUrl(?string $gitRepository): ?array
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return null;
+    }
+
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>[^:]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+        return null;
+    }
+
+    $host = trim($matches['host']);
+    $path = ltrim($matches['path'], '/');
+
+    if ($host === '' || $path === '') {
+        return null;
+    }
+
+    return [
+        'user' => $matches['user'],
+        'host' => $host,
+        'port' => ($matches['port'] ?? '') === '' ? null : $matches['port'],
+        'path' => $path,
+    ];
+}
+
+function scpStyleGitUrlToHttps(?string $gitRepository): ?string
+{
+    $parts = parseScpStyleGitUrl($gitRepository);
+
+    if ($parts === null) {
+        return null;
+    }
+
+    return 'https://'.$parts['host'].'/'.$parts['path'];
+}
+
+function gitRepositorySlug(?string $gitRepository): string
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return '';
+    }
+
+    if (($scp = parseScpStyleGitUrl($gitRepository)) !== null) {
+        $gitRepository = $scp['path'];
+    } elseif (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
+        $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
+    }
+
+    return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+}
+
 function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
 {
     $repository = $gitRepository;
@@ -4368,7 +4424,6 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         'repository' => $gitRepository,
     ];
     $sshMatches = [];
-    $matches = [];
 
     // Let's try and parse the string to detect if it's a valid SSH string or not
     preg_match('/((.*?)\:\/\/)?(.*@.*:.*)/', $gitRepository, $sshMatches);
@@ -4403,11 +4458,11 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
             $providerInfo['port'] = (string) $parsedRepository['port'];
         }
     } else {
-        preg_match('/^(?<host>[^:]+):(?<port>\d+)\/(?<path>.+)$/', $normalizedRepository, $matches);
+        $scp = parseScpStyleGitUrl($normalizedRepository);
 
-        if (! empty($matches['port'])) {
-            $providerInfo['port'] = $matches['port'];
-            $repository = "{$matches['host']}:{$matches['path']}";
+        if ($scp !== null && $scp['port'] !== null) {
+            $providerInfo['port'] = $scp['port'];
+            $repository = "{$scp['user']}@{$scp['host']}:{$scp['path']}";
         }
     }
 
