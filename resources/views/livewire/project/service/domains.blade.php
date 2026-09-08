@@ -160,15 +160,6 @@
     @else
         <div wire:key="service-domains-list"
             class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible">
-            <div class="data-table-header service-domains-overview-grid">
-                <span>Domain</span>
-                <span>Protocol redirect</span>
-                <span>Domain redirect</span>
-                <span>Internal port</span>
-                <span>Search indexing</span>
-                <span>DNS status</span>
-                <span class="text-right">Actions</span>
-            </div>
             @foreach ($domainGroups as $appId => $rows)
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
@@ -204,7 +195,7 @@
                             'domainRows' => $domainRows,
                             'service' => $service,
                             'showServiceColumn' => false,
-                            'showHeader' => false,
+                            'showHeader' => true,
                         ])
                     </div>
                 </section>

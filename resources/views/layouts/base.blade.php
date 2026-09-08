@@ -184,7 +184,7 @@
 </head>
 @section('body')
 
-<body class="overflow-y-scroll dark:text-inherit text-black">
+<body class="dark:text-inherit text-black">
     <x-toast />
     <x-icon-tooltip />
     <script data-navigate-once>

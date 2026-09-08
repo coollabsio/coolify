@@ -8,6 +8,15 @@ test('input modal renders without requiring a modal id', function () {
     expect($html)->toContain('Modal content');
 });
 
+test('input modal overlay is fixed to the viewport without its own page scrollbar', function () {
+    $html = Blade::render('<x-modal-input>Modal content</x-modal-input>');
+
+    expect($html)
+        ->toContain('class="fixed inset-0 z-99 overflow-hidden"')
+        ->not->toContain('w-screen overflow-hidden')
+        ->not->toContain('class="fixed inset-0 z-99 overflow-y-auto"');
+});
+
 test('confirmation modal closes before dispatching an event that can open another modal', function () {
     $modal = file_get_contents(resource_path('views/components/modal-confirmation.blade.php'));
 

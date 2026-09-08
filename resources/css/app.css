@@ -101,8 +101,16 @@
     --button-depth-color: color-mix(in oklab, var(--color-coollabs) 52%, black);
 }
 
-.dark .button:not(.button-highlighted):not([isHighlighted]):not(:disabled) {
+.dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
     --button-depth-color: rgb(255 255 255 / 0.08);
+}
+
+.button.button-error:not(:disabled) {
+    --button-depth-color: var(--color-red-300);
+}
+
+.dark .button.button-error:not(:disabled) {
+    --button-depth-color: var(--color-red-800);
 }
 
 /* Keep the shared focus indicator when the depth shadow owns box-shadow. */
@@ -377,8 +385,16 @@ option {
     @apply dark:text-white dark:bg-coolgray-100;
 }
 
-button[isError]:not(:disabled) {
-    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800 hover:bg-red-300 hover:text-white dark:hover:bg-red-800 dark:hover:text-white;
+.button.button-error {
+    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+}
+
+.button.button-error:disabled {
+    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+}
+
+.button-error:not(:disabled) {
+    @apply hover:bg-red-100 hover:text-red-900 dark:hover:bg-red-700 dark:hover:text-white;
 }
 
 button[isHighlighted]:not(:disabled) {

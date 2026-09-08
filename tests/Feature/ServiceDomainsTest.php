@@ -1114,6 +1114,18 @@ it('renders domain settings in compact columns instead of a second summary line'
         ->not->toContain('gap-x-3 gap-y-1');
 });
 
+it('renders each domain table header below its service heading', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+    $serviceHeadingPosition = strpos($view, 'service-domain-group-{{ $appId }}');
+    $domainTablePosition = strpos($view, "'showHeader' => true");
+
+    expect($view)
+        ->not->toContain('<div class="data-table-header service-domains-overview-grid">')
+        ->and($serviceHeadingPosition)->not->toBeFalse()
+        ->and($domainTablePosition)->not->toBeFalse()
+        ->and($domainTablePosition)->toBeGreaterThan($serviceHeadingPosition);
+});
+
 it('lays out the domain settings dropdowns in responsive columns', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
     expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
