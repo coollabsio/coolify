@@ -150,7 +150,7 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain('x-on:error="$el.remove()"')
         ->toContain('class="min-w-0 flex-1 truncate text-[13px]')
         ->toContain('class="listbox-trigger"')
-        ->toContain('application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible')
+        ->toContain('application-settings-section-body is-flush overflow-visible')
         ->toContain('dark:bg-white/[0.04]')
         ->toContain('<span>Domain</span>')
         ->toContain('<span>DNS status</span>')
@@ -1124,6 +1124,15 @@ it('renders each domain table header below its service heading', function () {
         ->and($serviceHeadingPosition)->not->toBeFalse()
         ->and($domainTablePosition)->not->toBeFalse()
         ->and($domainTablePosition)->toBeGreaterThan($serviceHeadingPosition);
+});
+
+it('renders each service domain group as a separate card', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)
+        ->toContain('class="flex flex-col gap-3"')
+        ->toContain('class="application-settings-section-body is-flush overflow-visible"')
+        ->not->toContain('class="border-b border-neutral-200 last:border-b-0 dark:border-white/10"');
 });
 
 it('lays out the domain settings dropdowns in responsive columns', function () {
