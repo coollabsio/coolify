@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Database\FlushCacheDatabase;
-use App\Livewire\Project\Database\Heading;
+use App\Livewire\Project\Database\FlushCache;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -49,12 +49,27 @@ function makeRedis(mixed $environment, mixed $destination): StandaloneRedis
     ]);
 }
 
+function makePostgres(mixed $environment, mixed $destination): StandalonePostgresql
+{
+    return StandalonePostgresql::create([
+        'name' => 'app-postgres',
+        'image' => 'postgres:16',
+        'postgres_user' => 'coolify',
+        'postgres_password' => 'password',
+        'postgres_db' => 'coolify',
+        'status' => 'running:healthy',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
 test('flushes the cache of a running redis database and records an audit event', function () {
     $redis = makeRedis($this->environment, $this->destination);
 
     FlushCacheDatabase::mock()->shouldReceive('handle')->once();
 
-    Livewire::test(Heading::class, ['database' => $redis])
+    Livewire::test(FlushCache::class, ['database' => $redis])
         ->call('flush')
         ->assertDispatched('success');
 
@@ -65,21 +80,11 @@ test('flushes the cache of a running redis database and records an audit event',
 });
 
 test('refuses to flush a non-cache database and does not run the action', function () {
-    $postgres = StandalonePostgresql::create([
-        'name' => 'app-postgres',
-        'image' => 'postgres:16',
-        'postgres_user' => 'coolify',
-        'postgres_password' => 'password',
-        'postgres_db' => 'coolify',
-        'status' => 'running:healthy',
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-    ]);
+    $postgres = makePostgres($this->environment, $this->destination);
 
     FlushCacheDatabase::mock()->shouldReceive('handle')->never();
 
-    Livewire::test(Heading::class, ['database' => $postgres])
+    Livewire::test(FlushCache::class, ['database' => $postgres])
         ->call('flush')
         ->assertDispatched('error');
 
@@ -96,31 +101,30 @@ test('denies flushing to a member without manage permission', function () {
 
     FlushCacheDatabase::mock()->shouldReceive('handle')->never();
 
-    Livewire::test(Heading::class, ['database' => $redis])
+    Livewire::test(FlushCache::class, ['database' => $redis])
         ->call('flush')
         ->assertDispatched('error');
 
     expect(AuditEvent::query()->where('event', 'ui.database.flushed')->exists())->toBeFalse();
 });
 
-test('only cache databases expose the flush cache action in the heading', function () {
+test('renders the flush cache card for a cache database', function () {
     $redis = makeRedis($this->environment, $this->destination);
 
-    Livewire::test(Heading::class, ['database' => $redis])
-        ->assertSee('Flush cache');
+    Livewire::test(FlushCache::class, ['database' => $redis])
+        ->assertSee('Flush cache')
+        ->assertSee('FLUSHALL ASYNC');
+});
 
-    $postgres = StandalonePostgresql::create([
-        'name' => 'app-postgres',
-        'image' => 'postgres:16',
-        'postgres_user' => 'coolify',
-        'postgres_password' => 'password',
-        'postgres_db' => 'coolify',
-        'status' => 'running:healthy',
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-    ]);
+test('the danger page wires the flush cache section only for cache database types', function () {
+    $source = file_get_contents(resource_path('views/livewire/project/database/configuration.blade.php'));
 
-    Livewire::test(Heading::class, ['database' => $postgres])
-        ->assertDontSee('Flush cache');
+    // The flush-cache component is rendered on the danger route, guarded to the three cache types.
+    expect($source)
+        ->toContain('project.database.flush-cache')
+        ->toMatch('/in_array\(\$database->type\(\), \[.*standalone-redis.*standalone-keydb.*standalone-dragonfly.*\]\)[\s\S]*project\.database\.flush-cache/');
+
+    // It must no longer live in the heading action menu.
+    $heading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+    expect($heading)->not->toContain('Flush cache');
 });
