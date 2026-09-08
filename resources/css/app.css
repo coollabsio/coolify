@@ -86,8 +86,36 @@
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Shared press feedback: every button-like control dips slightly on press and
-   eases back, so pressable elements feel responsive and consistent app-wide. */
+/* Standard buttons have a compact physical edge. Hover lifts the face by 1px;
+   pressing nudges it down while the depth disappears. */
+.button:not(:disabled) {
+    --button-depth-color: rgb(0 0 0 / 0.22);
+    --button-depth: 0 2px 0 var(--button-depth-color);
+    --button-depth-hover: 0 3px 0 var(--button-depth-color);
+
+    box-shadow: var(--button-depth);
+}
+
+.button.button-highlighted:not(:disabled),
+.button[isHighlighted]:not(:disabled) {
+    --button-depth-color: color-mix(in oklab, var(--color-coollabs) 52%, black);
+}
+
+/* Keep the shared focus indicator when the depth shadow owns box-shadow. */
+.button:not(:disabled):focus-visible {
+    box-shadow: var(--button-depth), 0 0 0 1px var(--color-accent);
+}
+
+.button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--button-depth-hover);
+}
+
+.button:not(:disabled):hover:focus-visible {
+    box-shadow: var(--button-depth-hover), 0 0 0 1px var(--color-accent);
+}
+
+/* Other button-like controls retain the lighter scale feedback. */
 .button,
 .icon-button,
 .app-tab,
@@ -98,12 +126,16 @@
     transition-duration: 120ms;
 }
 
-.button:not(:disabled):active,
 .icon-button:not(:disabled):active,
 .app-tab:active,
 .split-action-main:not(:disabled):active,
 .split-action-caret:not(:disabled):active {
     transform: scale(0.97);
+}
+
+.button:not(:disabled):active {
+    transform: translateY(2px);
+    box-shadow: none;
 }
 
 /* Focus border/ring on any form control should ease, not snap. The accent

@@ -51,6 +51,14 @@ Avoid oversized titles, generic dashboard cards, strong shadows, thick
 dividers, native browser selects, and isolated colored buttons that do not
 match the current action styles.
 
+Standard `.button` controls use a compact 2px bottom depth. Hover raises the
+button face by 1px and increases the visible depth to 3px. Pressing moves the
+face down 2px into the edge and removes the depth until release, keeping the
+overall bottom position stable. Disabled controls stay flat,
+and focus-visible controls retain the accent ring alongside the depth.
+Highlighted buttons mix the accent equally with black for a pronounced bottom
+edge, so custom theme colors produce a matching edge instead of a generic one.
+
 ---
 
 ## 2. Development and cascade notes
