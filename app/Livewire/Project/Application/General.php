@@ -145,7 +145,9 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'fqdn' => isset($this->application) && $this->fqdn === $this->application->fqdn
+                ? ['nullable']
+                : ValidationPatterns::applicationDomainRules(),
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
@@ -757,8 +759,11 @@ class General extends Component
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
             $oldBaseDirectory = $this->application->base_directory;
 
-            // Process FQDN with intermediate variable to avoid Collection/string confusion
-            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            $fqdnChanged = $this->fqdn !== $this->application->fqdn;
+            if ($fqdnChanged) {
+                $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            }
+
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
