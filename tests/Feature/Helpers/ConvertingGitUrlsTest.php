@@ -61,6 +61,14 @@ test('convertGitUrlsForSourceAndSshUrlWithCustomPort', function () {
     ]);
 });
 
+test('convertGitUrlsForSourceAndSshUrlWithCustomUsernameAndPort', function () {
+    $result = convertGitUrl('custom-user@git.domain.com:766/group/project.git', 'source', null);
+    expect($result)->toBe([
+        'repository' => 'custom-user@git.domain.com:group/project.git',
+        'port' => '766',
+    ]);
+});
+
 test('convertGitUrlsForSourceAndSshUrlSchemeWithCustomPort', function () {
     $result = convertGitUrl('ssh://git@192.168.56.11:22222/User/Repo.git', 'source', null);
     expect($result)->toBe([
