@@ -19,9 +19,9 @@
                         Disable backup
                     </x-forms.button>
                 @endif
-                @if (str($status)->startsWith('running'))
-                    <x-forms.button type="button" wire:click="backupNow">Back up now</x-forms.button>
-                @endif
+                <x-forms.button type="button" wire:click="backupNow"
+                    :disabled="! str($status)->startsWith('running')"
+                    :tooltip="! str($status)->startsWith('running') ? 'The database must be running to start a backup.' : null">Back up now</x-forms.button>
             </div>
         </div>
 
@@ -91,6 +91,9 @@
                     required />
                 <x-forms.input label="Timeout" id="timeout" type="number" min="60"
                     helper="Maximum backup runtime in seconds." required />
+                <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
+                    min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
+                    helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
         </div>
     </section>

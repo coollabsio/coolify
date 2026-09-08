@@ -2,6 +2,7 @@
 
 namespace App\Notifications\ScheduledTask;
 
+use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
@@ -16,10 +17,10 @@ class TaskFailed extends CustomEmailNotification
     public function __construct(public ScheduledTask $task, public string $output)
     {
         $this->onQueue('high');
-        if ($task->application) {
-            $this->url = $task->application->taskLink($task->uuid);
-        } elseif ($task->service) {
-            $this->url = $task->service->taskLink($task->uuid);
+        $resource = $task->application ?? $task->service;
+        if ($resource) {
+            $type = $resource instanceof Application ? 'application' : 'service';
+            $this->url = base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/{$type}/{$resource->uuid}/tasks/{$task->uuid}";
         }
     }
 

@@ -32,7 +32,11 @@ class StartDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
-        $database->resetRestartLimit();
+        $database->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
 
         $activity = activity()
             ->withProperties([
@@ -49,7 +53,6 @@ class StartDatabase
 
         if ($activity === null) {
             return 'Database start could not be queued because activity logging is disabled.';
-
         }
 
         DatabaseStartJob::dispatch(

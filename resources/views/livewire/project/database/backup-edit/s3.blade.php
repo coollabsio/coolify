@@ -35,12 +35,12 @@
                 @endif
             </div>
             <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="s3StorageId" label="S3 storage" :required="$saveS3"
+                <x-forms.listbox id="s3StorageId" label="S3 storage" portal :required="$saveS3"
                     :options="$availableS3Storages->map(fn ($s3) => [
                         'value' => $s3->id,
                         'label' => $s3->name,
                     ])->values()->all()" />
-                <x-forms.listbox id="disableLocalBackup" label="Local copy" :disabled="! $saveS3"
+                <x-forms.listbox id="disableLocalBackup" label="Local copy" portal :disabled="! $saveS3"
                     :options="[
                         ['value' => false, 'label' => 'Keep local backup'],
                         ['value' => true, 'label' => 'Delete after S3 upload'],
