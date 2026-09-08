@@ -58,6 +58,8 @@ overall bottom position stable. Disabled controls stay flat,
 and focus-visible controls retain the accent ring alongside the depth.
 Highlighted buttons mix the accent equally with black for a pronounced bottom
 edge, so custom theme colors produce a matching edge instead of a generic one.
+Dark mode matches the depth edge of neutral buttons to their regular border
+color. Highlighted buttons keep their dark, color-matched accent edge.
 
 ---
 
