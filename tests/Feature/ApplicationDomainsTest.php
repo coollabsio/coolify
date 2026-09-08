@@ -1909,12 +1909,17 @@ it('uses concise search indexing headers in application and service domain table
         ->toContain('<span>Search indexing</span>');
 });
 
-it('shows save guidance in the application domain settings', function () {
+it('shows a form save button at the bottom of application domain settings', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
 
     expect($view)
-        ->toContain('Indexing and redirect changes save automatically.')
-        ->toContain('<x-unsaved-bar action="updateDomain"');
+        ->not->toContain('Indexing and redirect changes save automatically.')
+        ->toContain('data-testid="domain-settings-scroll"')
+        ->toContain('data-testid="domain-settings-footer"')
+        ->toContain('class="shrink-0 border-t')
+        ->toContain('<x-forms.button type="submit" wire:target="updateDomain" isHighlighted>')
+        ->toContain('Save')
+        ->not->toContain('<x-unsaved-bar action="updateDomain"');
 });
 
 it('does not render a last checked column in the domains table', function () {

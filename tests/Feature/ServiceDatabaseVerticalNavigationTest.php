@@ -76,6 +76,24 @@ it('groups application navigation by user workflow', function () {
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");
 });
 
+it('uses the same responsive settings grid for applications services and databases', function () {
+    $sidebars = [
+        resource_path('views/components/application/configuration-sidebar.blade.php'),
+        resource_path('views/components/service/configuration-sidebar.blade.php'),
+        resource_path('views/components/database/configuration-sidebar.blade.php'),
+    ];
+
+    foreach ($sidebars as $sidebar) {
+        expect(file_get_contents($sidebar))
+            ->toContain('grid grid-cols-2 gap-0.5')
+            ->toContain('sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1');
+    }
+
+    expect(file_get_contents($sidebars[0]))
+        ->not->toContain('aria-label="Configuration menu"')
+        ->not->toContain('menuOpen');
+});
+
 it('shows the database sidebar on backup pages', function () {
     $configuration = file_get_contents(resource_path('views/livewire/project/database/configuration.blade.php'));
     $backups = file_get_contents(resource_path('views/livewire/project/database/backup/index.blade.php'));
