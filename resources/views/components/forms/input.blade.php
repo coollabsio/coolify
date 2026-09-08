@@ -22,7 +22,11 @@
             @endif
         </div>
     @endif
-    @if ($type === 'password')
+    @if ($loading)
+        <div class="{{ $defaultClass }} flex w-full items-center text-neutral-500 dark:text-fg-dim" aria-busy="true">
+            <x-loading :text="$loadingText" />
+        </div>
+    @elseif ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 x-bind:type="type"
@@ -33,7 +37,7 @@
                 @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
-                @if ($autofocus) x-ref="autofocusInput" @endif>
+                @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
             @if ($allowToPeak)
                 <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
                     class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
@@ -56,7 +60,7 @@
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
-            @if ($autofocus) x-ref="autofocusInput" @endif>
+            @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

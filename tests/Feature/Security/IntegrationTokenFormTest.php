@@ -3,6 +3,7 @@
 use App\Livewire\Security\IntegrationTokenEditor;
 use App\Livewire\Security\IntegrationTokenForm;
 use App\Livewire\Security\IntegrationTokens;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\Team;
@@ -15,6 +16,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutDefer();
     if (! InstanceSettings::query()->whereKey(0)->exists()) {
         $settings = new InstanceSettings;
         $settings->id = 0;
@@ -60,10 +62,32 @@ test('a cloudflare dns token is validated with read only requests before it is s
         'provider' => 'cloudflare',
         'name' => 'Production DNS',
     ]);
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'ui.integration_token.created',
+        'resource_name' => 'Production DNS',
+    ]);
 
     Http::assertSentCount(3);
     Http::assertSent(fn ($request) => $request->method() === 'GET'
         && $request->url() === 'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1');
+});
+
+test('deleting an integration token is audited without storing its value', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'doppler',
+        'name' => 'Production secrets',
+        'token' => 'dp.st.super-secret',
+        'capabilities' => ['secrets'],
+    ]);
+
+    Livewire::test(IntegrationTokens::class)->call('deleteToken', $token->id);
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.integration_token.deleted')->sole();
+
+    expect($auditEvent->resource_uuid)->toBe($token->uuid)
+        ->and(json_encode($auditEvent->metadata))->not->toContain('dp.st.super-secret');
 });
 
 test('a cloudflare token is not saved when scope validation fails', function () {
@@ -98,6 +122,14 @@ test('at least one capability is required when adding a cloudflare token', funct
 
     $this->assertDatabaseCount('integration_tokens', 0);
     Http::assertNothingSent();
+});
+
+test('provider validation uses the provider names declared by the model', function () {
+    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenForm.php'));
+
+    expect($component)
+        ->toContain("implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))")
+        ->not->toContain('in:cloudflare,doppler,infisical,vault');
 });
 
 test('integration tokens page lists saved provider and capabilities', function () {

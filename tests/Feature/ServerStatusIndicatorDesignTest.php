@@ -39,6 +39,10 @@ test('server status summary uses warning indicators for proxy updates and sentin
 
     expect($summary)
         ->toContain('$server->hasCurrentTraefikOutdatedInfo()')
+        ->toContain('$proxyStatusLabel = match (true)')
+        ->toContain("\$proxyConfigurationPending => 'Restart required'")
+        ->toContain("\$traefikUpdateAvailable => 'Update available'")
+        ->toContain('{{ $proxyStatusLabel }}')
         ->toContain("'bg-warning' => \$proxyNeedsAttention && (\$proxyUpdateAvailable")
         ->toContain("'bg-warning' => \$sentinelNeedsAttention")
         ->not->toContain("\$server->isSentinelLive() ? 'bg-success' : 'bg-error'");

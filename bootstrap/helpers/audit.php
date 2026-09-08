@@ -1,13 +1,10 @@
 <?php
 
-use Illuminate\Support\Facades\Log;
+use App\Models\AuditEvent;
 
 if (! function_exists('auditLog')) {
     /**
-     * Write a security-relevant audit entry to the dedicated `audit` log channel.
-     *
-     * Never include secrets (private keys, passwords, tokens, webhook secrets,
-     * signature header values, env-var values) in $context.
+     * Queue an audit event for persistence after the response.
      *
      * @param  string  $event  Dot-namespaced event name, e.g. `api.private_key.created`.
      * @param  array<string, mixed>  $context  Identifiers + outcome details.
@@ -16,39 +13,15 @@ if (! function_exists('auditLog')) {
     function auditLog(string $event, array $context = [], string $level = 'info'): void
     {
         try {
-            $request = app()->bound('request') ? request() : null;
-            $user = auth()->check() ? auth()->user() : null;
-            $token = $user?->currentAccessToken();
-
-            $base = [
-                'event' => $event,
-                'ip' => $request?->ip(),
-                'ua' => substr((string) $request?->userAgent(), 0, 200),
-                'user_id' => $user?->id,
-                'user_email' => $user?->email,
-                'team_id' => $token ? data_get($token, 'team_id') : null,
-                'token_id' => $token?->id ?? null,
-                'token_name' => $token?->name ?? null,
-                'method' => $request?->method(),
-                'path' => $request?->path(),
-            ];
-
-            $payload = array_merge($base, $context);
-
-            Log::channel('audit')->{$level}($event, $payload);
-        } catch (Throwable $e) {
-            // Audit logging must never break the request path.
-            try {
-                Log::warning('auditLog failed: '.$e->getMessage(), ['event' => $event]);
-            } catch (Throwable) {
-            }
+            AuditEvent::record($event, $context);
+        } catch (Throwable) {
         }
     }
 }
 
 if (! function_exists('auditLogWebhookFailure')) {
     /**
-     * Record a webhook signature/auth verification failure to the `audit` channel.
+     * Record a webhook signature/auth verification failure.
      */
     function auditLogWebhookFailure(string $provider, string $reason, array $context = []): void
     {
@@ -58,10 +31,7 @@ if (! function_exists('auditLogWebhookFailure')) {
             $event = "webhook.{$provider}.signature_failed";
 
             $base = [
-                'event' => $event,
                 'reason' => $reason,
-                'ip' => $request?->ip(),
-                'ua' => substr((string) $request?->userAgent(), 0, 200),
                 'method' => $request?->method(),
                 'path' => $request?->path(),
                 'event_header' => $request?->header('X-GitHub-Event')
@@ -70,12 +40,8 @@ if (! function_exists('auditLogWebhookFailure')) {
                     ?? $request?->header('X-Event-Key'),
             ];
 
-            Log::channel('audit')->warning($event, array_merge($base, $context));
-        } catch (Throwable $e) {
-            try {
-                Log::warning('auditLogWebhookFailure failed: '.$e->getMessage(), ['provider' => $provider]);
-            } catch (Throwable) {
-            }
+            auditLog($event, array_merge($base, $context), 'warning');
+        } catch (Throwable) {
         }
     }
 }

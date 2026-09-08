@@ -144,6 +144,23 @@ test('is_shared attribute detects variable without spaces', function () {
     expect($env->is_shared)->toBeTrue();
 });
 
+test('is_shared persisted value rejects unsupported reference types', function () {
+    $env = EnvironmentVariable::create([
+        'key' => 'TEST',
+        'value' => '{{vault.KEY}}',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    $env->refresh();
+
+    expect($env->is_shared)->toBeFalse()
+        ->and(EnvironmentVariable::query()
+            ->whereKey($env->id)
+            ->where('is_shared', false)
+            ->exists())->toBeTrue();
+});
+
 test('non-shared variable preserves spaces', function () {
     $env = EnvironmentVariable::create([
         'key' => 'REGULAR',

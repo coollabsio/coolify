@@ -14,7 +14,7 @@
                         <x-slot:headerActions>
                             <div x-data="{ preview: false, validating: false, saving: false }"
                                 @compose-validate-finished.window="validating = false"
-                                @compose-save-finished.window="saving = false" class="flex items-center gap-2">
+                                @compose-save-finished.window="saving = false" class="flex w-full items-center gap-2 overflow-x-auto sm:w-auto">
                                 <x-forms.button
                                     @click="preview = !preview; $dispatch('compose-preview-toggle')">
                                     <x-reicon name="eye" class="size-3.5" />

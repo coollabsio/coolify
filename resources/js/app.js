@@ -2,6 +2,11 @@ import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeTerminalComponent } from './terminal.js';
 // Registers window.terminalRendererToolbar() for the console renderer selector.
 import './terminal-renderer-toolbar.js';
+import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+
+document.addEventListener('livewire:init', () => {
+    registerLivewireRequestFailureHandler(window.Livewire);
+});
 
 // Livewire 3.5.19+ re-applies `x-cloak` to morphed elements during wire:navigate
 // (via replaceHtmlAttributes). With `[x-cloak]{display:none}` on the app wrapper,

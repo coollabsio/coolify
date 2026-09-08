@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,8 +21,8 @@ use OpenApi\Attributes as OA;
 )]
 class Project extends BaseModel
 {
+    use Auditable, HasFactory;
     use ClearsGlobalSearchCache;
-    use HasFactory;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -63,7 +64,9 @@ class Project extends BaseModel
             ]);
         });
         static::deleting(function ($project) {
-            $project->environments()->delete();
+            foreach ($project->environments()->get() as $environment) {
+                $environment->delete();
+            }
             $project->settings()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {

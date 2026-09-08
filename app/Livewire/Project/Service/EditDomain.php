@@ -46,18 +46,18 @@ class EditDomain extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
 
             // Sync to model
-            $this->application->fqdn = $this->fqdn;
+            $this->application->setEditableUrls($this->fqdn);
 
             $this->application->save();
         } else {
             // Sync from model
-            $this->fqdn = $this->application->fqdn;
+            $this->fqdn = $this->application->url;
         }
     }
 
@@ -84,6 +84,10 @@ class EditDomain extends Component
     public function submit()
     {
         try {
+            $persistedApplication = $this->application->fresh();
+            $previousEditableUrls = $persistedApplication->url;
+            $previousFqdn = $persistedApplication->fqdn;
+            $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->application);
             $this->validate();
 
@@ -93,7 +97,7 @@ class EditDomain extends Component
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
             // Sync to model for domain conflict check (without validation)
-            $this->application->fqdn = $this->fqdn;
+            $this->application->setEditableUrls($this->fqdn);
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -113,28 +117,20 @@ class EditDomain extends Component
                 $requiredPort = $this->application->getRequiredPort();
 
                 if ($requiredPort !== null) {
-                    // Check if all FQDNs have a port
-                    $fqdns = str($this->fqdn)->trim()->explode(',');
-                    $missingPort = false;
-
-                    foreach ($fqdns as $fqdn) {
-                        $fqdn = trim($fqdn);
-                        if (empty($fqdn)) {
+                    foreach (str($this->fqdn)->trim()->explode(',') as $fqdn) {
+                        $fqdn = trim((string) $fqdn);
+                        if ($fqdn === '') {
                             continue;
                         }
 
-                        $port = ServiceApplication::extractPortFromUrl($fqdn);
-                        if ($port === null) {
-                            $missingPort = true;
-                            break;
+                        if ($this->application->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                            $this->requiredPort = $requiredPort;
+                            $this->showPortWarningModal = true;
+                            $this->application->fqdn = $previousFqdn;
+                            $this->application->domain_port_overrides = $previousPortOverrides;
+
+                            return;
                         }
-                    }
-
-                    if ($missingPort) {
-                        $this->requiredPort = $requiredPort;
-                        $this->showPortWarningModal = true;
-
-                        return;
                     }
                 }
             } else {
