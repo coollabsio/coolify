@@ -6,8 +6,6 @@
             handleSubmit(event) {
                 if (this.submitting) {
                     event.preventDefault();
-
-                    return;
                 }
 
                 this.submitting = true;
