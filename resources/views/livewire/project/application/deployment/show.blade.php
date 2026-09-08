@@ -367,7 +367,7 @@
                                         x-transition:leave="transition ease-in duration-75"
                                         x-transition:leave-start="transform opacity-100 scale-100"
                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-modal focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
+                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-dropdown focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
                                         <div>
                                             <button x-on:click="downloadLogs(); downloadMenuOpen = false"
                                                 class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">

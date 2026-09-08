@@ -8,7 +8,7 @@
         @else
             <div class="data-table w-full">
                 <div
-                    class="grid grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_8rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="grid grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_8rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <span>Resource</span>
                     <span>Server</span>
                     <span>Status</span>
