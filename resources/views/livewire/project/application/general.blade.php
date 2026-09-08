@@ -119,8 +119,7 @@
                 @else
                     <div class="flex flex-col gap-5">
                         @if ($buildPack === 'dockercompose')
-                            <div class="flex flex-col gap-2"
-                                @can('update', $application) x-init="$wire.dispatch('loadCompose', true)" @endcan>
+                            <div class="flex flex-col gap-2">
                                 <div x-data="{
                                     baseDir: @entangle('baseDirectory'),
                                     composeLocation: @entangle('dockerComposeLocation'),
@@ -399,7 +398,15 @@
             @endif
 
             @if ($buildPack !== 'dockercompose')
-                <x-application.settings-section id="networking-section" title="Networking" helper="Ports the container exposes, host port mappings and internal network aliases.">
+                @php
+                    $applicationDomainsUrl = route('project.application.domains', [
+                        'project_uuid' => $application->environment->project->uuid,
+                        'environment_uuid' => $application->environment->uuid,
+                        'application_uuid' => $application->uuid,
+                    ]);
+                    $portsExposesDomainHint = "You can also set a different internal port for each domain on the <a class='underline dark:text-white' href='{$applicationDomainsUrl}'>Domains</a> page.";
+                @endphp
+                <x-application.settings-section id="networking-section" title="Networking" helper="Ports the container exposes, host port mappings and internal network aliases. You can also set an internal port per domain.">
                 @if ($this->detectedPortInfo)
                     @if ($this->detectedPortInfo['isEmpty'])
                         <div
@@ -461,20 +468,30 @@
                     </x-callout>
                 @endif
                 <div class="grid gap-4 lg:grid-cols-[14rem_16rem_minmax(0,1fr)]">
+                    <div class="min-w-0">
                     @if ($isStatic || $buildPack === 'static')
                         <x-forms.input id="portsExposes" label="Ports exposes" readonly
+                            :helper="$portsExposesDomainHint"
+                            canGate="update" :canResource="$application"
                             x-bind:disabled="!canUpdate" />
                     @else
                         @if ($application->settings->is_container_label_readonly_enabled === false)
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes" readonly
-                                helper="Readonly labels are disabled. You can set the ports manually in the labels section."
+                                :helper="'Readonly labels are disabled. You can set the ports manually in the labels section.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes"
-                                helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly."
+                                :helper="'A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @endif
                     @endif
+                    <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">
+                        You can also set an internal port per domain on
+                        <a class="underline dark:text-white" href="{{ $applicationDomainsUrl }}" {{ wireNavigate() }}>Domains</a>.
+                    </p>
+                    </div>
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="portsMappings" label="Port mappings"
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Format:</span> host:container<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span> 3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host."

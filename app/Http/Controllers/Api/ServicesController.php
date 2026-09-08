@@ -1020,6 +1020,8 @@ class ServicesController extends Controller
 
         $this->authorize('delete', $service);
 
+        $service->delete();
+
         DeleteResourceJob::dispatch(
             resource: $service,
             deleteVolumes: $request->boolean('delete_volumes', true),

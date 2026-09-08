@@ -230,12 +230,10 @@ class Show extends Component
             ->toArray();
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-
-            $this->authorize('update', $this->server);
             $foundServer = Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
                 ->first();
@@ -363,6 +361,7 @@ class Show extends Component
     public function checkLocalhostConnection()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {
@@ -479,6 +478,7 @@ class Show extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -694,6 +694,7 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server settings updated.');
         } catch (\Throwable $e) {

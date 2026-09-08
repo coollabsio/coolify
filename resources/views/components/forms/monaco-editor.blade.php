@@ -10,8 +10,6 @@
         monacoVersion: '0.52.2',
         monacoContent: @entangle($id),
         monacoLanguage: '',
-        monacoPlaceholder: true,
-        monacoPlaceholderText: 'Start typing here',
         monacoLoader: true,
         monacoFontSize: '15px',
         monacoId: $id('monaco-editor'),
@@ -21,20 +19,7 @@
         monacoEditor(editor) {
             editor.onDidChangeModelContent((e) => {
                 this.monacoContent = editor.getValue();
-                this.updatePlaceholder(editor.getValue());
             });
-            editor.onDidBlurEditorWidget(() => {
-                this.updatePlaceholder(editor.getValue());
-            });
-            editor.onDidFocusEditorWidget(() => {
-                this.updatePlaceholder(editor.getValue());
-            });
-        },
-        updatePlaceholder(value) {
-            this.monacoPlaceholder = value === '';
-        },
-        monacoEditorFocus() {
-            document.getElementById(this.monacoId).dispatchEvent(new CustomEvent('monaco-editor-focused', { detail: { monacoId: this.monacoId } }));
         },
         monacoEditorAddLoaderScriptToHead() {
             // Use a global flag to prevent duplicate script loading
@@ -115,6 +100,10 @@
                         fontSize: monacoFontSize,
                         lineNumbersMinChars: 3,
                         automaticLayout: true,
+                        language: '{{ $language }}',
+                        placeholder: 'Start typing here',
+                        domReadOnly: '{{ $readonly ?? false }}',
+                        contextmenu: '!{{ $readonly ?? false }}',
                         renderLineHighlight: 'none',
                         stickyScroll: { enabled: false },
                         padding: { top: 12, bottom: 12 },
@@ -173,13 +162,8 @@
                     });
         
                     monacoEditor(editor);
-        
-                    document.getElementById(monacoId).editor = editor;
-                    document.getElementById(monacoId).addEventListener('monaco-editor-focused', (event) => {
-                        editor.focus();
-                    });
 
-                    updatePlaceholder(editor.getValue());
+                    document.getElementById(monacoId).editor = editor;
 
                     @if ($autofocus)
                     // Auto-focus the editor
@@ -210,10 +194,6 @@
                 Loading editor
             </div>
             <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
-            <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder && {{ $isDiff ? 'false' : 'true' }}" @click="monacoEditorFocus()"
-                :style="'font-size: ' + monacoFontSize"
-                class="w-full text-sm font-mono absolute z-50 text-gray-500 ml-14 -translate-x-0.5 mt-0.5 left-0 top-0"
-                x-text="monacoPlaceholderText"></div>
         </div>
     </div>
 </div>

@@ -29,10 +29,9 @@ class Swarm extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->save();
@@ -45,6 +44,7 @@ class Swarm extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
         } catch (\Throwable $e) {

@@ -76,9 +76,8 @@
             </div>
             @foreach ($privateKeys as $key)
                 @can('view', $key)
-                    <x-modal-input title="Edit Private Key" isFullWidth :wireIgnore="false" :contentClicks="false"
+                    <div wire:key="private-key-{{ $key->id }}"
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                        <x-slot:content>
                     <div
                         class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:hover:bg-white/[0.025]"
                     >
@@ -104,14 +103,13 @@
                             @endif
                         </div>
                         <button type="button" class="icon-button" title="Edit private key"
-                            aria-label="Edit {{ $key->name }}" @click="modalOpen=true">
+                            aria-label="Edit {{ $key->name }}"
+                            @click="$dispatch('open-private-key-editor', { name: @js($key->name), description: @js($key->description ?? '') })"
+                            wire:click="openEditor('{{ $key->uuid }}')">
                             <x-reicon name="settings" class="size-3.5" />
                         </button>
                     </div>
-                        </x-slot:content>
-                        <livewire:security.private-key.show :private_key_uuid="$key->uuid" :modalMode="true"
-                            :key="'private-key-editor-'.$key->uuid" />
-                    </x-modal-input>
+                    </div>
                 @else
                     <div class="grid min-h-14 cursor-not-allowed grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 opacity-65 last:border-b-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:border-white/[0.07]"
                         title="You do not have permission to view this private key">
@@ -139,6 +137,39 @@
             @endforeach
         </div>
     @endif
+
+    <x-modal-input title="Edit Private Key" :wireIgnore="false" :contentClicks="false"
+        @open-private-key-editor.window="modalOpen=true; $nextTick(() => { $refs.loadingPrivateKeyName.value = $event.detail.name; $refs.loadingPrivateKeyDescription.value = $event.detail.description })">
+        <x-slot:content><span class="hidden" aria-hidden="true"></span></x-slot:content>
+        <div wire:loading.flex wire:target="openEditor" aria-label="Loading private key editor"
+            class="w-full flex-col gap-4">
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="Name" required x-ref="loadingPrivateKeyName" />
+                <x-forms.input label="Description" x-ref="loadingPrivateKeyDescription" />
+                <div class="lg:col-span-2">
+                    <x-forms.input label="Public key" loading
+                        helper="Copy this value to ~/.ssh/authorized_keys on the target server." />
+                </div>
+                <div class="lg:col-span-2">
+                    <div class="mb-1.5 flex items-center justify-between gap-3">
+                        <label class="text-[13px] font-medium">Private key <span class="text-helper">*</span></label>
+                        <span class="text-[11px] font-medium text-neutral-400 dark:text-fg-faint">Edit key</span>
+                    </div>
+                    <x-forms.input loading :allowToPeak="false" />
+                </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                <x-forms.button disabled isError>Delete</x-forms.button>
+                <x-forms.button disabled isHighlighted>Save changes</x-forms.button>
+            </div>
+        </div>
+        @if ($selectedPrivateKeyUuid)
+            <div wire:loading.remove wire:target="openEditor">
+                <livewire:security.private-key.show :private_key_uuid="$selectedPrivateKeyUuid" :modalMode="true"
+                    :key="'private-key-editor-'.$selectedPrivateKeyUuid" />
+            </div>
+        @endif
+    </x-modal-input>
         </x-application.settings-section>
 
     </x-security.settings-layout>

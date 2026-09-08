@@ -36,11 +36,14 @@ it('returns each service template last updated timestamp from the generated bund
         ->toBe(CarbonImmutable::parse($templateTimestamp)->timezone(config('app.timezone'))->format('M j, Y H:i'));
 });
 
-it('uses a valid local icon or the default icon for every service', function () {
+it('returns local, CDN, and default logo fallbacks for every service', function () {
     $services = (new Select)->loadServices()['services'];
 
     expect($services['opnform']['logo'])->toBe(asset('svgs/opnform.svg'))
-        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/default.webp'));
+        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/cells.svg'))
+        ->and($services['pydio-cells']['logo_cdn_url'])
+        ->toBe('https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/svgs/cells.svg')
+        ->and($services['pydio-cells']['logo_default_url'])->toBe(asset('svgs/default.webp'));
 });
 
 it('crops wide database wordmarks to their icon artwork', function () {
@@ -125,6 +128,22 @@ it('renders the service templates last updated hint placeholder', function () {
     $view->assertSee('aria-controls="resource-category-options"', false);
     $view->assertSee('@click.outside="closeCategoryFilter()"', false);
     $view->assertSee('@keydown.escape.stop="closeCategoryFilter(true)"', false);
+});
+
+it('renders the local, CDN, and default service logo fallback chain', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee('service.logo_cdn_url', false);
+    $view->assertSee('service.logo_default_url', false);
+
+    expect(file_get_contents(resource_path('views/livewire/global-search.blade.php')))
+        ->toContain('item.logo_cdn_url')
+        ->toContain('item.logo_default_url');
 });
 
 it('keeps service template keys for service selection and docs links', function () {

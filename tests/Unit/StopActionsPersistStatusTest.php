@@ -10,8 +10,7 @@ it('persists exited status for every full application stop path', function () {
     $action = file_get_contents(__DIR__.'/../../app/Actions/Application/StopApplication.php');
 
     expect($action)
-        ->toContain("\$status = ['status' => 'exited'];")
-        ->toContain('$application->update($status);')
+        ->toMatch('/\$status\s*=\s*\[\s*\'status\'\s*=>\s*\'exited\',.*?\];.*?\$application->update\(\$status\);/s')
         ->not->toMatch('/docker stack rm .*?return;/s');
 });
 
@@ -19,8 +18,10 @@ it('persists exited status for all children when stopping a service', function (
     $action = file_get_contents(__DIR__.'/../../app/Actions/Service/StopService.php');
 
     expect($action)
-        ->toContain("\$applications->each->update(['status' => 'exited']);")
-        ->toContain("\$dbs->each->update(['status' => 'exited']);");
+        ->toContain("\$application->update(['status' => 'exited']);")
+        ->toContain('$application->resetRestartLimit();')
+        ->toContain("\$database->update(['status' => 'exited']);")
+        ->toContain('$database->resetRestartLimit();');
 });
 
 it('persists exited status when stopping an individual service resource', function () {
@@ -28,6 +29,8 @@ it('persists exited status when stopping an individual service resource', functi
 
     expect($action)
         ->toContain("\$serviceApplication->update(['status' => 'exited']);")
+        ->toContain('$commands = ["docker rm -f {$containerName}"];')
+        ->toContain('throwError: ! $removeContainer')
         ->toContain('ServiceStatusChanged::dispatch($service->environment->project->team->id);');
 });
 
