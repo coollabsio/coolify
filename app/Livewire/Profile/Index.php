@@ -47,7 +47,7 @@ class Index extends Component
 
             $avatarStorage->store(Auth::user(), $this->avatar);
             $this->reset('avatar');
-            $this->dispatch('avatar-updated', url: route('profile.avatar', ['v' => Auth::user()->fresh()->updated_at->timestamp]));
+            $this->dispatch('avatar-updated', url: profile_avatar_url(Auth::user()->fresh()));
             $this->dispatch('success', 'Profile picture updated.');
 
             return true;

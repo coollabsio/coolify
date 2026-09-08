@@ -128,7 +128,7 @@ class General extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -237,6 +237,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 

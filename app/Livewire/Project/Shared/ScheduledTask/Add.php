@@ -102,7 +102,7 @@ class Add extends Component
         }
     }
 
-    public function saveScheduledTask()
+    private function saveScheduledTask(): mixed
     {
         try {
             $task = new ScheduledTask;

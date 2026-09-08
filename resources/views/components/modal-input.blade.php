@@ -47,7 +47,7 @@
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
-            <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+            <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
                 <div id="{{ $modalId }}" x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
                     x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -61,19 +61,22 @@
                         'lg:w-auto lg:min-w-2xl lg:max-w-4xl' => ! $isLarge,
                     ])
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header class="flex-nowrap!">
+                    <header class="flex-wrap! sm:flex-nowrap!">
                         <h3 class="min-w-0 flex-1 truncate">{{ $title }}</h3>
                         @isset($headerActions)
-                            <div class="flex shrink-0 items-center gap-2">
+                            <div class="order-3 w-full sm:order-none sm:w-auto flex shrink-0 items-center gap-2">
                                 {{ $headerActions }}
                             </div>
                         @endisset
                         <button type="button" @click="modalOpen=false"
-                            class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                            class="order-2 sm:order-none flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                             <x-reicon name="x" class="size-4" />
                         </button>
                     </header>
-                    <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                    <div @class([
+                        'application-settings-section-body min-h-0 flex-1 overflow-y-auto',
+                        'mt-2 sm:mt-0' => isset($headerActions),
+                    ])
                         style="-webkit-overflow-scrolling: touch;">
                         {{ $slot }}
                     </div>

@@ -61,9 +61,10 @@
                 ->reject(fn ($item) => (bool) ($item['is_suggested'] ?? false))
                 ->first(fn ($item) => $redirectPairKey($item['url']) === $pairKey)['url'] ?? null;
             $showDirection = ! $isSuggested && $firstPairRowUrl === $row['url'];
+            $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
         @endphp
 
-        <div wire:key="svc-domain-{{ $row['service_application_id'] ?? 'x' }}-{{ $index }}-{{ md5(($isSuggested ? 's:' : '') . $row['url']) }}"
+        <div wire:key="svc-domain-{{ $row['service_application_id'] ?? 'x' }}-{{ md5(($isSuggested ? 's:' : '') . $row['url']) }}"
             class="env-table-item">
             <div @class([
                 'data-table-row',
@@ -97,6 +98,12 @@
                                 title="{{ $row['url'] }}">
                                 {{ $row['url'] }}
                             </a>
+                            @if (filled($row['internal_port'] ?? null) && (int) $row['internal_port'] > 0)
+                                <span class="table-badge shrink-0"
+                                    title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from the Coolify service port' }}">
+                                    Internal port {{ $row['internal_port'] }}
+                                </span>
+                            @endif
                         @endif
                         @if ($isSuggested && ! empty($row['suggestion_label']))
                             <span class="table-badge table-badge-warning shrink-0">{{ $row['suggestion_label'] }}</span>
@@ -208,7 +215,7 @@
                             </button>
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                 buttonTitle="Remove" isErrorButton
-                                submitAction="removeDomain({{ $index }})" :actions="[
+                                submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                     'This domain will be removed from the service application.',
                                     'Redeploy or restart may be required for proxy changes.',
                                 ]" :confirmWithPassword="false" :confirmWithText="false"

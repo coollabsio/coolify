@@ -26,7 +26,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -47,9 +46,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         if ($this->resource instanceof ApplicationPreview) {
-            DB::transaction(function (): void {
-                $this->deleteApplicationPreview();
-            });
+            $this->deleteApplicationPreview();
 
             return;
         }
@@ -99,17 +96,17 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        DB::transaction(function (): void {
-            try {
-                $this->deleteScheduledVolumeBackups();
-            } catch (\Throwable $e) {
-                Log::warning('Remote backup cleanup failed while deleting resource; continuing with local deletion.', [
-                    'resource_id' => $this->resource->id,
-                    'resource_type' => $this->resource->type(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        try {
+            $this->deleteScheduledVolumeBackups();
+        } catch (\Throwable $e) {
+            Log::warning('Remote backup cleanup failed while deleting resource; continuing with local deletion.', [
+                'resource_id' => $this->resource->id,
+                'resource_type' => $this->resource->type(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
+        DB::transaction(function (): void {
             if ($this->resource instanceof Service) {
                 app(DeleteService::class)->deleteLocal($this->resource);
 
@@ -130,7 +127,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $this->resource->forceDelete();
         });
 
-        Artisan::queue('cleanup:stucked-resources');
     }
 
     private function isDatabase(): bool
@@ -163,10 +159,22 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function deleteApplicationPreview()
+    private function deleteApplicationPreview(): void
     {
         $application = $this->resource->application;
-        $server = $application->destination->server;
+
+        if (! $application) {
+            $this->deleteApplicationPreviewLocally();
+
+            return;
+        }
+
+        $server = $application->destination?->server;
+        if (! $server) {
+            $this->deleteApplicationPreviewLocally();
+
+            return;
+        }
         $pull_request_id = $this->resource->pull_request_id;
 
         // Ensure the preview is soft deleted (may already be done in Livewire component)
@@ -237,6 +245,14 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         // Finally, force delete to trigger resource cleanup
         $this->resource->forceDelete();
+    }
+
+    private function deleteApplicationPreviewLocally(): void
+    {
+        DB::transaction(function (): void {
+            $this->resource->persistentStorages()->delete();
+            ApplicationPreview::withoutEvents(fn () => $this->resource->forceDelete());
+        });
     }
 
     private function stopPreviewContainers(array $containers, $server, int $timeout = 30)
