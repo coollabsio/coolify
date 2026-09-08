@@ -1,16 +1,11 @@
 <div class="flex w-full min-w-0 flex-col gap-6">
     {{-- Header (real chrome; only the data below is a skeleton) --}}
     <div class="flex flex-col gap-4">
-        <div class="flex items-center gap-3">
-            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
-                <x-reicon name="analytics" class="size-5" />
-            </span>
-            <div class="min-w-0">
-                <h1 class="text-[16px]! leading-5! font-semibold! text-black dark:text-fg">Analytics</h1>
-                <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-faint">
-                    Request traffic across every application and server, reported by Sentinel.
-                </p>
-            </div>
+        <div class="min-w-0">
+            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                Request traffic across every application and server, reported by Sentinel.
+            </p>
         </div>
 
         {{-- Filter bar --}}

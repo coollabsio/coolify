@@ -1,5 +1,5 @@
 <?php
-$tabButtonBase = 'h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+$tabButtonBase = 'relative inline-flex h-7 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 $tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
 $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
 
@@ -27,43 +27,54 @@ $appListboxOptions = array_merge(
 
     {{-- Header --}}
     <div class="flex flex-col gap-4">
-        <div class="flex items-center gap-3">
-            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
-                <x-reicon name="analytics" class="size-5" />
-            </span>
-            <div class="min-w-0">
-                <h1 class="text-[16px]! leading-5! font-semibold! text-black dark:text-fg">Analytics</h1>
-                <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-faint">
-                    Request traffic across every application and server, reported by Sentinel.
-                </p>
-            </div>
+        <div class="min-w-0">
+            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                Request traffic across every application and server, reported by Sentinel.
+            </p>
         </div>
 
         @if ($servers->isNotEmpty() && $overview)
             <div class="flex flex-wrap items-center gap-2">
-                <div class="w-full sm:w-52">
+                <div class="relative w-full transition-opacity sm:w-52"
+                    wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid">
                     <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers" />
+                    <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                        wire:loading.flex wire:target="serverUuid">
+                        <x-loading compact aria-label="Loading analytics" />
+                    </div>
                 </div>
                 {{-- Re-key on the server filter so the application listbox re-initializes with the
                      newly-scoped options (and reset value) instead of showing stale Alpine state. --}}
-                <div class="w-full sm:w-52" wire:key="app-filter-{{ $serverUuid }}">
+                <div class="relative w-full transition-opacity sm:w-52" wire:key="app-filter-{{ $serverUuid }}"
+                    wire:loading.class="pointer-events-none opacity-60" wire:target="appUuid">
                     <x-forms.listbox id="appUuid" live :options="$appListboxOptions" placeholder="All applications" />
+                    <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                        wire:loading.flex wire:target="appUuid">
+                        <x-loading compact aria-label="Loading analytics" />
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-2 sm:ml-auto">
                     @include('livewire.traffic._live-toggle')
                     <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
                         <button type="button" wire:click="setRange('24h')"
+                            wire:loading.attr="disabled" wire:target="setRange"
                             @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
-                            24 hours
+                            <span wire:loading.class="invisible" wire:target="setRange('24h')">24 hours</span>
+                            <x-loading compact class="absolute" wire:loading wire:target="setRange('24h')" aria-label="Loading analytics" />
                         </button>
                         <button type="button" wire:click="setRange('7d')"
+                            wire:loading.attr="disabled" wire:target="setRange"
                             @class([$tabButtonBase, $range === '7d' ? $tabButtonActive : $tabButtonInactive])>
-                            7 days
+                            <span wire:loading.class="invisible" wire:target="setRange('7d')">7 days</span>
+                            <x-loading compact class="absolute" wire:loading wire:target="setRange('7d')" aria-label="Loading analytics" />
                         </button>
                         <button type="button" wire:click="setRange('30d')"
+                            wire:loading.attr="disabled" wire:target="setRange"
                             @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
-                            30 days
+                            <span wire:loading.class="invisible" wire:target="setRange('30d')">30 days</span>
+                            <x-loading compact class="absolute" wire:loading wire:target="setRange('30d')" aria-label="Loading analytics" />
                         </button>
                     </div>
                 </div>
@@ -207,7 +218,7 @@ $appListboxOptions = array_merge(
         </x-application.settings-section>
 
         {{-- Requests over time (single area series). --}}
-        <x-application.settings-section id="analytics-requests-section" title="Requests"
+        <x-application.settings-section id="analytics-requests-section" title="Requests" flush
             helper="Total request volume over time for the selected range.">
             @include('livewire.traffic._requests-chart')
         </x-application.settings-section>

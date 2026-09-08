@@ -1,5 +1,5 @@
 <?php
-$tabButtonBase = 'h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+$tabButtonBase = 'relative inline-flex h-7 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 $tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
 $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
 
@@ -14,7 +14,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 Traffic analytics
             </h2>
             <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                Team-wide request volume across traffic-enabled servers
+                Team-wide request volume across servers with traffic analytics enabled
             </p>
         </div>
 
@@ -22,16 +22,22 @@ $spark = 'refreshChartData-'.$chartId.'-status';
             @if ($servers->isNotEmpty() && $overview)
                 <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
                     <button type="button" wire:click="setRange('24h')"
+                        wire:loading.attr="disabled" wire:target="setRange"
                         @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
-                        24 hours
+                        <span wire:loading.class="invisible" wire:target="setRange('24h')">24 hours</span>
+                        <x-loading compact class="absolute" wire:loading wire:target="setRange('24h')" aria-label="Loading analytics" />
                     </button>
                     <button type="button" wire:click="setRange('7d')"
+                        wire:loading.attr="disabled" wire:target="setRange"
                         @class([$tabButtonBase, $range === '7d' ? $tabButtonActive : $tabButtonInactive])>
-                        7 days
+                        <span wire:loading.class="invisible" wire:target="setRange('7d')">7 days</span>
+                        <x-loading compact class="absolute" wire:loading wire:target="setRange('7d')" aria-label="Loading analytics" />
                     </button>
                     <button type="button" wire:click="setRange('30d')"
+                        wire:loading.attr="disabled" wire:target="setRange"
                         @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
-                        30 days
+                        <span wire:loading.class="invisible" wire:target="setRange('30d')">30 days</span>
+                        <x-loading compact class="absolute" wire:loading wire:target="setRange('30d')" aria-label="Loading analytics" />
                     </button>
                 </div>
             @endif

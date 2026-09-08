@@ -152,6 +152,21 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSet('appOptions', [$application->uuid => 'Global Leaderboard App']);
 });
 
+it('shows loading states while analytics filters refresh', function () {
+    $view = file_get_contents(resource_path('views/livewire/analytics.blade.php'));
+
+    expect($view)
+        ->toContain('wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid"')
+        ->toContain('wire:loading.flex wire:target="serverUuid"')
+        ->toContain('wire:loading.class="pointer-events-none opacity-60" wire:target="appUuid"')
+        ->toContain('wire:loading.flex wire:target="appUuid"')
+        ->toContain('wire:loading.attr="disabled" wire:target="setRange"')
+        ->toContain('wire:loading.class="invisible" wire:target="setRange(\'24h\')"')
+        ->toContain('wire:loading wire:target="setRange(\'7d\')"')
+        ->toContain('wire:loading wire:target="setRange(\'30d\')"')
+        ->toContain('aria-label="Loading analytics"');
+});
+
 it('shows a no-data state for the requests chart when no traffic falls in the range', function () {
     $server = bootEnabledGlobalServer();
 

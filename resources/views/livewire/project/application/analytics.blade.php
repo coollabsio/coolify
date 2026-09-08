@@ -130,7 +130,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section id="analytics-requests-section" title="Requests"
+        <x-application.settings-section id="analytics-requests-section" title="Requests" flush
             helper="Total request volume over time for the selected range.">
             @include('livewire.traffic._requests-chart')
         </x-application.settings-section>

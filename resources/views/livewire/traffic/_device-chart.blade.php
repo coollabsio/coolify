@@ -11,8 +11,9 @@
     $labels = $labels ?? [];
     $series = $series ?? [];
     $deviceChartId = $chartId.'-device';
+    $hasDeviceData = array_sum(array_map('intval', $series)) > 0;
 @endphp
-@if (empty($series))
+@if (! $hasDeviceData)
     <x-empty size="sm" title="No device data" description="No device data for the selected range." icon-name="network" />
 @else
     <div wire:ignore id="{!! $deviceChartId !!}" class="min-h-[240px] w-full"></div>
@@ -20,6 +21,7 @@
     @script
     <script>
         (() => {
+            requestAnimationFrame(() => {
             checkTheme();
             const el = document.getElementById('{!! $deviceChartId !!}');
             if (!el) { return; }
@@ -50,6 +52,7 @@
                 if (!data || !Array.isArray(data.deviceSeries)) { return; }
                 chart.updateOptions({ labels: data.deviceLabels, legend: legend() });
                 chart.updateSeries(data.deviceSeries);
+            });
             });
         })();
     </script>

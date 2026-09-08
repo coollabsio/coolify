@@ -141,6 +141,17 @@ test('sentinel custom docker image x-init only sets wire when a value exists', f
         ->not->toContain("x-init=\"\$wire.set('sentinelCustomDockerImage', customImage)\"");
 });
 
+test('sentinel custom docker image does not rerender while typing and has an explicit apply action', function () {
+    $contents = file_get_contents(resource_path('views/livewire/server/sentinel.blade.php'));
+
+    expect($contents)
+        ->toContain('async applyCustomImage()')
+        ->toContain("await \$wire.set('sentinelCustomDockerImage', this.customImage || null)")
+        ->toContain('await $wire.restartSentinel()')
+        ->toContain('Apply and restart')
+        ->not->toContain('@input.debounce.500ms="saveCustomImage()"');
+});
+
 /**
  * Instant-save listboxes (e.g. MCP server) entangle + call instantSave. Until the
  * round-trip finishes, the component is dirty — so an unscoped unsaved bar flashes.

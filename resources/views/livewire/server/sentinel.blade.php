@@ -148,19 +148,27 @@
                             ]" />
                         <div x-data="{
                             customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
-                            saveCustomImage() {
+                            async applyCustomImage() {
                                 localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                                $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.restartSentinel();
                             }
                         }"
                             {{-- Only hydrate Livewire when a real override exists. Unconditional
                                  $wire.set('', null→'') on every open marks the component dirty and
                                  flashes the unsaved bar until the round-trip completes. --}}
                             x-init="if (customImage) { $wire.set('sentinelCustomDockerImage', customImage) }">
-                            <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
-                                @input.debounce.500ms="saveCustomImage()"
-                                placeholder="sentinel:latest" label="Custom Docker image"
-                                helper="Leave empty to use the default Sentinel image." />
+                            <div class="flex items-end gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
+                                        placeholder="sentinel:latest" label="Custom Docker image"
+                                        helper="Leave empty to use the default Sentinel image." />
+                                </div>
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    x-on:click="applyCustomImage()">
+                                    Apply and restart
+                                </x-forms.button>
+                            </div>
                         </div>
                     </div>
                 </x-application.settings-section>

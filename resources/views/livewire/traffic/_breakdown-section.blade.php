@@ -18,7 +18,7 @@
 <x-application.settings-section id="analytics-{{ $dimension }}-section" :title="$label" :helper="$helper" flush>
     @if (collect($rows)->isEmpty())
         <x-empty size="sm" title="No data"
-            description="No {{ strtolower($label) }} data for the selected range." icon-name="network" />
+            :description="'No '.strtolower($label).' data for the selected range.'" icon-name="network" />
     @else
         <div x-data="{ page: 0, per: 10, total: {{ count($rows) }} }">
             @foreach ($rows as $row)

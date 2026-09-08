@@ -440,6 +440,7 @@ class Analytics extends Component
                 's5xx' => array_column($this->series, 's5xx'),
             ],
             'requestsSpark' => $this->requestsSpark(),
+            'sparkCategories' => array_column($this->series, 'bucket'),
             'errorsSpark' => $this->errorsSpark(),
             'bandwidthSpark' => $this->bandwidthSpark(),
             'uniquesSpark' => $this->uniquesSpark(),

@@ -4,14 +4,20 @@
     token. Updated via the `refreshChartData-{chartId}-status` event (the `timeSeries.requests`
     array, aligned with `timeSeries.categories`). Expects `$chartId` in scope.
 --}}
+@php
+    $initialChartData = [
+        'initialCategories' => array_column($series, 'bucket'),
+        'initialRequests' => $this->requestsSpark(),
+    ];
+@endphp
 <div wire:ignore class="relative w-full">
-    <div id="{!! $chartId !!}-requests" class="min-h-[220px] w-full"></div>
+    <div id="{{ $chartId }}-requests" class="min-h-[220px] w-full"></div>
 
     {{-- No-data overlay: covers the empty chart frame when no requests fall in the range.
          Uses the shared x-empty component so it matches the other analytics empty states
          (e.g. Status codes). Toggled from the refresh listener below (kept mounted so the
          chart's listener survives live/range re-renders). --}}
-    <div id="{!! $chartId !!}-requests-empty" style="display: {{ $this->hasRequestSeries() ? 'none' : 'flex' }}"
+    <div id="{{ $chartId }}-requests-empty" style="display: {{ $this->hasRequestSeries() ? 'none' : 'flex' }}"
         class="absolute inset-0 items-center justify-center bg-white dark:bg-base">
         <x-empty size="sm" title="No requests in this range"
             description="No request traffic was recorded for the selected filters and range. Try a wider range or check back later."
@@ -22,16 +28,28 @@
 @script
 <script>
     (() => {
+        requestAnimationFrame(() => {
         checkTheme();
 
-        const el = document.getElementById('{!! $chartId !!}-requests');
-        const emptyEl = document.getElementById('{!! $chartId !!}-requests-empty');
+        const chartId = @js($chartId);
+        const initial = @js($initialChartData);
+        const initialPoints = initial.initialCategories.map((category, index) => ({
+            x: category,
+            y: initial.initialRequests[index] || 0,
+        }));
+        const el = document.getElementById(`${chartId}-requests`);
+        const emptyEl = document.getElementById(`${chartId}-requests-empty`);
+        if (!el) { return; }
         const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const accent = () => cssVar('--chart-status-3xx') || '#3b82f6';
         const gridColor = () => cssVar('--chart-geo-empty') || 'rgba(128,128,128,0.15)';
 
         // `24h` buckets are hourly, `7d`/`30d` daily — pick a matching axis/tooltip format.
         const timeFormat = range => (range === '24h' ? 'HH:mm' : 'dd MMM');
+        const formatTimestamp = timestamp => `${new Date(timestamp).toLocaleString(undefined, {
+            timeZone: 'UTC',
+            hour12: false,
+        })} UTC`;
 
         const chart = new ApexCharts(el, {
             chart: {
@@ -42,7 +60,7 @@
                 animations: { enabled: false },
                 background: 'transparent',
             },
-            series: [{ name: 'Requests', data: [] }],
+            series: [{ name: 'Requests', data: initialPoints }],
             colors: [accent()],
             dataLabels: { enabled: false },
             stroke: { width: 2, curve: 'smooth' },
@@ -58,25 +76,39 @@
             },
             yaxis: {
                 labels: {
+                    minWidth: 28,
+                    maxWidth: 28,
                     style: { colors: textColor },
                     formatter: value => Math.round(value).toLocaleString(),
                 },
             },
-            grid: { borderColor: gridColor() },
+            grid: {
+                borderColor: gridColor(),
+                padding: { left: 0, right: 12, top: 12, bottom: 0 },
+            },
             legend: { show: false },
             noData: {
                 text: 'Loading requests…',
                 style: { color: textColor },
             },
             tooltip: {
-                y: {
-                    formatter: value => `${value.toLocaleString()} requests`,
+                shared: true,
+                intersect: false,
+                marker: { show: false },
+                custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                    const requests = series[seriesIndex][dataPointIndex];
+                    const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+
+                    return `<div class="apexcharts-tooltip-custom">
+                        <div class="apexcharts-tooltip-custom-value">Requests: <span class="apexcharts-tooltip-value-bold">${requests.toLocaleString()}</span></div>
+                        <div class="apexcharts-tooltip-custom-title">${formatTimestamp(timestamp)}</div>
+                    </div>`;
                 },
             },
         });
         chart.render();
 
-        Livewire.on('refreshChartData-{!! $chartId !!}-status', payload => {
+        Livewire.on(`refreshChartData-${chartId}-status`, payload => {
             checkTheme();
             const data = Array.isArray(payload) ? payload[0] : payload;
             if (!data || !data.timeSeries) { return; }
@@ -90,7 +122,10 @@
 
             chart.updateOptions({
                 colors: [accent()],
-                grid: { borderColor: gridColor() },
+                grid: {
+                    borderColor: gridColor(),
+                    padding: { left: 0, right: 12, top: 12, bottom: 0 },
+                },
                 xaxis: {
                     type: 'datetime',
                     labels: { style: { colors: textColor }, datetimeUTC: false, format: timeFormat(data.range) },
@@ -98,6 +133,7 @@
                 tooltip: { x: { format: timeFormat(data.range) } },
             });
             chart.updateSeries([{ name: 'Requests', data: points }]);
+        });
         });
     })();
 </script>

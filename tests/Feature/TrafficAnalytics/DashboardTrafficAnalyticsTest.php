@@ -139,6 +139,17 @@ it('shows only sparkline KPI cards that link through to the full analytics page'
         ->assertDontSee($otherTeamApplication->uuid);
 });
 
+it('shows loading states while the dashboard range refreshes', function () {
+    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
+
+    expect($view)
+        ->toContain('wire:loading.attr="disabled" wire:target="setRange"')
+        ->toContain('wire:loading.class="invisible" wire:target="setRange(\'24h\')"')
+        ->toContain('wire:loading wire:target="setRange(\'7d\')"')
+        ->toContain('wire:loading wire:target="setRange(\'30d\')"')
+        ->toContain('aria-label="Loading analytics"');
+});
+
 it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {
     $serverOne = Server::factory()->create([
         'team_id' => $this->team->id,

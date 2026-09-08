@@ -120,6 +120,7 @@ class TrafficAnalytics extends Component
 
         $this->dispatch("refreshChartData-{$this->chartId}-status", [
             'requestsSpark' => $this->requestsSpark(),
+            'sparkCategories' => array_column($this->series, 'bucket'),
             'errorsSpark' => $this->errorsSpark(),
             'bandwidthSpark' => $this->bandwidthSpark(),
             'uniquesSpark' => $this->uniquesSpark(),

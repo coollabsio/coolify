@@ -32,3 +32,15 @@ it('builds a flagcdn image url for valid ISO codes only', function () {
     expect(countryFlagUrl(''))->toBeNull();
     expect(countryFlagUrl(null))->toBeNull();
 });
+
+it('renders ampersands in breakdown empty-state descriptions', function () {
+    $html = view('livewire.traffic._breakdown-section', [
+        'dimension' => 'agent',
+        'label' => 'AI agents & bots',
+        'rows' => [],
+    ])->render();
+
+    expect($html)
+        ->toContain('No ai agents &amp; bots data for the selected range.')
+        ->not->toContain('No ai agents &amp;amp; bots data for the selected range.');
+});

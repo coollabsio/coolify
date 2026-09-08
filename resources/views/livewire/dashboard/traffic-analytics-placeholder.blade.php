@@ -6,7 +6,7 @@
                 Traffic analytics
             </h2>
             <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                Team-wide request volume across traffic-enabled servers
+                Team-wide request volume across servers with traffic analytics enabled
             </p>
         </div>
         <div class="flex items-center gap-2">
