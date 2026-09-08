@@ -1765,15 +1765,13 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 @media (min-width: 1280px) {
-    /* Flat rail welded to the main sidebar: full height (3rem → bottom), surface
-       bled left across <main>'s gutter. Negative margins cancel main's pt breathing
-       and the 2.5rem gutter (lg:px-10). */
+    /* Fixed like the main sidebar (3rem → bottom); left tracks its width (--sidebar-w).
+       Fixed leaves the grid, so the content sibling is pinned to column 2 below. */
     .application-settings-navigation {
-        position: sticky;
+        position: fixed;
         top: 3rem;
-        margin-top: -1.75rem;
-        margin-left: -2.5rem;
-        align-self: start;
+        left: var(--sidebar-w, 14rem);
+        width: calc(210px + 2.5rem);
         height: calc(100dvh - 3rem);
         overflow-x: hidden;
         overflow-y: auto;
@@ -1785,6 +1783,11 @@ html[data-theme="custom"] textarea:disabled {
         padding: 0.5rem;
         background: var(--rail-fill);
         border-right: 1px solid var(--coollabs-hairline);
+        transition: left 200ms ease;
+    }
+
+    .application-settings-navigation ~ * {
+        grid-column: 2;
     }
 
     html:not(.dark) .application-settings-navigation {
@@ -1808,13 +1811,14 @@ html[data-theme="custom"] textarea:disabled {
         background: var(--coollabs-line);
     }
 
-    /* Embeds: keep the surface, drop the weld/full-height. */
+    /* Embeds: keep the surface, drop the fixed positioning. */
     .application-settings-navigation.is-flush {
         position: static;
+        inset: auto;
+        width: auto;
         height: auto;
         overflow: visible;
-        margin-top: 0;
-        margin-left: 0;
+        transition: none;
     }
 }
 

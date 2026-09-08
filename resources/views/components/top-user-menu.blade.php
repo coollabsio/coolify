@@ -84,6 +84,22 @@
             <x-theme-controls variant="menu" />
         </div>
 
+        <button type="button" class="listbox-option w-full" @click="toggleAutoCollapse()"
+            :aria-pressed="autoCollapse" title="Collapse the sidebar on pages that have a settings menu">
+            <span class="flex items-center gap-2">
+                <svg class="size-4 opacity-80" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+                Auto-collapse sidebar
+            </span>
+            <svg x-show="autoCollapse" x-cloak class="size-4 shrink-0 text-black dark:text-fg" viewBox="0 0 24 24"
+                fill="none" aria-hidden="true">
+                <path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+        </button>
+
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
 
         <livewire:settings-dropdown trigger="account-menu" />

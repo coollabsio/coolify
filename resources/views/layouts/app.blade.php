@@ -9,21 +9,50 @@
     @auth
         <div x-data="{
             open: false,
-            collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            autoCollapse: localStorage.getItem('sidebarAutoCollapse') !== 'false',
+            hasSecondBar: false,
+            collapsed: false,
             pageWidth: localStorage.getItem('pageWidth') || 'full',
             sidebarReady: false,
             init() {
+                this.applyCollapsed(false);
                 this.$nextTick(() => {
                     requestAnimationFrame(() => {
                         this.sidebarReady = true;
                     });
                 });
             },
+            targetCollapsed() {
+                this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
+                return this.autoCollapse ? this.hasSecondBar : this.userCollapsed;
+            },
+            applyCollapsed(animate) {
+                const target = this.targetCollapsed();
+                if (target === this.collapsed) return;
+                if (animate) {
+                    // Let the new page paint at the current width, then animate the
+                    // slide a frame later so the auto-collapse reads as a motion.
+                    this.sidebarReady = true;
+                    requestAnimationFrame(() => requestAnimationFrame(() => { this.collapsed = target; }));
+                } else {
+                    this.collapsed = target;
+                }
+            },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
-                localStorage.setItem('sidebarCollapsed', this.collapsed);
+                if (!this.autoCollapse) {
+                    this.userCollapsed = this.collapsed;
+                    localStorage.setItem('sidebarCollapsed', this.collapsed);
+                }
+            },
+            toggleAutoCollapse() {
+                this.autoCollapse = !this.autoCollapse;
+                localStorage.setItem('sidebarAutoCollapse', this.autoCollapse);
+                this.applyCollapsed(true);
             }
-        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-cloak
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-on:livewire:navigated.window="applyCollapsed(true)"
+            :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
             class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
 
