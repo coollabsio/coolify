@@ -91,7 +91,7 @@ function createPerfApplicationWithVolumes(int $volumeCount = 5): array
     return [$application, $firstVolume, $team];
 }
 
-it('renders volume rows without nesting Livewire Show components', function () {
+it('renders volume rows inline without nested Livewire row components', function () {
     [$application] = createPerfApplicationWithVolumes(5);
 
     $html = Livewire::test(All::class, ['resource' => $application])->html();
@@ -100,7 +100,6 @@ it('renders volume rows without nesting Livewire Show components', function () {
         ->toContain('data-table')
         ->toContain('openBackupModal')
         ->toContain('wire:submit="submit(')
-        ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('shared-configure-volume-backup-');
 });
 

@@ -261,7 +261,8 @@
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                 @if ($menuItem['badge'] ?? false)
                                     <span class="shrink-0">
-                                        <livewire:project.application.server-status-badge :application="$application" />
+                                        <livewire:project.application.server-status-badge :application="$application"
+                                            :key="'application-server-status-'.$application->uuid" />
                                     </span>
                                 @endif
                             </a>

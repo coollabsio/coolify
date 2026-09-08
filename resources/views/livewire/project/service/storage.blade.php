@@ -366,7 +366,7 @@
                 icon-name="storages" />
         @elseif ($activeTab === 'volumes')
             @if ($hasVolumes)
-                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}"
                     :resource="$resource" />
             @else
                 <x-empty size="sm" title="No volumes configured"
@@ -433,7 +433,7 @@
             @elseif ($activeTab === 'volumes')
                 @if ($hasVolumes)
                     <livewire:project.shared.storages.all
-                        wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                        wire:key="svc-volumes-{{ $resource->id }}"
                         :resource="$resource" />
                 @else
                     <x-empty size="sm" title="No volumes configured"

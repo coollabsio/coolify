@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandalonePostgresql $database;
 
@@ -22,7 +24,11 @@ class StartPostgresql
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandalonePostgresql $database)
+    private string $resolvedPostgresUser;
+
+    private string $resolvedPostgresDatabase;
+
+    public function handle(StandalonePostgresql $database, ?Activity $activity = null)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
@@ -111,7 +117,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', '-U', (string) $this->database->postgres_user, '-d', (string) $this->database->postgres_db, '-c', 'SELECT 1',
+                        'CMD', 'psql', '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -227,7 +233,7 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -265,8 +271,17 @@ class StartPostgresql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedPostgresUser = (string) $this->database->postgres_user;
+        $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'POSTGRES_USER') {
+                $this->resolvedPostgresUser = $rawValue;
+            } elseif ($env->key === 'POSTGRES_DB') {
+                $this->resolvedPostgresDatabase = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {

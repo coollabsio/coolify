@@ -36,3 +36,30 @@ test('non-critical reminders collapse after ten seconds', function () {
         ->toContain('reminders.sponsorship.compact = true')
         ->toContain('reminders.notification.compact = true');
 });
+
+test('sponsorship reminder is disabled in development', function () {
+    $view = file_get_contents(resource_path('views/livewire/layout-popups.blade.php'));
+
+    expect($view)
+        ->toContain('this.popups.sponsorship = !this.isDevelopment && this.shouldShowMonthlyPopup')
+        ->toContain('x-on:show-sponsorship-reminder.window="popups.sponsorship = true')
+        ->toContain('x-on:show-sponsorship-reminder.window="bannerVisible = true"');
+});
+
+test('sponsorship reminder listener is not parsed as a blade directive', function () {
+    $view = file_get_contents(resource_path('views/livewire/layout-popups.blade.php'));
+    $compiledView = Blade::compileString($view);
+
+    expect($compiledView)
+        ->toContain('x-on:show-sponsorship-reminder.window=')
+        ->not->toContain('$__env->yieldSection()');
+});
+
+test('advanced settings provides a development-only sponsorship reminder preview', function () {
+    $view = file_get_contents(resource_path('views/livewire/settings/advanced.blade.php'));
+
+    expect($view)
+        ->toContain('@if (isDev())')
+        ->toContain("@click=\"\$dispatch('show-sponsorship-reminder')\"")
+        ->toContain('Show sponsorship reminder');
+});

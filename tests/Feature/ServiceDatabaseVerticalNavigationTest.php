@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Project\Service\DatabaseBackups;
+
 it('moves service and database page navigation into their sidebars', function () {
     $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
@@ -58,7 +60,7 @@ it('groups database and service navigation by user workflow', function () {
         expect($serviceSidebar)
             ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage']")
             ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
-            ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
+            ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup']")
             ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
     }
 });
@@ -110,7 +112,7 @@ it('combines service database and storage backups in one section', function () {
         ->toContain('class="data-table w-full overflow-x-auto"')
         ->toContain('backup-table-grid service-backup-table-grid')
         ->not->toContain('<span class="text-right">Executions</span>')
-        ->toContain('class="data-table-row backup-table-grid text-[13px]')
+        ->toMatch('/class="(?=[^"]*\\bdata-table-row\\b)(?=[^"]*\\bbackup-table-grid\\b)(?=[^"]*text-\\[13px\\])[^\"]*"/')
         ->toContain('class="listbox-option justify-start! gap-2.5!"')
         ->toContain('x-data="{ dropdownOpen: false }"')
         ->toContain('class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!"')
@@ -119,13 +121,145 @@ it('combines service database and storage backups in one section', function () {
     expect($styles)->toContain('.service-backup-table-grid');
 });
 
-it('links compose database backups to the unified service backups page', function () {
+it('keeps backup navigation out of compose database settings', function () {
     $sidebar = file_get_contents(resource_path('views/components/service-database/sidebar.blade.php'));
 
     expect($sidebar)
-        ->toContain("'route' => 'project.service.volume-backups.index'")
-        ->toContain("'parameters' => \$serviceParameters")
+        ->not->toContain("'label' => 'Backups'")
+        ->not->toContain("'label' => 'Import Backup'")
         ->not->toContain("'route' => 'project.service.database.backups'");
+});
+
+it('links service backup details back to the unified service backups page', function () {
+    $sidebar = file_get_contents(resource_path('views/components/backup-sidebar.blade.php'));
+
+    expect($sidebar)->toContain("'back' => 'project.service.volume-backups.index'");
+});
+
+it('declares the database backup mount return type', function () {
+    $returnType = (new ReflectionMethod(DatabaseBackups::class, 'mount'))->getReturnType();
+
+    expect($returnType)->not->toBeNull()
+        ->and($returnType->getName())->toBe('mixed');
+});
+
+it('keeps service navigation visible on backup detail pages and uses section tabs', function () {
+    $databaseBackup = file_get_contents(resource_path('views/livewire/project/service/database-backups.blade.php'));
+    $storageBackup = file_get_contents(resource_path('views/livewire/project/service/volume-backup/show.blade.php'));
+
+    foreach ([$databaseBackup, $storageBackup] as $view) {
+        expect($view)
+            ->toContain('<x-service.configuration-sidebar :service="$service"')
+            ->toContain('<x-backup-tabs')
+            ->not->toContain('<x-backup-sidebar');
+    }
+
+    expect($databaseBackup)->toContain('context="service"')
+        ->and($storageBackup)->toContain('context="service-volume"');
+});
+
+it('opens service backup schedules in place without navigating', function () {
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($index)
+        ->toContain('wire:click="openSchedule(')
+        ->toContain('wireOpen="scheduleModalOpen"')
+        ->toContain('<x-backup-tabs')
+        ->not->toContain("route('project.service.backups.schedule.show'");
+});
+
+it('shows service backup executions below schedules without a separate view tab', function () {
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+    $executions = file_get_contents(resource_path('views/livewire/project/service/backup-executions.blade.php'));
+
+    expect($index)
+        ->toContain('<livewire:project.service.backup-executions :service="$service"')
+        ->not->toContain('aria-label="Backup views"')
+        ->not->toContain("route('project.service.backups.executions'");
+
+    expect($executions)
+        ->toContain('title="Executions"')
+        ->toContain('flush>');
+});
+
+it('wraps backup modal tabs and shows schedule loading feedback', function () {
+    $tabs = file_get_contents(resource_path('views/components/backup-tabs.blade.php'));
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($tabs)
+        ->toContain('flex-wrap')
+        ->not->toContain('overflow-x-auto');
+
+    expect($index)
+        ->toContain('<x-table.loading target="openSchedule" text="Loading schedule..."')
+        ->not->toContain('Loading schedule\n');
+});
+
+it('loads every backup editor section when the modal opens and switches tabs locally', function () {
+    $tabs = file_get_contents(resource_path('views/components/backup-tabs.blade.php'));
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($index)
+        ->toContain("x-data=\"{ activeSection: 'general' }\"")
+        ->toContain("@foreach (['general', 's3', 'retention', 'danger'] as \$modalSection)")
+        ->toContain("x-show=\"activeSection === '{{ \$modalSection }}'\"");
+
+    expect($tabs)
+        ->toContain("@click=\"activeSection = '{{ \$item['key'] }}'\"")
+        ->not->toContain('wire:click="selectScheduleSection');
+});
+
+it('adds a back up now action to every service backup schedule row', function () {
+    $index = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($index)
+        ->toContain('<span class="text-right">Actions</span>')
+        ->toContain('<div class="min-w-[59rem]">')
+        ->toContain("wire:click.stop=\"backupNow('database',")
+        ->toContain("wire:click.stop=\"backupNow('storage',")
+        ->toContain('<x-forms.button')
+        ->toContain('Back up now</x-forms.button>')
+        ->not->toContain('class="icon-button shrink-0"')
+        ->not->toContain('class="contents cursor-pointer"');
+
+    expect($styles)
+        ->toContain('.service-backup-table-grid')
+        ->toContain('width: 100%;')
+        ->toContain('.data-table-row.service-backup-table-grid {')
+        ->not->toContain('.data-table-header.service-backup-table-grid > :last-child')
+        ->not->toContain('.data-table-row.service-backup-table-grid > :last-child');
+});
+
+it('refreshes backup executions from backup broadcasts on the current team channel', function () {
+    $serviceExecutions = file_get_contents(app_path('Livewire/Project/Service/BackupExecutions.php'));
+    $serviceBackups = file_get_contents(app_path('Livewire/Project/Service/VolumeBackup/Index.php'));
+    $databaseExecutions = file_get_contents(app_path('Livewire/Project/Database/BackupExecutions.php'));
+    $databaseBackupJob = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
+
+    expect($serviceExecutions)
+        ->toContain('echo-private:team.{$teamId},BackupCreated')
+        ->toContain("=> '\$refresh'")
+        ->and($serviceBackups)
+        ->toContain('echo-private:team.{$teamId},BackupCreated')
+        ->and($databaseExecutions)
+        ->toContain('$teamId = currentTeam()->id')
+        ->not->toContain('$userId = Auth::id()')
+        ->and(strpos($databaseBackupJob, "'finished_at' => Carbon::now()->toImmutable()"))
+        ->toBeLessThan(strrpos($databaseBackupJob, 'BackupCreated::dispatch($this->team->id)'));
+});
+
+it('offers downloads from the service backup executions list', function () {
+    $component = file_get_contents(app_path('Livewire/Project/Service/BackupExecutions.php'));
+    $view = file_get_contents(resource_path('views/livewire/project/service/backup-executions.blade.php'));
+
+    expect($component)
+        ->toContain("route('download.backup'")
+        ->toContain("route('download.volume-backup'")
+        ->and($view)
+        ->toContain('<span class="text-right">Actions</span>')
+        ->toContain('aria-label="Download backup"')
+        ->toContain('@click.stop');
 });
 
 it('uses a distinct backup icon across resource sidebars', function () {

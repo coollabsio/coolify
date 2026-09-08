@@ -15,7 +15,7 @@
     pageWidth: localStorage.getItem('pageWidth') || 'full',
     themeColor: localStorage.getItem('themeColor') || '#6b16ed',
     themeColorFrame: null,
-    avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
+    avatarUrl: @js($user?->avatar_path ? profile_avatar_url($user) : null),
     openPanel() {
         this.appearanceOpen = false;
         this.open = true;

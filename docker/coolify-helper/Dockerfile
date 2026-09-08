@@ -2,11 +2,11 @@
 # https://hub.docker.com/_/alpine
 ARG BASE_IMAGE=alpine:3.21
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=28.0.0
+ARG DOCKER_VERSION=29.7.2
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.38.2
+ARG DOCKER_COMPOSE_VERSION=5.5.0
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.25.0
+ARG DOCKER_BUILDX_VERSION=0.36.1
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases

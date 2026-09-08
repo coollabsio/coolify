@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">
@@ -249,9 +249,10 @@
                                 </p>
                             </div>
                             <form action="/user/confirmed-two-factor-authentication" method="POST"
-                                class="flex items-end gap-2">
+                                class="flex items-end gap-2"
+                                x-init="$nextTick(() => $el.querySelector('input[name=code]')?.focus())">
                                 @csrf
-                                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
+                                <x-forms.input name="code" type="text" inputmode="numeric" pattern="[0-9]*" id="code"
                                     label="One-time code" required />
                                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
                             </form>

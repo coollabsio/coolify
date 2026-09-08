@@ -26,10 +26,17 @@ class Configuration extends Component
 
     public array $parameters;
 
-    protected $listeners = [
-        'refreshServices' => 'refreshServices',
-        'refresh' => 'refreshServices',
-    ];
+    public function getListeners(): array
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            'refreshServices' => 'refreshServices',
+            'refresh' => 'refreshServices',
+            'configurationChanged' => 'refreshServices',
+            "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'refreshServices',
+        ];
+    }
 
     public function render()
     {

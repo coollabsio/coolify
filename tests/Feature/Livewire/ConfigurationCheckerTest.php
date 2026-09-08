@@ -1,22 +1,29 @@
 <?php
 
+use App\Events\ApplicationConfigurationChanged;
+use App\Livewire\Project\Service\Configuration;
 use App\Livewire\Project\Shared\ConfigurationChecker;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\Project;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -119,6 +126,39 @@ it('warns when a service has missing required environment variables', function (
         ->assertSee('PLUNK_API_KEY')
         ->assertSee('Open environment variables');
 
+});
+
+it('broadcasts a configuration update after a required service variable is set', function () {
+    Event::fake([ApplicationConfigurationChanged::class]);
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $server->id,
+    ]);
+    $environmentVariable = $service->environment_variables()->create([
+        'key' => 'PLUNK_API_KEY',
+        'value' => '',
+        'is_required' => true,
+    ]);
+
+    Livewire::test(Show::class, ['env' => $environmentVariable, 'type' => 'service'])
+        ->call('loadValues')
+        ->set('value', 'secret')
+        ->call('submit');
+
+    Event::assertDispatched(
+        ApplicationConfigurationChanged::class,
+        fn (ApplicationConfigurationChanged $event): bool => $event->teamId === $this->team->id,
+    );
+});
+
+it('refreshes the service configuration when a websocket configuration event arrives', function () {
+    $listeners = app(Configuration::class)->getListeners();
+
+    expect($listeners)
+        ->toHaveKey("echo-private:team.{$this->team->id},ApplicationConfigurationChanged", 'refreshServices')
+        ->toHaveKey('configurationChanged', 'refreshServices');
 });
 
 it('marks the service environment variables menu when required values are missing', function () {

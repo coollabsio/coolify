@@ -34,6 +34,8 @@ class Input extends Component
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
+        public bool $loading = false,
+        public string $loadingText = 'Loading...',
     ) {
         // Handle authorization-based disabling
         if ($this->canGate && $this->canResource && $this->autoDisable) {

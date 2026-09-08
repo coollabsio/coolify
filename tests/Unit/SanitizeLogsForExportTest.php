@@ -108,14 +108,14 @@ it('removes GitHub tokens', function () {
         'gho_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'gho_ OAuth token',
         'ghu_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghu_ user-to-server token',
         'ghs_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghs_ server-to-server token',
+        'ghs_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxMjM0NTY3OCIsInN1YiI6Imluc3RhbGxhdGlvbi10b2tlbiJ9.signature-with_dots-and-hyphens' => 'ghs_ stateless server-to-server token',
         'ghr_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789' => 'ghr_ refresh token',
     ];
 
     foreach ($testCases as $token => $description) {
         $input = "Token: {$token}";
         $result = sanitizeLogsForExport($input);
-        expect($result)->not->toContain($token, "Failed to redact {$description}");
-        expect($result)->toContain(REDACTED);
+        expect($result)->toBe('Token: '.REDACTED, "Failed to redact {$description}");
     }
 });
 

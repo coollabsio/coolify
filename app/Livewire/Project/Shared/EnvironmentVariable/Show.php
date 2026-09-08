@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
@@ -12,7 +13,9 @@ use App\Models\SharedEnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -21,7 +24,12 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
-    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
+
+    protected function secretManagerResource(): ?Model
+    {
+        return $this->isSharedVariable ? null : $this->env->resourceable;
+    }
 
     public $parameters;
 
@@ -144,6 +152,8 @@ class Show extends Component
      */
     public function loadValues(): void
     {
+        $this->authorize('update', $this->env);
+
         if ($this->valuesLoaded) {
             return;
         }
@@ -177,7 +187,8 @@ class Show extends Component
         );
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
+
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
@@ -314,6 +325,10 @@ class Show extends Component
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
+
+            if ($this->is_required && $this->resource instanceof Service) {
+                event(new ApplicationConfigurationChanged($this->resource->team()->id));
+            }
         } catch (\Exception $e) {
             return handleError($e);
         }

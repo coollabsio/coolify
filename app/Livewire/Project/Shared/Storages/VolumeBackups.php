@@ -204,6 +204,12 @@ class VolumeBackups extends Component
         }
 
         VolumeBackupJob::dispatch($this->backup);
+        auditLog('ui.volume_backup.started', [
+            'team_id' => $this->resource->team()?->id,
+            'resource_uuid' => $this->resource->uuid,
+            'resource_name' => $this->resource->name,
+            'backup_uuid' => $this->backup->uuid,
+        ]);
         $this->dispatch('success', 'Storage backup queued.');
 
         return redirect()->route($this->routeName('executions'), $this->routeParameters());

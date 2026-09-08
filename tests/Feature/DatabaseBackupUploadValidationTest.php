@@ -18,10 +18,45 @@ function writeScanPayload(string $content, bool $gzip = false): string
 /**
  * Execute the real shell scanner snippet (as it runs inside the container)
  * against a local payload file and return true when the restore is blocked.
+ *
+ * @param  array<string, string>  $env
  */
-function scannerBlocks(string $script): bool
+function scannerBlocks(string $script, array $env = []): bool
 {
-    return Process::run(['sh', '-c', $script])->exitCode() === 1;
+    $command = $script;
+
+    if ($env !== []) {
+        $exports = [];
+        foreach ($env as $name => $value) {
+            $exports[] = $name.'='.escapeshellarg($value);
+        }
+        $command = implode(' ', $exports).'; '.$script;
+    }
+
+    return Process::run(['sh', '-c', $command])->exitCode() === 1;
+}
+
+function fakePgRestorePath(string $sql, int $listExitCode = 0): string
+{
+    $dir = sys_get_temp_dir().'/coolify-fake-pg-'.uniqid();
+    mkdir($dir);
+
+    $sqlFile = $dir.'/archive.sql';
+    file_put_contents($sqlFile, $sql);
+
+    $escapedSqlFile = escapeshellarg($sqlFile);
+    file_put_contents($dir.'/pg_restore', <<<SH
+#!/bin/sh
+if [ "\$1" = '-l' ]; then exit {$listExitCode}; fi
+if [ "\$1" = '-f' ] && [ "\$2" = '-' ]; then
+  cat {$escapedSqlFile}
+  exit 0
+fi
+exit 1
+SH);
+    chmod($dir.'/pg_restore', 0755);
+
+    return $dir;
 }
 
 function invokeHasAllowedExtension(string $name): bool
@@ -185,14 +220,20 @@ test('file scanner allows ordinary gzipped dumps', function () {
     expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($gzClean))->toBeFalse();
 });
 
-test('file scanner allows PostgreSQL custom format archives', function () {
+test('file scanner detects program execution payloads inside custom format archives', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload");
 
-    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
 });
 
-test('file scanner allows gzipped PostgreSQL custom format archives', function () {
+test('file scanner detects program execution payloads inside gzipped custom format archives', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload", gzip: true);
+
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
+});
+
+test('file scanner allows custom format archives without program execution', function () {
+    $archive = writeScanPayload("PGDMP\0binary archive without restore programs");
 
     expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
 });
@@ -226,6 +267,8 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
     'psql pipe redirect' => ["\\o | id\n", false],
     'psql query pipe redirect' => ["\\g | id\n", false],
     'gzipped comment bypass' => ["COPY x FROM/**/PROGRAM 'id';\n", true],
+    'custom format archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", false],
+    'custom format gzip archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", true],
 ]);
 
 test('remote postgresql scanner allows legitimate restores', function (string $content, bool $gzip) {
@@ -241,10 +284,25 @@ test('remote postgresql scanner allows legitimate restores', function (string $c
     'copy from stdin' => ["COPY users FROM stdin;\n1\tTaylor\n\\.\n", false],
     'plain select' => ["SELECT * FROM users;\n", false],
     'gzipped clean dump' => ["CREATE TABLE users (id int);\n", true],
-    'custom format archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", false],
-    'custom format gzip archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", true],
     'copy words in table data' => ["COPY notes FROM stdin;\n1\tcopy files from program storage\n\\.\n", false],
 ]);
+
+test('remote postgresql scanner inspects custom archives instead of skipping them', function () {
+    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
+    $safeArchive = writeScanPayload("PGDMP\0binary archive");
+    $maliciousSql = "COPY x FROM PROGRAM 'id';\n";
+    $safeSql = "CREATE TABLE users (id integer);\nCOPY users FROM stdin;\n1\tTaylor\n\\.\n";
+
+    $maliciousPath = fakePgRestorePath($maliciousSql);
+    $safePath = fakePgRestorePath($safeSql);
+    $unreadablePath = fakePgRestorePath($safeSql, listExitCode: 1);
+    $path = getenv('PATH') ?: '/usr/bin:/bin';
+
+    expect(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $maliciousPath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $safePath.':'.$path]))->toBeFalse()
+        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $unreadablePath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive)))->toBeTrue();
+});
 
 test('MAX_BYTES constant is 10 GiB', function () {
     $constant = (new ReflectionClass(UploadController::class))->getConstant('MAX_BYTES');

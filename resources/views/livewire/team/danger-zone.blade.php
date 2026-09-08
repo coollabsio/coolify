@@ -1,4 +1,12 @@
 <div>
+    @php
+        $deletionBlockers = currentTeam()->deletionBlockers();
+        $blockerDetails = [
+            'projects' => ['label' => 'project', 'route' => 'project.index'],
+            'servers' => ['label' => 'server', 'route' => 'server.index'],
+            'sources' => ['label' => 'Git source', 'route' => 'source.all'],
+        ];
+    @endphp
     <x-slot:title>
         Team Danger Zone | Coolify
     </x-slot>
@@ -34,7 +42,7 @@
                                         {{ wireNavigate() }} href="{{ route('subscription.show') }}">subscription</a>
                                     before deleting this team.
                                 </p>
-                            @elseif(currentTeam()->isEmpty())
+                            @elseif($deletionBlockers === [])
                                 <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
                                     Permanently delete <strong class="font-semibold text-black dark:text-fg">{{ currentTeam()->name }}</strong>
                                     from Coolify. This action cannot be undone.
@@ -45,7 +53,20 @@
                                 </ul>
                             @else
                                 <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
-                                    Remove or move every resource owned by this team before deleting it.
+                                    This team still owns:
+                                </p>
+                                <ul class="mt-2 space-y-1 text-[13px] text-neutral-600 dark:text-fg-dim">
+                                    @foreach ($deletionBlockers as $type => $count)
+                                        <li>
+                                            <a class="font-medium text-coollabs hover:underline dark:text-warning"
+                                                {{ wireNavigate() }} href="{{ route($blockerDetails[$type]['route']) }}">
+                                                {{ $count }} {{ str($blockerDetails[$type]['label'])->plural($count) }}
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                <p class="mt-2 text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                    Remove or move these resources before deleting the team.
                                 </p>
                             @endif
                         </div>
@@ -57,14 +78,15 @@
                                     auth()->user()->teams()->count() > 1 &&
                                     !auth()->user()->currentTeam()->personal_team &&
                                     !currentTeam()->subscription &&
-                                    currentTeam()->isEmpty())
+                                    $deletionBlockers === [])
                                 <x-modal-confirmation title="Confirm Team Deletion?" buttonTitle="Delete team"
                                     isErrorButton submitAction="delete"
                                     :actions="['The current team will be permanently deleted from Coolify and the database.']"
                                     confirmationText="{{ currentTeam()->name }}"
                                     confirmationLabel="Enter the team name to confirm permanent deletion"
                                     shortConfirmationLabel="Team name" :confirmWithPassword="false"
-                                    step2ButtonText="Permanently Delete" />
+                                    step2ButtonText="Permanently Delete" canGate="delete"
+                                    :canResource="$team" />
                             @else
                                 <x-forms.button disabled tooltip="Resolve the requirements shown before deleting this team.">
                                     Delete team

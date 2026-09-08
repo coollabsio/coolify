@@ -1,6 +1,8 @@
-<div x-init="$wire.loadPublicKey()">
+<div>
     @if ($modalMode)
-        <form wire:submit="changePrivateKey" class="flex flex-col gap-4" x-data="{ showPrivateKey: false }">
+        <div class="relative">
+        <form wire:submit="changePrivateKey" class="flex flex-col gap-4" x-data="{ showPrivateKey: false }"
+            wire:loading.class="pointer-events-none opacity-50" wire:target="delete">
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input canGate="update" :canResource="$private_key" id="name" label="Name" required />
                 <x-forms.input canGate="update" :canResource="$private_key" id="description" label="Description" />
@@ -34,6 +36,11 @@
                 <x-forms.button type="submit" isHighlighted>Save changes</x-forms.button>
             </div>
         </form>
+        <div wire:loading.flex wire:target="delete"
+            class="absolute inset-0 z-10 items-center justify-center rounded-lg bg-white/50 dark:bg-black/40">
+            <x-loading text="Deleting private key..." />
+        </div>
+        </div>
     @else
     <x-slot:title>
         {{ $private_key->name }} | Private Keys | Coolify
