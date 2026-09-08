@@ -60,7 +60,7 @@
                                         <livewire:server.proxy.dynamic-configuration-navbar
                                             :server_id="$server->id" :server="$server" :fileName="$fileName"
                                             :value="$value ?? ''" :newFile="false"
-                                            wire:key="{{ $fileName }}-{{ $loop->index }}" />
+                                            wire:key="proxy-navbar-{{ $fileName }}" />
                                     @endif
                                 </x-slot:actions>
                                 <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"

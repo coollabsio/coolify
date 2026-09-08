@@ -70,8 +70,8 @@ test('saving a private key from its modal editor closes the modal', function () 
         'modalMode' => true,
     ])->set('name', 'Updated SSH key')
         ->call('changePrivateKey')
-        ->assertDispatched('securityResourceChanged')
-        ->assertDispatched('close-modal');
+        ->assertDispatched('privateKeyUpdated')
+        ->assertNoRedirect();
 
     expect($privateKey->fresh()->name)->toBe('Updated SSH key');
 });

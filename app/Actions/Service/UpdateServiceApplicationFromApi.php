@@ -56,7 +56,7 @@ class UpdateServiceApplicationFromApi
                 }
             }
 
-            $serviceApplication->fqdn = $parsed['normalized'];
+            $serviceApplication->setEditableUrls($parsed['normalized']);
         }
 
         if (array_key_exists('noindex_domains', $payload)) {

@@ -15,3 +15,9 @@ test('sentinel startup regenerates an empty endpoint from instance settings', fu
         ->and($component)
         ->toContain('$this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;');
 });
+
+test('sentinel startup allows legacy metrics migrations to finish before health checks fail', function () {
+    $action = file_get_contents(dirname(__DIR__, 2).'/app/Actions/Server/StartSentinel.php');
+
+    expect($action)->toContain('--health-start-period 120s');
+});

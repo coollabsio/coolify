@@ -138,7 +138,7 @@ class SentinelController extends Controller
     /**
      * Build a stable hash of container state.
      *
-     * Covers [name, state] only — metrics, filesystem_usage_root, and
+     * Covers [name, state, restart_count] only — metrics, filesystem_usage_root, and
      * health_status are excluded on purpose. Disk % churns constantly, and
      * health checks can flap between starting/healthy/unhealthy while the
      * container lifecycle state remains unchanged. Both would otherwise defeat
@@ -153,6 +153,7 @@ class SentinelController extends Controller
             ->map(fn ($c) => [
                 'name' => data_get($c, 'name'),
                 'state' => data_get($c, 'state'),
+                'restart_count' => data_get($c, 'restart_count'),
             ])
             ->sortBy('name')
             ->values()

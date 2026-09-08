@@ -90,8 +90,11 @@ class DatabaseBackupFileValidator
 
     public static function containsPostgresqlProgramExecution(string $sql): bool
     {
+        $requireStatementBoundary = true;
+
         if (str_starts_with($sql, 'PGDMP')) {
-            return false;
+            $sql = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]+/', "\n", $sql) ?? $sql;
+            $requireStatementBoundary = false;
         }
 
         $withoutComments = self::stripSqlComments($sql);
@@ -100,7 +103,9 @@ class DatabaseBackupFileValidator
             return true;
         }
 
-        return preg_match('/(?:^|;)\s*copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
+        $copyPrefix = $requireStatementBoundary ? '(?:^|;)\s*' : '\b';
+
+        return preg_match('/'.$copyPrefix.'copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
     }
 
     private static function extensionFor(string $name): ?string
