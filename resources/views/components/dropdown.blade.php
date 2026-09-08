@@ -60,15 +60,21 @@
         </svg>
     </button>
 
-    <div x-ref="panel" x-show="dropdownOpen" @click.away="if (! {{ $inline ? 'true' : 'false' }}) close()" x-transition:enter="ease-out duration-200"
-        x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
+    <div x-ref="panel" x-show="dropdownOpen" @click.away="if (! {{ $inline ? 'true' : 'false' }}) close()"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+        x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
         :style="panelStyles" @class([
+            'origin-top' => true,
             'mt-1 w-full' => $inline,
             'absolute top-full z-50 mt-1 min-w-max max-w-[calc(100vw-1rem)] md:top-0 md:mt-6' => ! $inline,
         ]) x-cloak>
         <div @class([
             'border border-neutral-300 bg-white p-1 dark:border-coolgray-300',
-            'shadow-sm dark:bg-coolgray-200' => ! $inline,
+            'shadow-[var(--shadow-dropdown)] dark:bg-coolgray-200' => ! $inline,
             'border-0 bg-transparent shadow-none dark:border-0 dark:bg-transparent' => $inline,
             $panelClass,
         ])>

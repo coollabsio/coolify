@@ -34,7 +34,9 @@ The interface is compact and product-focused:
 
 - near-neutral layered surfaces instead of large bordered boxes;
 - 13–14px UI typography and 32px controls;
-- hairline rings instead of heavy borders;
+- crisp hairline rings plus a restrained card lift (single 1px ring +
+  `0 1px 2px rgb(0 0 0 / 0.05)`) so cards and tables separate from the canvas,
+  never heavy borders or a strong floating shadow;
 - full-width data tables for dense collections;
 - outline Reicon glyphs through `<x-reicon>`;
 - the Coolify purple brand accent in light mode;
@@ -48,6 +50,19 @@ The interface is compact and product-focused:
 Avoid oversized titles, generic dashboard cards, strong shadows, thick
 dividers, native browser selects, and isolated colored buttons that do not
 match the current action styles.
+
+Standard `.button` controls use a compact 2px bottom depth. Hover raises the
+button face by 1px and increases the visible depth to 3px. Pressing moves the
+face down 2px into the edge and removes the depth until release, keeping the
+overall bottom position stable. Disabled controls stay flat,
+and focus-visible controls retain the accent ring alongside the depth.
+Movement and depth-shadow changes transition over 80ms; color transitions keep
+the shared 120ms duration.
+Standard button labels use `capitalize`, giving each word an initial capital.
+Highlighted buttons mix the accent equally with black for a pronounced bottom
+edge, so custom theme colors produce a matching edge instead of a generic one.
+Dark mode matches the depth edge of neutral buttons to their regular border
+color. Highlighted buttons keep their dark, color-matched accent edge.
 
 ---
 
@@ -89,14 +104,14 @@ The surface ladder is defined in `resources/css/app.css`.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--coollabs-canvas` | near white | 10% neutral | page canvas |
+| `--coollabs-canvas` | 97% off-white | 10% neutral | page canvas (kept below card fills so cards lift) |
 | `--coollabs-elevated` | 98% neutral | 15% neutral | shells and card headers |
 | `--coollabs-base` | white | 17% neutral | nested card bodies |
 | `--coollabs-recessed` | 96% neutral | 20% neutral | inputs and listboxes |
 | `--coollabs-fill` | 92.2% neutral | 26.9% neutral | dividers and passive fills |
 | `--coollabs-line` | translucent dark | 32% neutral | control borders |
-| `--coollabs-hairline` | 93.5% neutral | 26.9% neutral | shell rings |
-| `--coollabs-subtle` | 55.6% neutral | 70.8% neutral | labels and muted titles |
+| `--coollabs-hairline` | 85.5% neutral | 32% neutral | shell rings (crisp enough to read as a card edge, ~1.5:1) |
+| `--coollabs-subtle` | 50% neutral | 70.8% neutral | labels and muted titles (light darkened for WCAG AA 4.5:1) |
 
 Accent behavior is intentionally theme-aware:
 
@@ -115,6 +130,38 @@ dark:bg-warning/15 dark:text-warning dark:ring-warning/25
 
 The filled top-level action/tab treatment uses the same palette at a restrained
 opacity rather than a fully saturated fill.
+
+### Shell layering
+
+The app shell is three distinct surface layers, not one flat color. Chrome
+lifts, content is the base, cards lift off the content:
+
+- **Content canvas** is the base layer: `bg-app` in dark (deepest,
+  `--color-app` `#0a0a0b`), `bg-gray-50` in light. The `<main>` content area
+  and page body use it.
+- **Sidebar and topbar chrome** use `bg-panel` in dark (`--color-panel`
+  `#141418`, a clear step lighter than the content canvas) and `bg-white` in
+  light, so the chrome reads as a separate panel from the content.
+
+Dark surface tokens are hex, not oklch. oklch lightness compresses toward pure
+black below ~15% (oklch(10%) renders as sRGB 3, oklch(15%) as sRGB 11), so oklch
+values there give no visible step between layers. The dark ladder is
+`--color-app` 10, `--coollabs-elevated` 22, `--coollabs-base` 28,
+`--coollabs-recessed` 34 (sRGB), which reads as distinct surfaces.
+
+Temperature: every panel is **pure neutral gray** (r=g=b), one consistent
+temperature across the sidebar, tables, cards, inputs, dividers, borders, and
+text, in both modes. Do not give one surface a cool (blue) or warm cast while
+the others stay neutral. The light page canvas uses `bg-neutral-50` (not
+`bg-gray-50`, which is faintly cool) so it matches the neutral cards and chrome.
+The only intentional color is the purple/yellow brand accent.
+- **Cards, tables, and collection tiles** lift off the content canvas with
+  `dark:bg-white/[0.05]` plus the crisp `--coollabs-hairline` ring; in light
+  they are `bg-white` with the ring and the restrained card lift.
+
+Do not paint the content area with the same `bg-panel` as the sidebar, and do
+not drop card fills below `dark:bg-white/[0.05]`; both make surfaces read as one
+color. Row-hover states keep the lighter `dark:hover:bg-white/[0.025]`.
 
 ---
 
@@ -418,6 +465,12 @@ checkbox on application pages.
 The popup panel uses a 10px radius around 6px options with a 4px inset. Keep
 the option content left-aligned and size the panel to its content or trigger;
 do not create an unnecessarily wide menu.
+
+Every dropdown, menu, listbox panel, and the command palette uses the shared
+`--shadow-dropdown` token (`0 4px 12px rgb(0 0 0 / 0.12), 0 2px 4px
+rgb(0 0 0 / 0.08)`) for a restrained, consistent lift. Do not hand-roll a
+heavier `shadow-lg` / `0 18px 50px` / `0.45`-alpha drop shadow on a menu.
+Reserve the stronger `--shadow-modal` for actual modals, dialogs, and toasts.
 
 Toolbar filter and sort buttons keep static labels (`Filter`, `Sort`). The
 selected option is indicated inside the menu, not repeated on the trigger.

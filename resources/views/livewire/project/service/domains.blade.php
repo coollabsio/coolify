@@ -158,17 +158,7 @@
                 icon-name="globe" />
         </div>
     @else
-        <div wire:key="service-domains-list"
-            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible">
-            <div class="data-table-header service-domains-overview-grid">
-                <span>Domain</span>
-                <span>Protocol redirect</span>
-                <span>Domain redirect</span>
-                <span>Internal port</span>
-                <span>Search indexing</span>
-                <span>DNS status</span>
-                <span class="text-right">Actions</span>
-            </div>
+        <div wire:key="service-domains-list" class="flex flex-col gap-3">
             @foreach ($domainGroups as $appId => $rows)
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
@@ -179,8 +169,8 @@
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
                     x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
-                    class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                    <div class="flex w-full flex-wrap items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    class="application-settings-section-body is-flush overflow-visible">
+                    <div class="flex w-full flex-wrap items-center gap-3 rounded-t-lg border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
                         @if ($hasHttpsDomains)
                             <div class="flex w-full items-center gap-2 sm:w-auto service-domains-https">
@@ -204,7 +194,7 @@
                             'domainRows' => $domainRows,
                             'service' => $service,
                             'showServiceColumn' => false,
-                            'showHeader' => false,
+                            'showHeader' => true,
                         ])
                     </div>
                 </section>

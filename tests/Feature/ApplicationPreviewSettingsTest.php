@@ -106,6 +106,17 @@ it('shows preview settings and persists changes independently of preview inputs'
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeFalse();
 });
 
+it('renders preview deployment enablement as a section action', function () {
+    Livewire::test(Previews::class, ['application' => $this->application])
+        ->assertSee('Enable preview deployments')
+        ->assertDontSeeHtml('id="isPreviewDeploymentsEnabled"')
+        ->call('togglePreviewDeployments')
+        ->assertSee('Disable preview deployments')
+        ->assertSet('isPreviewDeploymentsEnabled', true);
+
+    expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeTrue();
+});
+
 it('does not show git preview settings for non-git applications', function (string $buildPack, ?string $dockerfile) {
     $this->application->update(['build_pack' => $buildPack, 'dockerfile' => $dockerfile]);
 
