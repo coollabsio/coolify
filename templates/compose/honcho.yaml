@@ -18,18 +18,17 @@ services:
       - AUTH_USE_AUTH=false
       - LLM_OPENAI_API_KEY=${LLM_OPENAI_API_KEY}
       - VECTOR_STORE_TYPE=pgvector
-    depends_on:
-      database:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   deriver:
     image: ghcr.io/plastic-labs/honcho:v3.0.12
@@ -49,7 +48,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: unless-stopped
 
   database:
     image: pgvector/pgvector:pg15
@@ -64,7 +62,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
   redis:
     image: redis:8.2
@@ -75,4 +72,3 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
