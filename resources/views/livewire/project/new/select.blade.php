@@ -287,15 +287,8 @@
                                     <div class="flex min-w-0 items-start gap-3">
                                         <div
                                             class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                            <template x-if="service.has_logo">
-                                                <img class="h-full w-full object-contain p-2" :src="service.logo"
-                                                    onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                    :data-fallback="service.logo_github_url" />
-                                            </template>
-                                            <template x-if="!service.has_logo">
-                                                <x-reicon name="layers"
-                                                    class="size-6 text-neutral-400 dark:text-fg-faint" />
-                                            </template>
+                                            <img class="h-full w-full object-contain p-2" :src="service.logo"
+                                                x-on:error="if (!$el.dataset.cdnTried) { $el.dataset.cdnTried = 'true'; $el.src = service.logo_cdn_url; } else if (!$el.dataset.defaultTried) { $el.dataset.defaultTried = 'true'; $el.src = service.logo_default_url; }" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"

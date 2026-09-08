@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 class Email extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -79,6 +80,9 @@ class Email extends Component
     public bool $statusChangeEmailNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $restartLimitReachedEmailNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $backupSuccessEmailNotifications = false;
 
     #[Validate(['boolean'])]
@@ -128,12 +132,11 @@ class Email extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
             $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
-            $this->authorize('update', $this->settings);
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
@@ -154,6 +157,7 @@ class Email extends Component
             $this->settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
             $this->settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
             $this->settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
+            $this->settings->restart_limit_reached_email_notifications = $this->restartLimitReachedEmailNotifications;
             $this->settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
             $this->settings->backup_failure_email_notifications = $this->backupFailureEmailNotifications;
             $this->settings->scheduled_task_success_email_notifications = $this->scheduledTaskSuccessEmailNotifications;
@@ -192,6 +196,7 @@ class Email extends Component
             $this->deploymentSuccessEmailNotifications = $this->settings->deployment_success_email_notifications;
             $this->deploymentFailureEmailNotifications = $this->settings->deployment_failure_email_notifications;
             $this->statusChangeEmailNotifications = $this->settings->status_change_email_notifications;
+            $this->restartLimitReachedEmailNotifications = $this->settings->restart_limit_reached_email_notifications;
             $this->backupSuccessEmailNotifications = $this->settings->backup_success_email_notifications;
             $this->backupFailureEmailNotifications = $this->settings->backup_failure_email_notifications;
             $this->scheduledTaskSuccessEmailNotifications = $this->settings->scheduled_task_success_email_notifications;
@@ -218,6 +223,8 @@ class Email extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         $this->dispatch('success', 'Email notifications settings updated.');
     }

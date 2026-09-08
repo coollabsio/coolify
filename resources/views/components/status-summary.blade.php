@@ -23,7 +23,7 @@
 
     $containerType = match (true) {
         str($containerStatus)->startsWith('running') => 'success',
-        str($containerStatus)->startsWith(['starting', 'restarting']) => 'warning',
+        str($containerStatus)->startsWith(['starting', 'restarting', 'degraded']) => 'warning',
         default => 'error',
     };
 
@@ -36,6 +36,7 @@
 
     [$summaryLabel, $summaryType] = match (true) {
         $containerType === 'error' => [$containerLabel, 'error'],
+        str($containerStatus)->startsWith('degraded') => ['Degraded', 'warning'],
         $healthType === 'error' => ['Degraded', 'error'],
         $containerType === 'warning' => [$containerLabel, 'warning'],
         $monitoringExcluded => ["{$containerLabel} (monitoring disabled)", 'warning'],

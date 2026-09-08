@@ -279,13 +279,22 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(TeamInvitation::class);
     }
 
-    public function isEmpty()
+    /**
+     * @return array<string, int>
+     */
+    public function deletionBlockers(): array
     {
-        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
-            return true;
-        }
+        return array_filter([
+            'projects' => $this->projects()->count(),
+            'servers' => $this->servers()->count(),
+            'sources' => GithubApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
+                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
+        ]);
+    }
 
-        return false;
+    public function isEmpty(): bool
+    {
+        return $this->deletionBlockers() === [];
     }
 
     public function projects()

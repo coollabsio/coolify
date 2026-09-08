@@ -87,7 +87,7 @@ class Show extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -169,9 +169,9 @@ class Show extends Component
             $this->task->delete();
 
             if ($this->type === 'application') {
-                return redirect()->route('project.application.scheduled-tasks.show', $this->parameters);
+                return redirectRoute($this, 'project.application.scheduled-tasks.show', $this->parameters);
             } else {
-                return redirect()->route('project.service.scheduled-tasks.show', $this->parameters);
+                return redirectRoute($this, 'project.service.scheduled-tasks.show', $this->parameters);
             }
         } catch (\Exception $e) {
             return handleError($e);
