@@ -51,10 +51,12 @@
                 @elseif ($currentRoute === 'project.database.tags')
                     <livewire:project.shared.tags :resource="$database" />
                 @elseif ($currentRoute === 'project.database.danger')
-                    @if (in_array($database->type(), ['standalone-redis', 'standalone-keydb', 'standalone-dragonfly']))
-                        <livewire:project.database.flush-cache :database="$database" />
-                    @endif
-                    <livewire:project.shared.danger :resource="$database" />
+                    <div class="flex flex-col gap-8">
+                        @if (in_array($database->type(), ['standalone-redis', 'standalone-keydb', 'standalone-dragonfly']))
+                            <livewire:project.database.flush-cache :database="$database" />
+                        @endif
+                        <livewire:project.shared.danger :resource="$database" />
+                    </div>
                 @endif
             </div>
         </div>
