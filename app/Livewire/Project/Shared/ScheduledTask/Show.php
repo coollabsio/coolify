@@ -184,6 +184,13 @@ class Show extends Component
             $this->authorize('update', $this->resource);
             $this->authorize('update', $this->task);
             ScheduledTaskJob::dispatch($this->task);
+            auditLog('ui.scheduled_task.executed', [
+                'team_id' => $this->resource->team()?->id,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+                'scheduled_task_uuid' => $this->task->uuid,
+                'scheduled_task_name' => $this->task->name,
+            ]);
             $this->dispatch('success', 'Scheduled task executed.');
         } catch (\Exception $e) {
             return handleError($e);

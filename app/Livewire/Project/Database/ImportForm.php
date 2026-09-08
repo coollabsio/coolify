@@ -510,6 +510,12 @@ EOD;
                 // Dispatch activity to the monitor and open slide-over
                 $this->dispatch('activityMonitor', $activity->id);
                 $this->dispatch('databaserestore');
+                auditLog('ui.database.import_started', [
+                    'team_id' => $this->resource->team()?->id,
+                    'database_uuid' => $this->resource->uuid,
+                    'database_name' => $this->resource->name,
+                    'source' => 'file',
+                ]);
             }
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -768,6 +774,13 @@ EOD;
             // Dispatch activity to the monitor and open slide-over
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
+            auditLog('ui.database.restore_started', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+                'source' => 's3',
+                'storage_id' => $this->s3StorageId,
+            ]);
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (\Throwable $e) {
             $this->importRunning = false;

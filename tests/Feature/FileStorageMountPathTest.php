@@ -4,7 +4,6 @@ use App\Jobs\ServerStorageSaveJob;
 use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\Storages\All;
-use App\Livewire\Project\Shared\Storages\Show;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -247,8 +246,8 @@ test('deleting a volume mount refreshes the configuration warning', function () 
         'resource_type' => $database->getMorphClass(),
     ]);
 
-    Livewire::test(Show::class, ['storage' => $volume, 'resource' => $database])
-        ->call('delete', 'password')
+    Livewire::test(All::class, ['resource' => $database])
+        ->call('delete', $volume->id, 'password')
         ->assertDispatched('configurationChanged');
 
     expect($volume->fresh())->toBeNull();
