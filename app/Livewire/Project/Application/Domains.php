@@ -150,7 +150,15 @@ class Domains extends Component
 
     public function refreshDomains(): void
     {
+        $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
+
         $this->loadDomainState();
+
+        if ($editingRow !== null) {
+            $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
+                && ($row['service'] ?? null) === ($editingRow['service'] ?? null));
+            $this->editingIndex = $index === false ? null : (int) $index;
+        }
     }
 
     public function pollDnsChecks(): void
@@ -227,7 +235,9 @@ class Domains extends Component
 
         $this->isCompose = $this->application->build_pack === 'dockercompose';
         $this->labelsAreWritable = $this->application->settings->is_container_label_readonly_enabled === false;
-        $this->redirect = $this->application->redirect ?? 'both';
+        if ($this->pendingAction !== 'redirect' || $this->isCompose) {
+            $this->redirect = $this->application->redirect ?? 'both';
+        }
         $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
 
         $settings = instanceSettings();
@@ -254,6 +264,9 @@ class Domains extends Component
         }
 
         $this->composeServices = [];
+        $pendingRedirect = $this->pendingRedirectService !== null
+            ? ($this->serviceRedirects[$this->serviceRedirectWireKey($this->pendingRedirectService)] ?? null)
+            : null;
         $this->serviceRedirects = [];
         if ($this->isCompose) {
             try {
@@ -290,7 +303,9 @@ class Domains extends Component
                 $serviceEntry = $domains[$serviceName] ?? null;
                 $storedRedirect = is_array($serviceEntry) ? ($serviceEntry['redirect'] ?? null) : null;
                 $this->serviceRedirects[$this->serviceRedirectWireKey($serviceName)] = $this->normalizeRedirect(
-                    is_string($storedRedirect) ? $storedRedirect : null
+                    $this->pendingAction === 'redirect' && $serviceName === $this->pendingRedirectService
+                        ? $pendingRedirect
+                        : (is_string($storedRedirect) ? $storedRedirect : null)
                 );
             }
         }
@@ -554,17 +569,24 @@ class Domains extends Component
             ];
         }
 
-        if ($this->application->settings?->is_static) {
-            return [
-                'internal_port' => 80,
-                'has_port_override' => false,
-            ];
-        }
-
         $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
         if ($composePort !== null) {
             return [
                 'internal_port' => $composePort,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->isCompose && $service !== null) {
+            return [
+                'internal_port' => null,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->application->settings?->is_static) {
+            return [
+                'internal_port' => 80,
                 'has_port_override' => false,
             ];
         }
@@ -606,7 +628,7 @@ class Domains extends Component
         return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
     }
 
-    protected function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    protected function shouldConfirmPort(?int $port, ?int $currentPort = null, ?string $serviceName = null): bool
     {
         if ($this->forceUseUnknownPort || $port === null) {
             return false;
@@ -615,7 +637,7 @@ class Domains extends Component
             return false;
         }
 
-        return $this->application->portRequiresConfirmation($port);
+        return $this->application->portRequiresConfirmation($port, $serviceName);
     }
 
     protected function openPortWarning(?int $port, string $action): void
@@ -659,6 +681,11 @@ class Domains extends Component
     protected function authorizeUpdateForDomainConnect(): void
     {
         $this->authorize('update', $this->application);
+    }
+
+    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    {
+        return $this->application->destination?->server?->id === 0;
     }
 
     public function checkAllDns(): void
@@ -961,7 +988,13 @@ class Domains extends Component
             return;
         }
 
+        $this->authorize('update', $this->application);
+        $wasRedirect = $this->pendingAction === 'redirect';
         $this->pendingAction = null;
+        $this->pendingRedirectService = null;
+        if ($wasRedirect) {
+            $this->refreshDomains();
+        }
     }
 
     public function addDomain(): void
@@ -1006,7 +1039,7 @@ class Domains extends Component
                 }
             }
 
-            if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+            if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts), serviceName: $this->newDomainService)) {
                 $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
 
                 return;
@@ -1403,7 +1436,7 @@ class Domains extends Component
                 return;
             }
 
-            if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+            if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl), $service)) {
                 $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
                 return;

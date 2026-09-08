@@ -27,6 +27,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -1455,7 +1456,9 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $repository_url_parsed = Url::fromString($request->git_repository);
             $git_host = $repository_url_parsed->getHost();
@@ -1719,7 +1722,9 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->git_repository = str($gitRepository)->trim()->toString();
@@ -1950,7 +1955,9 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->private_key_id = $privateKey->id;
@@ -3369,7 +3376,12 @@ class ApplicationsController extends Controller
         }
 
         if ($dockerComposeDomainsJson->count() > 0) {
+            [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts(
+                $dockerComposeDomainsJson,
+                $application->domain_port_overrides,
+            );
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
+            data_set($data, 'domain_port_overrides', $domainPortOverrides);
         }
         $requestHasNoindexDomains = $request->has('noindex_domains');
         data_forget($data, 'noindex_domains');
@@ -6115,5 +6127,29 @@ class ApplicationsController extends Controller
         ]);
 
         return response()->json(['message' => 'Destination detached.']);
+    }
+
+    /**
+     * @param  Collection<string, array{domain: ?string, redirect?: string}>  $domains
+     * @param  array<string, int|string>|null  $existingOverrides
+     * @return array{Collection<string, array{domain: ?string, redirect?: string}>, ?array<string, int>}
+     */
+    private function normalizeDockerComposeDomainPorts(Collection $domains, ?array $existingOverrides = null): array
+    {
+        $allDomains = $domains
+            ->pluck('domain')
+            ->filter()
+            ->implode(',');
+        $normalized = DomainPortOverrides::normalize($allDomains, $existingOverrides);
+
+        $domains = $domains->map(function (array $entry): array {
+            $entry['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain'] ?? null))
+                ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                ->implode(',');
+
+            return $entry;
+        });
+
+        return [$domains, $normalized['overrides']];
     }
 }

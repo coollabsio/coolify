@@ -295,7 +295,7 @@
         @if ($streamLogs)
             <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
-        <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
+        <div x-show="expanded" {{ $collapsible ? 'x-collapse.duration.200ms' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
             <div class="runtime-log-panel"

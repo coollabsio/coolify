@@ -209,19 +209,20 @@ trait InteractsWithCloudflareDomainConnect
             }
         }
 
-        // Prefer instance public IPv6 when the destination IP is IPv4-only (and vice versa).
-        try {
-            $settings = instanceSettings();
-            $publicV4 = data_get($settings, 'public_ipv4');
-            $publicV6 = data_get($settings, 'public_ipv6');
-            if ($ipv4 === null && is_string($publicV4) && filter_var($publicV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                $ipv4 = $publicV4;
+        if ($this->usesInstanceNetworkAddressesForDnsHints()) {
+            try {
+                $settings = instanceSettings();
+                $publicV4 = data_get($settings, 'public_ipv4');
+                $publicV6 = data_get($settings, 'public_ipv6');
+                if ($ipv4 === null && is_string($publicV4) && filter_var($publicV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    $ipv4 = $publicV4;
+                }
+                if ($ipv6 === null && is_string($publicV6) && filter_var($publicV6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                    $ipv6 = $publicV6;
+                }
+            } catch (\Throwable) {
+                //
             }
-            if ($ipv6 === null && is_string($publicV6) && filter_var($publicV6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-                $ipv6 = $publicV6;
-            }
-        } catch (\Throwable) {
-            //
         }
 
         return [$ipv4, $ipv6];
@@ -252,6 +253,8 @@ trait InteractsWithCloudflareDomainConnect
 
         return null;
     }
+
+    abstract protected function usesInstanceNetworkAddressesForDnsHints(): bool;
 
     abstract protected function authorizeUpdateForDomainConnect(): void;
 }

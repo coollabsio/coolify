@@ -607,6 +607,13 @@ function firstDockerComposeServicePort(mixed $service): ?int
         ->merge(data_get($service, 'ports', []));
 
     foreach ($portDefinitions as $definition) {
+        $protocol = is_array($definition)
+            ? data_get($definition, 'protocol', 'tcp')
+            : (str_contains((string) $definition, '/') ? str((string) $definition)->afterLast('/')->value() : 'tcp');
+        if ($protocol !== 'tcp') {
+            continue;
+        }
+
         $port = is_array($definition)
             ? data_get($definition, 'target')
             : str((string) $definition)->before('/')->afterLast(':')->value();
@@ -621,17 +628,28 @@ function firstDockerComposeServicePort(mixed $service): ?int
 
 function dockerComposeServicePort(?string $compose, ?string $serviceName): ?int
 {
+    return dockerComposeServicePorts($compose, $serviceName)[0] ?? null;
+}
+
+function dockerComposeServicePorts(?string $compose, ?string $serviceName): array
+{
     if (blank($compose) || blank($serviceName)) {
-        return null;
+        return [];
     }
 
     try {
         $services = data_get(Yaml::parse($compose), 'services', []);
     } catch (Throwable) {
-        return null;
+        return [];
     }
 
-    return firstDockerComposeServicePort(is_array($services) ? ($services[$serviceName] ?? null) : null);
+    $service = is_array($services) ? ($services[$serviceName] ?? []) : [];
+
+    return collect(data_get($service, 'expose', []))
+        ->merge(data_get($service, 'ports', []))
+        ->map(fn ($definition) => firstDockerComposeServicePort(['expose' => [$definition]]))
+        ->filter(fn ($port) => $port !== null)
+        ->unique()->values()->all();
 }
 
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
