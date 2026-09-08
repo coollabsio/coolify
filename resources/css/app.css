@@ -101,6 +101,10 @@
     --button-depth-color: color-mix(in oklab, var(--color-coollabs) 52%, black);
 }
 
+.dark .button:not(.button-highlighted):not([isHighlighted]):not(:disabled) {
+    --button-depth-color: rgb(255 255 255 / 0.08);
+}
+
 /* Keep the shared focus indicator when the depth shadow owns box-shadow. */
 .button:not(:disabled):focus-visible {
     box-shadow: var(--button-depth), 0 0 0 1px var(--color-accent);
