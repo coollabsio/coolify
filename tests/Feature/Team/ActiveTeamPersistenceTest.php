@@ -183,6 +183,54 @@ it('preserves a newer team selection when clearing a stale team', function () {
     expect($user->fresh()->current_team_id)->toBe($personal->id);
 });
 
+it('returns the sole remaining team when the deleting owner has one team left', function () {
+    [$owner, $personal, $shared] = userWithTwoTeams();
+    $owner->update(['current_team_id' => $shared->id]);
+
+    $next = app(DeleteTeam::class)->handle($shared->fresh(), $owner);
+
+    expect($next?->id)->toBe($personal->id);
+});
+
+it('returns null (picker) when the deleting owner still has multiple teams left', function () {
+    [$owner, , $shared] = userWithTwoTeams();
+    $third = Team::factory()->create(['show_boarding' => false]);
+    $owner->teams()->attach($third, ['role' => 'owner']);
+    $owner->update(['current_team_id' => $shared->id]);
+
+    // Deleting the active team leaves personal + third: ambiguous, so no team is
+    // chosen silently and refreshSession(null) routes to the selection screen.
+    $next = app(DeleteTeam::class)->handle($shared->fresh(), $owner->fresh());
+
+    expect($next)->toBeNull();
+});
+
+it('keeps the active team when the deleted team was not the active one', function () {
+    [$owner, $personal, $shared] = userWithTwoTeams();
+    $third = Team::factory()->create(['show_boarding' => false]);
+    $owner->teams()->attach($third, ['role' => 'owner']);
+    $owner->update(['current_team_id' => $personal->id]);
+
+    // Deleting a non-active team must not move the owner off their active team.
+    $next = app(DeleteTeam::class)->handle($shared->fresh(), $owner->fresh());
+
+    expect($next?->id)->toBe($personal->id);
+});
+
+it('does not persist current_team_id while impersonating', function () {
+    [$user, , $second] = userWithTwoTeams();
+    $user->update(['current_team_id' => $second->id]);
+    $this->actingAs($user);
+    session(['impersonating' => true]);
+
+    // Viewing a user's account switches the session team but must never
+    // overwrite that user's stored last-active team.
+    refreshSession($user->teams->first());
+
+    expect(data_get(session('currentTeam'), 'id'))->toBe($user->teams->first()->id)
+        ->and($user->fresh()->current_team_id)->toBe($second->id);
+});
+
 it('bounces users who already have an active team away from the select screen', function () {
     [$user, , $second] = userWithTwoTeams();
     $user->update(['current_team_id' => $second->id]);

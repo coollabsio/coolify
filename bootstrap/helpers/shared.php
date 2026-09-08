@@ -602,9 +602,11 @@ function refreshSession(?Team $team = null): void
     });
     session(['currentTeam' => $team]);
 
-    // Persist the active team so it can be restored after logout/login.
+    // Persist the active team so it can be restored after logout/login — but
+    // never while an admin is impersonating, so viewing another user's account
+    // does not overwrite that user's real last-active team.
     $user = Auth::user();
-    if ($user && $user->current_team_id !== $team->id) {
+    if ($user && ! session('impersonating') && $user->current_team_id !== $team->id) {
         $user->current_team_id = $team->id;
         $user->saveQuietly();
     }

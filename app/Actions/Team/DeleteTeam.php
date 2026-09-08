@@ -60,7 +60,12 @@ class DeleteTeam
 
             $team->delete();
 
-            return $user->teams()->first();
+            // Resolve the next active team the same way login does: the user's
+            // stored choice when still valid, or their sole remaining team.
+            // Returns null for a multi-team user whose active team was just
+            // deleted, so refreshSession sends them to the selection screen
+            // instead of silently dropping them into an arbitrary first team.
+            return User::query()->find($user->id)?->resolveStoredTeam();
         });
 
         Cache::forget("user:{$user->id}:team:{$team->id}");
