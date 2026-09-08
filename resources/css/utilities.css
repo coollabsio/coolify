@@ -370,6 +370,14 @@
     @apply z-[1];
 }
 
+/* Floating notice / popover surface: elevated fill, hairline ring, and the
+   shared dropdown lift. Toasts, change-pending popovers and the deployments
+   list share this so they match menus/dropdowns instead of the heavier modal. */
+@utility surface-popover {
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-dropdown);
+}
+
 @utility dz-button {
     @apply p-4 py-10 my-4 w-full font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent dark:hover:bg-coolgray-400;
 }

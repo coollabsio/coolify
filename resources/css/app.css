@@ -563,14 +563,6 @@ html[data-theme="custom"] #nprogress .spinner-icon {
     --console-theme-opacity: 1;
 }
 
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header {
-    background: transparent;
-    color: #52525b;
-    border-color: rgb(0 0 0 / 0.1);
-    backdrop-filter: none;
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"],
 /* Session toolbar (selected-target trigger + label) sits over the white
    system console in light mode. Without this its text-white/* stayed white on
    white and the selected server was invisible (issue #11532). */
@@ -787,13 +779,6 @@ html.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 body.terminal-is-fullscreen .terminal-fullscreen-shell .terminal-fullscreen-btn,
 body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-toolbar] {
     touch-action: manipulation;
-}
-
-.application-console-header {
-    position: relative;
-    z-index: 2;
-    background: rgb(0 0 0 / 0.24);
-    backdrop-filter: blur(20px);
 }
 
 /* Session header band: an attached card-style header on top of the console,
@@ -1601,27 +1586,6 @@ html[data-theme="custom"] textarea:disabled {
     margin-top: 1.75rem;
 }
 
-.error-contact-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.25rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #525252;
-    text-underline-offset: 3px;
-    transition: color 0.15s ease;
-}
-
-.dark .error-contact-link {
-    color: var(--color-fg-dim);
-}
-
-.error-contact-link:hover {
-    color: var(--color-accent);
-    text-decoration: underline;
-}
-
 /* Layer card root: elevated shell with a hairline ring. overflow stays
    visible so floating panels (listbox, tooltips) can escape the card. */
 .application-settings-section {
@@ -2001,7 +1965,7 @@ html[data-theme="custom"] textarea:disabled {
     margin-inline: 0.25rem;
     border-radius: 9999px;
     color: #737373;
-    background: #ffffff;
+    background: var(--coollabs-base);
     box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.06),
         0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -2073,20 +2037,6 @@ html[data-theme="custom"] textarea:disabled {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-}
-
-.resource-heading-overflow-separator {
-    width: 1px;
-    align-self: stretch;
-    margin: 0.25rem 0.25rem;
-    background: color-mix(in srgb, var(--coollabs-line) 80%, transparent);
-}
-
-.resource-heading-overflow.is-collapsed .resource-heading-overflow-separator {
-    width: auto;
-    height: 1px;
-    align-self: auto;
-    margin: 0.25rem 0.375rem;
 }
 
 .resource-heading-overflow.is-collapsed .resource-heading-overflow-items > .button,
@@ -3403,7 +3353,7 @@ input[type="search"]::-webkit-search-results-decoration {
 /* Shared logs viewer (deployment + runtime) — mobile-first toolbar
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
 .logs-viewer {
-    background: #fff;
+    background: var(--coollabs-base);
     color: #262626;
 }
 
@@ -3904,7 +3854,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .runtime-log-viewport {
     min-height: 12rem;
     border-radius: 0 0 8px 8px;
-    background: #fafafa;
+    background: var(--coollabs-elevated);
     color: #262626;
 }
 
@@ -3917,10 +3867,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .dark .runtime-log-viewport {
     background: var(--color-log);
     color: var(--color-fg-dim);
-}
-
-.env-table-detail {
-    padding: 0.25rem 1rem 1.25rem;
 }
 
 /* Small pill badges for table cells */
@@ -4071,93 +4017,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .chip-remove:hover {
     color: inherit;
-}
-
-/* Detached pill options (segmented radio groups rendered as separate pills) */
-.option-pill-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.option-pill-group label {
-    margin-bottom: 0;
-}
-
-.option-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    height: 2rem;
-    padding: 0 0.875rem;
-    border-radius: 8px;
-    border: 1px solid var(--coollabs-line);
-    background: var(--coollabs-elevated);
-    font-size: 0.875rem;
-    font-weight: 500;
-    white-space: nowrap;
-    color: #000000;
-    transition: background-color 0.15s, border-color 0.15s;
-}
-
-.dark .option-pill {
-    color: var(--color-fg);
-}
-
-.option-pill:hover {
-    background: var(--coollabs-recessed);
-}
-
-.peer:checked + .option-pill {
-    background: var(--coollabs-fill);
-    border-color: var(--coollabs-line);
-}
-
-.peer:disabled + .option-pill {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* Label column + content rows inside a card body */
-.application-purpose-row {
-    display: grid;
-    gap: 1rem;
-    border-top: 1px solid var(--coollabs-fill);
-    padding-top: 1.25rem;
-}
-
-@media (min-width: 768px) {
-    .application-purpose-row {
-        grid-template-columns: 13rem minmax(0, 1fr);
-        gap: 2rem;
-    }
-}
-
-.application-purpose-copy h4 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #000000;
-}
-
-.dark .application-purpose-copy h4 {
-    color: var(--color-fg);
-}
-
-.application-purpose-copy p {
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: #71717a;
-}
-
-.dark .application-purpose-copy p {
-    color: var(--color-fg-dim);
-}
-
-.application-details-card .application-purpose-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
 }
 
 /* In-card sub-headings (e.g. "Container labels", "Docker Compose") */
@@ -4316,7 +4175,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overflow: hidden;
     border-radius: 10px;
     background: var(--coollabs-elevated);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown);
 }
 
 .command-palette-header {
