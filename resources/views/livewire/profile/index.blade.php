@@ -218,8 +218,9 @@
                     <h2>Two-factor authentication</h2>
                     <p>Add a time-based one-time password to protect your account.</p>
                 </div>
-                @if (! request()->user()->two_factor_confirmed_at
-                        && session('status') !== 'two-factor-authentication-enabled')
+                @if (request()->user()->two_factor_confirmed_at)
+                    <x-status-badge status="Enabled" type="success" />
+                @elseif (session('status') !== 'two-factor-authentication-enabled')
                     <form action="/user/two-factor-authentication" method="POST">
                         @csrf
                         <x-forms.button type="submit">Configure 2FA</x-forms.button>
