@@ -7,20 +7,6 @@
 services:
   appwrite:
     image: appwrite/appwrite:2.0.0
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
-      - appwrite-clickhouse
-      - appwrite-geo
-    volumes:
-      - appwrite-uploads:/storage/uploads:rw
-      - appwrite-imports:/storage/imports:rw
-      - appwrite-cache:/storage/cache:rw
-      - appwrite-config:/storage/config:rw
-      - appwrite-certificates:/storage/certificates:rw
-      - appwrite-functions:/storage/functions:rw
-      - appwrite-sites:/storage/sites:rw
-      - appwrite-builds:/storage/builds:rw
     environment:
       - SERVICE_URL_APPWRITE=/v1
       - _APP_ENV=${_APP_ENV:-production}
@@ -206,6 +192,24 @@ services:
       - _APP_DOCUMENTSDB=${_APP_DOCUMENTSDB:-disabled}
       - _APP_VECTORSDB=${_APP_VECTORSDB:-disabled}
       - _APP_EMBEDDING=${_APP_EMBEDDING:-disabled}
+    volumes:
+      - appwrite-uploads:/storage/uploads:rw
+      - appwrite-imports:/storage/imports:rw
+      - appwrite-cache:/storage/cache:rw
+      - appwrite-config:/storage/config:rw
+      - appwrite-certificates:/storage/certificates:rw
+      - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
+      - appwrite-builds:/storage/builds:rw
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
+      appwrite-clickhouse:
+        condition: service_healthy
+      appwrite-geo:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost/v1/health/version || exit 1"]
       interval: 20s
@@ -213,12 +217,25 @@ services:
       retries: 6
       start_period: 120s
 
+  appwrite-console:
+    image: appwrite/new:1.1.16
+    environment:
+      - SERVICE_URL_APPWRITE_3000=/
+      - VITE_CONSOLE_PROFILE=self-hosted
+      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
+      - VITE_GROWTH_ENDPOINT=${VITE_GROWTH_ENDPOINT:-https://growth.appwrite.io/v1}
+    depends_on:
+      appwrite:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
   appwrite-realtime:
     image: appwrite/appwrite:2.0.0
     entrypoint: realtime
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
     environment:
       - SERVICE_URL_APPWRITE=/v1/realtime
       - _APP_ENV=${_APP_ENV:-production}
@@ -263,23 +280,13 @@ services:
       - _APP_VECTORSDB=${_APP_VECTORSDB:-disabled}
       - _APP_EMBEDDING=${_APP_EMBEDDING:-disabled}
       - _APP_POOL_ADAPTER=swoole
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -s localhost > /dev/null || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-
-  appwrite-console:
-    image: appwrite/new:1.1.16
-    depends_on:
-      - appwrite
-    environment:
-      - SERVICE_URL_APPWRITE_3000=/
-      - VITE_CONSOLE_PROFILE=self-hosted
-      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
-      - VITE_GROWTH_ENDPOINT=${VITE_GROWTH_ENDPOINT:-https://growth.appwrite.io/v1}
-    healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -287,21 +294,6 @@ services:
   appwrite-worker:
     image: appwrite/appwrite:2.0.0
     entrypoint: worker
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
-      - appwrite-clickhouse
-      - openruntimes-executor
-      - orchestrator
-    volumes:
-      - appwrite-uploads:/storage/uploads:rw
-      - appwrite-imports:/storage/imports:rw
-      - appwrite-cache:/storage/cache:rw
-      - appwrite-config:/storage/config:rw
-      - appwrite-certificates:/storage/certificates:rw
-      - appwrite-functions:/storage/functions:rw
-      - appwrite-sites:/storage/sites:rw
-      - appwrite-builds:/storage/builds:rw
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
@@ -442,6 +434,26 @@ services:
       - _APP_DOCUMENTSDB=${_APP_DOCUMENTSDB:-disabled}
       - _APP_VECTORSDB=${_APP_VECTORSDB:-disabled}
       - _APP_EMBEDDING=${_APP_EMBEDDING:-disabled}
+    volumes:
+      - appwrite-uploads:/storage/uploads:rw
+      - appwrite-imports:/storage/imports:rw
+      - appwrite-cache:/storage/cache:rw
+      - appwrite-config:/storage/config:rw
+      - appwrite-certificates:/storage/certificates:rw
+      - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
+      - appwrite-builds:/storage/builds:rw
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
+      appwrite-clickhouse:
+        condition: service_healthy
+      openruntimes-executor:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[p]hp' || exit 1"]
       interval: 20s
@@ -451,9 +463,6 @@ services:
   appwrite-task-scheduler:
     image: appwrite/appwrite:2.0.0
     entrypoint: schedule
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
@@ -491,6 +500,11 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_POSTGRES
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_FUNCTIONS_SCHEDULE_SPREAD=${_APP_FUNCTIONS_SCHEDULE_SPREAD:-0}
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[p]hp' || exit 1"]
       interval: 20s
@@ -500,9 +514,6 @@ services:
   appwrite-task-maintenance:
     image: appwrite/appwrite:2.0.0
     entrypoint: maintenance
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
@@ -538,6 +549,11 @@ services:
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
       - _APP_MAINTENANCE_START_TIME=${_APP_MAINTENANCE_START_TIME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[p]hp' || exit 1"]
       interval: 20s
@@ -547,9 +563,6 @@ services:
   appwrite-task-interval:
     image: appwrite/appwrite:2.0.0
     entrypoint: interval
-    depends_on:
-      - appwrite-postgresql
-      - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
@@ -577,21 +590,16 @@ services:
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_INTERVAL_DOMAIN_VERIFICATION=${_APP_INTERVAL_DOMAIN_VERIFICATION:-120}
       - _APP_INTERVAL_CLEANUP_STALE_EXECUTIONS=${_APP_INTERVAL_CLEANUP_STALE_EXECUTIONS:-300}
+    depends_on:
+      appwrite-postgresql:
+        condition: service_healthy
+      appwrite-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[p]hp' || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 3
-
-  appwrite-assistant:
-    image: appwrite/assistant:0.8.4
-    environment:
-      - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
-    exclude_from_hc: true
-
-  appwrite-browser:
-    image: appwrite/browser:0.3.4
-    exclude_from_hc: true
 
   appwrite-geo:
     image: appwrite/geo:0.3.1
@@ -604,16 +612,20 @@ services:
       retries: 3
       start_period: 10s
 
+  appwrite-assistant:
+    image: appwrite/assistant:0.8.4
+    environment:
+      - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
+    exclude_from_hc: true
+
+  appwrite-browser:
+    image: appwrite/browser:0.3.4
+    exclude_from_hc: true
+
   openruntimes-executor:
     image: openruntimes/executor:0.29.0
     hostname: openruntimes-executor
     stop_signal: SIGINT
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - appwrite-builds:/storage/builds:rw
-      - appwrite-functions:/storage/functions:rw
-      - appwrite-sites:/storage/sites:rw
-      - /tmp:/tmp:rw
     environment:
       - OPR_EXECUTOR_IMAGES=${_APP_EXECUTOR_IMAGES:-openruntimes/node:v5-22,openruntimes/static:v5-1}
       - OPR_EXECUTOR_INACTIVE_THRESHOLD=${_APP_COMPUTE_INACTIVE_THRESHOLD:-600}
@@ -629,6 +641,12 @@ services:
       - OPR_EXECUTOR_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - OPR_EXECUTOR_CONNECTION_STORAGE=${_APP_EXECUTOR_CONNECTION_STORAGE:-local://localhost}
       - OPR_EXECUTOR_CONNECTION_BUILD_CACHE_STORAGE=
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - appwrite-builds:/storage/builds:rw
+      - appwrite-functions:/storage/functions:rw
+      - appwrite-sites:/storage/sites:rw
+      - /tmp:/tmp:rw
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $$OPR_EXECUTOR_SECRET\" http://localhost/v1/health > /dev/null || exit 1"]
       interval: 20s
@@ -637,11 +655,9 @@ services:
       start_period: 10s
 
   orchestrator:
-    image: ghcr.io/open-runtimes/orchestrator/orchestrator:1.9.2
+    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.0.1
     hostname: orchestrator
     user: root
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - ORCHESTRATOR_BACKEND=docker
       - ORCHESTRATOR_NETWORK=${COMPOSE_PROJECT_NAME}
@@ -651,36 +667,23 @@ services:
       - S3_REGION=${_APP_STORAGE_S3_REGION:-us-east-1}
       - S3_ACCESS_KEY_ID=${_APP_STORAGE_S3_ACCESS_KEY}
       - S3_SECRET_ACCESS_KEY=${_APP_STORAGE_S3_SECRET}
-    exclude_from_hc: true
-
-  appwrite-clickhouse:
-    image: clickhouse/clickhouse-server:26.4.3-alpine
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
     volumes:
-      - appwrite-clickhouse:/var/lib/clickhouse:rw
-    environment:
-      - CLICKHOUSE_DB=appwrite
-      - CLICKHOUSE_USER=appwrite
-      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query \"SELECT 1\" > /dev/null || exit 1"]
-      interval: 10s
+      test: ["CMD", "/ko-app/orchestrator", "-check-ready"]
+      interval: 20s
       timeout: 5s
-      retries: 20
-      start_period: 30s
+      retries: 3
+      start_period: 10s
 
   appwrite-postgresql:
     image: appwrite/postgres:0.1.0
-    volumes:
-      - appwrite-postgresql:/var/lib/postgresql:rw
     environment:
       - POSTGRES_DB=${_APP_DB_SCHEMA:-appwrite}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - appwrite-postgresql:/var/lib/postgresql:rw
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -690,11 +693,7 @@ services:
 
   appwrite-redis:
     image: redis:7.4.7-alpine
-    command: >
-      redis-server
-      --maxmemory            512mb
-      --maxmemory-policy     allkeys-lru
-      --maxmemory-samples    5
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5
     volumes:
       - appwrite-redis:/data:rw
     healthcheck:
@@ -702,3 +701,23 @@ services:
       interval: 20s
       timeout: 10s
       retries: 5
+
+  appwrite-clickhouse:
+    image: clickhouse/clickhouse-server:26.4.3-alpine
+    environment:
+      - CLICKHOUSE_DB=appwrite
+      - CLICKHOUSE_USER=appwrite
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - appwrite-clickhouse:/var/lib/clickhouse:rw
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query \"SELECT 1\" > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
