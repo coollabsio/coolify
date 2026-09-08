@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Webhook\Concerns;
 use App\Models\Application;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 trait MatchesManualWebhookApplications
 {
@@ -79,11 +78,15 @@ trait MatchesManualWebhookApplications
 
         if (is_array($parts) && isset($parts['scheme'])) {
             $path = data_get($parts, 'path');
-        } elseif (Str::startsWith($gitRepository, 'git@') && str_contains($gitRepository, ':')) {
-            $path = Str::after($gitRepository, ':');
-            // scp-style SSH URLs embed a custom port as "git@host:2222/owner/repo".
+        } elseif (preg_match('/\A[^@\/]+@[^@:\/]+:(?<path>.*)\z/', $gitRepository, $sshMatches) === 1) {
+            // scp-style SSH URLs are written as "<user>@host:owner/repo". The user is
+            // not always "git" — Gitea defaults to "gitea", and self-hosted setups may
+            // use anything else — so match on the shape instead of a fixed user,
+            // consistent with convertGitUrl() in shared.php.
+            $path = $sshMatches['path'];
+            // scp-style SSH URLs embed a custom port as "user@host:2222/owner/repo".
             // Strip the leading numeric port segment so the path matches the webhook
-            // payload's owner/repo, consistent with convertGitUrl() in shared.php.
+            // payload's owner/repo.
             $path = preg_replace('#^\d+/#', '', $path) ?? $path;
         } else {
             $path = $gitRepository;

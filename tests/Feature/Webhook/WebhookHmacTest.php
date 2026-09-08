@@ -584,6 +584,102 @@ describe('Manual Webhook Repository Matching', function () {
         expect($response->getContent())->not->toContain('No applications found');
     });
 
+    test('gitea matches scp-style ssh repository URL with a non-default ssh user', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'gitea@git.example.com:test-org/test-repo.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitea;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/master',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/gitea/events/manual', [], [], [], [
+            'HTTP_X-Gitea-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('gitea matches scp-style ssh repository URL with a non-default ssh user and custom port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'gitea@git.example.com:12345/test-org/test-repo.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitea;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/master',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/gitea/events/manual', [], [], [], [
+            'HTTP_X-Gitea-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('gitea matches explicit ssh:// repository URL with a non-default user and custom port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'ssh://gitea@git.example.com:12345/test-org/test-repo.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitea;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/master',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/gitea/events/manual', [], [], [], [
+            'HTTP_X-Gitea-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('does not match a repository whose path differs only by the ssh user', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'gitea@git.example.com:test-org/other-repo.git',
+            'git_branch' => 'master',
+        ]);
+        $secret = $app->manual_webhook_secret_gitea;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/master',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/gitea/events/manual', [], [], [], [
+            'HTTP_X-Gitea-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('No applications found');
+    });
+
     test('github matches repository case-insensitively', function () {
         $app = createApplicationWithWebhook(overrides: [
             'git_repository' => 'https://github.com/Test-Org/Test-Repo.git',
