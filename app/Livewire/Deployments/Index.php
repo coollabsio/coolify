@@ -24,7 +24,7 @@ class Index extends Component
 
     public string $status = 'all';
 
-    public int $perPage = 25;
+    public int $perPage = 10;
 
     public function updated(string $property): void
     {
