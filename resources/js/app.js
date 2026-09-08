@@ -1,5 +1,6 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeTerminalComponent } from './terminal.js';
+import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 
 document.addEventListener('livewire:init', () => {

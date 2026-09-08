@@ -25,6 +25,9 @@
 
             </x-application.settings-section>
 
+            <livewire:project.application.traffic-overview :application="$application"
+                :key="'application-traffic-overview-'.$application->id" />
+
             <x-application.settings-section id="access-section" title="Access" helper="Manage how this application is reached publicly and from the Docker network.">
             <section id="public-access-section" @class([
                 'border-b border-neutral-200 pb-5 dark:border-white/[0.07]' => $buildPack !== 'dockercompose',

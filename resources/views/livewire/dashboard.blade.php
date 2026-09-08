@@ -16,6 +16,8 @@
     <div class="flex min-w-0 flex-col gap-8">
         <livewire:dashboard.active-deployments />
 
+        <livewire:dashboard.traffic-analytics />
+
         <section class="mb-0! min-w-0">
             <x-section-heading title="Projects" subtitle="Your deployment workspaces"
                 :href="route('project.index')" />
