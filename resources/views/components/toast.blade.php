@@ -101,10 +101,9 @@
                     x-transition:enter-end="translate-y-0 opacity-100"
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="translate-y-0 opacity-100"
-                    x-transition:leave-end="-translate-y-1 opacity-0"
+                    x-transition:leave-end="translate-y-1 opacity-0"
                     @mouseenter="pauseToast(toast)" @mouseleave="resumeToast(toast)"
-                    class="relative flex w-full items-start rounded-lg group"
-                    style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);"
+                    class="surface-popover relative flex w-full items-start rounded-lg group"
                     :class="{ 'p-3.5 pr-20': !toast.html, 'p-0': toast.html }">
                     <template x-if="!toast.html">
                         <div class="flex min-w-0 items-start gap-3">
