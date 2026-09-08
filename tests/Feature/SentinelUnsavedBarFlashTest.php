@@ -12,8 +12,20 @@ test('sentinel unsaved bar scopes dirty tracking to savable form fields', functi
 
     expect($contents)
         ->toContain('x-unsaved-bar')
-        ->toContain('targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds"')
+        ->toContain('targets="sentinelCustomUrl,sentinelToken"')
+        ->not->toContain('trafficTopn')
+        ->not->toContain('sentinelMetricsRefreshRateSeconds')
+        ->not->toContain('sentinelMetricsHistoryDays')
+        ->not->toContain('sentinelPushIntervalSeconds')
         ->not->toMatch('/x-unsaved-bar\s+action="submit"\s*\/>/');
+});
+
+test('metrics unsaved bar scopes dirty tracking to metrics collection fields', function () {
+    $contents = file_get_contents(resource_path('views/livewire/server/charts.blade.php'));
+
+    expect($contents)
+        ->toContain('x-unsaved-bar action="saveMetricsSettings"')
+        ->toContain('targets="sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds"');
 });
 
 test('unsaved bar component accepts optional wire:target list', function () {

@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
-use App\Livewire\Server\Sentinel;
+use App\Livewire\Server\TrafficAnalyticsSettings;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,7 +30,7 @@ it('toggles traffic analytics via the sentinel settings component', function () 
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
-    Livewire::test(Sentinel::class, ['server' => $server])
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
         ->assertHasNoErrors();
 
@@ -47,7 +47,7 @@ it('does not enable traffic analytics on a swarm server', function () {
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
-    Livewire::test(Sentinel::class, ['server' => $server])
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
         ->assertHasNoErrors();
 
@@ -61,14 +61,14 @@ it('saves traffic analytics settings from the sentinel form', function () {
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->save();
 
-    Livewire::test(Sentinel::class, ['server' => $server])
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->set('trafficTopn', 100)
         ->set('trafficSampleThreshold', 500)
         ->set('trafficRetention1hDays', 14)
         ->set('trafficRetention1dDays', 180)
         ->set('isGeoipEnabled', false)
         ->set('geoipRefreshDays', 7)
-        ->call('submit')
+        ->call('saveTrafficAnalyticsSettings')
         ->assertHasNoErrors();
 
     $settings = $server->settings->fresh();
@@ -83,9 +83,9 @@ it('saves traffic analytics settings from the sentinel form', function () {
 it('rejects a zero top-n cap', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
 
-    Livewire::test(Sentinel::class, ['server' => $server])
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->set('trafficTopn', 0)
-        ->call('submit')
+        ->call('saveTrafficAnalyticsSettings')
         ->assertHasErrors(['trafficTopn']);
 });
 
@@ -99,7 +99,7 @@ it('does not enable traffic analytics on a build server', function () {
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
-    Livewire::test(Sentinel::class, ['server' => $server])
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
         ->assertHasNoErrors();
 

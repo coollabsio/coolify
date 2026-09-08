@@ -1,16 +1,20 @@
 <div class="flex w-full min-w-0 flex-col gap-6">
     {{-- Header (real chrome; only the data below is a skeleton) --}}
     <div class="flex flex-col gap-4">
-        <div class="min-w-0">
-            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
-            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                Request traffic across every application and server, reported by Sentinel.
-            </p>
-        </div>
+        @if (empty($scopedServerUuid ?? null))
+            <div class="min-w-0">
+                <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
+                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                    Request traffic across every application and server, reported by Sentinel.
+                </p>
+            </div>
+        @endif
 
         {{-- Filter bar --}}
         <div class="flex flex-wrap items-center gap-2">
-            <x-skeleton class="h-9 w-full rounded-lg sm:w-52" />
+            @if (empty($scopedServerUuid ?? null))
+                <x-skeleton class="h-9 w-full rounded-lg sm:w-52" />
+            @endif
             <x-skeleton class="h-9 w-full rounded-lg sm:w-52" />
             <x-skeleton class="h-9 w-44 rounded-lg sm:ml-auto" />
         </div>

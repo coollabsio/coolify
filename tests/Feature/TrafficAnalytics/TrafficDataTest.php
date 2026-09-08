@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\Traffic\TrafficOverviewData;
+use App\Data\Traffic\TrafficPathData;
 
 it('maps a sentinel overview payload into a DTO', function () {
     $json = [
@@ -18,4 +19,20 @@ it('maps a sentinel overview payload into a DTO', function () {
 
 it('produces a zeroed overview', function () {
     expect(TrafficOverviewData::zero()->requests)->toBe(0);
+});
+
+it('maps per-path error counters from sentinel', function () {
+    $dto = TrafficPathData::fromSentinel([
+        'path' => '/api/checkout',
+        'app' => 'app-1',
+        'requests' => 20,
+        'bytes_out' => 1000,
+        's4xx' => 3,
+        's5xx' => 2,
+        'p50' => 10,
+        'p95' => 30,
+    ]);
+
+    expect($dto->s4xx)->toBe(3)
+        ->and($dto->s5xx)->toBe(2);
 });

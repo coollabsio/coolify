@@ -21,29 +21,35 @@ $appListboxOptions = array_merge(
 );
 ?>
 <div class="flex w-full min-w-0 flex-col gap-6">
-    <x-slot:title>
-        Analytics | Coolify
-    </x-slot>
+    @if ($scopedServerUuid === null)
+        <x-slot:title>
+            Analytics | Coolify
+        </x-slot>
+    @endif
 
     {{-- Header --}}
     <div class="flex flex-col gap-4">
-        <div class="min-w-0">
-            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
-            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                Request traffic across every application and server, reported by Sentinel.
-            </p>
-        </div>
+        @if ($scopedServerUuid === null)
+            <div class="min-w-0">
+                <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Analytics</h1>
+                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                    Request traffic across every application and server, reported by Sentinel.
+                </p>
+            </div>
+        @endif
 
         @if ($servers->isNotEmpty() && $overview)
             <div class="flex flex-wrap items-center gap-2">
-                <div class="relative w-full transition-opacity sm:w-52"
-                    wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid">
-                    <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers" />
-                    <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
-                        wire:loading.flex wire:target="serverUuid">
-                        <x-loading compact aria-label="Loading analytics" />
+                @if ($scopedServerUuid === null)
+                    <div class="relative w-full transition-opacity sm:w-52"
+                        wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid">
+                        <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers" />
+                        <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
+                            wire:loading.flex wire:target="serverUuid">
+                            <x-loading compact aria-label="Loading analytics" />
+                        </div>
                     </div>
-                </div>
+                @endif
                 {{-- Re-key on the server filter so the application listbox re-initializes with the
                      newly-scoped options (and reset value) instead of showing stale Alpine state. --}}
                 <div class="relative w-full transition-opacity sm:w-52" wire:key="app-filter-{{ $serverUuid }}"
@@ -83,7 +89,7 @@ $appListboxOptions = array_merge(
     </div>
 
     {{-- Nudge: enabled-eligible servers that haven't turned traffic analytics on yet. --}}
-    @if (! empty($eligibleDisabledServers))
+    @if ($scopedServerUuid === null && ! empty($eligibleDisabledServers))
         <div x-data="{ dismissed: localStorage.getItem('traffic-nudge-{{ $nudgeKey }}') === '1' }" x-show="!dismissed" x-cloak
             class="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
             <div class="min-w-0 flex-1">
@@ -97,7 +103,7 @@ $appListboxOptions = array_merge(
             </div>
             <div class="flex shrink-0 items-center gap-2">
                 @if (count($eligibleDisabledServers) === 1)
-                    <a class="button" href="{{ route('server.sentinel', ['server_uuid' => $eligibleDisabledServers[0]['uuid']]) }}" {{ wireNavigate() }}>
+                    <a class="button" href="{{ route('server.analytics', ['server_uuid' => $eligibleDisabledServers[0]['uuid']]) }}" {{ wireNavigate() }}>
                         Enable on {{ \Illuminate\Support\Str::limit($eligibleDisabledServers[0]['name'], 16) }}
                     </a>
                 @else
@@ -118,13 +124,15 @@ $appListboxOptions = array_merge(
 
     @if ($servers->isEmpty())
         <x-empty size="sm" title="Traffic analytics is not enabled"
-            description="Enable Sentinel traffic analytics on a server to see request analytics here."
+            description="{{ $scopedServerUuid === null ? 'Enable traffic analytics on a server to see request analytics here.' : 'Enable traffic analytics in the settings below to begin collecting requests for this server.' }}"
             icon-name="analytics">
-            <x-slot:contents>
-                <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
-                    View servers
-                </a>
-            </x-slot:contents>
+            @if ($scopedServerUuid === null)
+                <x-slot:contents>
+                    <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
+                        View servers
+                    </a>
+                </x-slot:contents>
+            @endif
         </x-empty>
     @elseif (! $overview)
         <x-empty size="sm" title="No analytics data yet"

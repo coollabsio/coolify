@@ -101,6 +101,14 @@ it('treats an all-zero device series as no data', function () {
         ->toContain('@if (! $hasDeviceData)');
 });
 
+it('renders the device chart tooltip with the shared opaque background', function () {
+    $partial = file_get_contents(base_path('resources/views/livewire/traffic/_device-chart.blade.php'));
+
+    expect($partial)
+        ->toContain('apexcharts-tooltip-custom')
+        ->toContain('apexcharts-tooltip-custom-value');
+});
+
 it('keeps KPI sparklines axisless after live updates', function () {
     $partial = file_get_contents(base_path('resources/views/livewire/traffic/_sparkline.blade.php'));
 

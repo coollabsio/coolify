@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
@@ -23,15 +22,6 @@ class Sentinel extends Component
 
     public ?string $sentinelUpdatedAt = null;
 
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsRefreshRateSeconds;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsHistoryDays;
-
-    #[Validate(['required', 'integer', 'min:10'])]
-    public int|string $sentinelPushIntervalSeconds;
-
     #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;
 
@@ -40,28 +30,6 @@ class Sentinel extends Component
     public bool $isSentinelDebugEnabled;
 
     public ?string $sentinelCustomDockerImage = null;
-
-    public bool $isTrafficAnalyticsEnabled;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $trafficTopn;
-
-    #[Validate(['required', 'integer', 'min:0'])]
-    public int|string $trafficSampleThreshold;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $trafficRetention1hDays;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $trafficRetention1dDays;
-
-    public bool $isGeoipEnabled;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $geoipRefreshDays;
-
-    #[Validate(['nullable', 'string', 'max:255'])]
-    public ?string $geoipMaxmindLicenseKey = null;
 
     public function getListeners()
     {
@@ -83,38 +51,17 @@ class Sentinel extends Component
             $this->validate();
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
-            $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
-            $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
-            $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
-            $this->server->settings->traffic_topn = $this->trafficTopn;
-            $this->server->settings->traffic_sample_threshold = $this->trafficSampleThreshold;
-            $this->server->settings->traffic_retention_1h_days = $this->trafficRetention1hDays;
-            $this->server->settings->traffic_retention_1d_days = $this->trafficRetention1dDays;
-            $this->server->settings->is_geoip_enabled = $this->isGeoipEnabled;
-            $this->server->settings->geoip_refresh_days = $this->geoipRefreshDays;
-            $this->server->settings->geoip_maxmind_license_key = $this->geoipMaxmindLicenseKey;
             $this->server->settings->save();
         } else {
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
-            $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
-            $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
-            $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
-            $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
-            $this->trafficTopn = $this->server->settings->traffic_topn;
-            $this->trafficSampleThreshold = $this->server->settings->traffic_sample_threshold;
-            $this->trafficRetention1hDays = $this->server->settings->traffic_retention_1h_days;
-            $this->trafficRetention1dDays = $this->server->settings->traffic_retention_1d_days;
-            $this->isGeoipEnabled = (bool) $this->server->settings->is_geoip_enabled;
-            $this->geoipRefreshDays = $this->server->settings->geoip_refresh_days;
-            $this->geoipMaxmindLicenseKey = $this->server->settings->geoip_maxmind_license_key;
         }
     }
 
@@ -163,27 +110,6 @@ class Sentinel extends Component
             }
             $this->submit();
             $this->dispatch('refreshServerShow');
-        } catch (\Throwable $e) {
-            handleError($e, $this);
-        }
-    }
-
-    public function toggleTrafficAnalytics(): void
-    {
-        try {
-            $this->authorize('update', $this->server);
-            if ($this->server->isSwarm() || $this->server->isBuildServer()) {
-                $this->dispatch('error', 'Traffic analytics is not supported on Swarm/Build servers.');
-
-                return;
-            }
-            $enable = ! $this->server->isTrafficAnalyticsEnabled();
-            ConfigureTrafficAnalytics::run($this->server, $enable);
-            $this->server->refresh();
-            $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
-            $this->dispatch('success', $enable
-                ? 'Traffic analytics enabled. Restarting proxy and Sentinel.'
-                : 'Traffic analytics disabled. Restarting proxy and Sentinel.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

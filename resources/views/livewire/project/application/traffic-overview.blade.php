@@ -18,7 +18,7 @@
                             geography for this application. Restarts the proxy + Sentinel.
                         </p>
                     </div>
-                    <a class="button shrink-0" href="{{ route('server.sentinel', ['server_uuid' => $serverUuid]) }}" {{ wireNavigate() }}>
+                    <a class="button shrink-0" href="{{ route('server.analytics', ['server_uuid' => $serverUuid]) }}" {{ wireNavigate() }}>
                         Server settings
                         <x-external-link />
                     </a>

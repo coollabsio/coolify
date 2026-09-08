@@ -21,6 +21,8 @@ class Analytics extends Component
 
     public string $chartId = 'global-analytics';
 
+    public ?string $scopedServerUuid = null;
+
     /** Traffic-enabled servers owned by the current team. */
     public Collection $servers;
 
@@ -109,32 +111,46 @@ class Analytics extends Component
      */
     protected array $appMetaCache = [];
 
-    public function mount(): void
+    public function mount(?string $scopedServerUuid = null): void
     {
         $allServers = Server::ownedByCurrentTeamCached();
 
-        $this->servers = $allServers
-            ->filter(fn (Server $server) => $server->isTrafficAnalyticsEnabled())
-            ->values();
+        $this->scopedServerUuid = $scopedServerUuid;
 
-        $this->serverOptions = $this->servers
-            ->mapWithKeys(fn (Server $server) => [$server->uuid => $server->name])
-            ->all();
+        if ($this->scopedServerUuid !== null) {
+            $server = $allServers->firstWhere('uuid', $this->scopedServerUuid);
+            abort_if($server === null, 404);
 
-        $eligibleDisabled = $allServers
-            ->filter(fn (Server $server) => ! $server->isTrafficAnalyticsEnabled()
-                && ! $server->isSwarm()
-                && ! $server->isBuildServer())
-            ->values();
+            $this->serverUuid = $server->uuid;
+            $this->chartId = 'server-analytics-'.$server->uuid;
+            $this->servers = $server->isTrafficAnalyticsEnabled() ? collect([$server]) : collect();
+            $this->serverOptions = [$server->uuid => $server->name];
+            $this->eligibleDisabledServers = [];
+            $this->nudgeKey = '';
+        } else {
+            $this->servers = $allServers
+                ->filter(fn (Server $server) => $server->isTrafficAnalyticsEnabled())
+                ->values();
 
-        $this->eligibleDisabledServers = $eligibleDisabled
-            ->map(fn (Server $server) => ['uuid' => $server->uuid, 'name' => $server->name])
-            ->all();
-        $this->nudgeKey = substr(md5($eligibleDisabled->pluck('uuid')->sort()->implode(',')), 0, 12);
+            $this->serverOptions = $this->servers
+                ->mapWithKeys(fn (Server $server) => [$server->uuid => $server->name])
+                ->all();
 
-        // A bookmarked ?server= may point at a server that is no longer enabled.
-        if ($this->serverUuid !== '' && ! array_key_exists($this->serverUuid, $this->serverOptions)) {
-            $this->serverUuid = '';
+            $eligibleDisabled = $allServers
+                ->filter(fn (Server $server) => ! $server->isTrafficAnalyticsEnabled()
+                    && ! $server->isSwarm()
+                    && ! $server->isBuildServer())
+                ->values();
+
+            $this->eligibleDisabledServers = $eligibleDisabled
+                ->map(fn (Server $server) => ['uuid' => $server->uuid, 'name' => $server->name])
+                ->all();
+            $this->nudgeKey = substr(md5($eligibleDisabled->pluck('uuid')->sort()->implode(',')), 0, 12);
+
+            // A bookmarked ?server= may point at a server that is no longer enabled.
+            if ($this->serverUuid !== '' && ! array_key_exists($this->serverUuid, $this->serverOptions)) {
+                $this->serverUuid = '';
+            }
         }
 
         $this->refreshAppOptions();
@@ -226,6 +242,10 @@ class Analytics extends Component
      */
     protected function targetServers(): Collection
     {
+        if ($this->scopedServerUuid !== null) {
+            return $this->servers;
+        }
+
         if ($this->appUuid !== '') {
             $server = Application::ownedByCurrentTeam()->whereUuid($this->appUuid)->first()
                 ?->destination?->server;
@@ -311,9 +331,11 @@ class Analytics extends Component
                     $key = $resolveId."\n".$pathStr;
                     $domain = $resolveId !== '' ? ($this->appMeta($resolveId)['domain'] ?? null) : null;
 
-                    $pathTotals[$key] ??= ['path' => $pathStr, 'domain' => $domain, 'requests' => 0, 'bytesOut' => 0, 'p95' => 0.0];
+                    $pathTotals[$key] ??= ['path' => $pathStr, 'domain' => $domain, 'requests' => 0, 'bytesOut' => 0, 's4xx' => 0, 's5xx' => 0, 'p95' => 0.0];
                     $pathTotals[$key]['requests'] += (int) ($data['requests'] ?? 0);
                     $pathTotals[$key]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
+                    $pathTotals[$key]['s4xx'] += (int) ($data['s4xx'] ?? 0);
+                    $pathTotals[$key]['s5xx'] += (int) ($data['s5xx'] ?? 0);
                     $pathTotals[$key]['p95'] = max($pathTotals[$key]['p95'], (float) ($data['p95'] ?? 0));
                 }
 

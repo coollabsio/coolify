@@ -45,7 +45,7 @@ function fakeGlobalAnalyticsResponses(array $appUuids = []): array
             'unique_visitors' => 320,
         ]),
         '/traffic/paths' => json_encode([
-            ['path' => '/', 'app' => $appUuids[0] ?? '', 'requests' => 500, 'bytes_out' => 12000, 'p50' => 10.0, 'p95' => 30.0],
+            ['path' => '/', 'app' => $appUuids[0] ?? '', 'requests' => 500, 'bytes_out' => 12000, 's4xx' => 3, 's5xx' => 1, 'p50' => 10.0, 'p95' => 30.0],
         ]),
         '/traffic/breakdown/agent' => json_encode([
             ['value' => 'GPTBot', 'requests' => 120, 'bytes_out' => 3000],
@@ -138,6 +138,8 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('Global Leaderboard App')
         ->assertSee('Top hosts')
         ->assertSee('Top paths')
+        ->assertSee('3 4xx')
+        ->assertSee('1 5xx')
         ->assertSee('Status codes')
         ->assertSee('Countries')
         ->assertSee('United States')
@@ -255,6 +257,8 @@ it('shows path domains, links top apps to analytics, groups by project, and surf
 
     // Path rows carry the resolved domain, top-app rows carry the domain + analytics link.
     expect($component->instance()->topPaths[0]['domain'])->toBe('shop.example.com');
+    expect($component->instance()->topPaths[0]['s4xx'])->toBe(3);
+    expect($component->instance()->topPaths[0]['s5xx'])->toBe(1);
     expect($component->instance()->topApps[0]['domain'])->toBe('shop.example.com');
     expect($component->instance()->topApps[0]['link'])->toBe($analyticsUrl);
 

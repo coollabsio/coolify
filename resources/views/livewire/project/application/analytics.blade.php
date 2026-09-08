@@ -16,7 +16,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
             helper="Inspect traffic statistics reported by Sentinel.">
             @if ($analyticsServerUuid)
                 <x-slot:actions>
-                    <a class="button" href="{{ route('server.sentinel', ['server_uuid' => $analyticsServerUuid]) }}"
+                    <a class="button" href="{{ route('server.analytics', ['server_uuid' => $analyticsServerUuid]) }}"
                         {{ wireNavigate() }}>
                         Server settings
                         <x-external-link />

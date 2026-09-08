@@ -28,6 +28,9 @@
 
             const palette = ['#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#14b8a6', '#6b7280'];
             const legend = () => ({ position: 'bottom', labels: { colors: textColor } });
+            const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
+            })[character]);
 
             const chart = new ApexCharts(el, {
                 chart: { type: 'donut', height: 240, background: 'transparent', animations: { enabled: false } },
@@ -38,10 +41,17 @@
                 dataLabels: { enabled: false },
                 legend: legend(),
                 plotOptions: { pie: { donut: { size: '68%' } } },
-                {{-- Donuts otherwise fill the whole tooltip with the slice color (white
-                     text on light slices reads poorly); fillSeriesColor:false gives the
-                     same neutral tooltip the other charts use. --}}
-                tooltip: { fillSeriesColor: false, y: { formatter: v => `${v.toLocaleString()} requests` } },
+                tooltip: {
+                    fillSeriesColor: false,
+                    custom: ({ series, seriesIndex, w }) => {
+                        const label = escapeHtml(w.globals.labels[seriesIndex] ?? '');
+                        const requests = Number(series[seriesIndex] ?? 0).toLocaleString();
+
+                        return `<div class="apexcharts-tooltip-custom">
+                            <div class="apexcharts-tooltip-custom-value">${label}: <span class="apexcharts-tooltip-value-bold">${requests} requests</span></div>
+                        </div>`;
+                    },
+                },
                 noData: { text: 'Loading devices…', style: { color: textColor } },
             });
             chart.render();
