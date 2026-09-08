@@ -708,3 +708,11 @@ it('uses overflow scroll arrows on resource heading navbars', function () {
         expect(file_get_contents($path))->toContain('<x-resource-heading-tabs');
     }
 });
+
+it('renders dropdown chevrons smaller than regular button icons', function () {
+    $icons = file_get_contents(resource_path('views/components/reicon.blade.php'));
+
+    expect($icons)
+        ->toContain("'chevron-down' => '<polyline points=\"5 9 12 16 19 9\"")
+        ->not->toContain('chevron-down\' => \'<g transform="scale(1.33333)"');
+});

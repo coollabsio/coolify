@@ -65,9 +65,9 @@ $spark = 'refreshChartData-'.$chartId.'-status';
             icon-name="network" />
     @else
         {{-- Sparkline KPI cards. Each links through to the full analytics page. --}}
-        <div class="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-neutral-200 ring-1 ring-neutral-200 sm:grid-cols-2 lg:grid-cols-4 dark:bg-white/[0.07] dark:ring-white/[0.08]">
+        <div class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/[0.08] dark:bg-white/[0.07]">
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--coollabs-canvas)_97.5%,white)] dark:hover:bg-[color-mix(in_srgb,var(--coollabs-canvas)_96%,white)]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
                 <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
                 <div class="mt-auto pt-3">
@@ -81,7 +81,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--coollabs-canvas)_97.5%,white)] dark:hover:bg-[color-mix(in_srgb,var(--coollabs-canvas)_96%,white)]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
                 <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                     Unique visitors
                     @if ($uniquesApproximate)
@@ -100,7 +100,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--coollabs-canvas)_97.5%,white)] dark:hover:bg-[color-mix(in_srgb,var(--coollabs-canvas)_96%,white)]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Bandwidth</span>
                 <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
                 <div class="mt-auto pt-3">
@@ -114,7 +114,7 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--coollabs-canvas)_97.5%,white)] dark:hover:bg-[color-mix(in_srgb,var(--coollabs-canvas)_96%,white)]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Error rate</span>
                 <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ $this->errorRate() }}%</span>
                 <div class="mt-auto pt-3">

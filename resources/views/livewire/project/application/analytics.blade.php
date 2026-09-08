@@ -62,7 +62,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
             </x-slot:actions>
 
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
-                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
@@ -75,7 +75,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                         ])
                     </div>
                 </div>
-                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Unique visitors</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
@@ -88,7 +88,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                         ])
                     </div>
                 </div>
-                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Bandwidth</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
                     <div class="mt-auto pt-3">
@@ -101,7 +101,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                         ])
                     </div>
                 </div>
-                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Error rate</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ $this->errorRate() }}%</span>
                     <div class="mt-auto pt-3">
@@ -114,7 +114,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                         ])
                     </div>
                 </div>
-                <div class="col-span-2 flex flex-col bg-white px-4 py-3 sm:col-span-1 dark:bg-base">
+                <div class="col-span-2 flex flex-col bg-[var(--coollabs-base)] px-4 py-3 sm:col-span-1">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">p95 latency</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
                     <div class="mt-auto pt-3">

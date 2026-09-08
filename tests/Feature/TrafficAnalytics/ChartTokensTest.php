@@ -71,6 +71,31 @@ it('renders request charts full bleed inside their analytics sections', function
     }
 });
 
+it('blends KPI rows into their analytics section surface', function () {
+    foreach ([
+        base_path('resources/views/livewire/analytics.blade.php'),
+        base_path('resources/views/livewire/project/application/analytics.blade.php'),
+    ] as $viewPath) {
+        $view = file_get_contents($viewPath);
+
+        expect($view)
+            ->toContain('bg-[var(--coollabs-base)]')
+            ->not->toContain('bg-white px-4 py-3 dark:bg-base');
+    }
+});
+
+it('keeps the analytics KPI skeleton the same height and surface as loaded tiles', function () {
+    $view = file_get_contents(base_path('resources/views/components/skeleton/tiles.blade.php'));
+
+    expect($view)
+        ->toContain('bg-[var(--coollabs-base)]')
+        ->toContain("'Requests', 'Unique visitors', 'Bandwidth', 'Error rate', 'p95 latency'")
+        ->toContain('tracking-wide text-neutral-500 uppercase dark:text-fg-dim')
+        ->not->toContain('h-3 w-16')
+        ->toContain('h-9 w-full rounded')
+        ->not->toContain('dark:bg-base');
+});
+
 it('seeds the requests chart with the server-rendered series', function () {
     $partial = file_get_contents(base_path('resources/views/livewire/traffic/_requests-chart.blade.php'));
 

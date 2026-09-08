@@ -154,10 +154,11 @@ it('uses the dashboard surface treatment for the analytics KPI group', function 
     $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
 
     expect($view)
-        ->toContain('rounded-xl bg-neutral-200 ring-1 ring-neutral-200')
-        ->toContain('dark:bg-white/[0.07] dark:ring-white/[0.08]')
-        ->toContain('dark:bg-[color-mix(in_srgb,var(--coollabs-canvas)_97.5%,white)]')
-        ->toContain('dark:hover:bg-[color-mix(in_srgb,var(--coollabs-canvas)_96%,white)]')
+        ->toContain('rounded-xl border border-neutral-200 bg-neutral-200')
+        ->toContain('dark:border-white/[0.08] dark:bg-white/[0.07]')
+        ->toContain('dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)]')
+        ->toContain('dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]')
+        ->not->toContain('rounded-xl bg-neutral-200 ring-1 ring-neutral-200')
         ->not->toContain('dark:bg-base dark:hover:bg-white/[0.03]');
 });
 
