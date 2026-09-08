@@ -28,11 +28,11 @@ it('uses the upload reicon for import backup in database configuration nav', fun
         ->toContain("'icon' => 'upload'");
 });
 
-it('uses the upload reicon for import backup in service database sidebar', function () {
-    $contents = file_get_contents(resource_path('views/components/service-database/sidebar.blade.php'));
+it('uses the upload reicon for import backup in service navigation', function () {
+    $contents = file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php'));
 
     expect($contents)
         ->toContain("'label' => 'Import Backup'")
         ->toContain("'icon' => 'upload'")
-        ->not->toMatch("/'label' => 'Import Backup',\s*'route' => 'project\.service\.database\.import',\s*'icon' => 'storages'/s");
+        ->toContain("'route' => 'project.service.import-backup'");
 });

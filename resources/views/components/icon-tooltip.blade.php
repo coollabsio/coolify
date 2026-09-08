@@ -38,11 +38,11 @@
         this.visible = true;
         const rect = target.getBoundingClientRect();
         this.below = rect.top < 48;
-        this.x = rect.left;
+        this.x = rect.left + rect.width / 2;
         this.y = this.below ? rect.bottom + 8 : rect.top - 8;
         this.$nextTick(() => {
             const width = this.$refs.tooltip?.offsetWidth || 0;
-            this.x = Math.max(8, Math.min(window.innerWidth - width - 8, this.x));
+            this.x = Math.max(8, Math.min(window.innerWidth - width - 8, this.x - width / 2));
             this.$nextTick(() => this.positioned = true);
         });
     },
@@ -69,8 +69,12 @@
     },
 }" class="contents">
     <div x-ref="tooltip" x-show="visible" x-cloak role="tooltip" x-text="text"
+        x-transition:enter="transition-opacity ease-out duration-100"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-75"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
         :style="`left: ${x}px; top: ${y}px;`"
         :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
-        class="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
+        class="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-dropdown dark:border-white/10 dark:bg-raised">
     </div>
 </div>

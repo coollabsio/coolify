@@ -182,6 +182,42 @@ YAML,
         ->toBe(['API_TOKEN']);
 });
 
+it('keeps Compose self-referencing environment variables editable without changing Compose', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      API_TOKEN: ${API_TOKEN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      FIXED_VALUE: production
+YAML;
+
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    foreach (['API_TOKEN', 'LOG_LEVEL'] as $key) {
+        EnvironmentVariable::create([
+            'key' => $key,
+            'resourceable_type' => Service::class,
+            'resourceable_id' => $service->id,
+        ]);
+    }
+
+    $rows = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
+        ->instance()
+        ->environmentVariablePageRows;
+
+    expect($rows->where('kind', 'managed')->pluck('environmentVariable.key')->all())
+        ->toBe(['API_TOKEN', 'LOG_LEVEL'])
+        ->and($rows->where('kind', 'hardcoded')->pluck('environmentVariable.key')->all())
+        ->toBe(['FIXED_VALUE'])
+        ->and($service->fresh()->docker_compose_raw)->toBe($dockerCompose);
+});
+
 it('shows a Compose-defined value as read-only when a managed variable has the same key', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,

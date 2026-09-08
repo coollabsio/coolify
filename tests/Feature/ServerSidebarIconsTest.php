@@ -36,6 +36,13 @@ it('uses the shield-star reicon for sentinel in the server sidebar', function ()
         ->toMatch("/'label' => 'Sentinel',\s*'route' => 'server\.sentinel',\s*'active' => request\(\)->routeIs\('server\.sentinel', 'server\.sentinel\.\*'\),\s*'icon' => 'shield-star'/s");
 });
 
+it('shows a warning icon when sentinel is enabled but not working', function () {
+    $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+
+    expect($contents)
+        ->toContain("'warning' => \$server->isSentinelEnabled() && ! \$server->isSentinelLive()");
+});
+
 it('uses the network reicon for proxy in the server sidebar', function () {
     $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
 
@@ -45,4 +52,18 @@ it('uses the network reicon for proxy in the server sidebar', function () {
         ->toContain("'icon' => 'network'")
         ->toMatch("/'label' => 'Proxy'[\s\S]*?'icon' => 'network'/")
         ->not->toMatch("/'label' => 'Proxy'[\s\S]*?'icon' => 'settings',\s*'group' => 'Platform'/");
+});
+
+it('shows a warning icon when a server menu item requires attention', function () {
+    $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+
+    expect($contents)
+        ->toContain('proxyConfigurationPending: @js($server->hasPendingProxyConfiguration())')
+        ->toContain('proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),')
+        ->toContain('traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())')
+        ->toContain('@proxy-configuration-state-changed.window')
+        ->toContain("\$menuItem['warning'] ?? false")
+        ->toContain('name="alert-triangle"');
+
+    expect(substr_count($contents, 'traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())'))->toBe(1);
 });

@@ -98,7 +98,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         // === STOP PHASE ===
         $commands = $commands->merge([
             "echo 'Stopping proxy...'",
-            "docker stop -t=$stopTimeout $containerName 2>/dev/null || true",
+            dockerStopCommand($stopTimeout, $containerName, $this->server).' 2>/dev/null || true',
             "docker rm -f $containerName 2>/dev/null || true",
             '# Wait for container to be fully removed',
             'for i in {1..15}; do',

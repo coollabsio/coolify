@@ -82,7 +82,7 @@ class Create extends Component
                 'type' => 'Directory',
                 'name' => $directory->fs_path,
             ]);
-        $this->targets = $volumes->concat($directories)->values();
+        $this->targets = collect($volumes->concat($directories)->all())->values();
         $this->targetKey = $this->selectedTargetKey ?? data_get($this->targets->first(), 'key');
         $this->loadSelectedBackup();
     }

@@ -230,12 +230,10 @@ class Show extends Component
             ->toArray();
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-
-            $this->authorize('update', $this->server);
             $foundServer = Server::where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
                 ->first();
@@ -363,6 +361,7 @@ class Show extends Component
     public function checkLocalhostConnection()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if ($uptime) {
@@ -371,6 +370,8 @@ class Show extends Component
                 $this->server->settings->is_usable = $this->isUsable = true;
                 $this->server->settings->save();
                 ServerReachabilityChanged::dispatch($this->server);
+                $this->server->gatherServerMetadata();
+                $this->server->refresh();
             } else {
                 $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
@@ -477,6 +478,7 @@ class Show extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -671,12 +673,18 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if (! $this->server->isFunctional()) {
+                $this->dispatch('error', 'Validate the server connection before fetching details.');
+
+                return;
+            }
+
             $result = $this->server->gatherServerMetadata();
             if ($result) {
-                $this->server->refresh();
+                $this->server->refresh()->load('settings');
                 $this->dispatch('success', 'Server details refreshed.');
             } else {
-                $this->dispatch('error', 'Could not fetch server details. Is the server reachable?');
+                $this->dispatch('error', 'Could not collect server details. Check the application logs for the remote command output.');
             }
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -686,6 +694,7 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server settings updated.');
         } catch (\Throwable $e) {

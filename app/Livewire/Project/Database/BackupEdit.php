@@ -85,6 +85,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int|string $timeout = 3600;
 
+    #[Validate(['required', 'integer', 'min:0', 'max:365'])]
+    public int $missingBackupNotificationDays = 0;
+
     public function getListeners(): array
     {
         // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
@@ -128,7 +131,7 @@ class BackupEdit extends Component
         $this->status = $database->status;
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->backup->enabled = $this->backupEnabled;
@@ -152,6 +155,7 @@ class BackupEdit extends Component
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
+            $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -170,6 +174,7 @@ class BackupEdit extends Component
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
+            $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
         }
     }
 
@@ -212,14 +217,14 @@ class BackupEdit extends Component
             if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
 
-                return redirect()->route('project.service.database.backups', [
+                return redirectRoute($this, 'project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
                     'environment_uuid' => $this->parameters['environment_uuid'],
                     'service_uuid' => $serviceDatabase->service->uuid,
                     'stack_service_uuid' => $serviceDatabase->uuid,
                 ]);
             } else {
-                return redirect()->route('project.database.backup.index', [
+                return redirectRoute($this, 'project.database.backup.index', [
                     'project_uuid' => $this->parameters['project_uuid'],
                     'environment_uuid' => $this->parameters['environment_uuid'],
                     'database_uuid' => $this->parameters['database_uuid'],
@@ -236,6 +241,14 @@ class BackupEdit extends Component
     {
         try {
             $this->authorize('manageBackups', $this->backup->database);
+
+            $database = $this->backup->database->refresh();
+            $this->status = $database->status;
+            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
+                $this->dispatch('error', 'The database must be running to start a backup.');
+
+                return;
+            }
 
             DatabaseBackupJob::dispatch($this->backup);
             $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');

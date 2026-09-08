@@ -39,10 +39,11 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
+        $environment->load(['applications']);
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (! $application) {
             return redirect()->route('dashboard');

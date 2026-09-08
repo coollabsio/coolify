@@ -41,8 +41,8 @@
             :mobileTitleOnly="true" />
 
         @if ($showSettingsSidebar)
-            <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-                <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+            <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+                <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
                     <aside class="application-settings-navigation min-w-0 xl:self-start">
                         <nav aria-label="GitHub App settings"
                             class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -127,7 +127,7 @@
 
                                         @if (!isCloud())
                                             <div class="lg:col-span-2">
-                                                <x-forms.listbox id="isSystemWide" label="Availability" :options="[
+                                                <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
                                                     ['value' => true, 'label' => 'Every team on this instance'],
                                                 ]"
@@ -161,7 +161,7 @@
                                             label="Client secret" type="password" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
                                             label="Webhook secret" type="password" required />
-                                        <x-forms.listbox id="privateKeyId" label="Private key" required
+                                        <x-forms.listbox canGate="update" :canResource="$github_app" id="privateKeyId" label="Private key" required
                                             :options="$privateKeyOptions" :disabled="!auth()->user()->can('update', $github_app)" />
                                     </div>
                                 </x-application.settings-section>
@@ -200,7 +200,7 @@
                                                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                                                         step2ButtonText="Permanently Delete" />
                                                 @else
-                                                    <x-forms.button disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                    <x-forms.button isError disabled tooltip="You do not have permission to delete this GitHub App.">
                                                         Delete
                                                     </x-forms.button>
                                                 @endcan
@@ -300,7 +300,7 @@
                             @endif
 
                             <div
-                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
                                 <p class="font-medium text-black dark:text-fg">Mandatory permissions</p>
                                 <p class="mt-1">Contents: read · Metadata: read · Email: read</p>
                             </div>

@@ -26,10 +26,11 @@ class Execution extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
+        $environment->load(['applications']);
         $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (! $database) {
             return redirect()->route('dashboard');

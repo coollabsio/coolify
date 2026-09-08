@@ -27,7 +27,10 @@ it('initializes persisted sidebar state before enabling layout transitions', fun
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
     expect($layout)
-        ->toContain("collapsed: localStorage.getItem('sidebarCollapsed') === 'true'")
+        ->toContain("userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true'")
+        ->toContain('return this.userCollapsed || (this.autoCollapse && this.hasSecondBar);')
+        ->toContain('this.userCollapsed = this.collapsed;')
+        ->toContain("localStorage.setItem('sidebarCollapsed', this.userCollapsed);")
         ->toContain('sidebarReady: false')
         ->toContain(":class=\"[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']\"")
         ->toContain(":class=\"[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']\"");
@@ -55,6 +58,23 @@ it('draws a single border between the desktop sidebar and main content', functio
 
     expect($navbar)->toContain('border-r border-neutral-200')
         ->and($layout)->not->toContain('lg:border-l border-neutral-200');
+});
+
+it('does not separate the desktop sidebar controls with a top border', function () {
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 bg-white')
+        ->not->toContain('sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 border-t');
+});
+
+it('draws the desktop header border only above the main content', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)
+        ->toContain('flex items-center gap-2 h-full shrink-0 border-r border-neutral-200')
+        ->toContain('flex h-full items-center gap-0.5 min-w-0 flex-1 border-b border-neutral-200 pl-3 pr-4 dark:border-white/[0.06]')
+        ->not->toContain('backdrop-blur border-b border-neutral-200 dark:border-white/[0.06]');
 });
 
 it('separates the mobile sidebar from the page with a visible border', function () {

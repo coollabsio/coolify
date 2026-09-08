@@ -87,15 +87,48 @@ class SshMultiplexingHelper
             return false;
         }
 
-        self::storeConnectionMetadata($server);
-
         return true;
     }
 
     public static function removeMuxFile(Server $server): void
     {
-        Process::run(self::muxControlCommand($server, 'exit'));
-        self::clearConnectionMetadata($server);
+        $checkProcess = Process::run(self::muxControlCommand($server, 'check'));
+        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+            ? $matches[1]
+            : null;
+
+        if ($pid !== null) {
+            self::markMuxProcessAsRetiring($pid, self::muxSocket($server));
+        }
+
+        $stopProcess = Process::run(self::muxControlCommand($server, 'stop'));
+
+        if ($pid !== null && ! $stopProcess->successful()) {
+            self::unmarkMuxProcessAsRetiring($pid, self::muxSocket($server));
+        }
+    }
+
+    public static function markMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void
+    {
+        $processStartTime ??= self::processStartTime($pid);
+        Cache::forever(self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime), true);
+    }
+
+    public static function isMuxProcessRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): bool
+    {
+        $processStartTime ??= self::processStartTime($pid);
+        $key = self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime);
+        if (! Cache::has($key)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function unmarkMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void
+    {
+        $processStartTime ??= self::processStartTime($pid);
+        Cache::forget(self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime));
     }
 
     public static function generateScpCommand(Server $server, string $source, string $dest): string
@@ -242,25 +275,6 @@ class SshMultiplexingHelper
         return $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
 
-    public static function isConnectionExpired(Server $server): bool
-    {
-        $connectionAge = self::getConnectionAge($server);
-        $maxAge = config('constants.ssh.mux_max_age');
-
-        return $connectionAge !== null && $connectionAge > $maxAge;
-    }
-
-    public static function getConnectionAge(Server $server): ?int
-    {
-        $connectionTime = Cache::get("ssh_mux_connection_time_{$server->uuid}");
-
-        if ($connectionTime === null) {
-            return null;
-        }
-
-        return time() - $connectionTime;
-    }
-
     public static function refreshMultiplexedConnection(Server $server): bool
     {
         self::removeMuxFile($server);
@@ -273,6 +287,28 @@ class SshMultiplexingHelper
         return 'ssh_mux_lock_'.(gethostname() ?: 'unknown').'_'.$server->uuid;
     }
 
+    private static function muxProcessRetirementKey(string $pid, string $muxSocket, ?string $processStartTime): string
+    {
+        return 'ssh_mux_retiring_'.hash('sha256', self::processScope().'|'.$pid.'|'.$processStartTime.'|'.$muxSocket);
+    }
+
+    private static function processScope(): string
+    {
+        return (gethostname() ?: 'unknown').'|'.(@readlink('/proc/self/ns/pid') ?: 'unknown');
+    }
+
+    private static function processStartTime(string $pid): ?string
+    {
+        $stat = @file_get_contents("/proc/{$pid}/stat");
+        if ($stat === false || ! preg_match('/^\d+ \(.*\) (.*)$/', trim($stat), $matches)) {
+            return null;
+        }
+
+        $fields = preg_split('/\s+/', $matches[1]);
+
+        return $fields[19] ?? null;
+    }
+
     private static function masterConnectionExists(Server $server): bool
     {
         return Process::run(self::muxControlCommand($server, 'check'))->exitCode() === 0;
@@ -281,14 +317,6 @@ class SshMultiplexingHelper
     private static function connectionIsReusable(Server $server): bool
     {
         if (! self::masterConnectionExists($server)) {
-            return false;
-        }
-
-        if (self::getConnectionAge($server) === null) {
-            self::storeConnectionMetadata($server);
-        }
-
-        if (self::isConnectionExpired($server)) {
             return false;
         }
 
@@ -381,15 +409,5 @@ class SshMultiplexingHelper
         }
 
         return $options.'-p '.escapeshellarg((string) $server->port).' ';
-    }
-
-    private static function storeConnectionMetadata(Server $server): void
-    {
-        Cache::put("ssh_mux_connection_time_{$server->uuid}", time(), config('constants.ssh.mux_persist_time') + 300);
-    }
-
-    private static function clearConnectionMetadata(Server $server): void
-    {
-        Cache::forget("ssh_mux_connection_time_{$server->uuid}");
     }
 }

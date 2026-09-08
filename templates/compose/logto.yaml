@@ -3,6 +3,7 @@
 # category: auth
 # tags: logto,identity,login,authentication,oauth,oidc,openid
 # logo: svgs/logto_dark.svg
+# port: 3001
 
 services:
   logto:

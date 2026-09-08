@@ -6,7 +6,7 @@
     <livewire:server.navbar :server="$server" />
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="docker-cleanup" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
@@ -99,7 +99,7 @@
                                 ['value' => true, 'label' => 'Delete unused networks'],
                             ]" />
                         <x-forms.listbox id="disableApplicationImageRetention" label="Application images"
-                            helper="Keeping retained images allows application rollbacks."
+                            helper="Choose Keep retained images to follow each application’s Images to keep setting under Rollback. Delete all old images ignores that setting and keeps only the running image."
                             onChange="instantSave" :options="[
                                 ['value' => false, 'label' => 'Keep retained images'],
                                 ['value' => true, 'label' => 'Delete all old images'],

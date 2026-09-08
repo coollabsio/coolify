@@ -23,6 +23,18 @@ it('allows unauthenticated access to two-factor-challenge page', function () {
     expect($response->status())->toBeIn([200, 302]);
 });
 
+it('uses one mobile-friendly field for authenticator code paste and autofill', function () {
+    $challenge = file_get_contents(resource_path('views/auth/two-factor-challenge.blade.php'));
+
+    expect($challenge)
+        ->toContain('name="code"')
+        ->toContain('autocomplete="one-time-code"')
+        ->toContain('inputmode="numeric"')
+        ->toContain('maxlength="6"')
+        ->toContain('@input="submitAuthenticatorCode($event)"')
+        ->not->toContain('x-for="(digit, index) in digits"');
+});
+
 it('includes two-factor-challenge in allowed paths for unsubscribed accounts', function () {
     $paths = allowedPathsForUnsubscribedAccounts();
 

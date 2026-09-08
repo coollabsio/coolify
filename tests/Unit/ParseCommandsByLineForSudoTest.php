@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use Symfony\Component\Process\Process;
 
 beforeEach(function () {
     // Create a mock server with non-root user
@@ -22,6 +23,24 @@ test('wraps complex Docker install command with pipes in bash -c', function () {
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
     expect($result[0])->toBe("sudo bash -c 'curl https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh'");
+});
+
+test('preserves command substitutions inside database and volume backup scripts', function () {
+    $script = 'compressor=$(if command -v pigz; then printf pigz; else printf gzip; fi); exec $compressor';
+    $command = 'docker exec database pg_dumpall | docker run --rm -i helper sh -c '.escapeshellarg($script);
+    $volumeCommand = 'docker run --rm helper sh -c '.escapeshellarg($script).' > /data/coolify/backups/volume.tar.gz';
+
+    $result = parseCommandsByLineForSudo(collect([$command, $volumeCommand]), $this->server);
+
+    expect($result[0])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if')
+        ->not->toContain('| sudo docker run')
+        ->and($result[1])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if');
 });
 
 test('wraps complex Docker install command with multiple fallbacks', function () {
@@ -165,6 +184,50 @@ test('handles if statements by adding sudo to condition', function () {
 
     expect($result[0])->toBe('if sudo command -v docker');
 });
+
+test('preserves shell negation before sudo', function (string $command, string $expected) {
+    expect(parseCommandsByLineForSudo(collect([$command]), $this->server))->toBe([$expected]);
+})->with([
+    'negated condition' => ['if ! docker inspect coolify-proxy; then', 'if ! sudo docker inspect coolify-proxy; then'],
+    'indented condition' => ["\tif  !  docker inspect coolify-proxy; then", "\tif  !  sudo docker inspect coolify-proxy; then"],
+    'negated pipeline' => [
+        '    if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        '    if ! sudo docker ps -a --format "{{.Names}}" | sudo grep -q "^coolify-proxy$"; then',
+    ],
+    'standalone negation' => ['! docker inspect coolify-proxy', '! sudo docker inspect coolify-proxy'],
+    'repeated negation' => ['if ! ! docker inspect coolify-proxy; then', 'if ! ! sudo docker inspect coolify-proxy; then'],
+    'literal exclamation argument' => ['echo "! docker"', 'echo "! docker"'],
+]);
+
+test('proxy removal loop exits only once the container is absent', function (string $containers, string $expected) {
+    $commands = collect([
+        'for i in {1..15}; do',
+        '    if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        '        echo "Container removed successfully."',
+        '        break',
+        '    fi',
+        '    echo "Waiting for container to be removed... ($i/15)"',
+        'done',
+    ]);
+    $script = <<<'BASH'
+sudo() { "$@"; }
+docker() { printf '%s\n' "$CONTAINERS"; }
+BASH;
+    $script .= "\n".implode("\n", parseCommandsByLineForSudo($commands, $this->server));
+    $process = new Process(['bash', '-c', $script], env: ['CONTAINERS' => $containers]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue()
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->getOutput())->toBe($expected);
+})->with([
+    'removed' => ['', "Container removed successfully.\n"],
+    'other containers remain' => ['another-container', "Container removed successfully.\n"],
+    'still present' => ['coolify-proxy', implode('', array_map(
+        fn (int $attempt): string => "Waiting for container to be removed... ($attempt/15)\n",
+        range(1, 15),
+    ))],
+]);
 
 test('skips sudo for fi statements', function () {
     $commands = collect([
@@ -439,6 +502,7 @@ test('handles real-world proxy startup with for loop from StartProxy action', fu
 
     // Verify other control structures remain correct
     expect($result[0])->toStartWith('if sudo docker ps');
+    expect($result[6])->toBe('        if ! sudo docker ps -a --format "{{.Names}}" | sudo grep -q "^coolify-proxy$"; then');
     expect($result[8])->toBe('        fi');
     expect($result[13])->toBe('fi');
 });

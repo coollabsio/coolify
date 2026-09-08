@@ -463,6 +463,7 @@ it('creates ServiceApplication with all fillable attributes', function () {
         'is_include_timestamps' => true,
         'is_gzip_enabled' => true,
         'is_stripprefix_enabled' => true,
+        'is_force_https_enabled' => false,
         'last_online_at' => now()->toISOString(),
         'is_migrated' => false,
     ]);
@@ -473,6 +474,26 @@ it('creates ServiceApplication with all fillable attributes', function () {
     expect($svcApp->human_name)->toBe('Web Server');
     expect($svcApp->image)->toBe('nginx:latest');
     expect($svcApp->is_log_drain_enabled)->toBeTrue();
+    expect($svcApp->is_force_https_enabled)->toBeFalse();
+    expect($svcApp->isForceHttpsEnabled())->toBeFalse();
+});
+
+it('enables HTTPS redirects for service applications by default', function () {
+    $service = Service::create([
+        'docker_compose_raw' => 'services: {}',
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $serviceApplication = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web-default-redirect',
+    ]);
+
+    expect($serviceApplication->is_force_https_enabled)->toBeTrue();
+    expect($serviceApplication->isForceHttpsEnabled())->toBeTrue();
 });
 
 it('creates ServiceDatabase with all fillable attributes', function () {
@@ -1026,14 +1047,15 @@ it('creates ScheduledTaskExecution with all fillable attributes', function () {
         'finished_at' => now()->toISOString(),
         'started_at' => now()->subMinute()->toISOString(),
         'retry_count' => 0,
-        'duration' => 60,
+        'duration' => '60.25',
         'error_details' => null,
     ]);
 
     expect($execution->exists)->toBeTrue();
     expect($execution->scheduled_task_id)->toBe($task->id);
     expect($execution->status)->toBe('success');
-    expect((float) $execution->duration)->toBe(60.0);
+    expect($execution->duration)->toBe(60.25);
+    expect($execution->toArray()['duration'])->toBe(60.25);
     expect($execution->retry_count)->toBe(0);
 });
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Team\DangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member as TeamMember;
 use App\Models\InstanceSettings;
@@ -60,11 +61,11 @@ test('owner can delete team', function () {
     expect(auth()->user()->can('delete', $this->team))->toBeTrue();
 });
 
-test('admin can delete team', function () {
+test('admin cannot delete team', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    expect(auth()->user()->can('delete', $this->team))->toBeTrue();
+    expect(auth()->user()->can('delete', $this->team))->toBeFalse();
 });
 
 test('member cannot delete team', function () {
@@ -156,24 +157,24 @@ test('team index mounts when is_mcp_server_enabled is null on the session team',
         ->assertSet('is_mcp_server_enabled', true);
 });
 
-// --- Team Index Livewire: delete ---
+// --- Team Danger Zone Livewire: delete ---
 
-test('member cannot delete team via index', function () {
+test('member cannot delete team via danger zone', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(TeamIndex::class)
-        ->call('delete', 'password')
+    Livewire::test(DangerZone::class)
+        ->call('delete')
         ->assertDispatched('error');
 
     expect(Team::find($this->team->id))->not->toBeNull();
 });
 
-test('admin can delete team via policy', function () {
+test('admin cannot delete team via policy', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    expect(auth()->user()->can('delete', $this->team))->toBeTrue();
+    expect(auth()->user()->can('delete', $this->team))->toBeFalse();
 });
 
 // --- Team Member Livewire: role changes ---

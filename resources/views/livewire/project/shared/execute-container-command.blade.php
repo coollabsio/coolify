@@ -7,10 +7,8 @@
         <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.application.heading :application="$resource" wire:key="application-heading-command" />
     @elseif ($type === 'database')
-        <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')
-        <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @else
         <livewire:server.navbar :server="$servers->first()" />
@@ -42,8 +40,8 @@
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service', 'server'], true))
-        <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
                 @if ($type === 'server')
                     <x-server.sidebar :server="$resource" activeMenu="terminal" />
                 @elseif ($type === 'application')
@@ -57,7 +55,7 @@
     @endif
 
     @if ($consoleUnavailable)
-        <section class="mt-8 w-full max-w-[1180px] xl:mt-0">
+        <section class="mt-8 w-full max-w-none xl:mt-0">
             @if ($type === 'server')
                 <x-empty size="lg" title="Terminal unavailable"
                     description="This server is not functional or terminal access is disabled."
@@ -69,7 +67,7 @@
             @endif
         </section>
     @else
-        <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-[1180px] xl:mt-0"
+        <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-none xl:mt-0"
             x-on:terminal-theme-selected="setTheme($event.detail.theme)"
             x-on:terminal-starting.window="syncTheme()"
             x-data="{
@@ -108,11 +106,11 @@
                 },
             }">
             <div data-terminal-session-canvas
-                class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
+                class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
                 :data-console-theme="consoleTheme"
                 :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
                 <header
-                    class="terminal-session-toolbar absolute top-3 right-3 left-3 z-20 flex items-center gap-3 text-white select-none">
+                    class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
                     @if ($type === 'server')
                         <div class="terminal-session-target-trigger flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70"
                             x-data="{ autoConnected: false }"
@@ -152,7 +150,7 @@
                                         </svg>
                                     </button>
                                     <div x-cloak x-show="containerOpen" x-transition.origin.top.left
-                                        class="terminal-target-picker terminal-target-list absolute top-11 left-0 z-50 max-h-72 w-80 overflow-y-auto rounded-lg border p-1 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                                        class="terminal-target-picker terminal-target-list absolute top-11 left-0 z-50 max-h-72 w-80 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-dropdown)]">
                                         <template x-for="option in containerOptions" :key="option.value">
                                             <button type="button"
                                                 class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
@@ -177,12 +175,12 @@
                         :theme-accents="$consoleThemeAccents" />
                 </header>
 
-                <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
                 <div class="application-console-block min-h-0 flex-1">
                     @if ($type !== 'server' && $containers->count() > 1)
                         <div x-cloak x-show="!targetChosen" data-terminal-target-picker="launcher"
                             class="absolute inset-0 z-20 flex items-start justify-start p-6 sm:p-10">
-                            <div class="terminal-target-picker w-full max-w-md rounded-lg border p-2 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                            <div class="terminal-target-picker w-full max-w-md rounded-lg border p-2 shadow-[var(--shadow-dropdown)]">
                                 <div class="px-2 pt-1 pb-2">
                                     <div class="text-sm font-semibold text-white/80">Start a terminal session</div>
                                     <div class="mt-0.5 text-[11px] text-white/45">

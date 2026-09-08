@@ -386,7 +386,7 @@ class ServicesController extends Controller
             'urls' => 'array|nullable',
             'urls.*' => 'array:name,url',
             'urls.*.name' => 'string|required',
-            'urls.*.url' => 'string|nullable',
+            'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
             'tags' => 'array|nullable',
@@ -602,7 +602,7 @@ class ServicesController extends Controller
                 'urls' => 'array|nullable',
                 'urls.*' => 'array:name,url',
                 'urls.*.name' => 'string|required',
-                'urls.*.url' => 'string|nullable',
+                'urls.*.url' => ValidationPatterns::applicationDomainRules(),
                 'force_domain_override' => 'boolean',
                 'is_container_label_escape_enabled' => 'boolean',
                 'tags' => 'array|nullable',
@@ -1020,6 +1020,8 @@ class ServicesController extends Controller
 
         $this->authorize('delete', $service);
 
+        $service->delete();
+
         DeleteResourceJob::dispatch(
             resource: $service,
             deleteVolumes: $request->boolean('delete_volumes', true),
@@ -1185,7 +1187,7 @@ class ServicesController extends Controller
             'urls' => 'array|nullable',
             'urls.*' => 'array:name,url',
             'urls.*.name' => 'string|required',
-            'urls.*.url' => 'string|nullable',
+            'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
         ];

@@ -5,6 +5,8 @@
     // appears when those fields differ from the last server snapshot — not on
     // incidental component state (e.g. $wire.set from x-init, display-only props).
     'targets' => null,
+    // Optional Alpine expression for drafts that survive unrelated server requests.
+    'dirty' => null,
 ])
 
 {{-- Floating "unsaved changes" pill (bottom center). Reveals itself via
@@ -40,7 +42,8 @@
         window.visualViewport?.removeEventListener('scroll', this.updateKeyboardInset);
         window.removeEventListener('resize', this.updateKeyboardInset);
     },
-}" x-bind:style="`--keyboard-inset: ${keyboardInset}px`" wire:dirty.class="is-dirty"
+}" x-bind:style="`--keyboard-inset: ${keyboardInset}px`"
+    @if ($dirty) x-bind:class="{ 'is-dirty': {{ $dirty }} }" @else wire:dirty.class="is-dirty" @endif
     wire:loading.class="is-saving"
     @keydown.enter.window="
         if ($el.classList.contains('is-dirty') &&
@@ -67,7 +70,7 @@
             class="button-highlighted flex h-8 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition-[transform,background-color] active:scale-[0.98]">
             <span>Save changes</span>
             <kbd
-                class="rounded border border-coollabs/20 bg-coollabs/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-coollabs-200 dark:border-white/20 dark:bg-white/10 dark:text-white/75">Enter</kbd>
+                class="rounded border border-current/20 bg-current/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-current">Enter</kbd>
         </button>
     </div>
 </div>

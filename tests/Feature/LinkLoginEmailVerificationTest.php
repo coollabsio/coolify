@@ -50,7 +50,7 @@ describe('invitation link login', function () {
             'via' => 'link',
         ]);
 
-        $this->get(route('auth.link', ['token' => $token]));
+        $this->post(route('auth.link.accept'), ['token' => $token]);
 
         $user->refresh();
         expect($user->email_verified_at)->toBeNull();
@@ -77,7 +77,7 @@ describe('invitation link login', function () {
             'via' => 'link',
         ]);
 
-        $this->get(route('auth.link', ['token' => $token]))
+        $this->post(route('auth.link.accept'), ['token' => $token])
             ->assertRedirect(route('dashboard'));
 
         expect(auth()->id())->toBe($user->id);

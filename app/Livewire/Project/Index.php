@@ -53,6 +53,7 @@ class Index extends Component
                     'uuid' => $project->uuid,
                     'name' => $project->name,
                     'description' => $project->description,
+                    'iconUrl' => $project->icon_path ? project_icon_url($project) : null,
                     'href' => $project->navigateTo(),
                     'environmentCount' => $project->environments->count(),
                     'resourceCount' => $resourceCount,

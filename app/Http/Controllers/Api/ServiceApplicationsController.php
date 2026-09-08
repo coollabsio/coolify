@@ -9,6 +9,7 @@ use App\Actions\Service\UpdateServiceApplicationFromApi;
 use App\Http\Controllers\Controller;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -256,6 +257,7 @@ class ServiceApplicationsController extends Controller
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
+                        'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                     ]
                 )
             )
@@ -328,10 +330,11 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled',
             'is_gzip_enabled',
             'is_stripprefix_enabled',
+            'is_force_https_enabled',
         ];
 
         $validationRules = [
-            'url' => 'nullable|string',
+            'url' => ValidationPatterns::applicationDomainRules(),
             'noindex_domains' => 'sometimes|array|nullable',
             'noindex_domains.*' => 'string',
             'human_name' => 'nullable|string|max:255',
@@ -341,6 +344,7 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
+            'is_force_https_enabled' => 'sometimes|boolean',
         ];
 
         $validator = Validator::make($payload, $validationRules);

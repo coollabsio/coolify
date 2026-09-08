@@ -76,9 +76,9 @@ test('unsaved bar keyboard shortcut remains visible in light mode', function () 
     $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
 
     expect($contents)
-        ->toContain('border-coollabs/20 bg-coollabs/10')
-        ->toContain('text-coollabs-200')
-        ->toContain('dark:border-white/20 dark:bg-white/10 dark:text-white/75');
+        ->toContain('border-current/20 bg-current/10')
+        ->toContain('text-current')
+        ->not->toContain('text-coollabs-200');
 });
 
 test('unsaved bar uses a light surface in light mode', function () {

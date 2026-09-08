@@ -3,6 +3,7 @@
 # category: finance
 # tags: personal finance, budgeting, expense tracking
 # logo: svgs/budge.png
+# port: 80
 
 services:
   budge:

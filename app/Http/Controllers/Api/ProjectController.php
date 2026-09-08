@@ -158,6 +158,8 @@ class ProjectController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
+        $this->authorize('view', $project);
+
         $environment = $project->environments()->whereName($request->environment_name_or_uuid)->first();
         if (! $environment) {
             $environment = $project->environments()->whereUuid($request->environment_name_or_uuid)->first();

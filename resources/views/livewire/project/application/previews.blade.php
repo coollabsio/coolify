@@ -1,4 +1,36 @@
 <div class="flex flex-col gap-6">
+    @if ($application->git_based())
+        @php
+            $canUpdate = auth()->user()->can('update', $application);
+        @endphp
+        <x-application.settings-section id="preview-settings-section" title="Preview settings"
+            helper="Automatic pull request deployments and who can trigger them.">
+            <x-slot:actions>
+                @can('update', $application)
+                    @if ($isPreviewDeploymentsEnabled)
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments">
+                            Disable preview deployments
+                        </x-forms.button>
+                    @else
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments"
+                            isHighlighted>
+                            Enable preview deployments
+                        </x-forms.button>
+                    @endif
+                @endcan
+            </x-slot:actions>
+
+            <div class="w-full">
+                <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
+                    helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
+                    :options="[
+                        ['value' => false, 'label' => 'Repository members only'],
+                        ['value' => true, 'label' => 'Public (fork PRs allowed)'],
+                    ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+            </div>
+        </x-application.settings-section>
+    @endif
+
     <livewire:project.application.preview.form :application="$application" />
 
     @if (count($application->additional_servers) > 0)
@@ -103,6 +135,7 @@
                                     Preview #{{ data_get($preview, 'pull_request_id') }}
                                 </h4>
                                 <x-status-summary :status="data_get($preview, 'status')" title="Preview status" />
+                                <x-application.restart-limit-warning :application="$preview" />
                             </div>
                         </div>
                     </div>
@@ -251,49 +284,19 @@
                 </div>
 
                 <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
-                    @if ($application->build_pack === 'dockercompose')
-                        @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
-                            <form wire:submit="save_preview('{{ $preview->id }}')"
-                                class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                                <x-forms.input label="Domain" helper="One domain per preview."
-                                    id="previewFqdns.{{ $previewName }}" canGate="update"
-                                    :canResource="$application"
-                                    wire:change="save_preview('{{ $preview->id }}')" />
-                                @can('update', $application)
-                                    <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">
-                                        Generate domain
-                                    </x-forms.button>
-                                @endcan
-                            </form>
-                        @else
-                            <div class="flex flex-col gap-3">
-                                @foreach (collect(json_decode($preview->docker_compose_domains)) as $serviceName => $service)
-                                    <livewire:project.application.previews-compose
-                                        wire:key="preview-{{ $preview->pull_request_id }}-{{ $serviceName }}"
-                                        :service="$service" :serviceName="$serviceName" :preview="$preview" />
-                                @endforeach
-                            </div>
-                        @endif
-                    @else
+                    <livewire:project.application.preview-domains
+                        wire:key="preview-domains-{{ $preview->id }}"
+                        :preview="$preview" />
+
+                    @if ($application->build_pack === 'dockerimage')
                         <form wire:submit="save_preview('{{ $preview->id }}')"
-                            class="grid gap-3 {{ $application->build_pack === 'dockerimage'
-                                ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]'
-                                : 'md:grid-cols-[minmax(0,1fr)_auto]' }} md:items-end">
-                            <x-forms.input label="Domain" helper="One domain per preview."
-                                id="previewFqdns.{{ $previewName }}" canGate="update"
-                                :canResource="$application"
-                                wire:change="save_preview('{{ $preview->id }}')" />
-                            @if ($application->build_pack === 'dockerimage')
-                                <x-forms.input label="Docker tag" helper="Image tag used by this preview."
-                                    id="previewDockerTags.{{ $previewName }}" canGate="update"
+                            class="application-settings-section-body is-flush mt-3 overflow-visible">
+                            <div class="data-table-header grid-cols-1"><span>Docker tag</span></div>
+                            <div class="p-3">
+                                <x-forms.input id="previewDockerTags.{{ $previewName }}" canGate="update"
                                     :canResource="$application"
                                     wire:change="save_preview('{{ $preview->id }}')" />
-                            @endif
-                            @can('update', $application)
-                                <x-forms.button wire:click="generate_preview('{{ $preview->id }}')">
-                                    Generate domain
-                                </x-forms.button>
-                            @endcan
+                            </div>
                         </form>
                     @endif
                 </div>
@@ -305,15 +308,4 @@
         @endforelse
     </x-application.settings-section>
 
-    <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
-        confirmAction="confirmDomainUsage">
-        The preview deployment domain is already used by another resource and may cause routing conflicts.
-        <x-slot:consequences>
-            <ul class="mt-2 ml-4 list-disc">
-                <li>The preview deployment may not be accessible.</li>
-                <li>SSL certificates may not work correctly.</li>
-                <li>Requests may be routed unpredictably.</li>
-            </ul>
-        </x-slot:consequences>
-    </x-domain-conflict-modal>
 </div>

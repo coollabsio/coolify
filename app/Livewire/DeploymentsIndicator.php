@@ -54,12 +54,6 @@ class DeploymentsIndicator extends Component
         return $this->deployments->count();
     }
 
-    #[Computed]
-    public function shouldReduceOpacity(): bool
-    {
-        return request()->routeIs('project.application.deployment.*');
-    }
-
     public function toggleExpanded()
     {
         $this->expanded = ! $this->expanded;

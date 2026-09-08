@@ -26,3 +26,16 @@ it('shows a loading indicator while database public access is changing', functio
             ->not->toContain('id="publicPort" live');
     }
 });
+
+it('passes the selected PostgreSQL public access state to the save action', function () {
+    $generalSettings = file_get_contents(resource_path('views/livewire/project/database/postgresql/general.blade.php'));
+
+    expect($generalSettings)
+        ->toContain('onChange="instantSave" :onChangeArgs="[]"');
+
+    $component = file_get_contents(app_path('Livewire/Project/Database/Postgresql/General.php'));
+
+    expect($component)
+        ->toContain('public function instantSave(?bool $isPublic = null)')
+        ->toContain('$this->isPublic = $isPublic;');
+});

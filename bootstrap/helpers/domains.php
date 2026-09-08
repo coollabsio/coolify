@@ -443,6 +443,26 @@ function getComposeServiceDomainString(array|Collection $domains, string $servic
     return $matches[0]['domain'];
 }
 
+/**
+ * Determine whether a compose service already has a domain-map entry, including
+ * an explicitly empty entry left when a user removes its generated domain.
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $domains
+ */
+function hasComposeServiceDomainEntry(array|Collection $domains, string $serviceName): bool
+{
+    $normalized = normalizeComposeServiceName($serviceName);
+
+    foreach (collect($domains)->keys() as $key) {
+        $key = (string) $key;
+        if ($key === $serviceName || normalizeComposeServiceName($key) === $normalized) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function composeDomainEntryString(mixed $entry): ?string
 {
     if (is_object($entry)) {

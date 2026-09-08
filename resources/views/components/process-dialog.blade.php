@@ -1,5 +1,6 @@
 @props([
     'closeWithX' => false,
+    'mobileFullscreen' => false,
     'open' => false,
     'size' => 'lg',
 ])
@@ -40,7 +41,11 @@
 
             <div class="fixed inset-0 overflow-y-auto">
                 <div @if (! $closeWithX) @click.self="processDialogOpen = false" @endif
-                    class="flex min-h-full items-center justify-center p-4 sm:p-6">
+                    @class([
+                        'flex min-h-full items-center justify-center',
+                        'p-4 sm:p-6' => ! $mobileFullscreen,
+                        'p-0 sm:p-6' => $mobileFullscreen,
+                    ])>
                     <div x-show="processDialogOpen"
                         x-trap.inert.noscroll="processDialogOpen"
                         x-transition:enter="ease-out duration-150"
@@ -54,6 +59,7 @@
                         aria-labelledby="process-dialog-title"
                         @class([
                             'application-settings-section application-settings-form process-dialog relative flex flex-col overflow-hidden',
+                            'process-dialog-mobile-fullscreen' => $mobileFullscreen,
                             $panelWidth,
                             // Fixed shell size so empty “waiting for process” state does not collapse.
                             'min-h-[min(70dvh,28rem)] h-[min(85dvh,52rem)] max-h-[calc(100dvh-2rem)]',

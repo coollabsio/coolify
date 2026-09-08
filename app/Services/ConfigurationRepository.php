@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Support\SmtpTransportFactory;
 use Illuminate\Config\Repository;
+use Illuminate\Support\Facades\Mail;
 
 class ConfigurationRepository
 {
@@ -15,37 +17,48 @@ class ConfigurationRepository
 
     public function updateMailConfig($settings): void
     {
+        $from = mail_from_identity($settings);
+
         if ($settings->resend_enabled) {
             $this->config->set('mail.default', 'resend');
-            $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
-            $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
+            $this->applyMailFrom($from);
             $this->config->set('resend.api_key', $settings->resend_api_key);
 
             return;
         }
 
         if ($settings->smtp_enabled) {
-            $encryption = match (strtolower($settings->smtp_encryption)) {
-                'starttls' => null,
-                'tls' => 'tls',
-                'none' => null,
-                default => null,
-            };
+            $mailerOptions = SmtpTransportFactory::mailerOptions($settings);
+            $localDomain = $settings->smtp_ehlo_domain
+                ?? $this->config->get('mail.mailers.smtp.local_domain');
 
             $this->config->set('mail.default', 'smtp');
-            $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
-            $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
+            $this->applyMailFrom($from);
             $this->config->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
+                'scheme' => $mailerOptions['scheme'],
                 'host' => $settings->smtp_host,
                 'port' => $settings->smtp_port,
-                'encryption' => $encryption,
+                'encryption' => $mailerOptions['encryption'],
                 'username' => $settings->smtp_username,
                 'password' => $settings->smtp_password,
                 'timeout' => $settings->smtp_timeout,
-                'local_domain' => null,
-                'auto_tls' => $settings->smtp_encryption === 'none' ? '0' : '',
+                'local_domain' => $localDomain,
+                'auto_tls' => $mailerOptions['auto_tls'],
             ]);
+        }
+    }
+
+    /**
+     * @param  array{address: string, name: string}  $from
+     */
+    private function applyMailFrom(array $from): void
+    {
+        $this->config->set('mail.from.address', $from['address']);
+        $this->config->set('mail.from.name', $from['name']);
+
+        if (app()->bound('mail.manager')) {
+            Mail::purge();
         }
     }
 

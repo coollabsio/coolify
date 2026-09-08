@@ -49,18 +49,6 @@ it('schedules every production job with onOneServer', function () {
     });
 });
 
-it('runs v5 agent token rotation often enough for the default ttl and refresh threshold', function () {
-    $schedule = app(Schedule::class);
-
-    $event = collect($schedule->events())->first(
-        fn ($e) => str_contains((string) $e->description, 'V5RotateAgentTokensJob')
-    );
-
-    expect($event)->not->toBeNull();
-    expect($event->expression)->toBe('*/15 * * * *');
-    expect($event->onOneServer)->toBeTrue();
-});
-
 it('does not schedule Stripe subscription reconciliation automatically', function () {
     $schedule = app(Schedule::class);
 
@@ -69,4 +57,18 @@ it('does not schedule Stripe subscription reconciliation automatically', functio
     );
 
     expect($event)->toBeNull();
+});
+
+it('schedules stuck resource cleanup in the background once per day', function () {
+    $schedule = app(Schedule::class);
+
+    $event = collect($schedule->events())->first(
+        fn ($event) => str_contains($event->command, 'cleanup:stucked-resources')
+    );
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('17 3 * * *')
+        ->and($event->onOneServer)->toBeTrue()
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->runInBackground)->toBeTrue();
 });

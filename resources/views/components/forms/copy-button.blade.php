@@ -1,21 +1,18 @@
 @props(['text', 'label' => null])
 
-<div class="w-full"
-    x-data="{ copied: false, canCopy: window.isSecureContext && typeof navigator.clipboard?.writeText === 'function' }">
+<div class="w-full" x-data="{ copied: false }">
     @if ($label)
         <label class="flex gap-1 items-center mb-1 text-sm font-medium text-black dark:text-white">{{ $label }}</label>
     @endif
     <div class="relative">
         <input type="text" value="{{ $text }}"
-            class="input bg-white dark:bg-coolgray-100 dark:read-only:bg-coolgray-100 dark:read-only:text-white"
-            x-bind:class="{ 'input-with-copy-button': canCopy }"
+            class="input input-with-copy-button bg-white dark:bg-coolgray-100 dark:read-only:bg-coolgray-100 dark:read-only:text-white"
             readonly
             @keydown.prevent @paste.prevent @cut.prevent @drop.prevent
             @focus="$event.target.select()">
         <button
-            x-show="canCopy"
             type="button"
-            @click.prevent="copied = true; navigator.clipboard.writeText({{ Js::from($text) }}); setTimeout(() => copied = false, 1000)"
+            @click.prevent="await window.copyToClipboard({{ Js::from($text) }}); copied = true; setTimeout(() => copied = false, 1000)"
             class="copy-button flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 transition-colors hover:text-black focus-visible:ring-2 focus-visible:ring-coollabs focus-visible:ring-offset-2 dark:text-neutral-400 dark:hover:text-white dark:focus-visible:ring-warning dark:focus-visible:ring-offset-base"
             title="Copy to clipboard"
             aria-label="Copy to clipboard">

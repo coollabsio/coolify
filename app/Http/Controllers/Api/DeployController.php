@@ -238,57 +238,71 @@ class DeployController extends Controller
             ApplicationDeploymentStatus::IN_PROGRESS->value,
         ];
 
-        if (! in_array($deployment->status, $cancellableStatuses)) {
+        if (! in_array($deployment->status, $cancellableStatuses, true)) {
             return response()->json([
                 'message' => "Deployment cannot be cancelled. Current status: {$deployment->status}",
             ], 400);
         }
 
         // Perform the cancellation
+        $cancelled = false;
+        $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
+
         try {
             $deployment_uuid = $deployment->deployment_uuid;
             $kill_command = "docker rm -f {$deployment_uuid}";
             $build_server_id = $deployment->build_server_id ?? $deployment->server_id;
 
             // Mark deployment as cancelled
-            $deployment->update([
-                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
-            ]);
+            $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
+                ->whereIn('status', $cancellableStatuses)
+                ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+
+            if ($updated !== 1) {
+                $deployment->refresh();
+
+                return response()->json([
+                    'message' => "Deployment cannot be cancelled. Current status: {$deployment->status}",
+                ], 400);
+            }
+
+            $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
+            $cancelled = true;
 
             // Get the server
             $server = Server::whereTeamId($teamId)->find($build_server_id);
 
-            if ($server) {
-                // Add cancellation log entry
-                $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
+            try {
+                if ($server) {
+                    // Add cancellation log entry
+                    $deployment->addLogEntry('Deployment cancelled by user via API.', 'stderr');
 
-                // Check if container exists and kill it
-                $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
-                $containerExists = instant_remote_process([$checkCommand], $server);
+                    // Check if container exists and kill it
+                    $checkCommand = "docker ps -a --filter name={$deployment_uuid} --format '{{.Names}}'";
+                    $containerExists = instant_remote_process([$checkCommand], $server);
 
-                if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                    instant_remote_process([$kill_command], $server);
-                    $deployment->addLogEntry('Deployment container stopped.');
-                } else {
-                    $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
-                }
+                    if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
+                        instant_remote_process([$kill_command], $server);
+                        $deployment->addLogEntry('Deployment container stopped.');
+                    } else {
+                        $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
+                    }
 
-                // Kill running process if process ID exists
-                if ($deployment->current_process_id) {
-                    try {
+                    // Kill running process if process ID exists
+                    if ($deployment->current_process_id) {
                         $processKillCommand = "kill -9 {$deployment->current_process_id}";
                         instant_remote_process([$processKillCommand], $server);
-                    } catch (\Throwable $e) {
-                        // Process might already be gone
                     }
                 }
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to clean up cancelled deployment {$deployment->id}: {$e->getMessage()}");
             }
 
             auditLog('api.deployment.cancelled', [
                 'team_id' => $teamId,
                 'deployment_uuid' => $deployment->deployment_uuid,
-                'application_id' => $application?->id,
-                'application_uuid' => $application?->uuid,
+                'application_id' => $deployment->application_id,
+                'application_uuid' => $deployment->application?->uuid,
                 'server_id' => $deployment->server_id,
             ]);
 
@@ -301,6 +315,14 @@ class DeployController extends Controller
             return response()->json([
                 'message' => 'Failed to cancel deployment: '.$e->getMessage(),
             ], 500);
+        } finally {
+            if ($cancelled) {
+                try {
+                    next_after_cancel($deploymentServer);
+                } catch (\Throwable $e) {
+                    \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
+                }
+            }
         }
     }
 

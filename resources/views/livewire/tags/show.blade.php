@@ -42,8 +42,9 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative" x-on:click.outside="sortOpen = false">
-                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen">
+                    <x-table.dropdown panel-class="w-52!">
+                        <x-slot:trigger>
+                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
                                 aria-hidden="true">
                                 <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
@@ -51,13 +52,12 @@
                                     stroke-linejoin="round" />
                             </svg>
                             Sort
-                        </button>
-                        <div x-cloak x-show="sortOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            </button>
+                        </x-slot:trigger>
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; sortOpen = false; page = 1">
+                                    x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -66,8 +66,7 @@
                                     </svg>
                                 </button>
                             </template>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
                     <div
                         class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
@@ -97,7 +96,7 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <template x-for="tag in paginatedTags" :key="tag.id">
                         <article
-                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <a :href="tag.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
                                 :aria-label="`Open ${tag.name}`"></a>
 
@@ -122,35 +121,15 @@
                         </article>
                     </template>
                 </div>
-
-                <footer x-show="totalPages > 1"
-                    class="mt-3 flex min-h-11 items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 text-[11px] text-neutral-500 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
-                    <span x-text="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredTags.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.tags" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="viewMode === 'table'"
-                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Tag</div>
                     <div>Resources</div>
                     <div>Applications</div>
@@ -176,33 +155,13 @@
                             x-text="tag.servicesCount"></div>
                     </a>
                 </template>
-
-                <footer x-show="totalPages > 1"
-                    class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                    <span x-text="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredTags.length > 0"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.tags" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="filteredTags.length === 0"
-                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
                 <p class="text-[13px] font-medium">No matching tags</p>
                 <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
@@ -291,7 +250,7 @@
         <div class="flex flex-col gap-6">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Resources</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ $resourceCount }}
@@ -301,7 +260,7 @@
                     </p>
                 </div>
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Applications</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ $applications?->count() ?? 0 }}
@@ -311,7 +270,7 @@
                     </p>
                 </div>
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Active deployments</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ collect($deploymentsPerTagPerServer ?? [])->flatten(1)->count() }}
@@ -349,7 +308,7 @@
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($applications ?? [] as $application)
                             <a {{ wireNavigate() }} href="{{ $application->link() }}"
-                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
                                         class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -373,7 +332,7 @@
 
                         @foreach ($services ?? [] as $service)
                             <a {{ wireNavigate() }} href="{{ $service->link() }}"
-                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
                                         class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -415,7 +374,7 @@
                         </div>
                     @else
                         <div
-                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <div>Resource</div>
                             <div>Server</div>
                             <div>Status</div>

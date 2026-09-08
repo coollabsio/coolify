@@ -22,7 +22,11 @@
             @endif
         </div>
     @endif
-    @if ($type === 'password')
+    @if ($loading)
+        <div class="{{ $defaultClass }} flex w-full items-center text-neutral-500 dark:text-fg-dim" aria-busy="true">
+            <x-loading :text="$loadingText" />
+        </div>
+    @elseif ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 x-bind:type="type"
@@ -63,7 +67,18 @@
     @endif
     @error($modelBinding)
         <label class="label">
-            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+            @php
+                preg_match('/(https?:\/\/\S+)$/', $message, $validationLinkMatches);
+                $validationLink = $validationLinkMatches[1] ?? null;
+            @endphp
+            <span class="text-red-500 label-text-alt">
+                @if ($validationLink)
+                    {{ str($message)->beforeLast($validationLink)->trim() }}
+                    <a class="font-medium underline" href="{{ $validationLink }}">Set them here.</a>
+                @else
+                    {{ $message }}
+                @endif
+            </span>
         </label>
     @enderror
 </div>

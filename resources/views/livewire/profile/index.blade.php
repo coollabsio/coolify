@@ -7,7 +7,7 @@
 }"
     @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    <div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
         <section class="application-settings-section" x-data="{
             preview: null,
             processing: false,
@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">
@@ -275,7 +275,7 @@
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
                             <div
-                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.05] dark:text-fg-dim">
                                 @foreach (request()->user()->recoveryCodes() as $code)
                                     <div>{{ $code }}</div>
                                 @endforeach

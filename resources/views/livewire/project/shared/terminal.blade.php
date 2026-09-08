@@ -76,7 +76,7 @@
                     : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')">
         </div>
 
-        <div x-show="terminalActive" x-cloak
+        <div x-show="terminalActive" x-cloak class="sm:hidden"
             :class="fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')"
             :style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : ''"
             data-terminal-mobile-toolbar>
@@ -96,6 +96,7 @@
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('~')">~</button>
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('-')">-</button>
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlC')">^C</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlD')">^D</button>
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlBackslash')">^\</button>
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlS')">^S</button>
                 <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlZ')">^Z</button>

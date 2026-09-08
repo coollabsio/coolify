@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
@@ -144,7 +145,9 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'fqdn' => isset($this->application) && $this->fqdn === $this->application->fqdn
+                ? ['nullable']
+                : ValidationPatterns::applicationDomainRules(),
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
@@ -320,17 +323,6 @@ class General extends Component
             }
         }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
-        if ($this->application->build_pack === 'dockercompose' && ! $this->application->docker_compose_raw) {
-            // Only load compose file if user has update permission
-            try {
-                $this->authorize('update', $this->application);
-                $this->initLoadingCompose = true;
-                $this->dispatch('info', 'Loading docker compose file.');
-            } catch (AuthorizationException $e) {
-                // User doesn't have update permission, skip loading compose file
-            }
-        }
-
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->dispatch('configurationChanged');
         }
@@ -340,7 +332,7 @@ class General extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -530,7 +522,7 @@ class General extends Component
 
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             // Refresh model to get restored values from Application::loadComposeFile
@@ -607,14 +599,9 @@ class General extends Component
             $this->resetDefaultLabels(false);
         }
         if ($this->buildPack === 'dockercompose') {
-            // Only update if user has permission
-            try {
-                $this->authorize('update', $this->application);
-                $this->fqdn = null;
-                $this->application->fqdn = null;
-                $this->application->settings->save();
-            } catch (AuthorizationException $e) {
-                // User doesn't have update permission, just continue without saving
+            if (blank($this->dockerComposeLocation)) {
+                $this->dockerComposeLocation = '/docker-compose.yaml';
+                $this->application->docker_compose_location = $this->dockerComposeLocation;
             }
         }
         if ($this->buildPack === 'static') {
@@ -666,6 +653,8 @@ class General extends Component
 
     public function resetDefaultLabels($manualReset = false)
     {
+        $this->authorize('update', $this->application);
+
         try {
             if (! $this->isContainerLabelReadonlyEnabled && ! $manualReset) {
                 return;
@@ -770,8 +759,11 @@ class General extends Component
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
             $oldBaseDirectory = $this->application->base_directory;
 
-            // Process FQDN with intermediate variable to avoid Collection/string confusion
-            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            $fqdnChanged = $this->fqdn !== $this->application->fqdn;
+            if ($fqdnChanged) {
+                $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            }
+
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));

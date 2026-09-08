@@ -12,6 +12,8 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -815,6 +817,54 @@ function firstDomainFromList(?string $fqdns): string
 {
     return trim((string) str($fqdns ?? '')->explode(',')->first());
 }
+function profile_avatar_url(User $user): string
+{
+    if ($user->avatar_storage_type === 's3') {
+        $url = s3_image_url($user->avatar_s3_storage_id, $user->avatar_path, $user->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
+}
+
+function project_icon_url(Project $project): string
+{
+    if ($project->icon_storage_type === 's3') {
+        $url = s3_image_url($project->icon_s3_storage_id, $project->icon_path, $project->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('project.icon', [
+        'project_uuid' => $project->uuid,
+        'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function s3_image_url(?int $storageId, ?string $path, int $version): ?string
+{
+    if (! $storageId || blank($path)) {
+        return null;
+    }
+
+    $storage = S3Storage::query()
+        ->whereKey($storageId)
+        ->whereTeamId(0)
+        ->where('is_usable', true)
+        ->first();
+
+    if (! $storage) {
+        return null;
+    }
+
+    $baseUrl = instanceSettings()->image_cdn_url ?: $storage->awsUrl();
+
+    return rtrim($baseUrl, '/').'/'.ltrim($path, '/').'?v='.$version;
+}
+
 /**
  * If fqdn is set, return it, otherwise return public ip.
  */
@@ -2068,7 +2118,7 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = new DNSQuery($dns_server);
+            $query = createDnsQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
             } else {
@@ -2076,11 +2126,11 @@ function validateDNSEntry(string $fqdn, Server $server)
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                         if ($ip && $result->getData() === $ip) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                     }
                 }
@@ -2090,6 +2140,15 @@ function validateDNSEntry(string $fqdn, Server $server)
     }
 
     return $found_matching_ip;
+}
+
+function createDnsQuery(string $dnsServer): DNSQuery
+{
+    return app()->make(DNSQuery::class, [
+        'server' => $dnsServer,
+        'port' => 53,
+        'timeout' => 5,
+    ]);
 }
 
 function isCloudflareIp(string $ip): bool
@@ -2427,7 +2486,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } catch (Exception $e) {
                 throw new RuntimeException($e->getMessage());
             }
-            $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $topLevelConfigs = collect(data_get($yaml, 'configs', []));
@@ -2453,25 +2511,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices, $envComments) {
-                // Workarounds for beta users.
-                if ($serviceName === 'registry') {
-                    $tempServiceName = 'docker-registry';
-                } else {
-                    $tempServiceName = $serviceName;
-                }
-                if (str(data_get($service, 'image'))->contains('glitchtip')) {
-                    $tempServiceName = 'glitchtip';
-                }
-                if ($serviceName === 'supabase-kong') {
-                    $tempServiceName = 'supabase';
-                }
-                $serviceDefinition = data_get($allServices, $tempServiceName);
-                $predefinedPort = data_get($serviceDefinition, 'port');
-                if ($serviceName === 'plausible') {
-                    $predefinedPort = '8000';
-                }
-                // End of workarounds for beta users.
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $envComments) {
+                $predefinedPort = $resource->getRequiredPort();
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3044,20 +3085,28 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array(data_get($savedService, 'redirect'), ['www', 'non-www', 'both'], true)
                             ? data_get($savedService, 'redirect')
                             : 'both';
+                        $domainPortOverrides = $savedService instanceof ServiceApplication
+                            ? ($savedService->domain_port_overrides ?? [])
+                            : [];
+                        $onlyPort = $savedService instanceof ServiceApplication
+                            ? $savedService->getRequiredPort()
+                            : $predefinedPort;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
                                     $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3065,14 +3114,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         network: $resource->destination->network,
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
+                                        predefinedPort: $onlyPort,
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
                                     ));
                                     break;
                             }
@@ -3080,27 +3132,32 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
+                                predefinedPort: $onlyPort,
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
                             ));
                         }
                     }
@@ -3799,6 +3856,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
+                            if (! $preview) {
+                                try {
+                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                } catch (ModelNotFoundException) {
+                                    throw new RuntimeException('Preview not found.');
+                                }
+                            }
                             $docker_compose_domains = json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: [];
                             if (count($docker_compose_domains) > 0) {
                                 $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
@@ -3808,22 +3872,20 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $fqdns = collect([]);
                                 }
                             } else {
-                                $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
-                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                    $url = Url::fromString($fqdn);
-                                    $template = $resource->preview_url_template;
-                                    $host = $url->getHost();
-                                    $schema = $url->getScheme();
-                                    $random = new_public_id();
-                                    $preview_fqdn = str_replace('{{random}}', $random, $template);
-                                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                                    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-                                    $preview_fqdn = "$schema://$preview_fqdn";
-                                    $preview->fqdn = $preview_fqdn;
-                                    $preview->save();
-
-                                    return $preview_fqdn;
-                                });
+                                $generatedDomains = $fqdns->map(
+                                    fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                                );
+                                $fqdns = $generatedDomains->pluck('url');
+                                $preview->fqdn = $fqdns->implode(',');
+                                $generatedOverrides = $generatedDomains
+                                    ->filter(fn (array $generated): bool => filled($generated['port']))
+                                    ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                                    ->all();
+                                $preview->domain_port_overrides = array_replace(
+                                    $preview->domain_port_overrides ?? [],
+                                    $generatedOverrides,
+                                );
+                                $preview->save();
                             }
                         }
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
@@ -3832,6 +3894,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
+                        $domainPortOverrides = $pull_request_id === 0
+                            ? ($resource->domain_port_overrides ?? [])
+                            : ($preview?->domain_port_overrides ?? []);
+                        $onlyPort = firstDockerComposeServicePort($service);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3845,8 +3911,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
                                         )
                                     );
                                     break;
@@ -3861,8 +3929,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
                                         )
                                     );
                                     break;
@@ -3878,8 +3948,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3892,8 +3964,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
                                 )
                             );
                         }
@@ -4143,11 +4217,12 @@ function coolifyHelperImage(): string
 
 function getHelperVersion(): string
 {
-    $settings = instanceSettings();
+    if (isDev()) {
+        $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
 
-    // In development mode, use the dev_helper_version if set, otherwise fallback to config
-    if (isDev() && ! empty($settings->dev_helper_version)) {
-        return $settings->dev_helper_version;
+        if (! empty($devHelperVersion)) {
+            return $devHelperVersion;
+        }
     }
 
     return config('constants.coolify.helper_version');
@@ -4722,6 +4797,23 @@ function downsampleLTTB(array $data, int $threshold): array
     $sampled[] = $data[$dataLength - 1]; // Always keep last point
 
     return $sampled;
+}
+
+/**
+ * Convert Sentinel container memory samples from bytes to megabytes.
+ *
+ * Sentinel stores container `used` memory in bytes. Application and database
+ * metric charts label the series as megabytes, so the values must be converted
+ * before they are sent to the frontend.
+ *
+ * @param  array<int, array{0: int|float, 1: int|float}>  $metrics
+ * @return array<int, array{0: int, 1: float}>
+ */
+function convertContainerMemoryBytesToMegabytes(array $metrics): array
+{
+    return array_map(static function (array $point): array {
+        return [(int) $point[0], round(((float) $point[1]) / 1024 / 1024, 2)];
+    }, $metrics);
 }
 
 /**

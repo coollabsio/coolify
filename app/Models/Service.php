@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
+use App\Support\DomainPortOverrides;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,7 +15,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
-use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -92,11 +92,18 @@ class Service extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $applications = $this->applications()->get();
+        $domains = $applications->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
-        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $noindexDomains = $applications->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $domainPortOverrides = $applications
+            ->mapWithKeys(fn (ServiceApplication $application): array => [
+                $application->id => DomainPortOverrides::sorted($application->domain_port_overrides),
+            ])
+            ->sortKeys()
+            ->all();
 
-        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $applicationImages = $applications->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
@@ -105,7 +112,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1180,6 +1187,27 @@ class Service extends BaseModel
                     }
                     $fields->put('Openclaw', $data->toArray());
                     break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
@@ -1434,32 +1462,6 @@ class Service extends BaseModel
         return null;
     }
 
-    public function taskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            $route = route('project.service.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'service_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
-            ]);
-            $settings = InstanceSettings::get();
-            if (data_get($settings, 'fqdn')) {
-                $url = Url::fromString($route);
-                $url = $url->withPort(null);
-                $fqdn = data_get($settings, 'fqdn');
-                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                $url = $url->withHost($fqdn);
-
-                return $url->__toString();
-            }
-
-            return $route;
-        }
-
-        return null;
-    }
-
     public function documentation()
     {
         $services = get_service_templates();
@@ -1475,7 +1477,10 @@ class Service extends BaseModel
     {
         try {
             $services = get_service_templates();
-            $serviceName = str($this->name)->beforeLast('-')->value();
+            if (blank($this->service_type)) {
+                return null;
+            }
+            $serviceName = $this->service_type;
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 

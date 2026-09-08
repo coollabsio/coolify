@@ -509,6 +509,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         'is_log_drain_enabled' => true,
         'is_gzip_enabled' => false,
         'is_stripprefix_enabled' => false,
+        'is_force_https_enabled' => false,
         'status' => 'running:healthy',
     ]);
     $serviceApp->uuid = 'svc-app-whoami';
@@ -722,6 +723,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         ->and($importedSvcApp->exposes)->toBe('80')
         ->and((bool) $importedSvcApp->is_gzip_enabled)->toBeFalse()
         ->and((bool) $importedSvcApp->is_stripprefix_enabled)->toBeFalse()
+        ->and((bool) $importedSvcApp->is_force_https_enabled)->toBeFalse()
         ->and($importedSvcApp->environment_variables()->where('key', 'WHOAMI_NAME')->first()?->value)->toBe('nested-secret')
         ->and($importedSvcApp->persistentStorages)->toHaveCount(1)
         ->and($importedSvcApp->fileStorages)->toHaveCount(1)

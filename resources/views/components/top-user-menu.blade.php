@@ -11,54 +11,17 @@
 <div @class(['relative', 'min-w-0' => $sidebar]) x-data="{
     open: false,
     appearanceOpen: false,
-    theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
-    themeColor: localStorage.getItem('themeColor') || '#6b16ed',
-    themeColorFrame: null,
-    avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
-    setTheme(type, closeMenu = true) {
-        this.theme = type;
-        localStorage.setItem('theme', type);
-
-        if (closeMenu) {
-            this.appearanceOpen = false;
-            this.open = false;
-        }
-
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = type === 'dark' || type === 'custom' || (type === 'system' && prefersDark);
-        document.documentElement.classList.toggle('dark', isDark);
-        document.documentElement.dataset.theme = type === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-        document.documentElement.style.setProperty('--theme-base-color', localStorage.themeColor || '#6b16ed');
-        document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-        document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+    avatarUrl: @js($user?->avatar_path ? profile_avatar_url($user) : null),
+    openPanel() {
+        this.appearanceOpen = false;
+        this.open = true;
     },
-    previewThemeColor(color) {
-        this.themeColor = color;
-
-        if (this.theme !== 'custom') {
-            this.theme = 'custom';
-            document.documentElement.classList.add('dark');
-            document.documentElement.dataset.theme = 'custom';
-        }
-
-        if (this.themeColorFrame) {
-            return;
-        }
-
-        this.themeColorFrame = requestAnimationFrame(() => {
-            document.documentElement.style.setProperty('--theme-base-color', this.themeColor);
-            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
-            this.themeColorFrame = null;
-        });
+    closePanel() {
+        this.open = false;
     },
-    saveThemeColor(color) {
-        this.previewThemeColor(color);
-        localStorage.setItem('themeColor', color);
-        localStorage.setItem('theme', 'custom');
-    },
-}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="open = false; appearanceOpen = false"
-    @click.outside="open = false; appearanceOpen = false">
-    <button type="button" @click="open = !open"
+}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
+    @click.outside="closePanel()">
+    <button type="button" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
         @if ($sidebar) :class="collapsed && 'w-8 justify-center px-0'" @endif
         @class([
@@ -81,14 +44,18 @@
         </svg>
     </button>
 
-    <template x-if="open">
-        <div @class([
-                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
-                'right-0! left-auto!' => ! $sidebar,
-                'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
-                'origin-bottom-left' => $sidebar,
-                'origin-top-right' => ! $sidebar,
-            ])>
+    <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+        @class([
+            'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+            'right-0! left-auto!' => ! $sidebar,
+            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+            'origin-bottom-left' => $sidebar,
+            'origin-top-right' => ! $sidebar,
+        ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
             <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
@@ -113,45 +80,25 @@
                     stroke-linejoin="round" />
             </svg>
         </button>
-        <div x-show="appearanceOpen" x-collapse class="mx-1 grid gap-0.5 pb-1 pl-6">
-            @foreach ([
-                ['value' => 'light', 'label' => 'Light'],
-                ['value' => 'system', 'label' => 'System'],
-                ['value' => 'dark', 'label' => 'Dark'],
-                ['value' => 'custom', 'label' => 'Custom'],
-            ] as $option)
-                @if ($option['value'] === 'custom')
-                    <div
-                        class="relative flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <span class="flex items-center gap-2">
-                            <span class="size-3.5 rounded-full border border-white/20"
-                                :style="`background: ${themeColor}`"></span>
-                            Custom
-                        </span>
-                        <svg x-show="theme === 'custom'" class="size-3.5 text-coollabs dark:text-warning"
-                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <input type="color" :value="themeColor" @input="previewThemeColor($event.target.value)"
-                            @change="saveThemeColor($event.target.value)"
-                            aria-label="Custom theme color"
-                            class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
-                    </div>
-                @else
-                    <button type="button" @click="setTheme('{{ $option['value'] }}')"
-                        class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <span>{{ $option['label'] }}</span>
-                        <svg x-show="theme === '{{ $option['value'] }}'"
-                            class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
-                            aria-hidden="true">
-                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                @endif
-            @endforeach
+        <div x-show="appearanceOpen" x-collapse.duration.200ms class="mx-1 pb-1 pl-6">
+            <x-theme-controls variant="menu" />
         </div>
+
+        <button type="button" class="listbox-option w-full" @click="toggleAutoCollapse()"
+            :aria-pressed="autoCollapse" title="Collapse the sidebar on pages that have a settings menu">
+            <span class="flex items-center gap-2">
+                <svg class="size-4 opacity-80" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+                Auto-collapse sidebar
+            </span>
+            <svg x-show="autoCollapse" x-cloak class="size-4 shrink-0 text-black dark:text-fg" viewBox="0 0 24 24"
+                fill="none" aria-hidden="true">
+                <path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+        </button>
 
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
 
@@ -164,7 +111,7 @@
         </a>
         <x-modal-input title="How can we help?">
             <x-slot:content>
-                <div class="listbox-option cursor-pointer" @click="open = false">
+                <div class="listbox-option cursor-pointer" @click="closePanel()">
                     <span class="flex items-center gap-2">
                         <x-reicon name="feedback" class="size-4 opacity-80" />
                         Feedback
@@ -194,6 +141,5 @@
                 </span>
             </button>
         </form>
-        </div>
-    </template>
+    </div>
 </div>

@@ -77,6 +77,47 @@ it('reports noindex domain changes as requiring a redeploy', function () {
         ->and($change['impact'])->toBe('redeploy');
 });
 
+it('reports domain port-only changes as requiring a redeploy', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com',
+        'domain_port_overrides' => ['https://app.example.com' => 3000],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => ['https://app.example.com' => 8080],
+    ]);
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('key', 'domains.domain_port_overrides');
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($change)->not->toBeNull()
+        ->and($change['impact'])->toBe('redeploy');
+});
+
+it('keeps application deployment snapshots stable when port overrides are reordered', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://two.example.com' => 8080,
+            'https://one.example.com' => 3000,
+        ],
+    ]);
+
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});
+
 it('does not flag applications whose older snapshot omitted noindex domains', function () {
     $application = configurationChangedTestApplication([
         'fqdn' => 'https://app.example.com',

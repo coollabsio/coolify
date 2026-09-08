@@ -111,38 +111,14 @@ class Select extends Component
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
-            $default_logo = 'svgs/default.webp';
-            $logo = data_get($service, 'logo');
-
-            if (is_string($logo) && str_starts_with($logo, 'svg/')) {
-                $normalizedLogo = 'svgs/'.str($logo)->after('svg/');
-                if (file_exists(public_path($normalizedLogo))) {
-                    $logo = $normalizedLogo;
-                }
-            }
-
-            $hasLogo = is_string($logo)
-                && basename($logo) !== basename($default_logo)
-                && file_exists(public_path($logo));
-
-            if (! $hasLogo) {
-                $logo = $default_logo;
-            }
-
-            $local_logo_path = public_path($logo);
             $serviceKey = (string) $key;
 
             return [
                 'id' => $serviceKey,
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
-                'has_logo' => $hasLogo,
-                'logo' => asset($logo),
-                'logo_github_url' => file_exists($local_logo_path)
-                    ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
-                    : asset($default_logo),
                 'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
-            ] + (array) $service;
+            ] + service_logo_urls(data_get($service, 'logo')) + (array) $service;
         })->all();
 
         // Extract unique categories from services

@@ -56,7 +56,16 @@ class VolumeBackups extends Component
 
     public string $timezone = '';
 
-    public int $timeout = 3600;
+    public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
+
+    public int $perPage = 10;
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->resetPage();
+    }
 
     public bool $delete_backup_s3 = false;
 
@@ -138,7 +147,11 @@ class VolumeBackups extends Component
         }
 
         $this->resetErrorBag('s3StorageId');
-        $this->backup?->update(['s3_storage_id' => $this->s3StorageId]);
+        if (! $this->validateSettings()) {
+            return;
+        }
+
+        $this->backup = $this->persistBackup($this->enabled);
         $this->dispatch('success', 'S3 storage updated.');
     }
 
@@ -154,11 +167,11 @@ class VolumeBackups extends Component
 
         $this->saveToS3 = ! $this->saveToS3;
         $this->disableLocalBackup = $this->saveToS3 && $this->disableLocalBackup;
-        $this->backup?->update([
-            'save_s3' => $this->saveToS3,
-            'disable_local_backup' => $this->disableLocalBackup,
-            's3_storage_id' => $this->s3StorageId,
-        ]);
+        if (! $this->validateSettings()) {
+            return;
+        }
+
+        $this->backup = $this->persistBackup($this->enabled);
         $this->dispatch('success', $this->saveToS3 ? 'S3 backups enabled.' : 'S3 backups disabled.');
     }
 
@@ -316,7 +329,7 @@ class VolumeBackups extends Component
 
     public function render()
     {
-        $executions = $this->backup?->executions()->paginate(10);
+        $executions = $this->backup?->executions()->paginate($this->perPage);
 
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),

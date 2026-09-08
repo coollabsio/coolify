@@ -19,6 +19,7 @@ test('searchable listbox renders search field and filters options client-side', 
         ->toContain('No matching timezone')
         ->toContain('serverTimezone-trigger')
         ->toContain('x-ref="search"')
+        ->toContain('left-3 size-3')
         ->toContain('get filtered()')
         ->toContain('searchable-listbox-panel')
         ->toContain('Berlin')

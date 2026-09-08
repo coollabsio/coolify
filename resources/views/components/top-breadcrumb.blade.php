@@ -21,6 +21,45 @@
     $currentService = $currentEnvironment && $serviceUuid
         ? $currentEnvironment->services()->where('uuid', $serviceUuid)->first()
         : null;
+    $currentResource = $currentApplication ?? $currentDatabase ?? $currentService;
+    $resourceItems = $currentEnvironment
+        ? collect()
+            ->concat($currentEnvironment->applications->map(fn ($application) => [
+                'type' => 'application',
+                'resource' => $application,
+            ]))
+            ->concat($currentEnvironment->databases()->map(fn ($database) => [
+                'type' => 'database',
+                'resource' => $database,
+            ]))
+            ->concat($currentEnvironment->services->map(fn ($service) => [
+                'type' => 'service',
+                'resource' => $service,
+            ]))
+            ->sortBy(fn ($item) => strtolower($item['resource']->name))
+            ->map(fn ($item) => [
+                'label' => $item['resource']->name,
+                'href' => match ($item['type']) {
+                    'application' => route('project.application.configuration', [
+                        'project_uuid' => $currentProject->uuid,
+                        'environment_uuid' => $currentEnvironment->uuid,
+                        'application_uuid' => $item['resource']->uuid,
+                    ]),
+                    'database' => route('project.database.configuration', [
+                        'project_uuid' => $currentProject->uuid,
+                        'environment_uuid' => $currentEnvironment->uuid,
+                        'database_uuid' => $item['resource']->uuid,
+                    ]),
+                    'service' => route('project.service.configuration', [
+                        'project_uuid' => $currentProject->uuid,
+                        'environment_uuid' => $currentEnvironment->uuid,
+                        'service_uuid' => $item['resource']->uuid,
+                    ]),
+                },
+                'active' => $item['resource']->uuid === $currentResource?->uuid,
+            ])
+            ->values()
+        : collect();
     $storageUuid = request()->route('storage_uuid');
     $storages = $storageUuid && $team ? \App\Models\S3Storage::ownedByCurrentTeam()->orderBy('name')->get() : collect();
     $currentStorage = $storages->firstWhere('uuid', $storageUuid);
@@ -251,30 +290,20 @@
         </div>
     @endif
 
-    @if ($currentApplication)
-        <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
-        <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
-            <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentApplication->name }}</span>
-            <livewire:project.application.status :application="$currentApplication"
-                :wire:key="'application-status-'.$currentApplication->uuid" />
-        </span>
-    @endif
-
-    @if ($currentDatabase)
-        <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
-        <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
-            <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentDatabase->name }}</span>
-            <livewire:project.database.status :database="$currentDatabase"
-                :wire:key="'database-status-'.$currentDatabase->uuid" />
-        </span>
-    @endif
-
-    @if ($currentService)
-        <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
-        <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
-            <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentService->name }}</span>
-            <livewire:project.service.status :service="$currentService"
-                :wire:key="'service-status-'.$currentService->uuid" />
-        </span>
+    @if ($currentResource)
+        <x-breadcrumb-switcher title="Resources" :label="$currentResource->name" :items="$resourceItems">
+            <x-slot:meta>
+                @if ($currentApplication)
+                    <livewire:project.application.status :application="$currentApplication"
+                        :wire:key="'application-status-'.$currentApplication->uuid" />
+                @elseif ($currentDatabase)
+                    <livewire:project.database.status :database="$currentDatabase"
+                        :wire:key="'database-status-'.$currentDatabase->uuid" />
+                @else
+                    <livewire:project.service.status :service="$currentService"
+                        :wire:key="'service-status-'.$currentService->uuid" />
+                @endif
+            </x-slot:meta>
+        </x-breadcrumb-switcher>
     @endif
 </div>

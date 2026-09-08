@@ -56,7 +56,7 @@ class UpdateServiceApplicationFromApi
                 }
             }
 
-            $serviceApplication->fqdn = $parsed['normalized'];
+            $serviceApplication->setEditableUrls($parsed['normalized']);
         }
 
         if (array_key_exists('noindex_domains', $payload)) {
@@ -86,6 +86,10 @@ class UpdateServiceApplicationFromApi
 
         if (array_key_exists('is_stripprefix_enabled', $payload)) {
             $serviceApplication->is_stripprefix_enabled = filter_var($payload['is_stripprefix_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (array_key_exists('is_force_https_enabled', $payload)) {
+            $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('is_log_drain_enabled', $payload)) {

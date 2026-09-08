@@ -22,8 +22,6 @@ class DatabaseBackups extends Component
 
     public array $query;
 
-    public bool $isImportSupported = false;
-
     public ?ScheduledDatabaseBackup $backup = null;
 
     public string $section = 'index';
@@ -32,7 +30,7 @@ class DatabaseBackups extends Component
 
     protected $listeners = ['refreshScheduledBackups' => '$refresh'];
 
-    public function mount()
+    public function mount(): mixed
     {
         try {
             $this->parameters = array_filter(
@@ -67,10 +65,13 @@ class DatabaseBackups extends Component
                 return redirect()->route('project.service.index', $this->parameters);
             }
 
-            // Check if import is supported for this database type
-            $dbType = $this->serviceDatabase->databaseType();
-            $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
-            $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
+            if (! request()->route('backup_uuid')) {
+                return redirect()->route('project.service.volume-backups.index', [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $this->parameters['service_uuid'],
+                ]);
+            }
 
             if (request()->route('backup_uuid')) {
                 $this->backup = $this->serviceDatabase->scheduledBackups()
@@ -85,6 +86,14 @@ class DatabaseBackups extends Component
                     'project.service.database.backup.danger' => 'danger',
                     default => 'general',
                 };
+
+                $routeParameters = [
+                    'project_uuid' => $this->parameters['project_uuid'],
+                    'environment_uuid' => $this->parameters['environment_uuid'],
+                    'service_uuid' => $this->parameters['service_uuid'],
+                ];
+
+                return redirect()->route('project.service.volume-backups.index', $routeParameters);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

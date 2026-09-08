@@ -55,6 +55,8 @@
             'icon' => 'network',
             'group' => 'Platform',
             'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
+            'warning' => $server->hasCurrentTraefikOutdatedInfo(),
+            'tracks_proxy_configuration' => true,
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
                 ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => $activeSubMenu === 'dynamic-confs', 'icon' => 'sliders', 'visible' => $server->proxySet()],
@@ -68,6 +70,7 @@
             'icon' => 'shield-star',
             'group' => 'Platform',
             'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
+            'warning' => $server->isSentinelEnabled() && ! $server->isSentinelLive(),
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
                 ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
@@ -167,7 +170,15 @@
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:self-start">
+<aside class="application-settings-navigation min-w-0 xl:self-start"
+    x-data="{
+        proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
+        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())
+    }"
+    @proxy-configuration-state-changed.window="
+        proxyConfigurationPending = $event.detail.pending;
+        traefikOutdated = $event.detail.traefikOutdated;
+    ">
     <nav aria-label="Server configuration sections"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
@@ -186,6 +197,14 @@
                     href="{{ route($menuItem['route'], $serverRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                    @if ($menuItem['tracks_proxy_configuration'] ?? false)
+                        <x-reicon name="alert-triangle" x-cloak
+                            x-show="proxyConfigurationPending || traefikOutdated"
+                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['warning'] ?? false)
+                        <x-reicon name="alert-triangle"
+                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @endif
                 </a>
                 @if ($menuItem['active'] && isset($menuItem['children']))
                     <div class="col-span-full grid grid-cols-2 gap-0.5 border-l border-neutral-200 pl-2 sm:grid-cols-3 xl:grid-cols-1 dark:border-white/[0.08]">

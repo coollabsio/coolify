@@ -177,7 +177,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
@@ -346,7 +346,7 @@ function remove_iip($text)
     $text = preg_replace('/Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/i', 'Bearer '.REDACTED, $text);
 
     // GitHub tokens (ghp_ = personal, gho_ = OAuth, ghu_ = user-to-server, ghs_ = server-to-server, ghr_ = refresh)
-    $text = preg_replace('/\b(gh[pousr]_[A-Za-z0-9_]{36,})\b/', REDACTED, $text);
+    $text = preg_replace('/\bgh[pousr]_[A-Za-z0-9.\-_]{36,}(?![A-Za-z0-9.\-_])/', REDACTED, $text);
 
     // GitLab tokens (glpat- = personal access token, glcbt- = CI build token, glrt- = runner token)
     $text = preg_replace('/\b(gl(?:pat|cbt|rt)-[A-Za-z0-9\-_]{20,})\b/', REDACTED, $text);

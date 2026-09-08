@@ -48,6 +48,27 @@ it('renders the compose editor with clear guidance settings and actions', functi
         ->not->toContain('Show Deployable Compose');
 });
 
+it('keeps the compose modal usable on mobile screens', function () {
+    $stackForm = file_get_contents(resource_path('views/livewire/project/service/stack-form.blade.php'));
+    $editor = file_get_contents(resource_path('views/livewire/project/service/edit-compose.blade.php'));
+    $modal = file_get_contents(resource_path('views/components/modal-input.blade.php'));
+
+    expect($modal)
+        ->toContain('justify-center p-2')
+        ->toContain('sm:p-4')
+        ->toContain('flex-wrap! sm:flex-nowrap!')
+        ->toContain('order-3 w-full sm:order-none sm:w-auto')
+        ->toContain('order-2 sm:order-none')
+        ->toContain("'mt-2 sm:mt-0' => isset(\$headerActions)");
+
+    expect($stackForm)
+        ->toContain('w-full items-center gap-2 overflow-x-auto sm:w-auto');
+
+    expect($editor)
+        ->toContain('flex-col items-stretch')
+        ->toContain('sm:flex-row sm:flex-wrap sm:items-center');
+});
+
 it('keeps the save button loading until the parent compose save finishes', function () {
     $component = file_get_contents(app_path('Livewire/Project/Service/StackForm.php'));
 

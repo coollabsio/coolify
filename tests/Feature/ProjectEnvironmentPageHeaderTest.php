@@ -50,3 +50,16 @@ it('does not repeat the resources action outside the resources page', function (
     expect(file_get_contents(resource_path('views/livewire/project/resource/index.blade.php')))
         ->toContain('New resource');
 });
+
+it('uses a stable class for the environment resource count on mobile', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/show.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('class="environment-resource-count">Resources</div>')
+        ->toContain('class="environment-resource-count text-[12px]');
+
+    expect($css)
+        ->toContain('.environments-table-grid .environment-resource-count')
+        ->not->toContain('.environments-table-grid > :nth-child(2)');
+});

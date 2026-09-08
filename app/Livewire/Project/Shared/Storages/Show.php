@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Livewire\Project\Service\Storage as StorageComponent;
 use App\Models\Application;
 use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
@@ -105,6 +106,7 @@ class Show extends Component
         // PR deployment volume suffixes only apply to git-based applications.
         $this->supportsPreviewSuffix = $this->resource instanceof Application
             && $this->resource->git_based()
+            && filled($this->resource->git_repository)
             && ! $this->isService;
         // Parent All batches badge/url; isolated embeds still hydrate themselves.
         if (! $this->backupMetaHydrated) {
@@ -191,7 +193,7 @@ class Show extends Component
         }
 
         $this->storage->delete();
-        $this->dispatch('refreshStorages');
+        $this->dispatch('storageCountsChanged')->to(StorageComponent::class);
         $this->dispatch('configurationChanged');
 
         return true;

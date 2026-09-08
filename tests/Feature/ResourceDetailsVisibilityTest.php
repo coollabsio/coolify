@@ -38,13 +38,20 @@ it('renders copy fields as visible readonly controls with an accessible copy act
     expect($html)
         ->toContain('label class="flex gap-1 items-center mb-1 text-sm font-medium text-black dark:text-white"')
         ->toContain('readonly')
-        ->toContain("canCopy: window.isSecureContext && typeof navigator.clipboard?.writeText === 'function'")
-        ->toContain("x-bind:class=\"{ 'input-with-copy-button': canCopy }\"")
-        ->toContain('x-show="canCopy"')
+        ->toContain('window.copyToClipboard')
+        ->toContain('input-with-copy-button')
         ->toContain('copy-button')
         ->toContain('aria-label="Copy to clipboard"')
         ->toContain('title="Copy to clipboard"')
         ->toContain('class="size-[18px] text-green-500"');
+});
+
+it('uses the shared copy field for newly issued api tokens', function () {
+    $blade = file_get_contents(resource_path('views/livewire/security/api-tokens.blade.php'));
+
+    expect($blade)
+        ->toContain('<x-forms.copy-button :text="session(\'token\')" />')
+        ->not->toContain('navigator.clipboard.writeText(@js(session(\'token\')))');
 });
 
 it('keeps copy button padding above settings-workspace input overrides', function () {

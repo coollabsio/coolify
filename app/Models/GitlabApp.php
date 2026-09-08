@@ -100,6 +100,7 @@ class GitlabApp extends BaseModel
             if ($gitlabApp->applications()->count() > 0) {
                 throw new \RuntimeException('This source is being used by an application. Please delete all applications first.');
             }
+
         });
     }
 

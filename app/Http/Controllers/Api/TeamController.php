@@ -56,7 +56,7 @@ class TeamController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $teams = auth()->user()->teams->sortBy('id');
+        $teams = auth()->user()->teams->where('id', $teamId)->values();
         $teams = $teams->map(function ($team) {
             return $this->removeSensitiveData($team);
         });
@@ -100,13 +100,14 @@ class TeamController extends Controller
     )]
     public function team_by_id(Request $request)
     {
-        $id = $request->id;
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $teams = auth()->user()->teams;
-        $team = $teams->where('id', $id)->first();
+        if ((int) $request->id !== (int) $teamId) {
+            return response()->json(['message' => 'Team not found.'], 404);
+        }
+        $team = auth()->user()->teams->where('id', $teamId)->first();
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
@@ -159,13 +160,14 @@ class TeamController extends Controller
     )]
     public function members_by_id(Request $request)
     {
-        $id = $request->id;
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $teams = auth()->user()->teams;
-        $team = $teams->where('id', $id)->first();
+        if ((int) $request->id !== (int) $teamId) {
+            return response()->json(['message' => 'Team not found.'], 404);
+        }
+        $team = auth()->user()->teams->where('id', $teamId)->first();
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }

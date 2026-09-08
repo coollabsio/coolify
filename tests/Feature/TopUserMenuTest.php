@@ -31,6 +31,18 @@ it('animates the dropdown panel when the user menu opens', function () {
     expect($stylesheet)->toContain('@import "tw-animate-css";');
 });
 
+it('positions the account menu below the mobile trigger', function () {
+    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+    $stylesheet = file_get_contents(resource_path('css/app.css'));
+
+    expect($menu)->toContain('top-user-menu-panel');
+    expect($stylesheet)
+        ->toContain('.listbox-panel.top-user-menu-panel')
+        ->toContain('top: calc(100% + 0.25rem) !important;')
+        ->toContain('transform: none !important;')
+        ->toContain('max-height: calc(100dvh - 4.5rem) !important;');
+});
+
 it('changes appearance from a submenu instead of navigating to a separate page', function () {
     $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
 
@@ -43,7 +55,8 @@ it('changes appearance from a submenu instead of navigating to a separate page',
         ->not->toContain('@change="appearanceOpen = false; open = false"')
         ->toContain('this.appearanceOpen = false;')
         ->toContain('this.open = false;')
-        ->toContain('<template x-if="open">')
+        ->toContain('<div x-show="open" x-cloak @class([')
+        ->not->toContain('<template x-if="open">')
         ->not->toContain('x-show.important="open"')
         ->not->toContain('<div x-show="open" x-cloak x-transition.opacity.duration.120ms')
         ->toContain("['value' => 'light', 'label' => 'Light'")
@@ -51,4 +64,18 @@ it('changes appearance from a submenu instead of navigating to a separate page',
         ->toContain("['value' => 'dark', 'label' => 'Dark'")
         ->toContain('hover:bg-neutral-200 hover:text-neutral-950')
         ->not->toContain("route('profile.appearance')");
+});
+
+it('offers page width controls inside the appearance menu', function () {
+    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+
+    expect($menu)
+        ->toContain("pageWidth: localStorage.getItem('pageWidth') || 'full'")
+        ->toContain("['value' => 'full', 'label' => 'Full width']")
+        ->toContain("['value' => 'centered', 'label' => 'Centered']")
+        ->toContain("@click=\"setWidth('{{ \$option['value'] }}')\"")
+        ->toContain('Full width')
+        ->toContain('Centered')
+        ->toContain("localStorage.setItem('pageWidth', width)")
+        ->toContain("new CustomEvent('page-width-changed', { detail: width })");
 });

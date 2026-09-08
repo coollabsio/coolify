@@ -111,7 +111,7 @@
             @click.stop>
             <div class="searchable-listbox-search">
                 <x-reicon name="search"
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    class="pointer-events-none absolute top-1/2 left-3 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                 <input x-ref="search" type="search" x-model="query" autocomplete="off"
                     placeholder="{{ $searchPlaceholder }}"
                     class="searchable-listbox-search-input"

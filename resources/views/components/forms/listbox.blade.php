@@ -16,9 +16,16 @@
     'tooltip' => true,
     'portal' => false,
     'preserveValue' => false,
+    'canGate' => null,
+    'canResource' => null,
+    'autoDisable' => true,
 ])
 
 @php
+    if ($canGate && $canResource && $autoDisable && ! Illuminate\Support\Facades\Gate::allows($canGate, $canResource)) {
+        $disabled = true;
+    }
+
     $triggerId = ($htmlId ?? $id).'-trigger';
     $panelId = ($htmlId ?? $id).'-panel';
 @endphp
@@ -90,7 +97,13 @@
             const gap = 4;
             const edge = 12;
             const triggerRect = trigger.getBoundingClientRect();
-            const panelWidth = Math.max(triggerRect.width, panel.offsetWidth);
+            panel.style.width = 'max-content';
+            panel.style.minWidth = `${triggerRect.width}px`;
+            panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`;
+            const panelWidth = Math.min(
+                Math.max(triggerRect.width, panel.offsetWidth),
+                window.innerWidth - (edge * 2),
+            );
             const panelHeight = Math.min(panel.scrollHeight, 256);
             const fitsBelow = window.innerHeight - triggerRect.bottom - gap >= panelHeight;
             const top = fitsBelow
@@ -103,14 +116,15 @@
 
             panel.style.top = `${top}px`;
             panel.style.left = `${left}px`;
-            panel.style.minWidth = `${triggerRect.width}px`;
+            panel.style.width = `${panelWidth}px`;
             this.positioned = true;
-        }
+        },
     }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
-        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
+        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()"
+        @scroll.window.capture="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" @if ($tooltip) :title="current" @endif>
@@ -123,7 +137,7 @@
         @if ($portal)
             <template x-teleport="body">
                 <div id="{{ $panelId }}" class="listbox-panel"
-                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open && positioned"
+                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
                     x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"

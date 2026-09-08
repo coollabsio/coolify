@@ -16,6 +16,8 @@ class AdminView extends Component
 
     public string $sort = 'name_asc';
 
+    public int $perPage = 10;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -39,6 +41,13 @@ class AdminView extends Component
 
     public function updatedSort(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
         $this->resetPage();
     }
 
@@ -103,7 +112,7 @@ class AdminView extends Component
             ->when($this->sort === 'email_desc', fn ($query) => $query->orderByDesc('email'))
             ->when($this->sort === 'name_asc', fn ($query) => $query->orderBy('name'))
             ->orderBy('id')
-            ->paginate(10);
+            ->paginate($this->perPage);
 
         return view('livewire.team.admin-view', [
             'users' => $users,
