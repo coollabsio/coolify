@@ -79,9 +79,9 @@ trait MatchesManualWebhookApplications
 
         if (is_array($parts) && isset($parts['scheme'])) {
             $path = data_get($parts, 'path');
-        } elseif (Str::startsWith($gitRepository, 'git@') && str_contains($gitRepository, ':')) {
+        } elseif (preg_match('/^[A-Za-z0-9._-]+@[^:]+:/', $gitRepository) === 1) {
             $path = Str::after($gitRepository, ':');
-            // scp-style SSH URLs embed a custom port as "git@host:2222/owner/repo".
+            // scp-style SSH URLs embed a custom port as "user@host:2222/owner/repo".
             // Strip the leading numeric port segment so the path matches the webhook
             // payload's owner/repo, consistent with convertGitUrl() in shared.php.
             $path = preg_replace('#^\d+/#', '', $path) ?? $path;

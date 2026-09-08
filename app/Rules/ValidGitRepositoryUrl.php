@@ -77,15 +77,15 @@ class ValidGitRepositoryUrl implements ValidationRule
         }
 
         // Validate based on URL type
-        if (str_starts_with($value, 'git@')) {
+        if (preg_match('/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+:/', $value)) {
             if (! $this->allowSSH) {
                 $fail('SSH URLs are not allowed.');
 
                 return;
             }
 
-            // Validate SSH URL format (git@host:user/repo.git)
-            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.~]+$/', $value)) {
+            // Validate scp-style SSH URL format (user@host:user/repo.git)
+            if (! preg_match('/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+:[a-zA-Z0-9\-_\/.~]+$/', $value)) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
                 return;
