@@ -130,6 +130,10 @@
     transition-duration: 120ms;
 }
 
+.button {
+    transition-duration: 120ms, 120ms, 120ms, 80ms, 80ms;
+}
+
 .icon-button:not(:disabled):active,
 .app-tab:active,
 .split-action-main:not(:disabled):active,

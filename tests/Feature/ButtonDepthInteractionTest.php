@@ -14,6 +14,7 @@ test('standard buttons use raised hover and pressed depth states', function () {
         ->not->toContain('.dark .button.button-highlighted:not(:disabled)')
         ->toContain('.button:not(:disabled):hover')
         ->toContain('transform: translateY(-1px);')
+        ->toContain('transition-duration: 120ms, 120ms, 120ms, 80ms, 80ms;')
         ->toContain('.button:not(:disabled):active')
         ->toContain('transform: translateY(2px);')
         ->not->toContain('transform: translateY(1px);')

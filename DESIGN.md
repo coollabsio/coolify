@@ -56,6 +56,9 @@ button face by 1px and increases the visible depth to 3px. Pressing moves the
 face down 2px into the edge and removes the depth until release, keeping the
 overall bottom position stable. Disabled controls stay flat,
 and focus-visible controls retain the accent ring alongside the depth.
+Movement and depth-shadow changes transition over 80ms; color transitions keep
+the shared 120ms duration.
+Standard button labels use `capitalize`, giving each word an initial capital.
 Highlighted buttons mix the accent equally with black for a pronounced bottom
 edge, so custom theme colors produce a matching edge instead of a generic one.
 Dark mode matches the depth edge of neutral buttons to their regular border
