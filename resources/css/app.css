@@ -2620,7 +2620,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 7.5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 12.5rem;
     width: 100%;
 }
 
@@ -2772,7 +2772,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-col-backup {
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
     }
 
     .volumes-cell-actions {
@@ -4491,4 +4494,123 @@ a.command-palette-item:focus-visible {
 
 .dark .command-palette-arch-badge {
     color: #fcd34d;
+}
+
+/* Service domains prioritize public addresses; configuration lives in settings. */
+#service-domains-section,
+.domains-overview-container {
+    container: service-domains / inline-size;
+}
+
+.service-domains-overview-grid {
+    grid-template-columns: minmax(0, 1fr) 7.25rem 7.5rem 5.5rem 6.5rem 8rem 6.5rem;
+    column-gap: 0.75rem;
+}
+
+.data-table-row.service-domains-overview-grid {
+    padding-block: 0.5rem;
+}
+
+.service-domain-detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.service-domains-overview-grid > span:not(:first-child):not(:last-child) {
+    text-align: center;
+}
+
+.service-domain-detail-label {
+    display: none;
+}
+
+.service-domain-mobile-summary {
+    display: none;
+}
+
+.service-domains-https .listbox-trigger {
+    min-width: 7rem;
+}
+
+@container service-domains (max-width: 980px) {
+    .data-table-header.service-domains-overview-grid {
+        display: none;
+    }
+
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .service-domain-detail {
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .service-domain-detail-label {
+        display: inline;
+        color: var(--coollabs-fg-dim);
+    }
+}
+
+@container service-domains (max-width: 600px) {
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.625rem 0.75rem;
+        padding: 0.875rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child a,
+    .data-table-row.service-domains-overview-grid > :first-child span[title] {
+        overflow: visible;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+
+    .service-domain-detail,
+    .domains-service-desktop {
+        display: none;
+    }
+
+    .service-domain-mobile-summary {
+        display: flex;
+        grid-column: 1 / -1;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem 0.75rem;
+        color: var(--coollabs-fg-dim);
+        font-size: 12px;
+        line-height: 1.25rem;
+    }
+
+    .service-domain-mobile-summary > span:not(:last-child)::after {
+        margin-left: 0.75rem;
+        color: var(--coollabs-line);
+        content: "·";
+    }
+
+    .service-domain-dns {
+        justify-self: start;
+    }
+
+    .service-domain-actions {
+        justify-self: end;
+    }
+
+    .service-domain-actions .icon-button {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 }

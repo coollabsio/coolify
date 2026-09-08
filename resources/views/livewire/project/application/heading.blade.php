@@ -34,6 +34,9 @@
                     <x-status-summary :status="$application->status" />
                     <x-applications.links :application="$application" compact />
                 </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    <x-application.restart-limit-warning :application="$application" />
+                </div>
             </div>
         </div>
 

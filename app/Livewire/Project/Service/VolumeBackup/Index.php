@@ -11,6 +11,7 @@ use App\Models\ServiceDatabase;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Index extends Component
@@ -22,6 +23,9 @@ class Index extends Component
     public array $parameters;
 
     public string $search = '';
+
+    #[Url(as: 'backup_uuid', except: '')]
+    public string $backupUuid = '';
 
     public bool $scheduleModalOpen = false;
 
@@ -38,6 +42,7 @@ class Index extends Component
         return [
             'refreshVolumeBackups' => '$refresh',
             'modalClosed' => 'closeScheduleModal',
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             "echo-private:team.{$teamId},BackupCreated" => '$refresh',
         ];
     }
@@ -49,10 +54,14 @@ class Index extends Component
         $this->parameters = get_route_parameters();
         $this->search = request()->string('search')->toString();
 
+        if ($this->backupUuid !== '') {
+            $this->openSchedule($this->backupUuid);
+        }
     }
 
     public function openSchedule(string $backupUuid): void
     {
+        $this->authorize('update', $this->service);
         $this->loadSelectedSchedule($backupUuid);
         $this->s3s = currentTeam()->s3s;
         $this->scheduleModalOpen = true;
@@ -60,6 +69,7 @@ class Index extends Component
 
     public function closeScheduleModal(): void
     {
+        $this->backupUuid = '';
         $this->scheduleModalOpen = false;
         $this->selectedDatabaseBackup = null;
         $this->selectedVolumeBackup = null;
@@ -72,6 +82,12 @@ class Index extends Component
                 $this->loadSelectedSchedule($backupUuid);
                 abort_unless($this->selectedDatabaseBackup, 404);
                 $this->authorize('manageBackups', $this->selectedDatabaseBackup->database);
+                if (! str($this->selectedDatabaseBackup->database->status)->startsWith('running')) {
+                    $this->selectedDatabaseBackup = null;
+                    $this->dispatch('error', 'The database must be running to start a backup.');
+
+                    return;
+                }
                 DatabaseBackupJob::dispatch($this->selectedDatabaseBackup);
             } else {
                 abort_unless($type === 'storage', 404);

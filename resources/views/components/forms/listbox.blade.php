@@ -123,7 +123,8 @@
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
-        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
+        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()"
+        @scroll.window.capture="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" @if ($tooltip) :title="current" @endif>
@@ -136,7 +137,7 @@
         @if ($portal)
             <template x-teleport="body">
                 <div id="{{ $panelId }}" class="listbox-panel"
-                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open && positioned"
+                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
                     x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"

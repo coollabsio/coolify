@@ -247,6 +247,7 @@ it('redirects to executions after queuing a database backup with unusable S3 sto
         'timeout' => 3600,
     ]);
     $database = $backup->database;
+    $database->update(['status' => 'running:healthy']);
     $parameters = [
         'project_uuid' => $database->project()->uuid,
         'environment_uuid' => $database->environment->uuid,
@@ -509,7 +510,7 @@ it('subscribes to database status broadcasts so Backup Now can refresh without a
         ->toHaveKey('databaseUpdated');
 });
 
-it('shows Backup Now after refresh when the database becomes running', function () {
+it('enables Back up now after refresh when the database becomes running', function () {
     $backup = createBackupForEditValidationTest($this->team, [
         'enabled' => true,
     ]);
@@ -521,17 +522,21 @@ it('shows Backup Now after refresh when the database becomes running', function 
         'availableS3Storages' => $this->team->s3s,
         'status' => 'exited:unhealthy',
     ])
-        ->assertDontSee('Backup Now')
+        ->assertSee('Back up now')
         ->assertSet('status', 'exited:unhealthy');
+
+    expect($component->html())->toMatch('/<button\s+disabled[^>]*wire:click="backupNow"/s');
 
     $database->update(['status' => 'running:healthy']);
 
     $component->call('refreshStatus')
         ->assertSet('status', 'running:healthy')
-        ->assertSee('Backup Now');
+        ->assertSee('Back up now');
+
+    expect($component->html())->not->toMatch('/<button\s+disabled[^>]*wire:click="backupNow"/s');
 });
 
-it('hides Backup Now after refresh when the database stops', function () {
+it('disables Back up now after refresh when the database stops', function () {
     $backup = createBackupForEditValidationTest($this->team, [
         'enabled' => true,
     ]);
@@ -543,12 +548,33 @@ it('hides Backup Now after refresh when the database stops', function () {
         'availableS3Storages' => $this->team->s3s,
         'status' => 'running:healthy',
     ])
-        ->assertSee('Backup Now')
+        ->assertSee('Back up now')
         ->assertSet('status', 'running:healthy');
 
     $database->update(['status' => 'exited:unhealthy']);
 
     $component->call('refreshStatus')
         ->assertSet('status', 'exited:unhealthy')
-        ->assertDontSee('Backup Now');
+        ->assertSee('Back up now');
+
+    expect($component->html())->toMatch('/<button\s+disabled[^>]*wire:click="backupNow"/s');
+});
+
+it('renders S3 backup selectors outside the scrollable modal', function () {
+    createS3StorageForBackupEditValidationTest($this->team);
+    $backup = createBackupForEditValidationTest($this->team);
+    $html = Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => $this->team->s3s,
+        'section' => 's3',
+    ])->html();
+
+    $dom = new DOMDocument;
+    @$dom->loadHTML($html);
+    $xpath = new DOMXPath($dom);
+    foreach (['s3StorageId-panel', 'disableLocalBackup-panel'] as $panelId) {
+        $panels = $xpath->query('//template[@x-teleport="body"]/div[@id="'.$panelId.'"]');
+        expect($panels->length)->toBe(1);
+        expect($panels->item(0)->getAttribute('style'))->toContain('position: fixed', 'z-index: 9999');
+    }
 });
