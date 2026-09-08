@@ -21,6 +21,7 @@
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
         ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
         ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
+        ['label' => 'Container Info', 'route' => 'project.database.container-info', 'icon' => 'info-circle'],
         ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
         ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'shield-alert'],
     ])->filter(fn (array $item): bool => $item['visible'] ?? true)
@@ -33,7 +34,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics', 'Container Info'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],

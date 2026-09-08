@@ -48,6 +48,8 @@
                     <livewire:project.shared.resource-operations :resource="$database" />
                 @elseif ($currentRoute === 'project.database.metrics')
                     <livewire:project.shared.metrics :resource="$database" />
+                @elseif ($currentRoute === 'project.database.container-info')
+                    <livewire:project.shared.container-info :resource="$database" />
                 @elseif ($currentRoute === 'project.database.tags')
                     <livewire:project.shared.tags :resource="$database" />
                 @elseif ($currentRoute === 'project.database.danger')

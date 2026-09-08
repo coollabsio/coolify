@@ -291,6 +291,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/container-info', ApplicationConfiguration::class)->name('project.application.container-info');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -311,6 +312,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
         Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
         Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/container-info', DatabaseConfiguration::class)->name('project.database.container-info');
         Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
@@ -340,6 +342,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
         Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
+        Route::get('/container-info', ServiceConfiguration::class)->name('project.service.container-info');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
