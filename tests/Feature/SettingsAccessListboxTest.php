@@ -63,6 +63,33 @@ test('instance admin can toggle registration via listbox instantSave', function 
     expect((bool) $settings->fresh()->is_registration_enabled)->toBeTrue();
 });
 
+test('instance admin can toggle oauth registration via listbox instantSave', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
+    $settings = InstanceSettings::forceCreate([
+        'id' => 0,
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => false,
+        'disable_two_step_confirmation' => false,
+    ]);
+    Once::flush();
+
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Advanced::class)
+        ->assertSet('is_oauth_registration_enabled', false)
+        ->assertSee('OAuth registration')
+        ->set('is_oauth_registration_enabled', true)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    expect((bool) $settings->fresh()->is_oauth_registration_enabled)->toBeTrue();
+});
+
 test('instance admin can toggle two-step confirmation via listbox instantSave', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);

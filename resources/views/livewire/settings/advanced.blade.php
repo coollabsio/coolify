@@ -19,6 +19,12 @@
                             ['value' => true, 'label' => 'Anyone can register'],
                             ['value' => false, 'label' => 'Registration disabled'],
                         ]" />
+                    <x-forms.listbox id="is_oauth_registration_enabled" label="OAuth registration"
+                        helper="Allow users to self-register via an enabled OAuth provider, even when Registration is disabled."
+                        onChange="instantSave" :options="[
+                            ['value' => false, 'label' => 'Disabled'],
+                            ['value' => true, 'label' => 'Enabled'],
+                        ]" />
                     <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
                         helper="Choose whether destructive actions require password and text confirmation."
                         onChange="instantSave" :options="[

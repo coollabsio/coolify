@@ -4,6 +4,7 @@ use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
 
 uses(RefreshDatabase::class);
@@ -46,6 +47,59 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     $response->assertRedirect('/');
     $this->assertAuthenticatedAs($user);
     expect(User::count())->toBe(1);
+});
+
+it('creates a user when oauth self-registration is enabled and general registration is disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => true,
+    ]);
+    Once::flush();
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'oauth-user@example.edu',
+        'name' => 'OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+    expect(User::whereEmail('oauth-user@example.edu')->count())->toBe(1);
+    $this->assertAuthenticated();
+});
+
+it('rejects oauth self-registration when both toggles are disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => false,
+    ]);
+    Once::flush();
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'oauth-user@example.edu',
+        'name' => 'OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->from('/login')->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/login');
+    expect(User::count())->toBe(0);
 });
 
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
