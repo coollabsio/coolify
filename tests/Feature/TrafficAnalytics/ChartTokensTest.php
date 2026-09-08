@@ -55,7 +55,7 @@ it('keeps request values in a compact y-axis outside the plot', function () {
     expect($partial)
         ->toContain('minWidth: 28')
         ->toContain('maxWidth: 28')
-        ->toContain('padding: { left: 0, right: 12, top: 12, bottom: 0 }')
+        ->toContain('padding: { left: 6, right: 12, top: 12, bottom: 0 }')
         ->not->toContain('floating: true')
         ->not->toContain('offsetX: 32');
 });
@@ -110,18 +110,28 @@ it('keeps KPI sparklines axisless after live updates', function () {
         ->toContain('grid: { padding: { left: 4, right: 4, top: 0, bottom: 0 } }');
 });
 
-it('shows values and UTC timestamps in analytics chart tooltips', function () {
+it('shows values with local and UTC timestamps in analytics chart tooltips', function () {
     $sparkline = file_get_contents(base_path('resources/views/livewire/traffic/_sparkline.blade.php'));
     $requestsChart = file_get_contents(base_path('resources/views/livewire/traffic/_requests-chart.blade.php'));
 
     expect($sparkline)
         ->toContain('sparkCategories')
         ->toContain('apexcharts-tooltip-custom-value')
-        ->toContain('formatTimestamp(timestamp)');
+        ->toContain('formatLocalTimestamp(timestamp)')
+        ->toContain('formatUtcTimestamp(timestamp)')
+        ->toContain('Your time:')
+        ->toContain('UTC:')
+        ->toContain("timeZoneName: 'short'")
+        ->toContain("timeZone: 'UTC'");
 
     expect($requestsChart)
         ->toContain('apexcharts-tooltip-custom-value')
-        ->toContain('formatTimestamp(timestamp)');
+        ->toContain('formatLocalTimestamp(timestamp)')
+        ->toContain('formatUtcTimestamp(timestamp)')
+        ->toContain('Your time:')
+        ->toContain('UTC:')
+        ->toContain("timeZoneName: 'short'")
+        ->toContain("timeZone: 'UTC'");
 
     foreach ([
         app_path('Livewire/Analytics.php'),

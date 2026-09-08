@@ -58,10 +58,15 @@
         init() {
             if (typeof ApexCharts === 'undefined') { return; }
             const o = this.opts(@js($initial), @js($initialCategories));
-            const formatTimestamp = timestamp => `${new Date(timestamp).toLocaleString(undefined, {
-                timeZone: 'UTC',
+            const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
                 hour12: false,
-            })} UTC`;
+                timeZoneName: 'short',
+            });
+            const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
+                hour12: false,
+                timeZone: 'UTC',
+                timeZoneName: 'short',
+            });
             const formatValue = value => {
                 if (@js($key) === 'bandwidthSpark') {
                     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -95,7 +100,8 @@
                         const timestamp = w.globals.seriesX[0][dataPointIndex];
                         return `<div class='apexcharts-tooltip-custom'>
                             <div class='apexcharts-tooltip-custom-value'>${@js($label)}: <span class='apexcharts-tooltip-value-bold'>${formatValue(value)}</span></div>
-                            <div class='apexcharts-tooltip-custom-title'>${formatTimestamp(timestamp)}</div>
+                            <div class='apexcharts-tooltip-custom-title'>Your time: ${formatLocalTimestamp(timestamp)}</div>
+                            <div class='apexcharts-tooltip-custom-title'>UTC: ${formatUtcTimestamp(timestamp)}</div>
                         </div>`;
                     },
                 },
