@@ -109,6 +109,14 @@
             'visible' => ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
+            'label' => 'Images',
+            'route' => 'server.docker-images',
+            'active' => $activeMenu === 'docker-images',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => $server->isFunctional(),
+        ],
+        [
             'label' => 'Docker Cleanup',
             'route' => 'server.docker-cleanup',
             'active' => $activeMenu === 'docker-cleanup',
