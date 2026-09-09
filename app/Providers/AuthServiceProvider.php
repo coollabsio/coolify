@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 // use Illuminate\Support\Facades\Gate;
+use App\Models\AiProviderCredential;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
@@ -41,6 +42,7 @@ use App\Models\Tag;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
+use App\Policies\AiProviderCredentialPolicy;
 use App\Policies\ApiTokenPolicy;
 use App\Policies\ApplicationPolicy;
 use App\Policies\ApplicationPreviewPolicy;
@@ -134,6 +136,7 @@ class AuthServiceProvider extends ServiceProvider
 
         // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
+        AiProviderCredential::class => AiProviderCredentialPolicy::class,
         IntegrationToken::class => IntegrationTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
         Tag::class => TagPolicy::class,
