@@ -4,6 +4,7 @@ import {
     MAX_TERMINAL_SESSION_TIMEOUT_SECONDS,
     extractSshArgs,
     extractTargetHost,
+    getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAttachCommand,
     isAuthorizedTargetHost,
@@ -20,6 +21,32 @@ test('isAttachCommand detects a docker attach session', () => {
 test('isAttachCommand does not match a docker exec shell session', () => {
     assert.equal(isAttachCommand("docker exec -it 'web-1' sh -c 'exec $SHELL'"), false);
     assert.equal(isAttachCommand(''), false);
+});
+
+test('getTerminalProcessEnv preserves the PATH needed by SSH proxy commands', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '/usr/local/bin:/usr/bin:/bin',
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/bin:/usr/bin:/bin',
+    });
+});
+
+test('getTerminalProcessEnv uses the default PATH when PATH is absent', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    });
+});
+
+test('getTerminalProcessEnv uses the default PATH when PATH is empty', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '',
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    });
 });
 
 test('extractTargetHost normalizes quoted IPv4 hosts from generated ssh commands', () => {

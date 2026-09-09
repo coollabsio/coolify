@@ -15,7 +15,7 @@
 }
 
 @utility apexcharts-tooltip-custom {
-    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-lg p-3 text-sm;
+    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-dropdown p-3 text-sm;
     min-width: 160px;
 }
 
@@ -59,7 +59,7 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-white dark:bg-surface dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
+    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-[var(--coollabs-recessed)] dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
     box-shadow: none;
 
     &:where(.dark, .dark *) {
@@ -77,18 +77,18 @@
 
 /* Readonly */
 @utility input {
-    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 read-only:text-neutral-500 read-only:bg-neutral-200;
     @apply input-select;
     @apply focus-visible:outline-none;
 
     &:focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:where(.dark, .dark *):focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:read-only {
@@ -116,17 +116,17 @@
 
     &:focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 
     &:where(.dark, .dark *):focus-visible {
         border-color: var(--color-accent);
-        box-shadow: 0 0 0 1px var(--color-accent);
+        box-shadow: none;
     }
 }
 
 @utility button {
-    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-8 min-h-8 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
+    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-8 min-h-8 text-[13px] text-black capitalize rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
 }
 
 @utility button-highlighted {
@@ -162,7 +162,7 @@
 }
 
 @utility auth-tooltip {
-    @apply fixed z-[10000] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-lg dark:text-fg dark:bg-raised dark:border-white/10;
+    @apply fixed z-[10000] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-dropdown dark:text-fg dark:bg-raised dark:border-white/10;
 }
 
 @utility alert-success {
@@ -222,7 +222,10 @@
 }
 
 @utility menu-item {
-    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-md truncate min-w-0 transition-colors text-nav-text hover:bg-neutral-100 hover:text-nav-active dark:hover:bg-white/[0.05];
+    /* Translucent hover (like the active pill) so it darkens against any surface,
+       including the light-mode settings rail's gray fill; on white it matches the
+       old neutral-100. */
+    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-md truncate min-w-0 transition-colors text-nav-text hover:bg-black/[0.04] hover:text-nav-active dark:hover:bg-white/[0.05];
 }
 @utility menu-item-icon {
     @apply shrink-0 size-[18px] opacity-90;
@@ -245,7 +248,7 @@
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
     /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
-    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-md min-w-0 transition-colors text-nav-text hover:bg-neutral-100 hover:text-nav-active dark:hover:bg-white/[0.05];
+    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-md min-w-0 transition-colors text-nav-text hover:bg-black/[0.04] hover:text-nav-active dark:hover:bg-white/[0.05];
 }
 @utility menu-subitem-active {
     @apply rounded-md bg-black/[0.05] text-nav-active hover:bg-black/[0.05] dark:bg-white/[0.06] dark:hover:bg-white/[0.06];
@@ -344,7 +347,7 @@
 }
 
 @utility info-helper-popup {
-    @apply rounded-lg border border-neutral-200 bg-white text-neutral-600 shadow-modal whitespace-normal break-words dark:border-white/10 dark:bg-raised dark:text-fg-dim;
+    @apply rounded-lg border border-neutral-200 bg-white text-neutral-600 shadow-dropdown whitespace-normal break-words dark:border-white/10 dark:bg-raised dark:text-fg-dim;
 }
 
 @utility buyme {
@@ -365,6 +368,14 @@
 
 @utility toast {
     @apply z-[1];
+}
+
+/* Floating notice / popover surface: elevated fill, hairline ring, and the
+   shared dropdown lift. Toasts, change-pending popovers and the deployments
+   list share this so they match menus/dropdowns instead of the heavier modal. */
+@utility surface-popover {
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-dropdown);
 }
 
 @utility dz-button {

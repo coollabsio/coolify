@@ -180,8 +180,8 @@ it('uses the redesigned terminal canvas and controls on resource terminal pages'
 
     expect($view)
         ->toContain('data-terminal-session-canvas')
-        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
-        ->toContain('terminal-session-panel mt-8')
+        ->toContain('terminal-session-toolbar flex items-center gap-3 text-white select-none')
+        ->toContain('terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6')
         ->toContain('<x-terminal.theme-selector')
         ->not->toContain('application-console-header flex h-[30px]');
 });

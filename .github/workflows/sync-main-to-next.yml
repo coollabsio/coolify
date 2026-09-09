@@ -1,8 +1,8 @@
 name: Sync main to next
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:

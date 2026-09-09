@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server\Sentinel;
 
+use App\Actions\Server\StartSentinel;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
@@ -27,6 +28,35 @@ class Logs extends Component
         }
 
         $this->authorize('viewSentinel', $this->server);
+    }
+
+    public function enableSentinel(): void
+    {
+        $this->authorize('manageSentinel', $this->server);
+
+        try {
+            $this->server->refresh();
+            if ($this->server->isBuildServer()) {
+                $this->dispatch('error', 'Sentinel cannot be enabled on build servers.');
+
+                return;
+            }
+            if ($this->server->isSwarm()) {
+                $this->dispatch('error', 'Sentinel cannot be enabled on Swarm servers.');
+
+                return;
+            }
+            if ($this->server->isSentinelEnabled()) {
+                return;
+            }
+
+            StartSentinel::run($this->server, true);
+            $this->server->refresh();
+            $this->dispatch('refreshServerShow');
+            $this->dispatch('success', 'Sentinel has been enabled.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function render(): View
