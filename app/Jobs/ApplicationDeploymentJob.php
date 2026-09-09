@@ -273,7 +273,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = $this->resolveContainerName();
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
 
         $this->saved_outputs = collect();
 
@@ -2214,19 +2214,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
-    }
-
-    private function resolveContainerName(): string
-    {
-        if (! $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isEmpty()) {
-            return generateApplicationContainerName($this->application, $this->pull_request_id);
-        }
-
-        if ($this->pull_request_id === 0) {
-            return $this->application->settings->custom_internal_name;
-        }
-
-        return addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
     }
 
     private function health_check()
