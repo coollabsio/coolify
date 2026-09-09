@@ -180,8 +180,8 @@
                                     </div>
                                     <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal
                                         onChange="requestPreviewSuffixChange" :onChangeArgs="[$id]"
-                                        x-on:storage-sharing-pending.window="$event.detail.storageId === {{ $id }} && (value = true)"
-                                        x-on:storage-sharing-confirmed.window="$event.detail.storageId === {{ $id }} && (value = false)" :options="[
+                                        x-on:storage-sharing-pending.window="$event.detail.scope === '{{ $this->getId() }}' && $event.detail.storageId === {{ $id }} && (value = true)"
+                                        x-on:storage-sharing-confirmed.window="$event.detail.scope === '{{ $this->getId() }}' && $event.detail.storageId === {{ $id }} && (value = false)" :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
                                     ]" canGate="update" :canResource="$resource" />
@@ -264,5 +264,5 @@
         </div>
     @endif
 
-    <x-storage-sharing-confirmation subject="volume" />
+    <x-storage-sharing-confirmation :scope="$this->getId()" subject="volume" />
 </div>

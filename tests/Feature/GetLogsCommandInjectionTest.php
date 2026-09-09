@@ -213,3 +213,35 @@ describe('GetLogs container name injection payloads are blocked by validation', 
         expect(ValidationPatterns::isValidContainerName('coolify-proxy'))->toBeTrue();
     });
 });
+
+describe('GetLogs pull request label', function () {
+    test('reads the pull request number from the container label instead of the container name', function () {
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => $this->application->uuid.'-pr-12-web-1',
+            'pullRequestId' => '12',
+        ])->assertSet('pull_request', 'Pull Request: 12');
+    });
+
+    test('treats production containers as non pull request containers', function () {
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => $this->application->uuid.'-web-1',
+            'pullRequestId' => '0',
+        ])->assertSet('pull_request', null);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => 'legacy-name-pr-12_1',
+        ])->assertSet('pull_request', null);
+    });
+
+    test('pullRequestId property has Locked attribute', function () {
+        $property = new ReflectionProperty(GetLogs::class, 'pullRequestId');
+
+        expect($property->getAttributes(Locked::class))->not->toBeEmpty();
+    });
+});

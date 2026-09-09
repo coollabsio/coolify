@@ -294,8 +294,8 @@ class FileStorage extends Component
 
         if (! $this->isPreviewSuffixEnabled && $this->fileStorage->is_preview_suffix_enabled) {
             $this->isPreviewSuffixEnabled = true;
-            $this->dispatch('storage-sharing-pending');
-            $this->dispatch('open-storage-sharing-modal');
+            $this->dispatch('storage-sharing-pending', scope: $this->getId());
+            $this->dispatch('open-storage-sharing-modal', scope: $this->getId());
 
             return;
         }
@@ -322,15 +322,16 @@ class FileStorage extends Component
         $this->isPreviewSuffixEnabled = false;
         $this->fileStorage->is_preview_suffix_enabled = false;
         $this->fileStorage->save();
-        $this->dispatch('storage-sharing-confirmed');
+        $this->dispatch('storage-sharing-confirmed', scope: $this->getId());
         $this->dispatch('success', 'File updated.');
     }
 
     #[Renderless]
     public function cancelShareStorage(): void
     {
+        $this->authorize('update', $this->resource);
         $this->isPreviewSuffixEnabled = true;
-        $this->dispatch('storage-sharing-pending');
+        $this->dispatch('storage-sharing-pending', scope: $this->getId());
     }
 
     public function render()

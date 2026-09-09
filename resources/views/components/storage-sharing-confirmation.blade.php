@@ -1,10 +1,13 @@
 @props([
+    'scope',
     'subject' => 'storage',
     'canGate' => null,
     'canResource' => null,
 ])
 
-<div x-data="{ modalOpen: false }" @open-storage-sharing-modal.window="modalOpen = true"
+{{-- Every storage component on a page renders its own modal. The scope is the owning Livewire component id so only that modal reacts. --}}
+<div x-data="{ modalOpen: false, scope: @js($scope) }"
+    @open-storage-sharing-modal.window="$event.detail.scope === scope && (modalOpen = true)"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; $wire.cancelShareStorage() }"
     :class="{ 'z-40': modalOpen }" class="relative h-auto w-auto">
         <template x-teleport="body">

@@ -46,14 +46,24 @@ class ApplicationPreview extends BaseModel
             $application = $preview->application;
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
+                // Remove the preview compose project (containers, orphans and compose bookkeeping).
+                // Named volumes are removed below so shared production volumes are never touched.
+                $projectName = generateDockerComposeProjectName($application->uuid, $preview->pull_request_id);
+                instant_remote_process(["docker compose --project-name {$projectName} down --remove-orphans"], $server, false);
+
                 // Docker Compose volume and network cleanup
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
                 $volumes = data_get($composeFile, 'volumes');
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();
                 $volumeKeys = collect($volumes)->keys();
-                $volumeKeys->each(function ($key) use ($server) {
+                $previewSuffix = '-pr-'.$preview->pull_request_id;
+                $volumeKeys->each(function ($key) use ($server, $previewSuffix) {
                     if (! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
+                        return;
+                    }
+                    // Only volumes created for this preview carry the suffix. Others are shared with production.
+                    if (! str_ends_with((string) $key, $previewSuffix)) {
                         return;
                     }
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);

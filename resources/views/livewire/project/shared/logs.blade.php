@@ -80,6 +80,7 @@
                             <livewire:project.shared.get-logs
                                 wire:key="{{ data_get($container, 'ID', uniqid()) }}" :server="$server"
                                 :resource="$resource" :container="data_get($container, 'Names')"
+                                :pullRequestId="dockerContainerLabel($container, 'coolify.pullRequestId')"
                                 :expandByDefault="$totalContainers === 1" />
                         @endforeach
                     @endif

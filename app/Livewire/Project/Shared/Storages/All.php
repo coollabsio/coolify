@@ -124,8 +124,8 @@ class All extends Component
         if (! $isEnabled && $storage->is_preview_suffix_enabled) {
             $this->forms[$storageId]['isPreviewSuffixEnabled'] = true;
             $this->pendingSharedStorageId = $storageId;
-            $this->dispatch('storage-sharing-pending', storageId: $storageId);
-            $this->dispatch('open-storage-sharing-modal');
+            $this->dispatch('storage-sharing-pending', scope: $this->getId(), storageId: $storageId);
+            $this->dispatch('open-storage-sharing-modal', scope: $this->getId());
 
             return;
         }
@@ -151,16 +151,17 @@ class All extends Component
         $storage->is_preview_suffix_enabled = false;
         $storage->save();
         $this->pendingSharedStorageId = null;
-        $this->dispatch('storage-sharing-confirmed', storageId: $storageId);
+        $this->dispatch('storage-sharing-confirmed', scope: $this->getId(), storageId: $storageId);
         $this->dispatch('success', 'Storage updated successfully');
     }
 
     #[Renderless]
     public function cancelShareStorage(): void
     {
+        $this->authorize('update', $this->resource);
         $storageId = $this->pendingSharedStorageId;
         $this->pendingSharedStorageId = null;
-        $this->dispatch('storage-sharing-pending', storageId: $storageId);
+        $this->dispatch('storage-sharing-pending', scope: $this->getId(), storageId: $storageId);
     }
 
     public function delete(int $storageId, $password = '', $selectedActions = [])

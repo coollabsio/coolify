@@ -120,10 +120,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // Store execution ID for timeout handling
             $this->executionId = $this->task_log->id;
 
+            $matchedComposeService = false;
             if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
-                $isComposeApplication = $this->resource->build_pack === 'dockercompose';
-                if ($isComposeApplication && filled($this->task->container)) {
+                if ($this->resource->build_pack === 'dockercompose' && filled($this->task->container)) {
+                    // Compose containers are matched by service label, so every remaining container is a valid target.
+                    $matchedComposeService = true;
                     $containers = $containers->filter(
                         fn ($container) => dockerContainerLabel($container, 'com.docker.compose.service') === $this->task->container
                     );
@@ -154,7 +156,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || ($isComposeApplication ?? false) || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
+                if (count($this->containers) == 1 || $matchedComposeService || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
                     $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";

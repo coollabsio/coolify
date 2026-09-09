@@ -48,6 +48,12 @@ class GetLogs extends Component
     #[Locked]
     public ?string $container = null;
 
+    /**
+     * Value of the coolify.pullRequestId container label. Null or "0" means production.
+     */
+    #[Locked]
+    public ?string $pullRequestId = null;
+
     public ?string $displayName = null;
 
     public ?string $pull_request = null;
@@ -75,8 +81,8 @@ class GetLogs extends Component
                 }
             }
             if ($this->resource?->getMorphClass() === Application::class) {
-                if (str($this->container)->contains('-pr-')) {
-                    $this->pull_request = 'Pull Request: '.str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
+                if (filled($this->pullRequestId) && $this->pullRequestId !== '0') {
+                    $this->pull_request = 'Pull Request: '.$this->pullRequestId;
                 }
             }
         }

@@ -384,6 +384,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
+    // Named volume rows of a preview belong to the preview, so preview delete can remove them.
+    // Trashed previews are included because the delete hook parses the preview while it is soft deleted.
+    $previewVolumeOwner = null;
+    if ($isPullRequest) {
+        $previewVolumeOwner = ApplicationPreview::withTrashed()
+            ->where('application_id', $resource->id)
+            ->when(
+                $preview_id,
+                fn ($query) => $query->where('id', $preview_id),
+                fn ($query) => $query->where('pull_request_id', $pullRequestId),
+            )
+            ->first();
+    }
     try {
         $yaml = Yaml::parse($compose);
     } catch (Exception) {
@@ -886,19 +899,31 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $topLevel->get('volumes')->put($name, [
                         'name' => $name,
                     ]);
-                    LocalPersistentVolume::updateOrCreate(
-                        [
-                            'name' => $name,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ],
-                        [
-                            'name' => $name,
-                            'mount_path' => $target,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ]
-                    );
+                    $volumeOwner = $originalResource;
+                    if ($isPullRequest) {
+                        // Previews parsed before this change keep their row on the application. New previews own their rows.
+                        $hasLegacyApplicationRow = LocalPersistentVolume::query()
+                            ->where('name', $name)
+                            ->where('resource_type', get_class($originalResource))
+                            ->where('resource_id', $originalResource->id)
+                            ->exists();
+                        $volumeOwner = $hasLegacyApplicationRow ? $originalResource : $previewVolumeOwner;
+                    }
+                    if ($volumeOwner !== null) {
+                        LocalPersistentVolume::updateOrCreate(
+                            [
+                                'name' => $name,
+                                'resource_id' => $volumeOwner->id,
+                                'resource_type' => get_class($volumeOwner),
+                            ],
+                            [
+                                'name' => $name,
+                                'mount_path' => $target,
+                                'resource_id' => $volumeOwner->id,
+                                'resource_type' => get_class($volumeOwner),
+                            ]
+                        );
+                    }
                 }
                 dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);

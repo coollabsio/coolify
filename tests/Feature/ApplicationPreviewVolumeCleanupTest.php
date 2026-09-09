@@ -118,3 +118,40 @@ it('continues removing preview volumes when an earlier volume is already absent'
     Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'app-data-pr-42'"));
     expect(ApplicationPreview::find($this->preview->id))->toBeNull();
 });
+
+it('brings the compose preview project down and only removes preview-suffixed volumes', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - data:/data
+volumes:
+  data:
+  shared-cache:
+    external: true
+YAML;
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $preview = ApplicationPreview::create([
+        'uuid' => 'compose-preview-cleanup-test',
+        'application_id' => $application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/example/repository/pull/42',
+    ]);
+    Process::fake(['*' => Process::result(output: '')]);
+
+    $preview->forceDelete();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker compose --project-name {$application->uuid}-pr-42 down --remove-orphans"));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'down -v'));
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f '{$application->uuid}_data-pr-42'"));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'shared-cache'));
+    expect(ApplicationPreview::find($preview->id))->toBeNull();
+});

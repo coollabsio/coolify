@@ -122,8 +122,9 @@
                     <x-forms.listbox canGate="update" :canResource="$resource" id="isPreviewSuffixEnabled"
                         label="PR deployment suffix"
                         helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews."
-                        onChange="instantSave" x-on:storage-sharing-pending.window="value = true"
-                        x-on:storage-sharing-confirmed.window="value = false" :options="[
+                        onChange="instantSave"
+                        x-on:storage-sharing-pending.window="$event.detail.scope === '{{ $this->getId() }}' && (value = true)"
+                        x-on:storage-sharing-confirmed.window="$event.detail.scope === '{{ $this->getId() }}' && (value = false)" :options="[
                         ['value' => true, 'label' => 'Add suffix'],
                         ['value' => false, 'label' => 'Share volume'],
                     ]" />
@@ -159,6 +160,6 @@
                     shortConfirmationLabel="Storage Name" />
             </div>
         </div>
-        <x-storage-sharing-confirmation subject="volume" />
+        <x-storage-sharing-confirmation :scope="$this->getId()" subject="volume" />
     </form>
 @endif
