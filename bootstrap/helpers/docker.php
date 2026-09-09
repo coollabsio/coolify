@@ -358,7 +358,7 @@ function generateApplicationContainerName(Application $application, $pull_reques
             return $name;
         }
 
-        return $application->uuid.'-'.$now;
+        return ($application->settings->custom_container_name_prefix ?: $application->uuid).'-'.$now;
     }
 }
 
