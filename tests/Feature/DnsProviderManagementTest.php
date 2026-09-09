@@ -35,7 +35,7 @@ test('cloudflare zones are discovered and cached for a token', function () {
 
     app(CloudflareDnsProvider::class)->syncZones($token);
 
-    expect($token->dnsZones()->pluck('name')->all())->toBe(['example.com', 'example.org'])
+    expect($token->dnsZones()->orderBy('name')->pluck('name')->all())->toBe(['example.com', 'example.org'])
         ->and($token->fresh()->metadata['zones_synced_at'])->not->toBeNull();
 });
 
