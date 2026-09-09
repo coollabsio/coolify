@@ -56,3 +56,12 @@ it('includes old generated containers when cleaning up a consistent deployment',
     expect($reflection->getMethod('containerNamesToRemove')->invoke($job, $containers)->all())
         ->toBe(['application-uuid-192238854305', 'shadowuw']);
 });
+
+it('ignores the custom container name when consistent naming is disabled', function () {
+    $application = applicationWithContainerNaming();
+    $application->settings->is_consistent_container_name_enabled = false;
+
+    [$job, $reflection] = containerNamingJob($application);
+
+    expect($reflection->getMethod('resolveContainerName')->invoke($job))->toStartWith('application-uuid-');
+});
