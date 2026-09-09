@@ -2,10 +2,13 @@
 
 namespace App\Ai\Agents;
 
+use App\Ai\Docs\DocsIndexStore;
 use App\Ai\Tools\ControlResource;
 use App\Ai\Tools\DeleteResource;
 use App\Ai\Tools\DeleteServer;
+use App\Ai\Tools\ReadDocPage;
 use App\Ai\Tools\RunServerCommand;
+use App\Ai\Tools\SearchDocs;
 use App\Ai\Tools\UpsertEnvironmentVariable;
 use App\Mcp\Servers\CoolifyServer;
 use Laravel\Ai\Concerns\RemembersConversations;
@@ -42,6 +45,9 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
         - You can never exceed the current user's permissions. If a tool reports
           it is not allowed or not found, report that plainly; do not retry or
           work around it.
+        - When unsure about a Coolify feature, setting, or error, search the
+          documentation with search_docs, read the most relevant page with
+          read_doc_page, and cite the page url in your answer.
         PROMPT;
     }
 
@@ -62,6 +68,11 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
             app(DeleteResource::class),
             app(UpsertEnvironmentVariable::class),
         ];
+
+        if (app(DocsIndexStore::class)->masterEnabled()) {
+            $writeTools[] = app(SearchDocs::class);
+            $writeTools[] = app(ReadDocPage::class);
+        }
 
         return [...$readTools, ...$writeTools];
     }

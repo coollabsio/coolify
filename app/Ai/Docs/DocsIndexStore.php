@@ -17,7 +17,11 @@ class DocsIndexStore
 
     public function masterEnabled(): bool
     {
-        return (bool) (InstanceSettings::get()->is_ai_assistant_enabled ?? false);
+        try {
+            return (bool) (InstanceSettings::get()->is_ai_assistant_enabled ?? false);
+        } catch (Throwable) {
+            return false; // fail closed: no settings, no docs tools/fetch
+        }
     }
 
     public function get(): ?DocsIndex
