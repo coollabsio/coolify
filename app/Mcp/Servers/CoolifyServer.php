@@ -147,4 +147,30 @@ MD;
         TroubleshootApplication::class,
         ExplainFailedDeploy::class,
     ];
+
+    /**
+     * MCP tools that change state. Excluded from the in-app AI assistant, which
+     * uses gated native tools for every mutation.
+     */
+    public const MUTATING_TOOL_CLASSES = [
+        Control::class,
+        Deploy::class,
+        CancelDeployment::class,
+    ];
+
+    /**
+     * @return array<int, class-string>
+     */
+    public static function toolClasses(): array
+    {
+        return (new \ReflectionClass(static::class))->getDefaultProperties()['tools'] ?? [];
+    }
+
+    /**
+     * @return array<int, class-string>
+     */
+    public static function readToolClasses(): array
+    {
+        return array_values(array_diff(self::toolClasses(), self::MUTATING_TOOL_CLASSES));
+    }
 }
