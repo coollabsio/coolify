@@ -276,14 +276,14 @@
             @else
                 <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
                     helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-empty size="sm" title="Sentinel is required"
-                        description="Enable Sentinel before collecting CPU and memory metrics for this server."
+                    <x-empty size="sm" title="Metrics unavailable"
+                        description="Sentinel metrics are unavailable on build and Swarm servers."
                         icon-name="dashboard">
                         <x-slot:contents>
                             <a class="button"
                                 href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}"
                                 {{ wireNavigate() }}>
-                                Configure Sentinel
+                                View Sentinel
                                 <x-external-link />
                             </a>
                         </x-slot:contents>
