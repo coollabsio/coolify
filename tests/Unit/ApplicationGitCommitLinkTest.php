@@ -26,3 +26,14 @@ it('generates commit links for direct repository remotes', function (string $rep
         'https://bitbucket.org/coollabsio/coolify/commits/1234567890abcdef',
     ],
 ]);
+
+it('does not generate commit links from incomplete repository URLs', function (string $repository) {
+    $application = new Application;
+    $application->setRelation('source', null);
+    $application->git_repository = $repository;
+
+    expect($application->gitCommitLink('1234567890abcdef'))->toBeNull();
+})->with([
+    'missing host' => 'https://',
+    'missing scheme' => 'github.com/coollabsio/coolify',
+]);

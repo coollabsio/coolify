@@ -14,6 +14,7 @@
         logFilters: JSON.parse(localStorage.getItem('coolify-log-filters')) || {error: true, warning: true, debug: true, info: true},
         searchQuery: '',
         matchCount: 0,
+        expandedLogs: {},
         containerName: '{{ $container ?? "logs" }}',
         makeFullscreen() {
             this.fullscreen = !this.fullscreen;
@@ -118,6 +119,22 @@
             if (/\b(warn|warning|wrn|caution)\b/.test(content)) return 'warning';
             if (/\b(debug|dbg|trace|verbose)\b/.test(content)) return 'debug';
             return 'info';
+        },
+        toggleLogDetails(key, event) {
+            if (window.getSelection()?.toString()) return;
+            if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+            if (event.type === 'keydown') event.preventDefault();
+            this.expandedLogs[key] = !this.expandedLogs[key];
+        },
+        isLogExpanded(key) {
+            return this.expandedLogs[key] === true;
+        },
+        formatLogDetails(content) {
+            try {
+                return JSON.stringify(JSON.parse(content), null, 2);
+            } catch {
+                return content;
+            }
         },
         toggleLogFilter(level) {
             this.logFilters[level] = !this.logFilters[level];
@@ -295,7 +312,7 @@
         @if ($streamLogs)
             <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
-        <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
+        <div x-show="expanded" {{ $collapsible ? 'x-collapse.duration.200ms' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
             <div class="runtime-log-panel"
@@ -515,7 +532,17 @@
                             $displayLines = collect(explode("\n", $outputs))->filter(fn($line) => trim($line) !== '');
                             $lineOccurrences = [];
                         @endphp
-                        <div id="logs" class="font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs">
+                        <div id="logs" @class([
+                            'font-logs max-w-full cursor-default text-[11px] leading-relaxed sm:text-xs',
+                            'runtime-log-without-time' => !$showTimeStamps,
+                        ])>
+                            <div class="runtime-log-columns" aria-hidden="true">
+                                @if ($showTimeStamps)
+                                    <span>Time</span>
+                                @endif
+                                <span>Type</span>
+                                <span>Message</span>
+                            </div>
                             <div x-show="searchQuery.trim() && matchCount === 0"
                                 class="py-2 text-gray-500 dark:text-gray-400">
                                 No matches found.
@@ -543,17 +570,38 @@
                                         $timestamp = $carbonTs->format('Y-M-d H:i:s');
                                     }
                                 @endphp
-                                <div wire:key="log-{{ $lineFingerprint }}-{{ $lineOccurrence }}" data-log-line data-log-content="{{ $line }}" class="log-line logs-viewer-line">
+                                @php($lineKey = $lineFingerprint.'-'.$lineOccurrence)
+                                <div wire:key="log-{{ $lineFingerprint }}-{{ $lineOccurrence }}" data-log-line data-log-content="{{ $line }}"
+                                    role="button" tabindex="0"
+                                    :aria-expanded="isLogExpanded(@js($lineKey))"
+                                    x-on:click="toggleLogDetails(@js($lineKey), $event)"
+                                    x-on:keydown="toggleLogDetails(@js($lineKey), $event)"
+                                    class="log-line logs-viewer-line">
                                     @if ($timestamp && $showTimeStamps)
                                         <span class="logs-viewer-timestamp text-gray-500">{{ $timestamp }}</span>
                                     @endif
                                     <span data-line-text="{{ $logContent }}" class="logs-viewer-line-text">{{ $logContent }}</span>
                                 </div>
+                                <pre x-cloak x-show="isLogExpanded(@js($lineKey))"
+                                    class="runtime-log-detail"
+                                    aria-label="Full log entry"
+                                    x-text="formatLogDetails(@js($logContent))"></pre>
                             @endforeach
                         </div>
                     @else
-                        <pre id="logs"
-                            class="font-logs max-w-full whitespace-pre-wrap break-all text-neutral-400">No logs yet.</pre>
+                        <div class="runtime-log-loading" wire:loading.flex wire:target="getLogs" role="status">
+                            <x-loading compact aria-label="Loading logs" />
+                            <span>Loading logs</span>
+                        </div>
+                        <div id="logs" class="runtime-log-empty" wire:loading.remove wire:target="getLogs" role="status">
+                            <span class="runtime-log-empty-icon" aria-hidden="true">
+                                <x-reicon name="terminal" class="size-4" />
+                            </span>
+                            <div>
+                                <p>No logs yet</p>
+                                <span>Logs will appear here when the container produces output.</span>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>

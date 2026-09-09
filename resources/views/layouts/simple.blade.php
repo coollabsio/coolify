@@ -4,7 +4,7 @@
          styles (e.g. [wire\:loading] { display: none }) must be rendered manually too. --}}
     @livewireStyles
     @livewireScripts
-    <main class="h-full bg-gray-50 dark:bg-base">
+    <main class="h-full bg-neutral-50 dark:bg-base">
         {{ $slot }}
     </main>
     @parent

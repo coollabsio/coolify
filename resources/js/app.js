@@ -1,5 +1,6 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeTerminalComponent } from './terminal.js';
+import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 
 document.addEventListener('livewire:init', () => {
@@ -126,3 +127,16 @@ window.scrollToSettingsSection = function scrollToSettingsSection(id) {
 
     rafId = window.requestAnimationFrame(tick);
 };
+
+// When a settings sub-section link navigates across pages (href="route#section-id"),
+// scroll to that section once the destination page has rendered.
+function scrollToHashSettingsSection() {
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) {
+        return;
+    }
+    const id = decodeURIComponent(hash.slice(1));
+    window.requestAnimationFrame(() => window.scrollToSettingsSection?.(id));
+}
+document.addEventListener('livewire:navigated', scrollToHashSettingsSection);
+document.addEventListener('DOMContentLoaded', scrollToHashSettingsSection);

@@ -85,11 +85,10 @@ class CreateScheduledBackup extends Component
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
             if ($database->getMorphClass() === ServiceDatabase::class) {
                 $service = $database->service;
-                $this->redirectRoute('project.service.database.backup.show', [
+                $this->redirectRoute('project.service.volume-backups.index', [
                     'project_uuid' => $service->project()->uuid,
                     'environment_uuid' => $service->environment->uuid,
                     'service_uuid' => $service->uuid,
-                    'stack_service_uuid' => $database->uuid,
                     'backup_uuid' => $databaseBackup->uuid,
                 ], navigate: true);
             } else {

@@ -36,7 +36,7 @@
                         <a href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}"
                             {{ wireNavigate() }} class="button">Open server</a>
                         <x-application.restart-limit-warning :application="$resource" />
-                        <x-status-summary :status="$resource->status" />
+                        <x-status-summary :status="$resource->status" align="right" />
                         @if ($hasAdditionalDestinations)
                             <x-forms.button canGate="deploy" :canResource="$resource"
                                 wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">
