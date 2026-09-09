@@ -189,6 +189,7 @@
                             </button>
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                 buttonTitle="Remove" isErrorButton
+                                canGate="update" :canResource="$service"
                                 submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                     'This domain will be removed from the service application.',
                                     'Redeploy or restart may be required for proxy changes.',

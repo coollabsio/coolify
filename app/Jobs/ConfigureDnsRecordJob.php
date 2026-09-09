@@ -62,6 +62,19 @@ class ConfigureDnsRecordJob implements ShouldQueue
         }
     }
 
+    public function failed(?Throwable $exception): void
+    {
+        DnsRecordConfigurationFinished::dispatch(
+            $this->teamId,
+            $this->resourceType,
+            $this->resourceId,
+            $this->hostname,
+            false,
+            '',
+            'The DNS zone is no longer available.',
+        );
+    }
+
     private function resource(): ?Model
     {
         $resourceClass = $this->resourceType === null ? null : (Relation::getMorphedModel($this->resourceType) ?? $this->resourceType);

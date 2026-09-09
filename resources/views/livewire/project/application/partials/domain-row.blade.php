@@ -153,7 +153,8 @@
                             <x-reicon name="settings" class="size-3.5" />
                         </button>
                         <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?" buttonTitle="Remove"
-                            isErrorButton submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
+                            isErrorButton canGate="update" :canResource="$application"
+                            submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                 'This domain will be removed from the application.',
                                 'Redeploy or restart may be required for proxy changes.',
                             ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"

@@ -476,8 +476,10 @@ EOD;
                 'replace_existing' => $this->replaceExisting,
             ]);
         } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
             $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
+            $this->importRunning = false;
             handleError($e, $this);
 
             return true;
@@ -635,6 +637,7 @@ EOD;
             ]);
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
         } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
             $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
             $this->importRunning = false;
@@ -644,86 +647,6 @@ EOD;
         }
 
         return true;
-    }
-
-    public function buildRestoreSafetyCheckCommand(string $tmpPath): ?string
-    {
-        return app(DatabaseImportCommandBuilder::class)->buildPostgresSafetyCommand($this->resource, $this->container, $tmpPath);
-    }
-
-    /**
-     * Build the POSIX shell snippet that aborts (exit 1) when a PostgreSQL
-     * backup contains directives leading to OS command execution.
-     *
-     * Hardened against bypasses:
-     *  - decompresses gzip backups before scanning,
-     *  - converts custom-format (PGDMP) archives to SQL with pg_restore
-     *    before scanning, and rejects archives that cannot be inspected,
-     *  - strips `--` line comments and flattens newlines so multi-line and
-     *    comment-separated payloads (e.g. `FROM/**​/PROGRAM`) are caught,
-     *  - matches a literal `\!` shell escape and `\o|`/`\g|` pipe redirects.
-     */
-    public function buildPostgresRestoreScanScript(string $tmpPath): ?string
-    {
-        if (! $this->isPostgresqlRestore()) {
-            return null;
-        }
-
-        $escapedTmpPath = escapeshellarg($tmpPath);
-
-        // Token separator PostgreSQL treats as whitespace: real whitespace or a
-        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
-        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
-
-        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
-        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
-        $escapedSqlPattern = escapeshellarg($sqlPattern);
-        $escapedPsqlPattern = escapeshellarg($psqlPattern);
-        $contents = "{ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; }";
-        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
-        $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
-        $sqlScan = $scan($contents);
-        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
-        $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
-
-        return <<<SH
-header=\$({$contents} | head -c 5)
-if [ "\$header" = 'PGDMP' ]; then
-  inspect=\$(mktemp)
-  trap 'rm -f "\$inspect"' EXIT
-  if ! {$contents} > "\$inspect"; then
-    {$blockedInspect}
-  fi
-  if ! pg_restore -l "\$inspect" >/dev/null 2>&1; then
-    {$blockedInspect}
-  fi
-  if {$customScan}; then
-    {$blockedProgram}
-  fi
-elif {$sqlScan}; then
-  {$blockedProgram}
-fi
-SH;
-    }
-
-    private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void
-    {
-        $command = $this->buildRestoreSafetyCheckCommand($tmpPath);
-
-        if ($command !== null) {
-            $commands[] = $command;
-        }
-    }
-
-    private function isPostgresqlRestore(): bool
-    {
-        $morphClass = $this->resource->getMorphClass();
-
-        if ($morphClass === ServiceDatabase::class) {
-            return str_contains($this->resource->databaseType(), 'postgres');
-        }
-
-        return $morphClass === StandalonePostgresql::class || $morphClass === 'postgresql';
     }
 
     public function buildRestoreCommand(string $tmpPath): string

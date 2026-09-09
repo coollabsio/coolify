@@ -139,19 +139,26 @@ trait InteractsWithDnsProviders
         $key = $hostname.'|'.$zoneId;
         $conflict = $this->dnsProviderConflicts[$key] ?? null;
         $zone = $this->findTeamZone($zoneId);
-        if ($conflict === null || $zone === null) {
+        $content = $this->serverIp;
+        if ($conflict === null || $zone === null || blank($content) || filter_var($content, FILTER_VALIDATE_IP) === false) {
             $this->dispatch('error', 'The DNS conflict is no longer available. Check the record again.');
 
             return;
         }
         try {
             app(CloudflareDnsProvider::class)->replaceRecord(
-                $zone, $conflict['record_id'], $hostname, $conflict['proposed'], $this->dnsResourceForHostname($hostname),
+                $zone,
+                (string) ($conflict['record_id'] ?? ''),
+                $hostname,
+                $content,
+                $this->dnsResourceForHostname($hostname),
+                (string) ($conflict['current'] ?? ''),
             );
             unset($this->dnsProviderConflicts[$key]);
             $this->dispatch('success', "DNS record replaced for {$hostname}.");
             $this->loadDnsProviderProposals();
         } catch (\Throwable $e) {
+            unset($this->dnsProviderConflicts[$key]);
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -219,7 +226,19 @@ trait InteractsWithDnsProviders
         if (! is_string($hostname)) {
             return;
         }
-        $record = ManagedDnsRecord::query()->where('team_id', currentTeam()->id)->where('name', strtolower($hostname))->first();
+
+        $resource = $this->dnsResourceForHostname($hostname);
+        if ($resource === null) {
+            return;
+        }
+
+        $record = ManagedDnsRecord::query()
+            ->where('team_id', currentTeam()->id)
+            ->where('name', strtolower($hostname))
+            ->where('resource_type', $resource->getMorphClass())
+            ->where('resource_id', $resource->getKey())
+            ->first();
+
         if ($record !== null && ! app(CloudflareDnsProvider::class)->deleteRecord($record)) {
             $this->dispatch('warning', 'The domain was removed, but its DNS record changed externally and was left untouched.');
         }
@@ -235,6 +254,8 @@ trait InteractsWithDnsProviders
         return DnsProviderZone::query()->whereKey($zoneId)
             ->whereHas('integrationToken', fn ($query) => $query->where('team_id', currentTeam()->id))->first();
     }
+
+    abstract protected function persistDomainDnsStatuses(): void;
 
     abstract protected function dnsResourceForHostname(string $hostname): ?Model;
 }

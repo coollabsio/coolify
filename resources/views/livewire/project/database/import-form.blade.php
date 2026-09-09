@@ -98,7 +98,8 @@
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
                             <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
-                                helper="Drops matching tables, functions, types, and other PostgreSQL objects from the archive before restoring them." />
+                                helper="Drops matching tables, functions, types, and other PostgreSQL objects from the archive before restoring them."
+                                canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif
                 </div>

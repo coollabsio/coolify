@@ -336,3 +336,15 @@ test('editor updates its row without rerendering the teleported parent modal', f
         ->toContain("'integration-token-deleted'")
         ->not->toContain('integrationTokenChanged');
 });
+
+test('new integration token form controls declare authorization matching server-side actions', function () {
+    $editor = file_get_contents(resource_path('views/livewire/security/integration-token-editor.blade.php'));
+    $form = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
+
+    expect($editor)
+        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="edit-automatic-dns")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="refreshZones")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/');
+
+    expect($form)
+        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="automatic-dns")(?=[^>]*canGate="create")(?=[^>]*:canResource="\\\\App\\\\Models\\\\IntegrationToken::class")[^>]*>/');
+});

@@ -1535,7 +1535,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomainByKey(string $domainKey): void
+    public function removeDomainByKey(string $domainKey, string $password = '', array $selectedActions = []): void
     {
         $index = collect($this->domainRows)->search(
             fn (array $row): bool => ! ($row['is_suggested'] ?? false)
@@ -1546,7 +1546,7 @@ class Domains extends Component
             return;
         }
 
-        $this->removeDomain((int) $index);
+        $this->removeDomain((int) $index, $password, $selectedActions);
     }
 
     /**

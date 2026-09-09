@@ -1,6 +1,7 @@
 {{-- DNS entries: Domain Connect (Cloud only + key) and/or generic Type/Name/Value records. --}}
 @php
     $domainConnectAvailable = $this->domainConnectAvailable();
+    $dnsAuthResource = property_exists($this, 'application') ? $this->application : $this->service;
 @endphp
 
 <div x-data="{ dnsEntriesOpen: false }" class="relative" @click.outside="dnsEntriesOpen = false">
@@ -204,7 +205,8 @@
                                                     @foreach ($recordProviders as $provider)
                                                         <x-forms.button type="button"
                                                             wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($record['name']) }}, {{ $provider['zone_id'] }}, {{ \Illuminate\Support\Js::from($record['value']) }})"
-                                                            wire:target="createManagedDnsRecord">
+                                                            wire:target="createManagedDnsRecord"
+                                                            canGate="update" :canResource="$dnsAuthResource">
                                                             Add with {{ $provider['credential'] }}
                                                         </x-forms.button>
                                                     @endforeach

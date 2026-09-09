@@ -55,12 +55,28 @@ test('builds dump-all commands and postgres safety scan', function () {
     $builder = new DatabaseImportCommandBuilder;
     $postgres = importResource(StandalonePostgresql::class);
 
+    $safety = $builder->buildPostgresSafetyCommand($postgres, 'postgres-safe', '/tmp/dump.sql.gz');
+    $script = $builder->buildPostgresRestoreScanScript($postgres, '/tmp/dump.sql.gz');
+
     expect($builder->buildRestoreCommand($postgres, '/tmp/dump.sql.gz', true))
         ->toContain('pg_terminate_backend')
         ->toContain("gunzip -cf '/tmp/dump.sql.gz'")
-        ->and($builder->buildPostgresSafetyCommand($postgres, 'postgres-safe', '/tmp/dump.sql.gz'))
+        ->and($safety)
         ->toContain('COPY ... PROGRAM')
-        ->toContain('docker exec postgres-safe');
+        ->toContain('docker exec postgres-safe')
+        ->toContain('pg_restore -l')
+        ->toContain('pg_restore -f -')
+        ->toContain('unable to inspect custom archive')
+        ->not->toContain('then exit 0')
+        ->and($script)
+        ->toContain("tr '\\n\\r\\t'");
+});
+
+test('postgres safety command is null for non-postgres databases', function () {
+    $builder = new DatabaseImportCommandBuilder;
+
+    expect($builder->buildPostgresSafetyCommand(importResource(StandaloneMysql::class), 'mysql-test', '/tmp/restore_test'))
+        ->toBeNull();
 });
 
 test('dump-all mysql and mariadb commands use valid shell parameter expansions', function (string $class, string $binary, string $prefix) {

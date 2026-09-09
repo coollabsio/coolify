@@ -26,15 +26,56 @@ class DatabaseImportCommandBuilder
         };
     }
 
-    public function buildPostgresSafetyCommand(object $resource, string $container, string $path): ?string
+    public function buildPostgresRestoreScanScript(object $resource, string $path): ?string
     {
         if ($this->databaseType($resource) !== 'postgresql') {
             return null;
         }
 
-        $path = escapeshellarg($path);
-        $contents = "{ gunzip -cf {$path} 2>/dev/null || cat {$path}; }";
-        $script = "header=\$({$contents} | head -c 5); if [ \"\$header\" = 'PGDMP' ]; then exit 0; fi; if {$contents} | sed 's/--.*//' | grep -Eiq '(^|;)[[:space:]]*copy[[:space:]]+[^;]*(from|to)[[:space:]]+program|^[[:space:]]*\\\\(!|copy.*program|(o|g)[[:space:]]*\\|)'; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
+        $escapedPath = escapeshellarg($path);
+
+        // Token separator PostgreSQL treats as whitespace: real whitespace or a
+        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
+        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
+
+        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
+        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        $escapedSqlPattern = escapeshellarg($sqlPattern);
+        $escapedPsqlPattern = escapeshellarg($psqlPattern);
+        $contents = "{ gunzip -cf {$escapedPath} 2>/dev/null || cat {$escapedPath}; }";
+        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
+        $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
+        $sqlScan = $scan($contents);
+        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
+        $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
+
+        return <<<SH
+header=\$({$contents} | head -c 5)
+if [ "\$header" = 'PGDMP' ]; then
+  inspect=\$(mktemp)
+  trap 'rm -f "\$inspect"' EXIT
+  if ! {$contents} > "\$inspect"; then
+    {$blockedInspect}
+  fi
+  if ! pg_restore -l "\$inspect" >/dev/null 2>&1; then
+    {$blockedInspect}
+  fi
+  if {$customScan}; then
+    {$blockedProgram}
+  fi
+elif {$sqlScan}; then
+  {$blockedProgram}
+fi
+SH;
+    }
+
+    public function buildPostgresSafetyCommand(object $resource, string $container, string $path): ?string
+    {
+        $script = $this->buildPostgresRestoreScanScript($resource, $path);
+
+        if ($script === null) {
+            return null;
+        }
 
         return 'docker exec '.$container.' sh -c '.escapeshellarg($script);
     }

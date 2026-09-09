@@ -2346,6 +2346,99 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}':
+    delete:
+      tags:
+        - Applications
+      summary: 'Delete Preview Deployment'
+      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
+      operationId: delete-preview-deployment-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview to delete.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Preview deletion queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Update Preview Domains'
+      description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.'
+      operationId: update-preview-domains-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                domains:
+                  type: [string, 'null']
+                  example: 'https://pr.example.com:3000'
+                docker_compose_domains:
+                  type: [array, 'null']
+                  items: { properties: { name: { type: string }, domain: { type: [string, 'null'] }, redirect: { type: [string, 'null'], enum: [www, non-www, both] } }, type: object }
+                force_domain_override:
+                  type: boolean
+                  default: false
+              type: object
+      responses:
+        '200':
+          description: 'Preview domains updated.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'Domain conflict.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/envs':
     get:
       tags:
@@ -2996,48 +3089,6 @@ paths:
       responses:
         '200':
           description: 'Storage deleted.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-        '422':
-          $ref: '#/components/responses/422'
-      security:
-        -
-          bearerAuth: []
-  '/applications/{uuid}/previews/{pull_request_id}':
-    delete:
-      tags:
-        - Applications
-      summary: 'Delete Preview Deployment'
-      description: 'Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes/networks, and deletes the preview record.'
-      operationId: delete-preview-deployment-by-pull-request-id
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-        -
-          name: pull_request_id
-          in: path
-          description: 'Pull request ID of the preview to delete.'
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: 'Preview deletion queued.'
           content:
             application/json:
               schema:
@@ -3765,6 +3816,14 @@ paths:
         - Databases
       summary: 'Upload database import'
       operationId: upload-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
       responses:
         '201':
           description: 'Upload completed'
@@ -3779,6 +3838,14 @@ paths:
         - Databases
       summary: 'Import database backup'
       operationId: create-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -3801,9 +3868,28 @@ paths:
         - Databases
       summary: 'Get database import status'
       operationId: get-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'Import activity ID.'
+          required: true
+          schema:
+            type: integer
       responses:
         '200':
           description: 'Import status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseImportStatus'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -3932,6 +4018,12 @@ paths:
                   type: integer
                   description: 'Backup job timeout in seconds (min: 60, max: 36000)'
                   default: 3600
+                missing_backup_notification_days:
+                  type: integer
+                  description: 'Alert after this many days without an execution; 0 disables alerts'
+                  minimum: 0
+                  maximum: 365
+                  default: 0
               type: object
       responses:
         '201':
@@ -4351,6 +4443,11 @@ paths:
                   type: integer
                   description: 'Backup job timeout in seconds (min: 60, max: 36000)'
                   default: 3600
+                missing_backup_notification_days:
+                  type: integer
+                  description: 'Alert after this many days without an execution; 0 disables alerts'
+                  minimum: 0
+                  maximum: 365
               type: object
       responses:
         '200':
@@ -10035,6 +10132,13 @@ paths:
                   sentinel_push_interval_seconds: { type: integer }
                   sentinel_custom_url: { description: 'Only present with read:sensitive.', type: string }
                   sentinel_updated_at: { type: [string, 'null'] }
+                  traffic_topn: { type: integer }
+                  traffic_sample_threshold: { type: integer }
+                  traffic_retention_1h_days: { type: integer }
+                  traffic_retention_1d_days: { type: integer }
+                  is_geoip_enabled: { type: boolean }
+                  geoip_refresh_days: { type: integer }
+                  geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -10083,6 +10187,25 @@ paths:
                   type: integer
                   minimum: 10
                 sentinel_custom_url:
+                  type: [string, 'null']
+                traffic_topn:
+                  type: integer
+                  minimum: 1
+                traffic_sample_threshold:
+                  type: integer
+                  minimum: 0
+                traffic_retention_1h_days:
+                  type: integer
+                  minimum: 1
+                traffic_retention_1d_days:
+                  type: integer
+                  minimum: 1
+                is_geoip_enabled:
+                  type: boolean
+                geoip_refresh_days:
+                  type: integer
+                  minimum: 1
+                geoip_maxmind_license_key:
                   type: [string, 'null']
               type: object
       responses:
@@ -11080,6 +11203,21 @@ paths:
         - 'Service databases'
       summary: 'Upload service database import'
       operationId: upload-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
       responses:
         '201':
           description: 'Upload completed'
@@ -11094,6 +11232,21 @@ paths:
         - 'Service databases'
       summary: 'Import service database backup'
       operationId: create-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -11116,9 +11269,35 @@ paths:
         - 'Service databases'
       summary: 'Get service database import status'
       operationId: get-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'Import activity ID.'
+          required: true
+          schema:
+            type: integer
       responses:
         '200':
           description: 'Import status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseImportStatus'
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -13839,6 +14018,7 @@ components:
               type: boolean
               default: false
           type: object
+          additionalProperties: false
         -
           required:
             - source
@@ -13861,6 +14041,7 @@ components:
               type: boolean
               default: false
           type: object
+          additionalProperties: false
         -
           required:
             - source
@@ -13881,7 +14062,7 @@ components:
               type: boolean
               default: false
           type: object
-      additionalProperties: false
+          additionalProperties: false
     DatabaseImportStatus:
       properties:
         id:
@@ -14766,6 +14947,20 @@ components:
           type: boolean
         is_metrics_enabled:
           type: boolean
+        is_traffic_analytics_enabled:
+          type: boolean
+        traffic_topn:
+          type: integer
+        traffic_sample_threshold:
+          type: integer
+        traffic_retention_1h_days:
+          type: integer
+        traffic_retention_1d_days:
+          type: integer
+        is_geoip_enabled:
+          type: boolean
+        geoip_refresh_days:
+          type: integer
         is_reachable:
           type: boolean
         is_sentinel_enabled:

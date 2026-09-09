@@ -41,7 +41,7 @@
             </fieldset>
             <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
                 <x-forms.checkbox id="edit-automatic-dns" label="Automatically configure DNS" fullWidth
-                    wire:model.live="automaticDns" />
+                    wire:model.live="automaticDns" canGate="update" :canResource="$integrationToken" />
                 <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
                     Create DNS records automatically when a new domain has one unambiguous matching credential.
                 </p>
@@ -76,7 +76,8 @@
                         <div>Last refreshed {{ \Carbon\Carbon::parse(data_get($integrationToken->metadata, 'zones_synced_at'))->diffForHumans() }}</div>
                     @endif
                     </div>
-                    <x-forms.button type="button" wire:click="refreshZones" wire:target="refreshZones">Refresh zones</x-forms.button>
+                    <x-forms.button type="button" wire:click="refreshZones" wire:target="refreshZones"
+                        canGate="update" :canResource="$integrationToken">Refresh zones</x-forms.button>
                 </div>
                 @if ($zones !== [])
                     <div class="max-h-48 overflow-y-auto border-t border-neutral-200 dark:border-white/[0.08]">

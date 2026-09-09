@@ -1,4 +1,8 @@
-@if ($showDnsProviderModal)
+<div class="contents">
+    @php
+        $dnsAuthResource = property_exists($this, 'application') ? $this->application : $this->service;
+    @endphp
+    @if ($showDnsProviderModal)
     <div x-data="{ modalOpen: @entangle('showDnsProviderModal') }" class="relative h-auto w-auto"
         :class="{ 'z-40': modalOpen }" @keydown.escape.window="modalOpen = false; $wire.closeDnsProviderModal()">
         <template x-teleport="body">
@@ -26,12 +30,14 @@
                                             <x-modal-confirmation title="Replace conflicting DNS record?" isErrorButton buttonTitle="Replace record"
                                                 submitAction="replaceManagedDnsRecord({{ \Illuminate\Support\Js::from($proposal['hostname']) }}, {{ $proposal['zone_id'] }})"
                                                 :actions="['Replace '.$proposal['hostname'].' value '.$conflict['current'].' with '.$conflict['proposed'], 'Coolify will manage the replaced record.']"
-                                                :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Replace record" />
+                                                :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Replace record"
+                                                canGate="update" :canResource="$dnsAuthResource" />
                                         </div>
                                     @else
                                         <x-forms.button type="button"
                                             wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($proposal['hostname']) }}, {{ $proposal['zone_id'] }})"
-                                            wire:target="createManagedDnsRecord" isHighlighted>Create DNS record</x-forms.button>
+                                            wire:target="createManagedDnsRecord" isHighlighted
+                                            canGate="update" :canResource="$dnsAuthResource">Create DNS record</x-forms.button>
                                     @endif
                                 </div>
                             @endforeach
@@ -41,4 +47,5 @@
             </div>
         </template>
     </div>
-@endif
+    @endif
+</div>
