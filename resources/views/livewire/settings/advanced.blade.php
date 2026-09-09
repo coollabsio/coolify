@@ -88,6 +88,12 @@
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
                         ]" />
+                    <x-forms.listbox id="is_ai_assistant_enabled" label="AI assistant"
+                        helper="Enable the built-in AI assistant for this instance. Teams still bring their own provider key." onChange="instantSave"
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
                     <div class="lg:col-span-2">
                         <x-forms.input id="allowed_ips" label="Allowed API IPs"
                             helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
