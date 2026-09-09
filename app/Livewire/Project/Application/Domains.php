@@ -5,12 +5,14 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +22,7 @@ class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+    use InteractsWithDnsProviders;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -116,6 +119,13 @@ class Domains extends Component
         'configurationChanged' => 'refreshDomains',
         'confirmDomainUsage',
     ];
+
+    public function getListeners(): array
+    {
+        return array_merge($this->listeners, [
+            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
+        ]);
+    }
 
     protected function rules(): array
     {
@@ -1058,8 +1068,14 @@ class Domains extends Component
             $this->resetAddDomainForm();
             $this->dispatch('close-modal');
             $this->refreshDomains();
-            $urlsToCheck = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
-            $dnsChecks = collect($this->dnsEntriesForUrls($urlsToCheck, $serviceForCheck))
+            $addedUrls = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            if ($this->configureDnsAfterDomainAdd($addedUrls)) {
+                $this->dispatch('success', 'Domain added.');
+
+                return;
+            }
+
+            $dnsChecks = collect($this->dnsEntriesForUrls($addedUrls, $serviceForCheck))
                 ->map(fn (string $url, string $statusKey) => [
                     'status_key' => $statusKey,
                     'url' => $url,
@@ -1480,7 +1496,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomain(int $index): void
+    public function removeDomain(int $index, string $password = '', array $selectedActions = []): void
     {
         try {
             $this->authorize('update', $this->application);
@@ -1501,6 +1517,10 @@ class Domains extends Component
 
             if (! $this->saveDomainList($updated, $service, checkConflicts: false)) {
                 return;
+            }
+
+            if (in_array('deleteManagedDns', $selectedActions, true)) {
+                $this->deleteManagedDnsForUrl($url);
             }
 
             if ($this->editingIndex === $index) {
@@ -1535,6 +1555,11 @@ class Domains extends Component
     private function domainRowKey(array $row): string
     {
         return hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
+    }
+
+    protected function dnsResourceForHostname(string $hostname): ?Model
+    {
+        return $this->application;
     }
 
     public function generateDomain(?string $serviceName = null): void

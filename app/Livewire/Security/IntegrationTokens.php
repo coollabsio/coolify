@@ -22,7 +22,7 @@ class IntegrationTokens extends Component
     #[On('integrationTokenAdded')]
     public function loadTokens(): void
     {
-        $this->tokens = IntegrationToken::ownedByCurrentTeam()->latest()->get();
+        $this->tokens = IntegrationToken::ownedByCurrentTeam()->withCount('dnsZones')->latest()->get();
     }
 
     public function deleteToken(int $tokenId, string $password = ''): void
@@ -32,6 +32,12 @@ class IntegrationTokens extends Component
 
         if ($token->secretManagerLinks()->exists()) {
             $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
+
+            return;
+        }
+
+        if ($token->managedDnsRecords()->exists()) {
+            $this->dispatch('error', 'This token manages DNS records. Remove those domains or records first.');
 
             return;
         }

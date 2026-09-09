@@ -18,6 +18,35 @@ use OpenApi\Attributes as OA;
 
 class ServiceDatabasesController extends Controller
 {
+    use Concerns\HandlesDatabaseImportsApi;
+
+    #[OA\Post(path: '/services/{uuid}/databases/{database_uuid}/imports/uploads', operationId: 'upload-service-database-import', summary: 'Upload service database import', security: [['bearerAuth' => []]], tags: ['Service databases'], responses: [new OA\Response(response: 201, description: 'Upload completed'), new OA\Response(response: 422, ref: '#/components/responses/422')])]
+    public function upload_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->uploadDatabaseImport($request, $database, $teamId));
+    }
+
+    #[OA\Post(path: '/services/{uuid}/databases/{database_uuid}/imports', operationId: 'create-service-database-import', summary: 'Import service database backup', requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')), security: [['bearerAuth' => []]], tags: ['Service databases'], responses: [new OA\Response(response: 202, description: 'Import queued'), new OA\Response(response: 409, description: 'Import already active'), new OA\Response(response: 422, ref: '#/components/responses/422')])]
+    public function create_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->startDatabaseImport($request, $database, $teamId, 'api.service-databases.imports.show', ['uuid' => $request->route('uuid'), 'database_uuid' => $database->uuid]));
+    }
+
+    #[OA\Get(path: '/services/{uuid}/databases/{database_uuid}/imports/{activity_id}', operationId: 'get-service-database-import', summary: 'Get service database import status', security: [['bearerAuth' => []]], tags: ['Service databases'], responses: [new OA\Response(response: 200, description: 'Import status'), new OA\Response(response: 404, ref: '#/components/responses/404')])]
+    public function show_import(Request $request): JsonResponse
+    {
+        return $this->withImportDatabase($request, fn (ServiceDatabase $database, int $teamId) => $this->showDatabaseImport($database, $teamId, (int) $request->route('activity_id')));
+    }
+
+    private function withImportDatabase(Request $request, callable $callback): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        $service = $teamId === null ? null : $this->resolveService($request, $teamId);
+        $database = $service ? $this->resolveServiceDatabase($request, $service) : null;
+
+        return $database ? $callback($database, $teamId) : response()->json(['message' => 'Service database not found.'], 404);
+    }
+
     private function removeSensitiveData(ServiceDatabase $serviceDatabase): array
     {
         $serviceDatabase->makeHidden([

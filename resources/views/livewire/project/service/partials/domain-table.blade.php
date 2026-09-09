@@ -192,7 +192,8 @@
                                 submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                     'This domain will be removed from the service application.',
                                     'Redeploy or restart may be required for proxy changes.',
-                                ]" :confirmWithPassword="false" :confirmWithText="false"
+                                ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
+                                :confirmWithPassword="false" :confirmWithText="false"
                                 step2ButtonText="Remove domain">
                                 <x-slot:trigger>
                                     <button type="button"

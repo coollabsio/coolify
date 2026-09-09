@@ -3,8 +3,10 @@
 namespace App\Livewire\Security;
 
 use App\Models\IntegrationToken;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class IntegrationTokenForm extends Component
@@ -23,6 +25,8 @@ class IntegrationTokenForm extends Component
 
     public array $metadata = [];
 
+    public bool $automaticDns = true;
+
     public function mount(): void
     {
         $this->authorize('create', IntegrationToken::class);
@@ -33,6 +37,7 @@ class IntegrationTokenForm extends Component
         if ($this->provider === 'cloudflare') {
             $this->capabilities = ['dns'];
             $this->metadata = [];
+            $this->automaticDns = true;
         } else {
             $this->capabilities = ['secrets'];
             $this->metadata = $this->provider === 'infisical'
@@ -51,6 +56,7 @@ class IntegrationTokenForm extends Component
             'token' => ['required', 'string'],
             'capabilities' => ['required', 'array', 'min:1'],
             'capabilities.*' => ['required', 'in:'.$allowedCapability],
+            'automaticDns' => ['boolean'],
         ];
 
         if ($this->provider === 'infisical') {
@@ -79,10 +85,13 @@ class IntegrationTokenForm extends Component
         ];
     }
 
-    public function addToken(IntegrationTokenValidator $validator): void
+    public function addToken(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
     {
         $validated = $this->validate();
         $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
+        if ($validated['provider'] === 'cloudflare' && ! $validated['automaticDns']) {
+            $metadata['automatic_dns'] = false;
+        }
 
         try {
             if (! $validator->validate($validated['provider'], $validated['token'], $validated['capabilities'], $metadata)) {
@@ -91,14 +100,17 @@ class IntegrationTokenForm extends Component
                 return;
             }
 
-            $integrationToken = IntegrationToken::query()->create([
-                'provider' => $validated['provider'],
-                'name' => $validated['name'],
-                'token' => $validated['token'],
-                'capabilities' => $validated['capabilities'],
-                'metadata' => $metadata ?: null,
-                'team_id' => currentTeam()->id,
-            ]);
+            $integrationToken = DB::transaction(function () use ($validated, $metadata, $cloudflare): IntegrationToken {
+                $token = IntegrationToken::query()->create([
+                    'provider' => $validated['provider'], 'name' => $validated['name'], 'token' => $validated['token'],
+                    'capabilities' => $validated['capabilities'], 'metadata' => $metadata ?: null, 'team_id' => currentTeam()->id,
+                ]);
+                if ($token->provider === 'cloudflare') {
+                    $cloudflare->syncZones($token);
+                }
+
+                return $token;
+            });
 
             auditLog('ui.integration_token.created', [
                 'team_id' => currentTeam()->id,
