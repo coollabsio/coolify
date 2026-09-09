@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
@@ -12,6 +13,7 @@ use App\Models\ServiceApplication;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,7 @@ class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+    use InteractsWithDnsProviders;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -107,6 +110,13 @@ class Domains extends Component
         'refreshServices' => 'refreshDomains',
         'confirmDomainUsage',
     ];
+
+    public function getListeners(): array
+    {
+        return array_merge($this->listeners, [
+            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
+        ]);
+    }
 
     protected function rules(): array
     {
@@ -580,6 +590,11 @@ class Domains extends Component
         $this->domainRows[$index]['dns_message'] = $meta['pending_message'];
         $this->domainRows[$index]['suggestion_label'] = null;
         $this->domainRows[$index]['suggestion_role'] = $meta['role'];
+    }
+
+    protected function persistDomainDnsStatuses(): void
+    {
+        $this->persistAllDomainDnsStatuses();
     }
 
     protected function persistAllDomainDnsStatuses(): void
@@ -1085,9 +1100,15 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('close-modal');
             $this->refreshDomains();
-            $urlsToCheck = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            $addedUrls = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            if ($this->configureDnsAfterDomainAdd($addedUrls)) {
+                $this->dispatch('success', 'Domain added.');
+
+                return;
+            }
+
             $serviceApplicationId = (int) $app->id;
-            $dnsChecks = collect($urlsToCheck)->map(fn (string $url) => [
+            $dnsChecks = collect($addedUrls)->map(fn (string $url) => [
                 'url' => $url,
                 'check_id' => new_public_id(),
             ]);
@@ -1295,7 +1316,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomain(int $index): void
+    public function removeDomain(int $index, string $password = '', array $selectedActions = []): void
     {
         try {
             $this->authorize('update', $this->service);
@@ -1318,6 +1339,10 @@ class Domains extends Component
                 return;
             }
 
+            if (in_array('deleteManagedDns', $selectedActions, true)) {
+                $this->deleteManagedDnsForUrl($url);
+            }
+
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain removed.');
@@ -1328,7 +1353,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomainByKey(string $domainKey): void
+    public function removeDomainByKey(string $domainKey, string $password = '', array $selectedActions = []): void
     {
         $index = collect($this->domainRows)->search(
             fn (array $row): bool => ! ($row['is_suggested'] ?? false)
@@ -1339,7 +1364,7 @@ class Domains extends Component
             return;
         }
 
-        $this->removeDomain((int) $index);
+        $this->removeDomain((int) $index, $password, $selectedActions);
     }
 
     /**
@@ -1348,6 +1373,18 @@ class Domains extends Component
     private function domainRowKey(array $row): string
     {
         return hash('sha256', $row['url'].'|'.$row['service_application_id']);
+    }
+
+    protected function dnsResourceForHostname(string $hostname): ?Model
+    {
+        foreach ($this->domainRows as $row) {
+            $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
+            if (is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname)) {
+                return $this->findServiceApp((int) $row['service_application_id']);
+            }
+        }
+
+        return null;
     }
 
     public function addSuggestedDomain(int $index): void

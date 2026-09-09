@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Actions\Database\StartDatabaseImport;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\Service;
@@ -10,12 +11,13 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Rules\SafeWebhookUrl;
-use App\Support\DatabaseBackupFileValidator;
+use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
+use App\Support\DatabaseImport\DatabaseImportException;
+use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
@@ -158,13 +160,15 @@ class ImportForm extends Component
 
     public bool $dumpAll = false;
 
+    public bool $replaceExisting = false;
+
     public string $restoreCommandText = '';
 
     public string $customLocation = '';
 
     public ?int $activityId = null;
 
-    public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+    public string $postgresqlRestoreCommand = 'pg_restore --exit-on-error -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
 
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
 
@@ -276,11 +280,22 @@ createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
 EOD;
                     $this->restoreCommandText = $this->postgresqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
                 } else {
-                    $this->postgresqlRestoreCommand = 'pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+                    $this->syncPostgresqlRestoreCommand();
                 }
                 break;
         }
 
+    }
+
+    public function updatedReplaceExisting(): void
+    {
+        $this->syncPostgresqlRestoreCommand();
+    }
+
+    private function syncPostgresqlRestoreCommand(): void
+    {
+        $replaceExisting = $this->replaceExisting ? ' --clean --if-exists' : '';
+        $this->postgresqlRestoreCommand = 'pg_restore --exit-on-error'.$replaceExisting.' -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
     }
 
     public function getContainers()
@@ -446,78 +461,25 @@ EOD;
 
         try {
             $this->importRunning = true;
-            $this->importCommands = [];
-            $backupFileName = "upload/{$this->resourceUuid}/restore";
-
-            // Check if an uploaded file exists first (takes priority over custom location)
-            if (Storage::exists($backupFileName)) {
-                $path = Storage::path($backupFileName);
-
-                // Reject malicious PostgreSQL payloads before transferring the file anywhere.
-                if ($this->isPostgresqlRestore() && DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($path)) {
-                    Storage::delete($backupFileName);
-                    $this->dispatch('error', 'The uploaded backup contains disallowed PostgreSQL restore directives (COPY ... PROGRAM or psql shell commands) and was rejected.');
-
-                    return true;
-                }
-
-                $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resourceUuid;
-                instant_scp($path, $tmpPath, $this->server);
-                Storage::delete($backupFileName);
-                $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
-                $this->addRestoreSafetyCheckCommand($this->importCommands, $tmpPath);
-            } elseif (filled($this->customLocation)) {
-                // Validate the custom location to prevent command injection
-                if (! $this->validateServerPath($this->customLocation)) {
-                    $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters.');
-
-                    return true;
-                }
-                $tmpPath = '/tmp/restore_'.$this->resourceUuid;
-                $escapedCustomLocation = escapeshellarg($this->customLocation);
-                $this->importCommands[] = "docker cp {$escapedCustomLocation} {$this->container}:{$tmpPath}";
-                $this->addRestoreSafetyCheckCommand($this->importCommands, $tmpPath);
-            } else {
-                $this->dispatch('error', 'The file does not exist or has been deleted.');
-
-                return true;
-            }
-
-            // Copy the restore command to a script file
-            $scriptPath = "/tmp/restore_{$this->resourceUuid}.sh";
-
-            $restoreCommand = $this->buildRestoreCommand($tmpPath);
-
-            $restoreCommandBase64 = base64_encode($restoreCommand);
-            $this->importCommands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
-            $this->importCommands[] = "chmod +x {$scriptPath}";
-            $this->importCommands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
-
-            $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
-            $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
-
-            if (! empty($this->importCommands)) {
-                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'RestoreJobFinished', callEventData: [
-                    'scriptPath' => $scriptPath,
-                    'tmpPath' => $tmpPath,
-                    'container' => $this->container,
-                    'serverId' => $this->server->id,
-                ]);
-
-                // Track the activity ID
-                $this->activityId = $activity->id;
-
-                // Dispatch activity to the monitor and open slide-over
-                $this->dispatch('activityMonitor', $activity->id);
-                $this->dispatch('databaserestore');
-                auditLog('ui.database.import_started', [
-                    'team_id' => $this->resource->team()?->id,
-                    'database_uuid' => $this->resource->uuid,
-                    'database_name' => $this->resource->name,
-                    'source' => 'file',
-                ]);
-            }
+            $source = Storage::exists("upload/{$this->resourceUuid}/restore")
+                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting)
+                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
+            $this->activityId = $activity->id;
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('databaserestore');
+            auditLog('ui.database.import_started', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+                'source' => 'file',
+                'replace_existing' => $this->replaceExisting,
+            ]);
+        } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
+            $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
+            $this->importRunning = false;
             handleError($e, $this);
 
             return true;
@@ -660,118 +622,9 @@ EOD;
 
         try {
             $this->importRunning = true;
-
-            $s3Storage = S3Storage::ownedByCurrentTeam()->findOrFail($this->s3StorageId);
-
-            $key = $s3Storage->key;
-            $secret = $s3Storage->secret;
-            $bucket = $s3Storage->bucket;
-            $endpoint = $s3Storage->endpoint;
-
-            // Validate bucket name to prevent command injection
-            if (! $this->validateBucketName($bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
-
-                return true;
-            }
-
-            // Clean the S3 path
-            $cleanPath = ltrim($this->s3Path, '/');
-
-            // Validate the S3 path to prevent command injection
-            if (! $this->validateS3Path($cleanPath)) {
-                $this->dispatch('error', 'Invalid S3 path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
-
-                return true;
-            }
-
-            // Get helper image
-            $helperImage = coolifyHelperImage();
-            $latestVersion = getHelperVersion();
-            $fullImageName = "{$helperImage}:{$latestVersion}";
-
-            // Get the database destination network
-            if ($this->resource->getMorphClass() === ServiceDatabase::class) {
-                $destinationNetwork = $this->resource->service->destination->network ?? 'coolify';
-            } else {
-                $destinationNetwork = $this->resource->destination->network ?? 'coolify';
-            }
-
-            // Generate unique names for this operation
-            $containerName = "s3-restore-{$this->resourceUuid}";
-            $helperTmpPath = '/tmp/'.basename($cleanPath);
-            $serverTmpPath = "/tmp/s3-restore-{$this->resourceUuid}-".basename($cleanPath);
-            $containerTmpPath = "/tmp/restore_{$this->resourceUuid}-".basename($cleanPath);
-            $scriptPath = "/tmp/restore_{$this->resourceUuid}.sh";
-
-            $escapedServerTmpPath = escapeshellarg($serverTmpPath);
-            $escapedContainerTmpPath = escapeshellarg($containerTmpPath);
-            $escapedScriptPath = escapeshellarg($scriptPath);
-            $escapedHelperContainerPath = escapeshellarg("{$containerName}:{$helperTmpPath}");
-            $escapedDatabaseContainerTmpPath = escapeshellarg("{$this->container}:{$containerTmpPath}");
-            $escapedDatabaseContainerScriptPath = escapeshellarg("{$this->container}:{$scriptPath}");
-            $restoreAndCleanupCommand = escapeshellarg("{$escapedScriptPath} && rm -f {$escapedContainerTmpPath} {$escapedScriptPath}");
-
-            // Prepare all commands in sequence
-            $commands = [];
-
-            // 1. Clean up any existing helper container and temp files from previous runs
-            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
-            $commands[] = "rm -f {$escapedServerTmpPath} 2>/dev/null || true";
-            $commands[] = "docker exec {$this->container} rm -f {$escapedContainerTmpPath} {$escapedScriptPath} 2>/dev/null || true";
-
-            // 2. Start helper container on the database network
-            $commands[] = "docker run -d --network {$destinationNetwork} --name {$containerName} {$fullImageName} sleep 3600";
-
-            // 3. Configure S3 access in helper container
-            $escapedEndpoint = escapeshellarg($endpoint);
-            $escapedKey = escapeshellarg($key);
-            $escapedSecret = escapeshellarg($secret);
-            $commands[] = "docker exec {$containerName} mc alias set s3temp {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-
-            // 4. Check file exists in S3 (bucket and path already validated above)
-            $escapedS3Source = escapeshellarg("s3temp/{$bucket}/{$cleanPath}");
-            $commands[] = "docker exec {$containerName} mc stat {$escapedS3Source}";
-
-            // 5. Download from S3 to helper container (progress shown by default)
-            $escapedHelperTmpPath = escapeshellarg($helperTmpPath);
-            $commands[] = "docker exec {$containerName} mc cp {$escapedS3Source} {$escapedHelperTmpPath}";
-
-            // 6. Copy from helper to server, then immediately to database container
-            $commands[] = "docker cp {$escapedHelperContainerPath} {$escapedServerTmpPath}";
-            $commands[] = "docker cp {$escapedServerTmpPath} {$escapedDatabaseContainerTmpPath}";
-            $this->addRestoreSafetyCheckCommand($commands, $containerTmpPath);
-
-            // 7. Cleanup helper container and server temp file immediately (no longer needed)
-            $commands[] = "docker rm -f {$containerName} 2>/dev/null || true";
-            $commands[] = "rm -f {$escapedServerTmpPath} 2>/dev/null || true";
-
-            // 8. Build and execute restore command inside database container
-            $restoreCommand = $this->buildRestoreCommand($containerTmpPath);
-
-            $restoreCommandBase64 = base64_encode($restoreCommand);
-            $commands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$escapedScriptPath}";
-            $commands[] = "chmod +x {$escapedScriptPath}";
-            $commands[] = "docker cp {$escapedScriptPath} {$escapedDatabaseContainerScriptPath}";
-
-            // 9. Execute restore and cleanup temp files immediately after completion
-            $commands[] = "docker exec {$this->container} sh -c {$restoreAndCleanupCommand}";
-            $commands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
-
-            // Execute all commands with cleanup event (as safety net for edge cases)
-            $activity = remote_process($commands, $this->server, ignore_errors: true, callEventOnFinish: 'S3RestoreJobFinished', callEventData: [
-                'containerName' => $containerName,
-                'serverTmpPath' => $serverTmpPath,
-                'scriptPath' => $scriptPath,
-                'containerTmpPath' => $containerTmpPath,
-                'container' => $this->container,
-                'serverId' => $this->server->id,
-            ]);
-
-            // Track the activity ID
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
-
-            // Dispatch activity to the monitor and open slide-over
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
             auditLog('ui.database.restore_started', [
@@ -779,9 +632,13 @@ EOD;
                 'database_uuid' => $this->resource->uuid,
                 'database_name' => $this->resource->name,
                 'source' => 's3',
+                'replace_existing' => $this->replaceExisting,
                 'storage_id' => $this->s3StorageId,
             ]);
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
+        } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
+            $this->dispatch('error', $e->getMessage());
         } catch (\Throwable $e) {
             $this->importRunning = false;
             handleError($e, $this);
@@ -792,147 +649,8 @@ EOD;
         return true;
     }
 
-    public function buildRestoreSafetyCheckCommand(string $tmpPath): ?string
-    {
-        $script = $this->buildPostgresRestoreScanScript($tmpPath);
-
-        if ($script === null) {
-            return null;
-        }
-
-        return "docker exec {$this->container} sh -c ".escapeshellarg($script);
-    }
-
-    /**
-     * Build the POSIX shell snippet that aborts (exit 1) when a PostgreSQL
-     * backup contains directives leading to OS command execution.
-     *
-     * Hardened against bypasses:
-     *  - decompresses gzip backups before scanning,
-     *  - converts custom-format (PGDMP) archives to SQL with pg_restore
-     *    before scanning, and rejects archives that cannot be inspected,
-     *  - strips `--` line comments and flattens newlines so multi-line and
-     *    comment-separated payloads (e.g. `FROM/**​/PROGRAM`) are caught,
-     *  - matches a literal `\!` shell escape and `\o|`/`\g|` pipe redirects.
-     */
-    public function buildPostgresRestoreScanScript(string $tmpPath): ?string
-    {
-        if (! $this->isPostgresqlRestore()) {
-            return null;
-        }
-
-        $escapedTmpPath = escapeshellarg($tmpPath);
-
-        // Token separator PostgreSQL treats as whitespace: real whitespace or a
-        // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
-        $sep = '([[:space:]]|/\\*[^*]*\\*/)';
-
-        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
-        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
-        $escapedSqlPattern = escapeshellarg($sqlPattern);
-        $escapedPsqlPattern = escapeshellarg($psqlPattern);
-        $contents = "{ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; }";
-        $scan = static fn (string $source): string => "{$source} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$source} | sed 's/--.*//' | tr '\\n\\r\\t' '   ' | grep -Eiq {$escapedSqlPattern}";
-        $customScan = $scan('pg_restore -f - "$inspect" 2>/dev/null');
-        $sqlScan = $scan($contents);
-        $blockedProgram = 'echo \'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.\'; exit 1';
-        $blockedInspect = 'echo \'Blocked PostgreSQL restore: unable to inspect custom archive.\'; exit 1';
-
-        return <<<SH
-header=\$({$contents} | head -c 5)
-if [ "\$header" = 'PGDMP' ]; then
-  inspect=\$(mktemp)
-  trap 'rm -f "\$inspect"' EXIT
-  if ! {$contents} > "\$inspect"; then
-    {$blockedInspect}
-  fi
-  if ! pg_restore -l "\$inspect" >/dev/null 2>&1; then
-    {$blockedInspect}
-  fi
-  if {$customScan}; then
-    {$blockedProgram}
-  fi
-elif {$sqlScan}; then
-  {$blockedProgram}
-fi
-SH;
-    }
-
-    private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void
-    {
-        $command = $this->buildRestoreSafetyCheckCommand($tmpPath);
-
-        if ($command !== null) {
-            $commands[] = $command;
-        }
-    }
-
-    private function isPostgresqlRestore(): bool
-    {
-        $morphClass = $this->resource->getMorphClass();
-
-        if ($morphClass === ServiceDatabase::class) {
-            return str_contains($this->resource->databaseType(), 'postgres');
-        }
-
-        return $morphClass === StandalonePostgresql::class || $morphClass === 'postgresql';
-    }
-
     public function buildRestoreCommand(string $tmpPath): string
     {
-        $escapedTmpPath = escapeshellarg($tmpPath);
-        $morphClass = $this->resource->getMorphClass();
-
-        // Handle ServiceDatabase by checking the database type
-        if ($morphClass === ServiceDatabase::class) {
-            $dbType = $this->resource->databaseType();
-            if (str_contains($dbType, 'mysql')) {
-                $morphClass = 'mysql';
-            } elseif (str_contains($dbType, 'mariadb')) {
-                $morphClass = 'mariadb';
-            } elseif (str_contains($dbType, 'postgres')) {
-                $morphClass = 'postgresql';
-            } elseif (str_contains($dbType, 'mongo')) {
-                $morphClass = 'mongodb';
-            }
-        }
-
-        switch ($morphClass) {
-            case StandaloneMariadb::class:
-            case 'mariadb':
-                $restoreCommand = $this->mariadbRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD \${MARIADB_DATABASE:-default}";
-                } else {
-                    $restoreCommand .= " < {$escapedTmpPath}";
-                }
-                break;
-            case StandaloneMysql::class:
-            case 'mysql':
-                $restoreCommand = $this->mysqlRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD \${MYSQL_DATABASE:-default}";
-                } else {
-                    $restoreCommand .= " < {$escapedTmpPath}";
-                }
-                break;
-            case StandalonePostgresql::class:
-            case 'postgresql':
-                $restoreCommand = $this->postgresqlRestoreCommand;
-                if ($this->dumpAll) {
-                    $restoreCommand .= " && if [ \"\$({ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; } | head -c 5)\" = 'PGDMP' ]; then pg_restore -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}} {$escapedTmpPath}; else (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}; fi";
-                } else {
-                    $restoreCommand .= " {$escapedTmpPath}";
-                }
-                break;
-            case StandaloneMongodb::class:
-            case 'mongodb':
-                $restoreCommand = $this->mongodbRestoreCommand.$escapedTmpPath;
-                break;
-            default:
-                $restoreCommand = '';
-        }
-
-        return $restoreCommand;
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting);
     }
 }

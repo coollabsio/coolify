@@ -3,8 +3,10 @@
 namespace App\Livewire\Security;
 
 use App\Models\IntegrationToken;
+use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class IntegrationTokenEditor extends Component
@@ -21,6 +23,13 @@ class IntegrationTokenEditor extends Component
 
     public array $metadata = [];
 
+    public int $zoneCount = 0;
+
+    /** @var array<int, array{id: int, name: string, account_name: ?string, managed_records_count: int}> */
+    public array $zones = [];
+
+    public bool $automaticDns = true;
+
     public function mount(string $integration_token_uuid): void
     {
         $this->integrationToken = IntegrationToken::ownedByCurrentTeam()
@@ -32,6 +41,8 @@ class IntegrationTokenEditor extends Component
         $this->name = $this->integrationToken->name;
         $this->capabilities = $this->integrationToken->capabilities;
         $this->metadata = $this->integrationToken->metadata ?? [];
+        $this->loadZones();
+        $this->automaticDns = $this->integrationToken->automaticDnsEnabled();
     }
 
     protected function rules(): array
@@ -43,6 +54,7 @@ class IntegrationTokenEditor extends Component
             'newToken' => ['nullable', 'string'],
             'capabilities' => ['required', 'array', 'min:1'],
             'capabilities.*' => ['required', 'in:'.$allowedCapability],
+            'automaticDns' => ['boolean'],
         ];
 
         if ($this->integrationToken->provider === 'infisical') {
@@ -66,13 +78,20 @@ class IntegrationTokenEditor extends Component
         ];
     }
 
-    public function save(IntegrationTokenValidator $validator): void
+    public function save(IntegrationTokenValidator $validator, CloudflareDnsProvider $cloudflare): void
     {
         $this->authorize('update', $this->integrationToken);
         $validated = $this->validate();
         $provider = $this->integrationToken->provider;
         $token = filled($validated['newToken']) ? $validated['newToken'] : $this->integrationToken->token;
         $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
+        if ($provider === 'cloudflare') {
+            if ($validated['automaticDns']) {
+                unset($metadata['automatic_dns']);
+            } else {
+                $metadata['automatic_dns'] = false;
+            }
+        }
         $capabilitiesChanged = collect($validated['capabilities'])->sort()->values()->all()
             !== collect($this->integrationToken->capabilities)->sort()->values()->all();
         $metadataChanged = $metadata != ($this->integrationToken->metadata ?? []);
@@ -95,8 +114,14 @@ class IntegrationTokenEditor extends Component
                 $updates['token'] = $validated['newToken'];
             }
 
-            $this->integrationToken->update($updates);
+            DB::transaction(function () use ($updates, $provider, $validated, $capabilitiesChanged, $cloudflare): void {
+                $this->integrationToken->update($updates);
+                if ($provider === 'cloudflare' && (filled($validated['newToken']) || $capabilitiesChanged)) {
+                    $cloudflare->syncZones($this->integrationToken);
+                }
+            });
             $this->newToken = '';
+            $this->loadZones();
 
             auditLog('ui.integration_token.updated', [
                 'team_id' => currentTeam()->id,
@@ -128,6 +153,12 @@ class IntegrationTokenEditor extends Component
             return;
         }
 
+        if ($this->integrationToken->managedDnsRecords()->exists()) {
+            $this->dispatch('error', 'This token manages DNS records. Remove those domains or records first.');
+
+            return;
+        }
+
         $uuid = $this->integrationToken->uuid;
         $name = $this->integrationToken->name;
         $provider = $this->integrationToken->provider;
@@ -145,8 +176,38 @@ class IntegrationTokenEditor extends Component
         $this->dispatch('success', 'Integration token deleted successfully.');
     }
 
+    public function refreshZones(CloudflareDnsProvider $cloudflare): void
+    {
+        $this->authorize('update', $this->integrationToken);
+        try {
+            $cloudflare->syncZones($this->integrationToken);
+            $this->integrationToken->refresh();
+            $this->loadZones();
+            $this->dispatch('success', "Cloudflare zones refreshed. {$this->zoneCount} accessible zones found.");
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         return view('livewire.security.integration-token-editor');
+    }
+
+    private function loadZones(): void
+    {
+        $this->zones = $this->integrationToken->dnsZones()
+            ->select(['id', 'integration_token_id', 'name', 'account_name'])
+            ->withCount('managedRecords')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($zone) => [
+                'id' => $zone->id,
+                'name' => $zone->name,
+                'account_name' => $zone->account_name,
+                'managed_records_count' => $zone->managed_records_count,
+            ])
+            ->all();
+        $this->zoneCount = count($this->zones);
     }
 }

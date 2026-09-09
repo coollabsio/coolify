@@ -98,7 +98,7 @@
 
 .button.button-highlighted:not(:disabled),
 .button[isHighlighted]:not(:disabled) {
-    --button-depth-color: color-mix(in oklab, var(--color-coollabs) 52%, black);
+    --button-depth-color: var(--color-coollabs-300);
 }
 
 .dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {

@@ -51,6 +51,13 @@
                     <span class="text-xs text-red-500">{{ $message }}</span>
                 @enderror
             </fieldset>
+            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                <x-forms.checkbox id="automatic-dns" label="Automatically configure DNS" fullWidth
+                    wire:model.live="automaticDns" canGate="create" :canResource="\App\Models\IntegrationToken::class" />
+                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Create DNS records automatically when a new domain has one unambiguous matching credential.
+                </p>
+            </div>
         @else
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Capability: Secrets (read-only)</div>
