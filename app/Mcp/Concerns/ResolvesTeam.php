@@ -22,7 +22,7 @@ trait ResolvesTeam
 
     protected function ensureAbility(Request $request, string $ability = 'read', ?string $tool = null): ?Response
     {
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
         if (! $user) {
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'unauthenticated']);
 
@@ -30,51 +30,84 @@ trait ResolvesTeam
         }
 
         $token = $user->currentAccessToken();
-        if (! $token) {
-            $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'invalid_token']);
 
-            return Response::error('Invalid token.');
-        }
+        if ($token) {
+            // --- Token path (external MCP client): unchanged behavior. ---
+            $teamId = $token->team_id;
+            if ($teamId !== null) {
+                // Fresh pivot lookup (avoid stale $user->teams cache after role changes).
+                $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
+                $isAdminOrOwner = in_array($role, ['admin', 'owner'], true);
 
-        $teamId = $token->team_id;
-        if ($teamId !== null) {
-            // Fresh pivot lookup (avoid stale $user->teams cache after role changes).
-            $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
-            $isAdminOrOwner = in_array($role, ['admin', 'owner'], true);
+                if (! $isAdminOrOwner) {
+                    $tokenAbilities = $token->abilities ?? [];
+                    $disallowed = array_intersect($tokenAbilities, self::MEMBER_DISALLOWED_ABILITIES);
+                    if ($disallowed !== [] || in_array($ability, self::MEMBER_DISALLOWED_ABILITIES, true)) {
+                        $this->auditMcpTool($request, $tool, 'denied', [
+                            'reason' => 'member_role',
+                            'required_ability' => $ability,
+                        ]);
 
-            if (! $isAdminOrOwner) {
-                $tokenAbilities = $token->abilities ?? [];
-                $disallowed = array_intersect($tokenAbilities, self::MEMBER_DISALLOWED_ABILITIES);
-                if ($disallowed !== [] || in_array($ability, self::MEMBER_DISALLOWED_ABILITIES, true)) {
-                    $this->auditMcpTool($request, $tool, 'denied', [
-                        'reason' => 'member_role',
-                        'required_ability' => $ability,
-                    ]);
-
-                    return Response::error('Missing required team role.');
+                        return Response::error('Missing required team role.');
+                    }
                 }
             }
+
+            if ($token->can('root') || $token->can($ability)) {
+                return null;
+            }
+
+            $this->auditMcpTool($request, $tool, 'denied', [
+                'reason' => 'missing_ability',
+                'required_ability' => $ability,
+            ]);
+
+            return Response::error("Missing required permissions: {$ability}");
         }
 
-        if ($token->can('root') || $token->can($ability)) {
+        // --- Session path (in-app agent, no token): authorize by team role. ---
+        $teamId = currentTeam()?->id;
+        if (is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+            $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'no_team']);
+
+            return Response::error('No accessible team.');
+        }
+
+        if ($ability === 'read') {
+            return null;
+        }
+
+        $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
+        if (in_array($role, ['admin', 'owner'], true)) {
             return null;
         }
 
         $this->auditMcpTool($request, $tool, 'denied', [
-            'reason' => 'missing_ability',
+            'reason' => 'member_role',
             'required_ability' => $ability,
         ]);
 
-        return Response::error("Missing required permissions: {$ability}");
+        return Response::error('Missing required team role.');
     }
 
     protected function resolveTeamId(Request $request): ?int
     {
-        $user = $request->user();
-        $token = $user?->currentAccessToken();
+        $user = $request->user() ?? auth()->user();
+        if (! $user) {
+            return null;
+        }
+
+        $token = $user->currentAccessToken();
+
+        // Token path (external MCP): team comes from the token.
         $teamId = $token?->team_id;
 
-        if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+        // Session path (in-app agent, no token): fall back to the current team.
+        if (is_null($teamId) && is_null($token)) {
+            $teamId = currentTeam()?->id;
+        }
+
+        if (is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
             return null;
         }
 
