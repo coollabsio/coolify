@@ -35,29 +35,80 @@ class DatabasesController extends Controller
     use Concerns\HandlesDatabaseImportsApi;
     use Concerns\HandlesTagsApi;
 
-    #[OA\Post(path: '/databases/{uuid}/imports/uploads', operationId: 'upload-database-import', summary: 'Upload database import', security: [['bearerAuth' => []]], tags: ['Databases'], responses: [new OA\Response(response: 201, description: 'Upload completed'), new OA\Response(response: 422, ref: '#/components/responses/422')])]
+    #[OA\Post(
+        path: '/databases/{uuid}/imports/uploads',
+        operationId: 'upload-database-import',
+        summary: 'Upload database import',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 201, description: 'Upload completed'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
     public function upload_import(Request $request, string $uuid): JsonResponse
     {
         $teamId = getTeamIdFromToken();
-        $database = $teamId === null ? null : queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
 
         return $database ? $this->uploadDatabaseImport($request, $database, $teamId) : response()->json(['message' => 'Database not found.'], 404);
     }
 
-    #[OA\Post(path: '/databases/{uuid}/imports', operationId: 'create-database-import', summary: 'Import database backup', requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')), security: [['bearerAuth' => []]], tags: ['Databases'], responses: [new OA\Response(response: 202, description: 'Import queued'), new OA\Response(response: 409, description: 'Import already active'), new OA\Response(response: 422, ref: '#/components/responses/422')])]
+    #[OA\Post(
+        path: '/databases/{uuid}/imports',
+        operationId: 'create-database-import',
+        summary: 'Import database backup',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')),
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 202, description: 'Import queued'),
+            new OA\Response(response: 409, description: 'Import already active'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
     public function create_import(Request $request, string $uuid): JsonResponse
     {
         $teamId = getTeamIdFromToken();
-        $database = $teamId === null ? null : queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
 
         return $database ? $this->startDatabaseImport($request, $database, $teamId, 'api.databases.imports.show', ['uuid' => $uuid]) : response()->json(['message' => 'Database not found.'], 404);
     }
 
-    #[OA\Get(path: '/databases/{uuid}/imports/{activity_id}', operationId: 'get-database-import', summary: 'Get database import status', security: [['bearerAuth' => []]], tags: ['Databases'], responses: [new OA\Response(response: 200, description: 'Import status'), new OA\Response(response: 404, ref: '#/components/responses/404')])]
+    #[OA\Get(
+        path: '/databases/{uuid}/imports/{activity_id}',
+        operationId: 'get-database-import',
+        summary: 'Get database import status',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'activity_id', in: 'path', required: true, description: 'Import activity ID.', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Import status', content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportStatus')),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
     public function show_import(Request $request, string $uuid, int $activity_id): JsonResponse
     {
         $teamId = getTeamIdFromToken();
-        $database = $teamId === null ? null : queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
 
         return $database ? $this->showDatabaseImport($database, $teamId, $activity_id) : response()->json(['message' => 'Database not found.'], 404);
     }

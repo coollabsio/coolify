@@ -1,6 +1,8 @@
 <?php
 
 use App\Actions\Database\StartDatabaseImport;
+use App\Http\Middleware\ApiAbility;
+use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -131,3 +133,32 @@ test('returns only a team and resource scoped import activity', function () {
     $activity->save();
     $this->withHeaders($this->headers)->getJson("/api/v1/databases/{$database->uuid}/imports/{$activity->id}")->assertNotFound();
 });
+
+test('returns invalid token when the access token team is not a member team', function (string $method, string $path) {
+    $this->withoutMiddleware([
+        EnsureTokenBelongsToCurrentTeamMember::class,
+        ApiAbility::class,
+    ]);
+
+    $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
+    $foreignTeam = Team::factory()->create();
+    $plainTextToken = 'no-team';
+    $token = $this->user->tokens()->create([
+        'name' => 'imports-foreign-team',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['deploy', 'read'],
+        'team_id' => $foreignTeam->id,
+    ]);
+
+    $this->withHeaders(['Authorization' => 'Bearer '.$token->id.'|'.$plainTextToken])
+        ->{$method}(sprintf($path, $database->uuid))
+        ->assertBadRequest()
+        ->assertJson([
+            'message' => 'Invalid token.',
+            'docs' => 'https://coolify.io/docs/api-reference/authorization',
+        ]);
+})->with([
+    'upload' => ['postJson', '/api/v1/databases/%s/imports/uploads'],
+    'create' => ['postJson', '/api/v1/databases/%s/imports'],
+    'show' => ['getJson', '/api/v1/databases/%s/imports/1'],
+]);
