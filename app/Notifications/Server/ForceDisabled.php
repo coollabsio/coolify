@@ -74,4 +74,16 @@ class ForceDisabled extends CustomEmailNotification
             color: SlackMessage::errorColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "Server ({$this->server->name}) disabled because it is not paid! All automations and integrations are stopped.",
+            'event' => 'server_force_disabled',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => base_url().'/server/'.$this->server->uuid,
+        ];
+    }
 }

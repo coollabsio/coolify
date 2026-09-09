@@ -9,6 +9,7 @@ use App\Actions\Service\UpdateServiceApplicationFromApi;
 use App\Http\Controllers\Controller;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -333,7 +334,7 @@ class ServiceApplicationsController extends Controller
         ];
 
         $validationRules = [
-            'url' => 'nullable|string',
+            'url' => ValidationPatterns::applicationDomainRules(),
             'noindex_domains' => 'sometimes|array|nullable',
             'noindex_domains.*' => 'string',
             'human_name' => 'nullable|string|max:255',

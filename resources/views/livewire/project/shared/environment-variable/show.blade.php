@@ -89,7 +89,8 @@
             @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
-                wireOpen="editorOpen">
+                wireOpen="editorOpen"
+                @environment-variable-updated.window="if ($event.detail.envId === @js($env->id)) modalOpen = false">
                 <x-slot:content>
                     <button type="button" wire:click="loadValues" data-env-settings-trigger class="icon-button shrink-0"
                         title="Edit environment variable" aria-label="Edit environment variable">
@@ -224,26 +225,32 @@
 
                     @if ($canUpdate || auth()->user()?->can('delete', $this->env))
                         <div
-                            class="flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
-                            @if ($canUpdate && !$isLocked && !$isMagicVariable)
-                                <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
-                            @endif
-                            @can('delete', $this->env)
-                                @if (!$isMagicVariable)
-                                    <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
-                                        buttonTitle="Delete" submitAction="delete"
-                                        :actions="['The selected environment variable will be permanently deleted.']"
-                                        confirmationText="{{ $key }}"
-                                        confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
-                                        shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
-                                        step2ButtonText="Permanently Delete" />
+                            class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                            <div data-environment-variable-delete-action>
+                                @can('delete', $this->env)
+                                    @if (!$isMagicVariable)
+                                        <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
+                                            buttonTitle="Delete" submitAction="delete"
+                                            :actions="['The selected environment variable will be permanently deleted.']"
+                                            confirmationText="{{ $key }}"
+                                            confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
+                                            shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                                            step2ButtonText="Permanently Delete" />
+                                    @endif
+                                @endcan
+                            </div>
+                            <div class="ml-auto flex flex-wrap gap-2" data-environment-variable-update-actions>
+                                @if ($canUpdate && !$isLocked && !$isMagicVariable)
+                                    <x-forms.button type="button" wire:click="lock">Lock</x-forms.button>
                                 @endif
-                            @endcan
-                            @if ($canUpdate)
-                                <x-forms.button type="submit" :disabled="$isDisabled" @click="modalOpen = false">
-                                    Update variable
-                                </x-forms.button>
-                            @endif
+                                @if ($canUpdate && !$isDisabled)
+                                    <fieldset disabled wire:dirty.attr.remove="disabled">
+                                        <x-forms.button type="submit" isHighlighted wire:target="submit">
+                                            Update variable
+                                        </x-forms.button>
+                                    </fieldset>
+                                @endif
+                            </div>
                         </div>
                     @endif
                 </form>

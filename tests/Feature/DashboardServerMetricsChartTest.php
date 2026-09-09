@@ -79,7 +79,8 @@ it('configures the dashboard chart as a ten minute cpu and memory sparkline with
         ->not->toContain('w-full overflow-hidden rounded-b-xl')
         ->toContain('CPU:')
         ->toContain('Memory:')
-        ->toContain('formatTimestamp(timestamp)')
+        ->toContain('formatLocalTimestamp(timestamp)')
+        ->toContain('formatUtcTimestamp(timestamp)')
         ->toContain("min: 0,\n                            max: 100,")
         ->toContain('labels: { show: false }');
 });

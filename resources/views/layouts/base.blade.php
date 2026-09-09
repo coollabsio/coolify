@@ -3,6 +3,22 @@
 <script data-navigate-once>
     // Immediate theme application - runs before any rendering
     (function () {
+        // The OS color picker only speaks hex. Convert it once so the whole theme
+        // cascade is authored in OKLCH (sRGB -> linear -> OKLab -> OKLCH).
+        const srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        window.hexToOklch = (hex) => {
+            const [r, g, b] = hex.match(/[a-f\d]{2}/gi).map((channel) => srgbToLinear(parseInt(channel, 16) / 255));
+            const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+            const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+            const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+            const okL = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+            const okA = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+            const okB = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+            const chroma = Math.sqrt(okA * okA + okB * okB);
+            let hue = Math.atan2(okB, okA) * 180 / Math.PI;
+            if (hue < 0) hue += 360;
+            return `oklch(${(okL * 100).toFixed(2)}% ${chroma.toFixed(4)} ${hue.toFixed(2)})`;
+        };
         window.themeAccentForeground = (color) => {
             const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
             const luminance = channels
@@ -10,20 +26,93 @@
                 .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
                 .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
 
-            return luminance > 0.179 ? '#000000' : '#ffffff';
+            return luminance > 0.179 ? 'oklch(0% 0 0)' : 'oklch(100% 0 0)';
         };
         window.applyStoredTheme = () => {
             const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
             const themeColor = localStorage.themeColor || '#6b16ed';
-            const isDark = theme === 'dark' || theme === 'custom' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+            const customMode = localStorage.customMode || 'dark';
+            const isDark = theme === 'dark'
+                || (theme === 'custom' && customMode === 'dark')
+                || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
 
             localStorage.theme = theme;
             document.documentElement.classList.toggle('dark', isDark);
             document.documentElement.dataset.theme = theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
-            document.documentElement.style.setProperty('--theme-base-color', themeColor);
+            document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(themeColor));
             document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         };
+        // Single source for the theme controls Alpine state, shared by the
+        // Appearance page and the profile dropdown via x-data="themeControls()".
+        window.themeControls = () => ({
+            theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
+            themeColor: localStorage.getItem('themeColor') || '#6b16ed',
+            customMode: localStorage.getItem('customMode') || 'dark',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            themeColorFrame: null,
+            pickerOpen: false,
+            init() {
+                localStorage.setItem('theme', this.theme);
+                this.applyTheme();
+            },
+            chooseCustom() {
+                this.setTheme('custom');
+                this.pickerOpen = !this.pickerOpen;
+            },
+            setTheme(type) {
+                this.theme = type;
+                localStorage.setItem('theme', type);
+                this.applyTheme();
+            },
+            setCustomMode(mode) {
+                this.customMode = mode;
+                localStorage.setItem('customMode', mode);
+                if (this.theme !== 'custom') {
+                    this.setTheme('custom');
+                    return;
+                }
+                this.applyTheme();
+            },
+            setWidth(width) {
+                this.pageWidth = width;
+                localStorage.setItem('pageWidth', width);
+                window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
+            },
+            previewThemeColor(color) {
+                this.themeColor = color;
+                if (this.theme !== 'custom') {
+                    this.theme = 'custom';
+                    localStorage.setItem('theme', 'custom');
+                }
+                document.documentElement.dataset.theme = 'custom';
+                document.documentElement.classList.toggle('dark', this.customMode === 'dark');
+                if (this.themeColorFrame) {
+                    return;
+                }
+                this.themeColorFrame = requestAnimationFrame(() => {
+                    document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
+                    document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+                    this.themeColorFrame = null;
+                });
+            },
+            saveThemeColor(color) {
+                this.previewThemeColor(color);
+                localStorage.setItem('themeColor', color);
+                localStorage.setItem('theme', 'custom');
+            },
+            applyTheme() {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const isDark = this.theme === 'dark'
+                    || (this.theme === 'custom' && this.customMode === 'dark')
+                    || (this.theme === 'system' && prefersDark);
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.dataset.theme = this.theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+                document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
+                document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+            },
+        });
 
         document.addEventListener('livewire:navigated', window.applyStoredTheme);
         window.applyStoredTheme();
@@ -95,7 +184,7 @@
 </head>
 @section('body')
 
-<body class="overflow-y-scroll dark:text-inherit text-black">
+<body class="dark:text-inherit text-black">
     <x-toast />
     <x-icon-tooltip />
     <script data-navigate-once>

@@ -38,6 +38,7 @@ class PreviewDomains extends Component
 
     public function mount(): void
     {
+        $this->authorize('view', $this->preview->application);
         $this->refreshDomains();
         if ($this->preview->application->build_pack === 'dockercompose') {
             $this->newDomainService = $this->composeServices()[0] ?? null;
@@ -74,7 +75,7 @@ class PreviewDomains extends Component
 
             return;
         }
-        if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+        if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts), serviceName: $this->newDomainService)) {
             $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
 
             return;
@@ -94,7 +95,7 @@ class PreviewDomains extends Component
             ? ($this->composeServices()[0] ?? null)
             : null;
         $this->forceUseUnknownPort = false;
-        $this->dispatch('close-modal');
+        $this->dispatch('close-preview-domain-add', previewId: $this->preview->id);
 
         try {
             $server = $this->preview->application->destination?->server;
@@ -149,6 +150,7 @@ class PreviewDomains extends Component
 
     public function startEdit(int $index): void
     {
+        $this->authorize('update', $this->preview->application);
         if (! isset($this->domainRows[$index])) {
             return;
         }
@@ -159,7 +161,8 @@ class PreviewDomains extends Component
         if (filled($savedPort)) {
             $this->editingDomainParts['port'] = (string) $savedPort;
         }
-        $this->dispatch('open-preview-domain-edit');
+        $this->resetErrorBag('editingDomainParts.host');
+        $this->dispatch('open-preview-domain-edit', previewId: $this->preview->id);
     }
 
     public function updateDomain(): void
@@ -173,7 +176,7 @@ class PreviewDomains extends Component
             return;
         }
         $oldUrl = $this->domainRows[$this->editingIndex]['url'];
-        if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+        if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl), $this->domainRows[$this->editingIndex]['service'])) {
             $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
             return;
@@ -193,7 +196,7 @@ class PreviewDomains extends Component
             return;
         }
         $this->forceUseUnknownPort = false;
-        $this->dispatch('close-preview-domain-edit');
+        $this->dispatch('close-preview-domain-edit', previewId: $this->preview->id);
         $this->dispatch('success', 'Domain updated.');
         $this->checkDomainDns($index);
     }
@@ -228,6 +231,12 @@ class PreviewDomains extends Component
         $this->authorize('update', $this->preview->application);
         if (! isset($this->domainRows[$index])) {
             return;
+        }
+        if ($this->editingIndex === $index) {
+            $this->editingIndex = null;
+            $this->dispatch('close-preview-domain-edit', previewId: $this->preview->id);
+        } elseif ($this->editingIndex !== null && $this->editingIndex > $index) {
+            $this->editingIndex--;
         }
         unset($this->domainRows[$index]);
         $this->domainRows = array_values($this->domainRows);
@@ -268,6 +277,7 @@ class PreviewDomains extends Component
 
     public function pollDnsChecks(): void
     {
+        $this->authorize('view', $this->preview->application);
         $checkingRows = collect($this->domainRows)
             ->where('dns_status', 'checking')
             ->values();
@@ -321,6 +331,7 @@ class PreviewDomains extends Component
 
     private function refreshDomains(): void
     {
+        $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
         $this->preview->refresh();
         $statuses = $this->preview->domain_dns_statuses ?? [];
         $rows = [];
@@ -336,6 +347,11 @@ class PreviewDomains extends Component
             }
         }
         $this->domainRows = $rows;
+        if ($editingRow !== null) {
+            $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
+                && $row['service'] === $editingRow['service']);
+            $this->editingIndex = $index === false ? null : (int) $index;
+        }
     }
 
     private function persistDomains(): bool
@@ -349,13 +365,16 @@ class PreviewDomains extends Component
 
                 return false;
             }
-            $domains = collect($composeServices)
-                ->mapWithKeys(fn (string $service): array => [$service => ['domain' => '']])
-                ->all();
+            $existingDomains = json_decode($this->preview->docker_compose_domains ?: '[]', true) ?: [];
+            $domains = [];
+            foreach ($composeServices as $service) {
+                $domains[$service] = is_array($existingDomains[$service] ?? null) ? $existingDomains[$service] : [];
+                $domains[$service]['domain'] = '';
+            }
             $validRows = collect($this->domainRows)
                 ->filter(fn (array $row): bool => in_array($row['service'] ?? null, $composeServices, true));
             foreach ($validRows->groupBy('service') as $service => $rows) {
-                $domains[$service] = ['domain' => $rows->pluck('url')->implode(',')];
+                $domains[$service]['domain'] = $rows->pluck('url')->implode(',');
             }
             $this->preview->docker_compose_domains = json_encode($domains);
             $this->preview->fqdn = $validRows->pluck('url')->implode(',') ?: null;
@@ -439,11 +458,23 @@ class PreviewDomains extends Component
     private function makeRow(string $url, ?string $service, array $statuses = []): array
     {
         $status = $statuses[$this->statusKey($url, $service)] ?? [];
-        $port = $this->effectiveDomainInternalPort($url);
+        $port = $this->effectiveDomainInternalPort($url, $service);
+        $redirect = 'both';
+        if ($this->preview->application->build_pack === 'dockercompose' && $service !== null) {
+            $usesPreviewRedirect = (int) $this->preview->application->compose_parsing_version >= 3;
+            $domains = json_decode(($usesPreviewRedirect
+                ? $this->preview->docker_compose_domains
+                : $this->preview->application->docker_compose_domains) ?: '[]', true) ?: [];
+            $storedRedirect = $usesPreviewRedirect
+                ? ($domains[$service]['redirect'] ?? null)
+                : data_get($domains, "$service.redirect");
+            $redirect = in_array($storedRedirect, ['www', 'non-www', 'both'], true) ? $storedRedirect : 'both';
+        }
 
         return [
             'url' => $url,
             'service' => $service,
+            'redirect' => $redirect,
             'internal_port' => $port['internal_port'],
             'has_port_override' => $port['has_port_override'],
             'dns_status' => $status['status'] ?? 'pending',
@@ -478,7 +509,7 @@ class PreviewDomains extends Component
         return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
     }
 
-    private function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    private function shouldConfirmPort(?int $port, ?int $currentPort = null, ?string $serviceName = null): bool
     {
         if ($this->forceUseUnknownPort || $port === null) {
             return false;
@@ -487,7 +518,7 @@ class PreviewDomains extends Component
             return false;
         }
 
-        return $this->preview->application->portRequiresConfirmation($port);
+        return $this->preview->application->portRequiresConfirmation($port, $serviceName);
     }
 
     private function openPortWarning(?int $port, string $action): void
@@ -500,7 +531,7 @@ class PreviewDomains extends Component
     /**
      * @return array{internal_port: ?int, has_port_override: bool}
      */
-    private function effectiveDomainInternalPort(string $url): array
+    private function effectiveDomainInternalPort(string $url, ?string $service = null): array
     {
         $canonical = DomainPortOverrides::withoutPort($url);
         $overrides = $this->preview->domain_port_overrides ?? [];
@@ -519,6 +550,21 @@ class PreviewDomains extends Component
             return [
                 'internal_port' => $legacyPort,
                 'has_port_override' => true,
+            ];
+        }
+
+        $composePort = dockerComposeServicePort($this->preview->application->docker_compose_raw, $service);
+        if ($composePort !== null) {
+            return [
+                'internal_port' => $composePort,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->preview->application->build_pack === 'dockercompose' && $service !== null) {
+            return [
+                'internal_port' => null,
+                'has_port_override' => false,
             ];
         }
 
