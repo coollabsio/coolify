@@ -31,6 +31,18 @@ services:
       - ./data:/app/data
 YAML;
 
+const SIBLING_FILE_COMPOSE = <<<'YAML'
+services:
+  first:
+    image: nginx:latest
+    volumes:
+      - ./first.conf:/etc/nginx/conf.d/default.conf:ro
+  second:
+    image: nginx:latest
+    volumes:
+      - ./second.conf:/etc/nginx/conf.d/default.conf
+YAML;
+
 beforeEach(function () {
     Bus::fake();
 
@@ -101,6 +113,29 @@ it('preserves existing application file volume content when reparsing compose bi
 
     expect($fileVolume->content)->toBe('0')
         ->and($fileVolume->is_directory)->toBeFalse();
+});
+
+it('preserves configuration for sibling application file mounts sharing a target', function () {
+    $application = makeComposeApplication(SIBLING_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
+    $mountPath = '/etc/nginx/conf.d/default.conf';
+
+    seedFileVolume($application, $baseDir, 'first.conf', $mountPath, 'first content');
+    seedFileVolume($application, $baseDir, 'second.conf', $mountPath, 'second content');
+
+    applicationParser($application);
+
+    $volumes = $application->fileStorages()
+        ->where('mount_path', $mountPath)
+        ->orderBy('fs_path')
+        ->get();
+
+    expect($volumes)->toHaveCount(2)
+        ->and($volumes->pluck('content')->all())->toBe(['first content', 'second content'])
+        ->and($volumes->every(fn (LocalFileVolume $volume) => ! $volume->is_directory))->toBeTrue()
+        ->and($volumes->every(fn (LocalFileVolume $volume) => $volume->fs_path_hash === hash('sha256', $volume->fs_path)))->toBeTrue()
+        ->and($volumes[0]->isReadOnlyVolume())->toBeTrue()
+        ->and($volumes[1]->isReadOnlyVolume())->toBeFalse();
 });
 
 it('keeps existing application file volumes as files when content is empty', function () {
