@@ -95,6 +95,14 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Analytics</span>
                 </a>
             </li>
+            <li>
+                <a title="Deployments" {{ wireNavigate() }}
+                    class="{{ request()->is('deployments*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('deployments.index') }}">
+                    <x-reicon name="upload" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Deployments</span>
+                </a>
+            </li>
             @can('canAccessTerminal')
                 <li>
                     <a title="Terminal"
