@@ -25,6 +25,7 @@ class TeamFactory extends Factory
             'personal_team' => false,
             'show_boarding' => false,
             'is_mcp_server_enabled' => true,
+            'is_ai_assistant_enabled' => true,
         ];
     }
 

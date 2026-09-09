@@ -49,15 +49,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'show_boarding',
         'custom_server_limit',
         'is_mcp_server_enabled',
+        'is_ai_assistant_enabled',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
+        'is_ai_assistant_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'is_ai_assistant_enabled' => 'boolean',
     ];
 
     protected static function booted()
