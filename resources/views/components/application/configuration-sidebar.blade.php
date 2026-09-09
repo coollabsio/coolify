@@ -246,43 +246,50 @@
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="hidden xl:block my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
+                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
                         @endunless
                         <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
                         @foreach ($groupItems as $menuItem)
-                            <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
-                                @class([
-                                    'menu-item',
-                                    'menu-item-active' => $menuItem['active'],
-                                ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                                href="{{ route($menuItem['route'], $applicationRouteParameters) }}">
-                                <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
-                                <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                                @if ($menuItem['badge'] ?? false)
-                                    <span class="shrink-0">
-                                        <livewire:project.application.server-status-badge :application="$application" />
-                                    </span>
+                            @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
+                            <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                                <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
+                                    @class([
+                                        'menu-item',
+                                        'menu-item-active' => $menuItem['active'],
+                                    ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}"
+                                    >
+                                    <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
+                                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                    @if ($menuItem['badge'] ?? false)
+                                        <span class="shrink-0">
+                                            <livewire:project.application.server-status-badge :application="$application"
+                                                :key="'application-server-status-'.$application->uuid" />
+                                        </span>
+                                    @endif
+                                </a>
+                                @if (filled($sections))
+                                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                                        x-data="{ activeSection: '' }">
+                                        @foreach ($sections as $section)
+                                            @if ($menuItem['active'])
+                                                <button type="button" class="menu-subitem"
+                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                    x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                                </button>
+                                            @else
+                                                <a class="menu-subitem"
+                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
+                                                    {{ wireNavigate() }}>
+                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                                </a>
+                                            @endif
+                                        @endforeach
+                                    </div>
                                 @endif
-                            </a>
-                            @if ($menuItem['active'] && count($pageSections[$menuItem['route']] ?? []) >= 4)
-                                <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
-                                    x-data="{
-                                        activeSection: '',
-                                        scrollToSection(id) {
-                                            this.activeSection = id;
-                                            window.scrollToSettingsSection?.(id);
-                                        },
-                                    }">
-                                    @foreach ($pageSections[$menuItem['route']] as $section)
-                                        <button type="button" class="menu-subitem"
-                                            :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                            @click="scrollToSection('{{ $section['id'] }}')">
-                                            <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
+                            </div>
                         @endforeach
                     @endforeach
                 </nav>

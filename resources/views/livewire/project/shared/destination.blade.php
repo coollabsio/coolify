@@ -35,7 +35,8 @@
                     <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                         <a href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}"
                             {{ wireNavigate() }} class="button">Open server</a>
-                        <x-status-summary :status="$resource->status" />
+                        <x-application.restart-limit-warning :application="$resource" />
+                        <x-status-summary :status="$resource->status" align="right" />
                         @if ($hasAdditionalDestinations)
                             <x-forms.button canGate="deploy" :canResource="$resource"
                                 wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">
@@ -217,6 +218,9 @@
                     <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                         <a href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}"
                             {{ wireNavigate() }} class="button">Open server</a>
+                        @if (method_exists($resource, 'stoppedAfterRestartLimit'))
+                            <x-application.restart-limit-warning :application="$resource" />
+                        @endif
                         @if ($primaryStatus->startsWith('running'))
                             <x-status.running :status="$primaryStatus->value()" />
                         @elseif ($primaryStatus->startsWith(['starting', 'restarting']))

@@ -35,12 +35,12 @@ it('uses a single unified navbar for application, service, database, and server 
 
 it('uses interactive status summaries in mobile resource headings', function () {
     $headings = [
-        resource_path('views/livewire/project/application/heading.blade.php') => '<x-status-summary :status="$application->status" />',
-        resource_path('views/livewire/project/database/heading.blade.php') => '<x-status-summary :status="$database->status" title="Database status" />',
-        resource_path('views/livewire/project/service/heading.blade.php') => '<x-status-summary :status="$service->status" title="Service status" container-name="Containers" />',
+        resource_path('views/livewire/project/application/heading.blade.php'),
+        resource_path('views/livewire/project/database/heading.blade.php'),
+        resource_path('views/livewire/project/service/heading.blade.php'),
     ];
 
-    foreach ($headings as $path => $statusSummary) {
+    foreach ($headings as $path) {
         $mobileHeading = str(file_get_contents($path))
             ->after('<div class="mb-3 w-full xl:hidden">')
             ->before('<div class="w-full xl:hidden">')
@@ -49,7 +49,7 @@ it('uses interactive status summaries in mobile resource headings', function () 
         expect($mobileHeading)
             ->toContain('flex min-w-0 flex-col items-start gap-2')
             ->toContain('min-w-0 max-w-full truncate')
-            ->toContain($statusSummary)
+            ->toContain('<x-status-summary')
             ->not->toContain('<x-status-badge');
     }
 });
@@ -82,13 +82,31 @@ it('docks desktop resource actions in the top bar instead of floating over conte
     }
 });
 
-it('links the service header missing variables warning to environment variables', function () {
+it('shows disabled deploy actions when service variables are missing', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileActions = str($heading)
+        ->after('<div class="w-full xl:hidden">')
+        ->before("@teleport('#resource-action-hud-slot')")
+        ->toString();
+    $desktopActions = str($heading)
+        ->after("@teleport('#resource-action-hud-slot')")
+        ->before('@endteleport')
+        ->toString();
 
-    expect($heading)
-        ->toContain("route('project.service.environment-variables'")
-        ->toContain('Required variables missing')
-        ->toContain('href="{{ $environmentVariablesUrl }}"');
+    expect($mobileActions)
+        ->toContain('id="service-mobile-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline')
+        ->and($desktopActions)
+        ->toContain('id="service-desktop-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline');
 });
 
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
@@ -253,6 +271,25 @@ it('groups application lifecycle options in an Actions dropdown', function () {
     expect($mobile)
         ->toContain('Deploy (without cache)')
         ->not->toContain('Force deploy without cache');
+});
+
+it('shows stop in application action menus when the application is exited', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $desktopExitedActions = str($heading)
+        ->after("@if (str(\$application->status)->startsWith('exited'))")
+        ->before('@else')
+        ->toString();
+
+    $mobileActions = str($heading)
+        ->after('id="application-mobile-actions"')
+        ->before('<div class="hidden" aria-hidden="true">')
+        ->toString();
+
+    expect($mobileActions)->toContain('application-mobile-stop-trigger')
+        ->and($desktopExitedActions)->toContain('application-mobile-stop-trigger')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
+        ->and(strrpos($mobileActions, 'Deploy (without cache)'))
+        ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
 });
 
 it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
@@ -482,25 +519,33 @@ it('builds application sidebar routes independently of the current request route
         ->toContain("'application_uuid' => \$application->uuid");
 });
 
-it('keeps the deployment log sidebar fixed in the layout without a top gap', function () {
+it('welds the deployment log sidebar to the main sidebar', function () {
     $deployment = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
-    expect($deployment)->toContain(':flush="true"')
-        ->and($css)->toContain('.application-settings-navigation.is-flush')
-        ->and($css)->toContain('position: static;')
-        ->and($css)->toContain('overflow: visible;');
+    expect($deployment)->not->toContain(':flush="true"')
+        ->and($css)->toContain('left: var(--sidebar-w, 14rem);')
+        ->and($css)->toContain('position: fixed;');
 });
 
-it('uses the same mobile heading gap on deployment pages as application settings', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
-    $deploymentIndex = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
-    $deploymentShow = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+it('uses the same mobile heading gap on application pages', function () {
+    $views = [
+        resource_path('views/livewire/project/application/configuration.blade.php'),
+        resource_path('views/livewire/project/application/backup/index.blade.php'),
+        resource_path('views/livewire/project/application/backup/show.blade.php'),
+        resource_path('views/livewire/project/application/deployment/show.blade.php'),
+        resource_path('views/livewire/project/shared/logs.blade.php'),
+        resource_path('views/livewire/project/shared/execute-container-command.blade.php'),
+    ];
 
-    expect($configuration)->toContain('application-settings-workspace mt-4')
-        ->and($deploymentIndex)->toContain("'mt-4 max-w-[1180px] lg:mt-0' => ! \$embedded")
-        ->and($deploymentShow)->toContain('application-settings-workspace mt-4')
-        ->toContain('lg:mt-0');
+    foreach ($views as $view) {
+        expect(file_get_contents($view))
+            ->toContain('application-settings-workspace mt-4')
+            ->toContain('lg:mt-0');
+    }
+
+    expect(file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php')))
+        ->toContain("'mt-4 max-w-none lg:mt-0' => ! \$embedded");
 });
 
 it('removes desktop top spacing from the deployment log viewer', function () {

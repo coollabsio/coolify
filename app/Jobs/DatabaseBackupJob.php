@@ -322,6 +322,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
+                        BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_postgresql($database);
                     } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
@@ -343,6 +344,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
+                        BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_mongodb($database);
                     } elseif (str($databaseType)->contains('mysql')) {
                         $this->backup_file = "/mysql-dump-$database-".Carbon::now()->timestamp.'.dmp';
@@ -357,6 +359,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
+                        BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_mysql($database);
                     } elseif (str($databaseType)->contains('mariadb')) {
                         $this->backup_file = "/mariadb-dump-$database-".Carbon::now()->timestamp.'.dmp';
@@ -371,6 +374,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
+                        BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_mariadb($database);
                     } elseif ($this->database instanceof StandaloneClickhouse) {
                         $this->backup_file = '/clickhouse-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.zip";
@@ -382,6 +386,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                             'local_storage_deleted' => false,
                         ]);
+                        BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
                     } else {
                         throw new \Exception('Unsupported database type');
@@ -480,13 +485,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Throwable $e) {
             throw $e;
         } finally {
-            if ($this->team) {
-                BackupCreated::dispatch($this->team->id);
-            }
             if ($this->backup_log) {
                 $this->backup_log->update([
                     'finished_at' => Carbon::now()->toImmutable(),
                 ]);
+            }
+            if ($this->team) {
+                BackupCreated::dispatch($this->team->id);
             }
         }
     }

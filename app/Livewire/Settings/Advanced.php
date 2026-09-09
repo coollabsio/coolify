@@ -53,6 +53,8 @@ class Advanced extends Component
 
     public string $avatar_storage = 'local';
 
+    public ?string $image_cdn_url = null;
+
     public array $avatar_storage_options = [];
 
     public function rules()
@@ -71,6 +73,7 @@ class Advanced extends Component
             'webhook_allowed_internal_hosts' => 'nullable|string',
             'webhook_allow_localhost' => 'boolean',
             'domain_connect_private_key' => 'nullable|string',
+            'image_cdn_url' => 'nullable|url|max:255',
         ];
     }
 
@@ -97,6 +100,7 @@ class Advanced extends Component
         $this->avatar_storage = $this->settings->avatar_storage_type === 's3' && $this->settings->avatar_s3_storage_id
             ? 's3:'.$this->settings->avatar_s3_storage_id
             : 'local';
+        $this->image_cdn_url = $this->settings->image_cdn_url;
         $this->avatar_storage_options = [
             ['value' => 'local', 'label' => 'Local storage'],
             ...S3Storage::query()
@@ -210,6 +214,7 @@ class Advanced extends Component
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
+            $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');

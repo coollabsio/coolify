@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Livewire\Project\Service\Storage as StorageComponent;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -44,7 +45,7 @@ class All extends Component
 
     public bool $deleteDockerVolume = false;
 
-    protected $listeners = ['refreshStorages' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
+    protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
     public function mount(): void
     {
@@ -163,7 +164,7 @@ class All extends Component
 
         $storage->delete();
         $this->refreshList();
-        $this->dispatch('refreshStorages');
+        $this->dispatch('storageCountsChanged')->to(StorageComponent::class);
         $this->dispatch('configurationChanged');
 
         return true;

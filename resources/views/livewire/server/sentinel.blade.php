@@ -1,44 +1,31 @@
 <div class="application-settings-form flex w-full flex-col gap-6">
     <form wire:submit.prevent="submit" class="contents">
-        @if ($isSentinelEnabled)
-            {{-- Scope dirty tracking to savable form fields only. Without wire:target,
-                 Livewire compares the entire component snapshot — so dev-only x-init
-                 `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
-                 flashes this bar on every page open. --}}
-            <x-unsaved-bar action="submit"
-                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
-        @endif
+        {{-- Scope dirty tracking to savable form fields only. Without wire:target,
+             Livewire compares the entire component snapshot — so dev-only x-init
+             `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
+             flashes this bar on every page open. --}}
+        <x-unsaved-bar action="submit"
+            targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
             <x-slot:actions>
                 <div class="flex items-center gap-2">
-                    @if (!$isSentinelEnabled)
-                        <x-forms.button canGate="update" :canResource="$server" isHighlighted
-                            wire:click="toggleSentinel">
-                            Enable Sentinel
-                        </x-forms.button>
-                    @else
-                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                            :type="$server->isSentinelLive() ? 'success' : 'warning'" />
-                        <x-forms.button wire:click="restartSentinel" canGate="update"
-                            :canResource="$server">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            {{ $server->isSentinelLive() ? 'Restart' : 'Sync' }}
-                        </x-forms.button>
-                        <x-forms.button canGate="update" :canResource="$server"
-                            wire:click="toggleSentinel">
-                            Disable
-                        </x-forms.button>
-                    @endif
+                    <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                        :type="$server->isSentinelLive() ? 'success' : 'warning'" />
+                    <x-forms.button wire:click="restartSentinel" canGate="update"
+                        :canResource="$server">
+                        <x-reicon name="refresh" class="size-3.5" />
+                        {{ $server->isSentinelLive() ? 'Restart' : 'Sync' }}
+                    </x-forms.button>
                 </div>
             </x-slot:actions>
 
-            @if ($isSentinelEnabled && !$server->isSentinelLive())
+            @if (!$server->isSentinelLive())
                 <x-callout type="warning" title="Sentinel is out of sync">
                     Sync Sentinel to apply its current configuration and restore health reporting.
                 </x-callout>
-            @elseif ($isSentinelEnabled)
+            @else
                 <div class="flex items-start gap-3">
                     <div
                         class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
@@ -51,10 +38,6 @@
                         </p>
                     </div>
                 </div>
-            @else
-                <x-empty size="sm" title="Sentinel is disabled"
-                    description="Enable Sentinel to collect metrics and monitor server and container health."
-                    icon-name="dashboard" />
             @endif
         </x-application.settings-section>
 

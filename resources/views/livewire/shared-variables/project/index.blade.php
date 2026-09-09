@@ -19,12 +19,12 @@
                 <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($projects as $project)
                         <a x-show="matches(@js([$project->name, $project->description]))"
-                            class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                            class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                             href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}>
                             <div class="flex items-start gap-3">
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                                     @if ($project->icon_path)
-                                        <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                        <img src="{{ project_icon_url($project) }}"
                                             alt="{{ $project->name }} icon"
                                             class="h-full w-full rounded-lg object-cover">
                                     @else
@@ -43,13 +43,13 @@
                     @endforeach
                 </div>
 
-                <div x-show="viewMode === 'list'" class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div x-show="viewMode === 'list'" class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                     @foreach ($projects as $project)
                         <a x-show="matches(@js([$project->name, $project->description]))"
                             href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
                             class="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                             @if ($project->icon_path)
-                                <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                <img src="{{ project_icon_url($project) }}"
                                     alt="{{ $project->name }} icon" class="size-4 shrink-0 rounded object-cover">
                             @else
                                 <x-reicon name="projects" class="size-4 shrink-0 text-neutral-500 dark:text-fg-dim" />

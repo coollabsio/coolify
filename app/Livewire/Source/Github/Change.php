@@ -122,13 +122,6 @@ class Change extends Component
         }
     }
 
-    public function boot()
-    {
-        if ($this->github_app) {
-            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
-        }
-    }
-
     /**
      * Sync data between component properties and model
      *
@@ -170,8 +163,9 @@ class Change extends Component
             $this->appId = $this->github_app->app_id;
             $this->installationId = $this->github_app->installation_id;
             $this->clientId = $this->github_app->client_id;
-            $this->clientSecret = $this->github_app->client_secret;
-            $this->webhookSecret = $this->github_app->webhook_secret;
+            $canUpdate = auth()->user()->can('update', $this->github_app);
+            $this->clientSecret = $canUpdate ? $this->github_app->client_secret : null;
+            $this->webhookSecret = $canUpdate ? $this->github_app->webhook_secret : null;
             $this->isSystemWide = $this->github_app->is_system_wide;
             $this->privateKeyId = $this->github_app->private_key_id;
             $this->contents = $this->github_app->contents;
@@ -231,7 +225,7 @@ class Change extends Component
             syncGithubAppName($this->github_app);
 
             GithubAppPermissionJob::dispatchSync($this->github_app);
-            $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->github_app->refresh();
             $this->syncData(false);
             $this->isConnected = $this->github_app->isConnected();
             $this->name = str($this->github_app->name)->kebab();
@@ -305,7 +299,7 @@ class Change extends Component
         try {
             $github_app_uuid = request()->github_app_uuid;
             $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
-            $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
+            $this->authorize('view', $this->github_app);
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
 
             $this->applications = $this->github_app->applications;
@@ -420,7 +414,6 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
-            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->organization = normalizeGithubOrganization($this->organization);
             $this->apiUrl = filled($this->apiUrl)
                 ? $this->apiUrl
@@ -442,7 +435,6 @@ class Change extends Component
     {
         $this->authorize('update', $this->github_app);
 
-        $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
         $this->github_app->app_id = 1234567890;
         $this->github_app->installation_id = 1234567890;
         $this->github_app->save();
@@ -456,8 +448,6 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->github_app);
-
-            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
             $this->syncData(true);
             $this->github_app->save();
@@ -475,7 +465,6 @@ class Change extends Component
 
             if ($this->github_app->applications->isNotEmpty()) {
                 $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
-                $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
                 return;
             }
@@ -484,7 +473,7 @@ class Change extends Component
             // @can and canGate checks against a deleted model (null team_id TypeError).
             $this->github_app = null;
 
-            return redirect()->route('source.all');
+            return redirectRoute($this, 'source.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

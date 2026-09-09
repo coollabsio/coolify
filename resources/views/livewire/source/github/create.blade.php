@@ -36,7 +36,7 @@
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
             </button>
-            <div x-cloak x-show="open" x-collapse class="border-t border-neutral-200 px-3 py-3 dark:border-white/[0.08]">
+            <div x-cloak x-show="open" x-collapse.duration.200ms class="border-t border-neutral-200 px-3 py-3 dark:border-white/[0.08]">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <x-forms.input id="html_url" label="HTML URL" required
                         helper="For GitHub Enterprise, enter your instance URL (e.g. https://github.example.com)." />

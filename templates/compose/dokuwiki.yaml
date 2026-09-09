@@ -3,6 +3,7 @@
 # category: cms
 # tags: wiki, documentation, knowledge, base
 # logo: svgs/dokuwiki.png
+# port: 80
 
 services:
   dokuwiki:

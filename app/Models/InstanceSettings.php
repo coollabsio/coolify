@@ -56,6 +56,7 @@ class InstanceSettings extends Model
         'webhook_allow_localhost',
         'avatar_storage_type',
         'avatar_s3_storage_id',
+        'image_cdn_url',
         'is_dashboard_force_https_enabled',
     ];
 

@@ -123,7 +123,7 @@ function connectProxyToNetworks(Server $server)
     }
 
     return collect([
-        'for network in $(docker inspect $(docker ps --filter label=coolify.managed=true --format "{{.ID}}") --format=\'{{range $network, $_ := .NetworkSettings.Networks}}{{println $network}}{{end}}\' 2>/dev/null | sort -u); do',
+        'for network in $(docker inspect $(docker ps -a --filter label=coolify.managed=true --format "{{.ID}}") --format=\'{{range $network, $_ := .NetworkSettings.Networks}}{{println $network}}{{end}}\' 2>/dev/null | sort -u); do',
         '    if [ -z "$network" ] || [ "$network" = "bridge" ] || [ "$network" = "host" ] || [ "$network" = "none" ] || [ "$network" = "default" ]; then',
         '        continue',
         '    fi',

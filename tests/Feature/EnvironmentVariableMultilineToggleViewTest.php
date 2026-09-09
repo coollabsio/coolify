@@ -29,6 +29,8 @@ it('lazy-loads decrypted values only when opening the edit modal', function () {
         ->toContain('wireOpen="editorOpen"')
         ->toContain('$valuesLoaded')
         ->toContain('Loading value...');
+
+    expect($view)->toContain('<x-forms.input loading loadingText="Loading value..."');
 });
 
 it('keeps the environment variable delete button compact', function () {
