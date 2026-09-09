@@ -75,7 +75,7 @@
 <div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto scrollbar">
     @if ($ask)
         <div
-            class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+            class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
             This will revalidate the server, install or update Docker Engine, Docker Compose, and related
             configuration. Docker Engine will restart, so running containers may be briefly unreachable.
         </div>

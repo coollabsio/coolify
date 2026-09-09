@@ -59,13 +59,18 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
             return $line;
         }
 
+        // Negation belongs to the shell, before the elevated command.
+        if (preg_match('/^\s*!\s+/', $line)) {
+            return preg_replace('/^(\s*(?:!\s+)+)/', '$1sudo ', $line);
+        }
+
         // Check all keywords with word boundary matching
         // Match keyword followed by space, semicolon, or end of line
         foreach ($bashKeywords as $keyword) {
             if (preg_match('/^'.preg_quote($keyword, '/').'(\s|;|$)/', $trimmedLine)) {
-                // Special handling for 'if' - insert sudo after 'if '
+                // Keep any shell negation before sudo in the condition.
                 if ($keyword === 'if') {
-                    return preg_replace('/^(\s*)if\s+/', '$1if sudo ', $line);
+                    return preg_replace('/^(\s*if\s+(?:!\s+)*)/', '$1sudo ', $line);
                 }
 
                 return $line;

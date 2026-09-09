@@ -48,6 +48,7 @@ beforeEach(function () {
     // Create service with a name that maps to a template with required port
     $this->service = Service::factory()->create([
         'name' => 'supabase-test123',
+        'service_type' => 'supabase',
         'server_id' => $this->server->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
@@ -97,6 +98,67 @@ it('loads a persisted port override in the service application editor', function
     ])
         ->assertSet('fqdn', 'https://web.example.com:8080')
         ->assertOk();
+});
+
+it('preserves a legacy embedded port when only the description changes', function () {
+    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
+        'fqdn' => 'http://example.com:8080',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Index::class, [
+        'serviceApplication' => $this->serviceApplication->fresh(),
+    ])
+        ->set('description', 'Updated description')
+        ->call('submitApplication')
+        ->assertHasNoErrors()
+        ->assertSet('showPortWarningModal', false)
+        ->assertSet('fqdn', 'http://example.com:8080');
+
+    expect($this->serviceApplication->fresh())
+        ->description->toBe('Updated description')
+        ->fqdn->toBe('http://example.com')
+        ->domain_port_overrides->toBe(['http://example.com' => 8080]);
+});
+
+it('loads a legacy embedded port in the domain editor', function () {
+    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
+        'fqdn' => 'http://example.com:8080',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->assertSet('fqdn', 'http://example.com:8080')
+        ->assertOk();
+});
+
+it('prefers a persisted override over a legacy embedded port', function () {
+    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
+        'fqdn' => 'http://example.com:8080',
+        'domain_port_overrides' => json_encode(['http://example.com' => 3000]),
+    ]);
+
+    expect($this->serviceApplication->fresh()->url)->toBe('http://example.com:3000');
+});
+
+it('allows explicit removal of a legacy embedded port', function () {
+    ServiceApplication::query()->whereKey($this->serviceApplication->id)->update([
+        'fqdn' => 'http://example.com:8080',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->set('fqdn', 'http://example.com')
+        ->call('submit')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmRemovePort')
+        ->assertHasNoErrors()
+        ->assertSet('showPortWarningModal', false);
+
+    expect($this->serviceApplication->fresh())
+        ->fqdn->toBe('http://example.com')
+        ->url->toBe('http://example.com')
+        ->domain_port_overrides->toBeNull();
 });
 
 it('initializes route state when mounting a service application directly', function () {

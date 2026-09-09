@@ -10,15 +10,27 @@
             <x-application.settings-section title="Sentinel logs"
                 helper="Search, filter, follow, copy, or download recent output from the Sentinel container."
                 flush class="logs-settings-section">
-                <x-slot:actions>
-                    <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                        :type="$server->isSentinelLive() ? 'success' : 'warning'"
-                        class="logs-section-status-badge" />
-                </x-slot:actions>
-                <div class="settings-log-panel">
-                    <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel"
-                        displayName="Sentinel" :collapsible="false" />
-                </div>
+                @if ($server->isSentinelEnabled())
+                    <x-slot:actions>
+                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                            :type="$server->isSentinelLive() ? 'success' : 'warning'"
+                            class="logs-section-status-badge" />
+                    </x-slot:actions>
+                    <div class="settings-log-panel">
+                        <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel"
+                            displayName="Sentinel" :collapsible="false" />
+                    </div>
+                @else
+                    <x-slot:actions>
+                        <x-forms.button canGate="manageSentinel" :canResource="$server" isHighlighted
+                            wire:click="enableSentinel">
+                            Enable Sentinel
+                        </x-forms.button>
+                    </x-slot:actions>
+                    <x-empty size="sm" title="Sentinel is disabled"
+                        description="Enable Sentinel to view its logs."
+                        icon-name="dashboard" />
+                @endif
             </x-application.settings-section>
         </div>
     </div>

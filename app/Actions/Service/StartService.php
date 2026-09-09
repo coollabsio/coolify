@@ -25,7 +25,6 @@ class StartService
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
         $service->applications()->get()->each->resetRestartLimit();
-        $service->databases()->get()->each->resetRestartLimit();
         $workdir = $service->workdir();
         // $commands[] = "cd {$workdir}";
         $commands[] = "echo 'Saved configuration files to {$workdir}.'";

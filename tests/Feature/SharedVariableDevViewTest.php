@@ -168,3 +168,38 @@ test('server shared variable dev view updates existing variable', function () {
     expect($var->value)->toBe('new_value')
         ->and($var->comment)->toBe('updated comment');
 });
+
+test('server shared variables display built-ins as read-only rows', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertSee('COOLIFY_SERVER_NAME')
+        ->assertSee('Built-in · Read-only')
+        ->assertDontSee('Add a variable to make it available to resources in this scope.')
+        ->assertDontSee('data-env-settings-trigger', false)
+        ->assertSet('variables', '')
+        ->call('switch')
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertSee('COOLIFY_SERVER_NAME')
+        ->assertSet('variables', '')
+        ->set('variables', "COOLIFY_SERVER_UUID=changed\nCOOLIFY_SERVER_NAME=changed\nCUSTOM=value")
+        ->call('submit');
+
+    expect($server->environment_variables()->pluck('value', 'key')->all())
+        ->toMatchArray(['COOLIFY_SERVER_UUID' => $server->uuid, 'COOLIFY_SERVER_NAME' => $server->name, 'CUSTOM' => 'value']);
+});
+
+test('server built-ins are visible to team members but not other teams', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSee('COOLIFY_SERVER_UUID')
+        ->assertDontSee('Add variable');
+
+    $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $otherServer->uuid])
+        ->assertRedirect(route('dashboard'))
+        ->assertDontSee($otherServer->uuid);
+});
