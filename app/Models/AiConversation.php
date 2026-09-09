@@ -48,4 +48,24 @@ class AiConversation extends BaseModel
     {
         return self::where('team_id', currentTeam()->id);
     }
+
+    public function claim(User $user): bool
+    {
+        $claimed = static::where('id', $this->id)
+            ->where('status', self::STATUS_IDLE)
+            ->update([
+                'status' => self::STATUS_RESPONDING,
+                'responding_user_id' => $user->id,
+            ]);
+
+        return $claimed === 1;
+    }
+
+    public function release(): void
+    {
+        static::where('id', $this->id)->update([
+            'status' => self::STATUS_IDLE,
+            'responding_user_id' => null,
+        ]);
+    }
 }

@@ -42,6 +42,15 @@ class AiProviderCredential extends BaseModel
         return self::whereTeamId(currentTeam()->id)->select($selectArray->all());
     }
 
+    public static function defaultForTeam(int $teamId): ?self
+    {
+        return self::where('team_id', $teamId)
+            ->where('enabled', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->first();
+    }
+
     public function makeDefault(): void
     {
         static::where('team_id', $this->team_id)
