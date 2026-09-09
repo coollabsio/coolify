@@ -7,7 +7,6 @@ use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\SwarmDocker;
-use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
@@ -19,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
+use Throwable;
 
 class StartDatabaseImport
 {
@@ -117,17 +117,16 @@ class StartDatabaseImport
             }
             $key = ltrim((string) $source->path, '/');
             $this->assertS3Path($key);
-            $disk = Storage::build(['driver' => 's3', 'region' => $storage->region, 'key' => $storage->key, 'secret' => $storage->secret, 'bucket' => $storage->bucket, 'endpoint' => $storage->endpoint, 'use_path_style_endpoint' => true, 'http' => SafeWebhookUrl::httpClientOptions($storage->endpoint)]);
+            $disk = $storage->filesystem();
             if (! $disk->exists($key) || $disk->size($key) > self::MAX_BYTES) {
                 throw new DatabaseImportException('The S3 backup was not found or exceeds the 10 GiB limit.');
             }
             $helper = "s3-restore-{$operation}";
             $serverPath = "/tmp/s3-restore-{$operation}";
+            $this->startS3HelperWithEnv($storage, $server, $helper, $network);
             $sourceArg = escapeshellarg("s3temp/{$storage->bucket}/{$key}");
             $commandList = [
-                'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
-                'docker run -d --network '.escapeshellarg($network).' --name '.escapeshellarg($helper).' '.escapeshellarg(coolifyHelperImage().':'.getHelperVersion()).' sleep 3600',
-                'docker exec '.escapeshellarg($helper).' mc alias set s3temp '.escapeshellarg($storage->endpoint).' '.escapeshellarg($storage->key).' '.escapeshellarg($storage->secret),
+                'docker exec '.escapeshellarg($helper).' sh -c '.escapeshellarg('mc alias set s3temp "$S3_ENDPOINT" "$S3_ACCESS_KEY" "$S3_SECRET_KEY"'),
                 'docker exec '.escapeshellarg($helper).' mc cp '.$sourceArg.' /tmp/restore',
                 'docker cp '.escapeshellarg("{$helper}:/tmp/restore").' '.escapeshellarg($serverPath),
                 'docker cp '.escapeshellarg($serverPath).' '.escapeshellarg("{$container}:{$containerPath}"),
@@ -174,6 +173,27 @@ class StartDatabaseImport
     {
         if ($path === '' || preg_match('/\.\.|[$()`|;&><\r\n\0\'"\\\\]/', $path) || ! DatabaseBackupFileValidator::hasAllowedExtension(basename($path))) {
             throw new DatabaseImportException('The S3 path is invalid.');
+        }
+    }
+
+    private function startS3HelperWithEnv(S3Storage $storage, Server $server, string $helper, string $network): void
+    {
+        $image = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+
+        try {
+            instant_remote_process([
+                'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
+                'docker run -d --network '.escapeshellarg($network)
+                    .' --name '.escapeshellarg($helper)
+                    .' -e S3_ENDPOINT='.escapeshellarg((string) $storage->endpoint)
+                    .' -e S3_ACCESS_KEY='.escapeshellarg((string) $storage->key)
+                    .' -e S3_SECRET_KEY='.escapeshellarg((string) $storage->secret)
+                    .' '.$image.' sleep 3600',
+            ], $server);
+        } catch (Throwable) {
+            instant_remote_process(['docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true'], $server, throwError: false);
+
+            throw new DatabaseImportException('Unable to start the S3 restore helper.');
         }
     }
 }

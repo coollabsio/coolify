@@ -46,9 +46,11 @@ test('builds S3, upload, and server-path cleanup commands', function () {
     expect($listener->commands(importCleanupPayload([
         'containerName' => 's3-restore-op',
         'serverTmpPath' => '/tmp/s3-restore-op',
+        'credentialTmpPath' => '/tmp/s3-restore-op.env',
     ])))->toBe([
         'docker rm -f '.escapeshellarg('s3-restore-op').' 2>/dev/null || true',
         'rm -f '.escapeshellarg('/tmp/s3-restore-op').' 2>/dev/null || true',
+        'rm -f '.escapeshellarg('/tmp/s3-restore-op.env').' 2>/dev/null || true',
         'docker exec '.escapeshellarg('postgres-abc').' rm -f '.escapeshellarg('/tmp/restore_op').' 2>/dev/null || true',
         'docker exec '.escapeshellarg('postgres-abc').' rm -f '.escapeshellarg('/tmp/restore_op.sh').' 2>/dev/null || true',
     ]);
@@ -73,6 +75,7 @@ test('omits unsafe paths, missing container execs, and empty payloads', function
     expect($listener->commands(importCleanupPayload([
         'containerName' => 's3-restore-op',
         'serverTmpPath' => '/tmp/../etc/passwd',
+        'credentialTmpPath' => '/tmp/../etc/shadow',
         'containerTmpPath' => '/etc/shadow',
         'scriptPath' => '/tmp/../../etc/shadow',
     ])))->toBe([

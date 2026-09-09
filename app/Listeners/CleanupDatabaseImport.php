@@ -41,6 +41,10 @@ class CleanupDatabaseImport implements ShouldQueue
             $commands[] = 'rm -f '.escapeshellarg($data['serverTmpPath']).' 2>/dev/null || true';
         }
 
+        if (isSafeTmpPath($data['credentialTmpPath'] ?? null)) {
+            $commands[] = 'rm -f '.escapeshellarg($data['credentialTmpPath']).' 2>/dev/null || true';
+        }
+
         if (filled($data['container'] ?? null)) {
             foreach (['containerTmpPath', 'scriptPath'] as $key) {
                 if (isSafeTmpPath($data[$key] ?? null)) {
