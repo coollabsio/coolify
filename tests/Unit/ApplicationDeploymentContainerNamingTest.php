@@ -28,19 +28,11 @@ function applicationWithContainerNaming(string $customName = 'shadowuw'): Applic
 }
 
 it('uses the custom container name when consistent naming is enabled', function () {
-    $application = applicationWithContainerNaming();
-
-    [$job, $reflection] = containerNamingJob($application);
-
-    expect($reflection->getMethod('resolveContainerName')->invoke($job))->toBe('shadowuw');
+    expect(generateApplicationContainerName(applicationWithContainerNaming()))->toBe('shadowuw');
 });
 
 it('adds the pull request suffix to a custom container name', function () {
-    $application = applicationWithContainerNaming();
-
-    [$job, $reflection] = containerNamingJob($application, 42);
-
-    expect($reflection->getMethod('resolveContainerName')->invoke($job))->toBe('shadowuw-pr-42');
+    expect(generateApplicationContainerName(applicationWithContainerNaming(), 42))->toBe('shadowuw-pr-42');
 });
 
 it('includes old generated containers when cleaning up a consistent deployment', function () {
@@ -55,4 +47,11 @@ it('includes old generated containers when cleaning up a consistent deployment',
 
     expect($reflection->getMethod('containerNamesToRemove')->invoke($job, $containers)->all())
         ->toBe(['application-uuid-192238854305', 'shadowuw']);
+});
+
+it('ignores the custom container name when consistent naming is disabled', function () {
+    $application = applicationWithContainerNaming();
+    $application->settings->is_consistent_container_name_enabled = false;
+
+    expect(generateApplicationContainerName($application))->toStartWith('application-uuid-');
 });

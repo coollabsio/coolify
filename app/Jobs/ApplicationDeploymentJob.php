@@ -273,7 +273,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = $this->resolveContainerName();
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
 
         $this->saved_outputs = collect();
 
@@ -1992,7 +1992,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
                 throw new \InvalidArgumentException('Invalid build-time environment variable key.');
-
             }
 
             return $key;
@@ -2183,7 +2182,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->write_deployment_configurations();
                     $this->server = $this->mainServer;
                 }
-                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty() || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     if (count($this->application->ports_mappings_array) > 0) {
                         $this->application_deployment_queue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
@@ -2191,7 +2190,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                         $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                     }
-                    if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                    if ((bool) $this->application->settings->is_consistent_container_name_enabled && str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                         $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                     }
                     if ($this->pull_request_id !== 0) {
@@ -2215,19 +2214,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
-    }
-
-    private function resolveContainerName(): string
-    {
-        if (str($this->application->settings->custom_internal_name)->isEmpty()) {
-            return generateApplicationContainerName($this->application, $this->pull_request_id);
-        }
-
-        if ($this->pull_request_id === 0) {
-            return $this->application->settings->custom_internal_name;
-        }
-
-        return addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
     }
 
     private function health_check()
@@ -4285,7 +4271,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
-                if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
                         $this->graceful_shutdown_container($containerName);
