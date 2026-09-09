@@ -339,7 +339,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         if ($containerName === 'coolify-proxy') {
                             continue;
                         }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
+                        if (isGeneratedContainerName($containerName)) {
                             continue;
                         }
                         $containerIp = data_get($container, 'IPv4Address');
