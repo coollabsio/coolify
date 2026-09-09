@@ -27,3 +27,13 @@ test('postgresql single database restore offers explicit object replacement', fu
         ->toContain('wire:model="postgresqlRestoreCommand"')
         ->toContain('label="Import command" readonly');
 });
+
+test('restore confirmation dialogs warn that existing objects can block the import', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/database/import-form.blade.php'));
+
+    expect($view)
+        ->toContain('submitAction="runImport"')
+        ->toContain('submitAction="restoreFromS3"')
+        ->toContain('Existing objects can cause the import to fail unless replacement is enabled.')
+        ->not->toContain('All existing data will be replaced.');
+});

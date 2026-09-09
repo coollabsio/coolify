@@ -191,7 +191,7 @@
                                     <li>Copy backup file to database container</li>
                                     <li>Execute restore command</li>
                                 </ul>
-                                <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                             </x-modal-confirmation>
                         </div>
                     </div>
@@ -251,7 +251,7 @@
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>
-                                        <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                        <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                                         </x-modal-confirmation>
                                 </div>
                             </div>
