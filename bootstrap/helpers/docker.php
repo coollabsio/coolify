@@ -350,7 +350,7 @@ function generateApplicationContainerName(Application $application, $pull_reques
 
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
     $name = $consistent_container_name ? ($application->settings->custom_internal_name ?: $application->uuid) : $application->uuid;
-    $now = now()->format('Hisu');
+    $now = now()->format('Ymd\THis');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         return $name.'-pr-'.$pull_request_id;
     } else {
@@ -361,6 +361,20 @@ function generateApplicationContainerName(Application $application, $pull_reques
         return $application->uuid.'-'.$now;
     }
 }
+
+/**
+ * Generated (rolling update) container names end with the timestamp from generateApplicationContainerName().
+ * Drop the legacy pattern once containers created before the ISO 8601 suffix are gone.
+ */
+function isGeneratedContainerName(string $containerName): bool
+{
+    $isoTimestampSuffix = '/-\d{8}T\d{6}$/';
+    $legacyTimestampSuffix = '/-\d{12}$/';
+
+    return preg_match($isoTimestampSuffix, $containerName) === 1
+        || preg_match($legacyTimestampSuffix, $containerName) === 1;
+}
+
 function get_port_from_dockerfile($dockerfile): ?int
 {
     $dockerfile_array = explode("\n", $dockerfile);
