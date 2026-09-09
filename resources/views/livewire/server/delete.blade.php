@@ -24,6 +24,9 @@
                             It currently contains managed resources. Enable force deletion in the confirmation only
                             if those resources should also be removed.
                         @endif
+                        @if ($server->hostinger_virtual_machine_id)
+                            The Hostinger VPS and its subscription will not be deleted or cancelled. Manage billing and cancellation in hPanel.
+                        @endif
                     </x-callout>
 
                     <div class="mt-4 flex items-center justify-between gap-4 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-500/[0.08] dark:ring-red-500/20">

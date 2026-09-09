@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\HostingerController;
 use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
@@ -224,6 +225,11 @@ Route::group([
     Route::get('/digitalocean/images', [DigitalOceanController::class, 'images'])->middleware(['api.ability:read']);
     Route::get('/digitalocean/ssh-keys', [DigitalOceanController::class, 'sshKeys'])->middleware(['api.ability:read']);
     Route::post('/servers/digitalocean', [DigitalOceanController::class, 'createServer'])->middleware(['api.ability:write']);
+
+    Route::get('/hostinger/data-centers', [HostingerController::class, 'dataCenters'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/catalog', [HostingerController::class, 'catalog'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/templates', [HostingerController::class, 'templates'])->middleware(['api.ability:read']);
+    Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);
 

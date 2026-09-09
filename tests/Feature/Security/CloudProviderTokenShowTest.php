@@ -94,6 +94,21 @@ test('cloud token detail page validates the token', function () {
         ->assertDispatched('success');
 });
 
+test('cloud token detail page validates Hostinger tokens', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([], 200),
+    ]);
+
+    $token = CloudProviderToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+    ]);
+
+    Livewire::test(Show::class, ['cloud_token_uuid' => $token->uuid])
+        ->call('validateToken')
+        ->assertDispatched('success');
+});
+
 test('cloud token detail page deletes unused tokens', function () {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,

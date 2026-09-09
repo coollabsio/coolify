@@ -50,7 +50,7 @@
                         <p class="application-settings-section-description">Create a server with a cloud provider.</p>
                     </div>
                     <div class="application-settings-section-body is-flush">
-                        <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                             <a href="{{ route('server.create.type', ['type' => 'hetzner']) }}"
                                 class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                 {{ wireNavigate() }}>
@@ -94,6 +94,20 @@
                                 </div>
                             </a>
 
+                            <a href="{{ route('server.create.type', ['type' => 'hostinger']) }}"
+                                class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                {{ wireNavigate() }}>
+                                <div class="flex items-start">
+                                    <x-hostinger-icon class="size-8 text-[#673de6]" />
+                                </div>
+                                <div class="mt-auto pt-5">
+                                    <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Hostinger</h3>
+                                    <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                                        Purchase and provision a new VPS.
+                                    </p>
+                                </div>
+                            </a>
+
                         </div>
                     </div>
                 </section>
@@ -113,6 +127,10 @@
                 <livewire:server.new.by-digital-ocean :private_keys="$private_keys" :limit_reached="$limit_reached"
                     :selected-token-uuid="$selectedTokenUuid"
                     wire:key="new-server-digital-ocean-{{ $selectedTokenUuid ?? 'select' }}" />
+            @elseif ($selectedType === 'hostinger')
+                <livewire:server.new.by-hostinger :private_keys="$private_keys" :limit_reached="$limit_reached"
+                    :selected-token-uuid="$selectedTokenUuid"
+                    wire:key="new-server-hostinger-{{ $selectedTokenUuid ?? 'select' }}" />
             @else
                 <livewire:server.new.by-ip :private_keys="$private_keys" :limit_reached="$limit_reached"
                     key="new-server-manual" />
