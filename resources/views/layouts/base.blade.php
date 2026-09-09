@@ -160,6 +160,12 @@
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
+    @if (!isCloud() && is_file(customThemePath()) && is_readable(customThemePath()))
+        <link rel="stylesheet" href="{{ route('custom-theme.css', ['v' => substr(hash_file('sha256', customThemePath()), 0, 12)]) }}">
+    @endif
+    @if (($instanceThemeCss = instanceThemeCss($instanceSettings)) !== '')
+        <style id="instance-theme">{!! $instanceThemeCss !!}</style>
+    @endif
     <script>
         // Update theme-color meta tag (non-critical, can run async)
         const t = localStorage.theme || 'dark';

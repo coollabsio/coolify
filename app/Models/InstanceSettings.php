@@ -59,6 +59,8 @@ class InstanceSettings extends Model
         'avatar_s3_storage_id',
         'image_cdn_url',
         'is_dashboard_force_https_enabled',
+        'theme_preset',
+        'custom_css',
     ];
 
     protected $hidden = [
