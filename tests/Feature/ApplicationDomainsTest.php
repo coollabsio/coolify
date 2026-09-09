@@ -1,13 +1,16 @@
 <?php
 
 use App\Jobs\CheckDomainDnsJob;
+use App\Jobs\ConfigureDnsRecordJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -819,6 +822,52 @@ it('adds a domain to the application', function () {
 
     expect(explode(',', (string) $this->application->fqdn))
         ->toBe(['https://app.example.com', 'https://www.app.example.com']);
+});
+
+it('dispatches configure dns jobs when a matching automatic zone and valid server ip exist', function () {
+    Queue::fake();
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($token)->create(['name' => 'example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success', 'Domain added.');
+
+    Queue::assertPushed(ConfigureDnsRecordJob::class, 2);
+    Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'app.example.com'
+        && $job->content === '203.0.113.10'
+        && $job->teamId === $this->team->id);
+    Queue::assertPushed(ConfigureDnsRecordJob::class, fn (ConfigureDnsRecordJob $job): bool => $job->hostname === 'www.app.example.com'
+        && $job->content === '203.0.113.10');
+});
+
+it('does not dispatch configure dns jobs when the server ip is missing or invalid', function () {
+    Queue::fake();
+
+    $this->server->update(['ip' => 'not-an-ip']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($token)->create(['name' => 'example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertNotDispatched('error');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://app.example.com');
+
+    Queue::assertNotPushed(ConfigureDnsRecordJob::class);
 });
 
 it('composes the complete port on the server without duplicating an existing www domain', function () {

@@ -83,6 +83,9 @@ trait InteractsWithDnsProviders
         if ($this->dnsProviderProposals === []) {
             return false;
         }
+        if (blank($this->serverIp) || filter_var($this->serverIp, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
         $this->markDnsPending($hostnames);
 
         $proposalsByHostname = collect($this->dnsProviderProposals)->groupBy('hostname');
