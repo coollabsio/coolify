@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Ai\ConversationPage;
 use App\Livewire\Ai\Settings;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -409,6 +410,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
     Route::get('/ai/settings', Settings::class)->name('ai.settings');
+    Route::get('/assistant', ConversationPage::class)->name('ai.assistant');
 });
 
 Route::middleware(['auth'])->group(function () {
