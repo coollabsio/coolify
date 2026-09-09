@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Enums\ProcessStatus;
 use App\Models\S3Storage;
+use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\SwarmDocker;
 use App\Rules\SafeWebhookUrl;
@@ -13,6 +14,7 @@ use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -24,7 +26,14 @@ class StartDatabaseImport
 
     public const MAX_BYTES = 10 * 1024 * 1024 * 1024;
 
+    public const LOCK_SECONDS = 1800;
+
     public function __construct(private readonly DatabaseImportCommandBuilder $commands) {}
+
+    public static function lockKey(string $resourceUuid): string
+    {
+        return "database-import:{$resourceUuid}";
+    }
 
     public function handle(Model $resource, DatabaseImportSource $source, int $teamId): Activity
     {
@@ -44,6 +53,21 @@ class StartDatabaseImport
             throw new DatabaseImportException('The database server or container is invalid.', 400);
         }
 
+        $lock = Cache::lock(self::lockKey($resource->uuid), self::LOCK_SECONDS);
+
+        if (! $lock->get()) {
+            throw new DatabaseImportException('A database import is already running.', 409);
+        }
+
+        try {
+            return $this->startImport($resource, $source, $teamId, $server, $container, $network);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network): Activity
+    {
         $active = Activity::query()->where('properties->team_id', $teamId)
             ->where('properties->type_uuid', $resource->uuid)
             ->where('properties->operation', 'database_import')
