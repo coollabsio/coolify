@@ -270,7 +270,8 @@ class DeployController extends Controller
             $cancelled = true;
 
             // Get the server
-            $server = Server::whereTeamId($teamId)->find($build_server_id);
+            $server = Server::accessibleDeploymentExecutionServersForTeam($teamId)
+                ->find($build_server_id);
 
             try {
                 if ($server) {
