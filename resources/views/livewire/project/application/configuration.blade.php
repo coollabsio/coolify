@@ -5,7 +5,7 @@
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" :wire:key="'application-heading-'.$currentRoute" />
 
-    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+    <section class="application-settings-workspace w-full max-w-none">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-application.configuration-sidebar :application="$application" :current-route="$currentRoute" />
 
@@ -45,6 +45,8 @@
                 <livewire:project.shared.resource-operations :resource="$application" />
             @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
+            @elseif ($currentRoute === 'project.application.analytics')
+                <livewire:project.application.analytics :application="$application" />
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')

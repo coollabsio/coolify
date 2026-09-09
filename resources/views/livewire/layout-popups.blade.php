@@ -212,17 +212,11 @@
         </x-banner>
     @endif
     @if (request()->query->get('success'))
-        <x-banner>
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clip-rule="evenodd" />
-                </svg>
-                <span><span class="font-bold text-green-500">Welcome onboard!</span> Your subscription has been
-                    activated. It could take a few seconds before it's fully active.</span>
-            </div>
-        </x-banner>
+        <span x-init="$nextTick(() => window.toast('Welcome onboard!', {
+            type: 'success',
+            description: 'Your subscription has been activated. It could take a few seconds before it is fully active.',
+            persistent: true,
+        }))"></span>
     @endif
     @if (currentTeam()->subscriptionPastOverDue())
         <x-banner :closable=false>

@@ -16,7 +16,7 @@
             </div>
         </x-slot:actions>
 
-        <div class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.025] dark:ring-white/[0.07]">
+        <div class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:ring-white/[0.07]">
             <span class="text-[12px] text-neutral-500 dark:text-fg-dim">
                 {{ $backup?->targetType() ?? ($storage instanceof \App\Models\LocalFileVolume ? 'Directory' : 'Volume') }}
             </span>

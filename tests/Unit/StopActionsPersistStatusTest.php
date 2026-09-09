@@ -6,6 +6,17 @@ it('persists exited status when stopping standalone databases', function () {
     expect($action)->toContain("'status' => 'exited'");
 });
 
+it('does not change Docker restart policies when retaining stopped containers', function (string $actionPath) {
+    $action = file_get_contents(__DIR__.'/../../'.$actionPath);
+
+    expect($action)->not->toContain('docker update --restart=no');
+})->with([
+    'applications' => 'app/Actions/Application/StopApplication.php',
+    'application previews' => 'app/Actions/Application/StopApplicationPreview.php',
+    'service applications' => 'app/Actions/Service/StopServiceApplication.php',
+    'standalone databases' => 'app/Actions/Database/StopDatabase.php',
+]);
+
 it('persists exited status for every full application stop path', function () {
     $action = file_get_contents(__DIR__.'/../../app/Actions/Application/StopApplication.php');
 
@@ -21,7 +32,7 @@ it('persists exited status for all children when stopping a service', function (
         ->toContain("\$application->update(['status' => 'exited']);")
         ->toContain('$application->resetRestartLimit();')
         ->toContain("\$database->update(['status' => 'exited']);")
-        ->toContain('$database->resetRestartLimit();');
+        ->not->toContain('$database->resetRestartLimit();');
 });
 
 it('persists exited status when stopping an individual service resource', function () {
