@@ -2138,6 +2138,37 @@ class Application extends BaseModel
         }
     }
 
+    /**
+     * Original compose service names for a preview, excluding database images.
+     * Legacy parsers (< 3) suffix service keys with -pr-N; current parsers keep the original key.
+     *
+     * @return list<string>
+     */
+    public function composeServiceNamesForPreview(int $pullRequestId): array
+    {
+        $services = data_get($this->parse(pull_request_id: $pullRequestId), 'services', []);
+        if (! is_iterable($services)) {
+            return [];
+        }
+
+        $usesLegacyServiceKeys = (int) $this->compose_parsing_version < 3;
+        $previewSuffix = '-pr-'.$pullRequestId;
+        $names = [];
+        foreach ($services as $serviceName => $service) {
+            if (isDatabaseImage(data_get($service, 'image'))) {
+                continue;
+            }
+
+            $serviceName = (string) $serviceName;
+            if ($usesLegacyServiceKeys && str_ends_with($serviceName, $previewSuffix)) {
+                $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
+            }
+            $names[] = $serviceName;
+        }
+
+        return array_values(array_unique($names));
+    }
+
     public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         // Use provided restore values or capture current values as fallback

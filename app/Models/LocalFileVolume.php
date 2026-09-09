@@ -182,7 +182,21 @@ class LocalFileVolume extends BaseModel
         return (string) $content;
     }
 
-    public function deleteStorageOnServer()
+    /**
+     * Path used by a preview deployment. One row serves production and every preview; the
+     * preview path only differs when the -pr-N suffix is enabled for this storage.
+     */
+    public function fsPathForPullRequest(int $pullRequestId): string
+    {
+        $fsPath = (string) $this->fs_path;
+        if ($pullRequestId === 0 || ! ($this->is_preview_suffix_enabled ?? true)) {
+            return $fsPath;
+        }
+
+        return addPreviewDeploymentSuffix($fsPath, $pullRequestId);
+    }
+
+    public function deleteStorageOnServer(int $pullRequestId = 0)
     {
         if ($this->is_host_file) {
             return;
@@ -198,7 +212,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
+        $path = str($this->fsPathForPullRequest($pullRequestId));
         if ($path->startsWith('.')) {
             $path = $path->after('.');
             $path = $workdir.$path;
@@ -223,7 +237,7 @@ class LocalFileVolume extends BaseModel
         }
     }
 
-    public function saveStorageOnServer()
+    public function saveStorageOnServer(int $pullRequestId = 0)
     {
         if ($this->is_host_file) {
             return;
@@ -240,18 +254,19 @@ class LocalFileVolume extends BaseModel
         }
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
+        $fsPath = $this->fsPathForPullRequest($pullRequestId);
 
         if ($this->is_directory) {
             // Validate fs_path early before any shell interpolation
-            validateShellSafePath($this->fs_path, 'storage path');
-            $escapedFsPath = escapeshellarg($this->fs_path);
+            validateShellSafePath($fsPath, 'storage path');
+            $escapedFsPath = escapeshellarg($fsPath);
             $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
             $commands->push("cd {$escapedWorkdir}");
         }
-        $path = data_get_str($this, 'fs_path');
+        $path = str($fsPath);
         $content = data_get($this, 'content');
-        $pathForParentDirectory = str($this->fs_path);
+        $pathForParentDirectory = str($fsPath);
         if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
             $parent_dir = $pathForParentDirectory->beforeLast('/');
             if ($parent_dir != '') {

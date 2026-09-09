@@ -76,6 +76,17 @@ class ApplicationPreview extends BaseModel
                     instant_remote_process(["docker network disconnect {$k} coolify-proxy"], $server, false);
                     instant_remote_process(["docker network rm {$k}"], $server, false);
                 });
+                // Remove the preview copies of bind mount files and directories. The rows stay on the application.
+                $application->fileStorages()->get()
+                    ->filter(fn (LocalFileVolume $fileVolume): bool => ! $fileVolume->is_host_file
+                        && $fileVolume->fsPathForPullRequest($preview->pull_request_id) !== (string) $fileVolume->fs_path)
+                    ->each(function (LocalFileVolume $fileVolume) use ($preview): void {
+                        try {
+                            $fileVolume->deleteStorageOnServer($preview->pull_request_id);
+                        } catch (\Throwable $exception) {
+                            \Log::warning("Failed to remove preview file storage for PR #{$preview->pull_request_id}: {$exception->getMessage()}");
+                        }
+                    });
             } else {
                 // Regular application volume cleanup
                 $persistentStorages = $application->persistentStorages()
@@ -299,27 +310,6 @@ class ApplicationPreview extends BaseModel
      */
     private function composeServiceNamesForPreview(): array
     {
-        $parsedServices = $this->application->parse(pull_request_id: $this->pull_request_id);
-        $services = data_get($parsedServices, 'services', []);
-        if (! is_iterable($services)) {
-            return [];
-        }
-
-        $usesLegacyServiceKeys = (int) $this->application->compose_parsing_version < 3;
-        $previewSuffix = '-pr-'.$this->pull_request_id;
-        $names = [];
-        foreach ($services as $serviceName => $service) {
-            if (isDatabaseImage(data_get($service, 'image'))) {
-                continue;
-            }
-
-            $serviceName = (string) $serviceName;
-            if ($usesLegacyServiceKeys && str_ends_with($serviceName, $previewSuffix)) {
-                $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
-            }
-            $names[] = $serviceName;
-        }
-
-        return array_values(array_unique($names));
+        return $this->application->composeServiceNamesForPreview($this->pull_request_id);
     }
 }

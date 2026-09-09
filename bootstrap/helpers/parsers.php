@@ -833,15 +833,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
-                        $isPreviewSuffixEnabled = (bool) data_get(
-                            $foundConfig,
-                            'is_preview_suffix_enabled',
-                            true,
-                        );
-                        if ($isPullRequest && $isPreviewSuffixEnabled) {
-                            $source = addPreviewDeploymentSuffix($source, $pull_request_id);
-                        }
-                        LocalFileVolume::updateOrCreate(
+                        // One row per mount serves production and every preview, so the row always keeps
+                        // the production path. The preview path is derived from it below.
+                        $fileVolume = LocalFileVolume::updateOrCreate(
                             [
                                 'mount_path' => $target,
                                 'resource_id' => $originalResource->id,
@@ -856,6 +850,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
+                        if ($isPullRequest) {
+                            // The preview copy on the server is written by the deployment (write_preview_file_storages),
+                            // not here: parse() also runs from the UI and from the preview delete hook.
+                            $source = str($fileVolume->fsPathForPullRequest($pullRequestId));
+                        }
                         if (isDev()) {
                             if ((int) $resource->compose_parsing_version >= 4) {
                                 $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);

@@ -14,13 +14,16 @@ class ServerStorageSaveJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public LocalFileVolume $localFileVolume)
+    /**
+     * @param  int  $pullRequestId  Non-zero writes the preview copy of the storage (-pr-N path) instead of the production one.
+     */
+    public function __construct(public LocalFileVolume $localFileVolume, public int $pullRequestId = 0)
     {
         $this->onQueue('high');
     }
 
     public function handle()
     {
-        $this->localFileVolume->saveStorageOnServer();
+        $this->localFileVolume->saveStorageOnServer($this->pullRequestId);
     }
 }

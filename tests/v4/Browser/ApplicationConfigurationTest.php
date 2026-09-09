@@ -2,6 +2,7 @@
 
 use App\Models\ApplicationPreview;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -363,4 +364,96 @@ it('declares the compact preview domain layout and shared save bar', function ()
         ->toContain('Domain routing summary')
         ->toContain('<x-unsaved-bar action="updateDomain"')
         ->toContain('$event.detail.previewId');
+});
+
+it('asks for confirmation once before sharing a volume with preview deployments', function () {
+    $volumes = collect(range(1, 2))->map(fn (int $index) => LocalPersistentVolume::create([
+        'uuid' => (string) new Cuid2,
+        'name' => $this->application->uuid.'-share-'.$index,
+        'mount_path' => '/share/'.$index,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_preview_suffix_enabled' => true,
+    ]));
+    // A file storage renders its own confirmation modal, so the page holds more than one modal.
+    LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+        'uuid' => (string) new Cuid2,
+        'fs_path' => '/data/config.yml',
+        'mount_path' => '/app/config.yml',
+        'content' => 'key: value',
+        'is_directory' => false,
+        'is_based_on_git' => false,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_preview_suffix_enabled' => true,
+    ]));
+    $volume = $volumes->first();
+
+    // Host-side browser runs have no phpredis; keep maintenance checks off Redis.
+    config()->set('app.maintenance.store', 'array');
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ).'/persistent-storage';
+
+    $visibleModals = <<<'JS'
+        () => [...document.querySelectorAll('h3')]
+            .filter((h) => h.textContent.includes('with preview deployments?') && h.offsetParent !== null)
+            .length
+        JS;
+    $clickVisibleButton = fn (string $label): string => <<<JS
+        () => {
+            const button = [...document.querySelectorAll('button')]
+                .find((b) => b.textContent.trim() === '{$label}' && b.offsetParent !== null);
+            if (! button) { return false; }
+            button.click();
+
+            return true;
+        }
+        JS;
+    $chooseShareVolume = <<<JS
+        () => {
+            document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-trigger').click();
+            const panel = document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-panel');
+            const option = [...panel.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === 'Share volume');
+            option.click();
+
+            return true;
+        }
+        JS;
+
+    $page = visit($url);
+    $page->assertSee('PR suffix')
+        ->assertScript("({$visibleModals})() === 0")
+        ->assertScript("(() => document.querySelectorAll('h3').length >= 2)()")
+        ->assertScript($chooseShareVolume)
+        ->wait(1)
+        ->assertSee('Production data will be shared')
+        ->assertScript("({$visibleModals})() === 1")
+        ->screenshot(filename: 'application-persistent-storage-share-modal-open');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $page->assertScript($clickVisibleButton('Keep isolated'))
+        ->wait(1)
+        ->assertScript("({$visibleModals})() === 0")
+        ->assertScript("(() => document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-trigger').textContent.includes('Add suffix'))()");
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $page->assertScript($chooseShareVolume)
+        ->wait(1)
+        ->assertScript("({$visibleModals})() === 1")
+        ->assertScript($clickVisibleButton('Share volume'))
+        ->wait(1)
+        ->assertScript("({$visibleModals})() === 0")
+        ->assertScript("(() => document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-trigger').textContent.includes('Share volume'))()")
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-persistent-storage-share-modal-confirmed');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeFalse()
+        ->and($volumes->last()->fresh()->is_preview_suffix_enabled)->toBeTrue();
 });

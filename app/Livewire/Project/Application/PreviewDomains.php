@@ -623,27 +623,7 @@ class PreviewDomains extends Component
     private function composeServices(bool $failOnError = false): array
     {
         try {
-            $parsedCompose = $this->preview->application->parse(pull_request_id: $this->preview->pull_request_id);
-            $services = data_get($parsedCompose, 'services', []);
-            if (! is_iterable($services)) {
-                return [];
-            }
-
-            $previewSuffix = '-pr-'.$this->preview->pull_request_id;
-            $serviceNames = [];
-            foreach ($services as $serviceName => $service) {
-                if (isDatabaseImage(data_get($service, 'image'))) {
-                    continue;
-                }
-
-                $serviceName = (string) $serviceName;
-                if (str_ends_with($serviceName, $previewSuffix)) {
-                    $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
-                }
-                $serviceNames[] = $serviceName;
-            }
-
-            return array_values(array_unique($serviceNames));
+            return $this->preview->application->composeServiceNamesForPreview($this->preview->pull_request_id);
         } catch (\Throwable $exception) {
             if ($failOnError) {
                 throw $exception;

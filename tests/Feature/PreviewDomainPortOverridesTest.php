@@ -896,8 +896,10 @@ it('reports the readonly preview redirect policy used by proxy labels', function
     Livewire::test(PreviewDomains::class, ['preview' => $preview])
         ->assertSet('domainRows.0.redirect', $expectedRedirect);
 
+    // Legacy parsers (< 3) still suffix compose service keys for previews; current parsers keep the original key.
+    $serviceKey = $parserVersion >= 3 ? 'web' : 'web-pr-147';
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), 'services.web-pr-147.labels'))->implode("\n")
+        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), "services.{$serviceKey}.labels"))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
     if ($expectedRedirect === 'both') {
@@ -942,7 +944,7 @@ it('inherits preview HTTPS redirect policy while always preventing indexing', fu
     ] : []));
 
     $labels = $compose
-        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web-pr-149.labels'))->implode("\n")
+        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web.labels'))->implode("\n")
         : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
 
     expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');

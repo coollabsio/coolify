@@ -1,21 +1,18 @@
-# compose-zero-downtime: review follow-ups
+# compose-zero-downtime: follow-ups
 
-## Done (2026-09-09)
+## Done (2026-09-09): preview file storages and service name helper
 
-- [x] Scope storage-sharing modal events to the owning Livewire component (`scope: $this->getId()`), so one change opens one modal only.
-- [x] `cancelShareStorage` authorizes `update` in All, Show and FileStorage.
-- [x] `Show::instantSave` uses `$this->validate()` again.
-- [x] `GetLogs` reads the PR number from the `coolify.pullRequestId` label passed by `logs.blade.php`, not from the container name.
-- [x] `ScheduledTaskJob`: `$matchedComposeService` is declared before the branch; behavior unchanged (empty container + many containers still throws).
-- [x] `ApplicationPreview` force delete runs `docker compose --project-name {uuid}-pr-N down --remove-orphans` (no `-v`) and only removes volumes that end with `-pr-N`.
-- [x] Tests: `tests/Feature/StorageSharingConfirmationTest.php` (new), `GetLogsCommandInjectionTest.php`, `ApplicationPreviewVolumeCleanupTest.php`.
-- [x] Compose preview named-volume rows are owned by the `ApplicationPreview` (parser v3+). Existing previews are grandfathered: when the application already has the `-pr-N` row, the parser keeps updating that row. No migration. Test: `tests/Feature/ComposePreviewVolumeOwnershipTest.php`.
-- [x] Verified preview delete via API on the Jean dev env (`http://127.0.0.1:8000`): only `-pr-N` volume, preview containers and network removed; production untouched.
+Design: one `LocalFileVolume` row per mount stays on the application with the production path. The preview path is derived at use time with `LocalFileVolume::fsPathForPullRequest()`. No preview-owned rows, no migration. The parser never writes preview copies to the server (it also runs from the UI and the delete hook); `ApplicationDeploymentJob::write_preview_file_storages()` writes them before the stack starts.
 
-## Open
+- [x] `Application::composeServiceNamesForPreview()` is the single helper; `ApplicationPreview` and `PreviewDomains` delegate to it.
+- [x] `LocalFileVolume::fsPathForPullRequest()`; `saveStorageOnServer()` / `deleteStorageOnServer()` / `ServerStorageSaveJob` accept a pull request id.
+- [x] Parser bind branch always writes the production path and derives the preview path for the compose file.
+- [x] Deploy: `write_preview_file_storages()` after parse for PR deploys; the two `preserveRepository` loops pass the PR id.
+- [x] Preview force delete removes preview copies of bind mounts (never production paths).
+- [x] Tests: `tests/Feature/ComposePreviewFileStorageTest.php`, `tests/Feature/ComposeServiceNamesForPreviewTest.php`.
+- [x] Dev instance smoke test with `coolify-examples` `docker-compose-test/docker-compose-local-volumes.yaml`: production deploy, new preview deploy, existing preview redeploy from legacy rows (rows healed, copies kept with content, shared mount uses production dir, production not restarted), production redeploy, preview delete via API (copies removed and not recreated).
 
-- [ ] `tests/Feature/PreviewDomainPortOverridesTest.php` lines 900 and 945 still read `services.web-pr-N.labels`; change to `services.web.labels` (3 failures).
-- [ ] `VolumeBackupTest` and `ApplicationConfigAuthorizationTest` have 12 pre-existing failures on this branch (same count without the follow-up changes).
-- [ ] `PreviewDomains.php:632` strips `-pr-N` without a parser version gate; share one helper with `ApplicationPreview`.
-- [ ] Bind mount file rows: a preview parse still overwrites the production `LocalFileVolume` row's `fs_path` with the `-pr-N` path. Fixing this needs preview-aware `saveStorageOnServer`, `ServerFilesFromServerJob` and the deploy file loop. Not done.
-- [ ] Pre-existing test order dependence: `ApplicationPreviewVolumeCleanupTest` line 71 fails when run after any parser test file (also without these changes).
+## Deferred
+
+- [ ] Legacy `-pr-N` volume rows on the application (previews parsed before the ownership fix) stay after preview delete. Cleanup later.
+- [ ] Pre-existing on `main`: 12 failures in `VolumeBackupTest` and `ApplicationConfigAuthorizationTest`, and `ApplicationPreviewVolumeCleanupTest` line 71 fails when run after any parser test file.

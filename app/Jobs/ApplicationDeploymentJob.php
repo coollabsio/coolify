@@ -679,14 +679,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer();
-                        $fileStorage->saveStorageOnServer();
+                        $fileStorage->deleteStorageOnServer($this->pull_request_id);
+                        $fileStorage->saveStorageOnServer($this->pull_request_id);
                     } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
                         $fileStorage->is_directory = false;
                         $fileStorage->is_based_on_git = true;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer();
-                        $fileStorage->saveStorageOnServer();
+                        $fileStorage->deleteStorageOnServer($this->pull_request_id);
+                        $fileStorage->saveStorageOnServer($this->pull_request_id);
                     }
                 }
             }
@@ -708,6 +708,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
+            if ($this->pull_request_id !== 0) {
+                $this->write_preview_file_storages();
+            }
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
@@ -925,6 +928,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('New container started.');
         if ($this->pull_request_id !== 0 && $legacyPreviewContainersExist) {
             $this->removeHealthyLegacyComposePreviewContainers($composeProjectName, $composeFile);
+        }
+    }
+
+    /**
+     * Write the preview copies (-pr-N paths) of bind mount files and directories before the stack starts.
+     * The rows stay on the application; without the copy Docker would create an empty directory instead.
+     */
+    private function write_preview_file_storages(): void
+    {
+        foreach ($this->application->fileStorages()->get() as $fileStorage) {
+            $previewPath = $fileStorage->fsPathForPullRequest($this->pull_request_id);
+            if ($fileStorage->is_host_file || $previewPath === (string) $fileStorage->fs_path) {
+                continue;
+            }
+            try {
+                $fileStorage->saveStorageOnServer($this->pull_request_id);
+            } catch (Throwable $exception) {
+                $this->application_deployment_queue->addLogEntry("Failed to write preview storage {$previewPath}: {$exception->getMessage()}", 'stderr');
+            }
         }
     }
 
@@ -1233,7 +1255,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             foreach ($this->application->fileStorages as $fileStorage) {
                 if (! $fileStorage->is_host_file && ! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
-                    $fileStorage->saveStorageOnServer();
+                    $fileStorage->saveStorageOnServer($this->pull_request_id);
                 }
             }
             if ($this->use_build_server) {
