@@ -7,6 +7,7 @@
     <!-- Global search component - included once to prevent keyboard shortcut duplication -->
     <livewire:global-search />
     @auth
+        <livewire:ai.assistant />
         <div x-data="{
             open: false,
             userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',

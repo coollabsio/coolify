@@ -1,0 +1,45 @@
+<?php
+
+use App\Livewire\Ai\Assistant;
+use App\Models\AiConversation;
+use App\Models\InstanceSettings;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->team = Team::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->teams()->attach($this->team, ['role' => 'admin']);
+    $this->actingAs($this->user);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+});
+
+test('the assistant is enabled only when both flags are on', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    expect(Livewire::test(Assistant::class)->instance()->enabled())->toBeTrue();
+});
+
+test('the assistant is disabled when the instance flag is off', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => false]);
+    Once::flush();
+
+    expect(Livewire::test(Assistant::class)->instance()->enabled())->toBeFalse();
+});
+
+test('opening the assistant ensures an active thread', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    Livewire::test(Assistant::class)
+        ->call('openThread')
+        ->assertSet('activeConversationId', fn ($id) => $id !== null);
+
+    expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(1);
+});
