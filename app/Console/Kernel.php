@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\Ai\RefreshCoolifyDocs;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -55,6 +56,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new RefreshCoolifyDocs)->daily()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
