@@ -1,12 +1,12 @@
 <?php
 
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
-use AppModels\ServiceDatabase;
-use AppModels\StandaloneMariadb;
-use AppModels\StandaloneMongodb;
-use AppModels\StandaloneMysql;
-use AppModels\StandalonePostgresql;
 
 function importResource(string $class, ?string $databaseType = null): object
 {
