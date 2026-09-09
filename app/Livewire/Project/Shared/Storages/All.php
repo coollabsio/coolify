@@ -11,6 +11,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
@@ -46,6 +47,7 @@ class All extends Component
 
     public bool $deleteDockerVolume = false;
 
+    #[Locked]
     public ?int $pendingSharedStorageId = null;
 
     protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];

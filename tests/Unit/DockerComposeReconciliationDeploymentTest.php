@@ -66,6 +66,22 @@ it('gets current Compose service names from raw and parsed payloads', function (
     ]),
 ]);
 
+it('accepts parsed compose collections in preview migration helpers', function (string $method) {
+    $composeFileParameter = collect(
+        (new ReflectionMethod(ApplicationDeploymentJob::class, $method))->getParameters()
+    )->firstWhere('name', 'composeFile');
+
+    expect($composeFileParameter?->getType())->toBeInstanceOf(ReflectionUnionType::class);
+    expect(
+        collect($composeFileParameter->getType()->getTypes())
+            ->map(fn (ReflectionNamedType $type): string => $type->getName())
+            ->all()
+    )->toContain(Collection::class);
+})->with([
+    'removeHealthyLegacyComposePreviewContainers',
+    'composeContainersAreHealthy',
+]);
+
 it('stale production cleanup excludes containers belonging to legacy previews', function () {
     $method = sourceBetween(
         __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',

@@ -255,6 +255,7 @@ class LocalFileVolume extends BaseModel
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
         $fsPath = $this->fsPathForPullRequest($pullRequestId);
+        $isProductionPath = $fsPath === (string) $this->fs_path;
 
         if ($this->is_directory) {
             // Validate fs_path early before any shell interpolation
@@ -286,6 +287,9 @@ class LocalFileVolume extends BaseModel
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
         if ($isFile === 'OK' && $this->is_directory) {
+            if (! $isProductionPath) {
+                throw new \Exception("Preview path {$fsPath} is a file on the server, but this storage is marked as a directory.");
+            }
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
@@ -297,6 +301,9 @@ class LocalFileVolume extends BaseModel
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
         } elseif ($isDir === 'OK' && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
+                if (! $isProductionPath) {
+                    throw new \Exception("Preview path {$fsPath} is a directory on the server, but this storage is marked as a file.");
+                }
                 $this->is_directory = true;
                 $this->save();
                 throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');

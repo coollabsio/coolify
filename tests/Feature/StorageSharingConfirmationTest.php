@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -193,6 +194,23 @@ it('renders one confirmation modal per component bound to that component scope',
     $modal = file_get_contents(resource_path('views/components/storage-sharing-confirmation.blade.php'));
     expect($modal)->toContain('$event.detail.scope === scope && (modalOpen = true)');
 });
+
+it('locks pendingSharedStorageId so confirmation cannot target a client-supplied volume', function () {
+    $otherVolume = LocalPersistentVolume::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => $this->application->uuid.'-other',
+        'mount_path' => '/other',
+        'host_path' => null,
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'is_preview_suffix_enabled' => true,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $this->application])
+        ->call('requestPreviewSuffixChange', $this->volume->id, false)
+        ->assertSet('pendingSharedStorageId', $this->volume->id)
+        ->set('pendingSharedStorageId', $otherVolume->id);
+})->throws(CannotUpdateLockedPropertyException::class);
 
 it('forbids members from confirming or cancelling storage sharing', function () {
     $this->actingAs($this->member);

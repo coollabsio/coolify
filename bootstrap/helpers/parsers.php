@@ -11,6 +11,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
@@ -907,6 +908,15 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             ->where('resource_id', $originalResource->id)
                             ->exists();
                         $volumeOwner = $hasLegacyApplicationRow ? $originalResource : $previewVolumeOwner;
+                        if ($volumeOwner === null) {
+                            Log::warning('ApplicationPreview missing while parsing preview named volumes; falling back to application ownership.', [
+                                'application_id' => $originalResource->id,
+                                'pull_request_id' => $pullRequestId,
+                                'preview_id' => $preview_id,
+                                'volume' => $name,
+                            ]);
+                            $volumeOwner = $originalResource;
+                        }
                     }
                     if ($volumeOwner !== null) {
                         LocalPersistentVolume::updateOrCreate(

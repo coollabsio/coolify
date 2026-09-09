@@ -11,6 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 uses(RefreshDatabase::class);
@@ -96,10 +97,20 @@ it('keeps legacy preview rows on the application for existing previews', functio
         ->and($preview->persistentStorages()->count())->toBe(0);
 });
 
-it('does not write preview rows when the preview record does not exist', function () {
-    applicationParser($this->application, pull_request_id: 42);
+it('falls back to application ownership and logs when the preview record does not exist', function () {
+    Log::spy();
 
-    expect(LocalPersistentVolume::query()->where('name', $this->previewVolumeName)->exists())->toBeFalse();
+    $parsed = applicationParser($this->application, pull_request_id: 42);
+
+    expect($this->application->persistentStorages()->pluck('name')->all())->toBe([$this->previewVolumeName])
+        ->and(data_get($parsed, 'volumes'))->toHaveKey($this->previewVolumeName);
+
+    Log::shouldHaveReceived('warning')->once()->with(
+        Mockery::pattern('/ApplicationPreview/'),
+        Mockery::on(fn (array $context): bool => $context['application_id'] === $this->application->id
+            && $context['pull_request_id'] === 42
+            && $context['volume'] === $this->previewVolumeName),
+    );
 });
 
 it('removes preview owned rows when the preview is force deleted', function () {

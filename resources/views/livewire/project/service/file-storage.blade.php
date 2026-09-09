@@ -34,7 +34,8 @@
         @if ($resource instanceof \App\Models\Application && $resource->git_based())
             @can('update', $resource)
                 <div class="w-full sm:w-96">
-                    <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
+                    <x-forms.listbox canGate="update" :canResource="$resource" id="isPreviewSuffixEnabled"
+                        label="PR deployment suffix"
                         helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews."
                         onChange="instantSave"
                         x-on:storage-sharing-pending.window="$event.detail.scope === '{{ $this->getId() }}' && (value = true)"

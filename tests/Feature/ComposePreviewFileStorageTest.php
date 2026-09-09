@@ -137,6 +137,54 @@ it('resolves the preview path only when the suffix is enabled', function () {
         ->and($shared->fsPathForPullRequest(42))->toBe("{$this->baseDir}/data");
 });
 
+it('does not reconcile a preview file into the shared directory row', function () {
+    $row = seedPreviewFileRow($this->application, $this->baseDir, 'data', '/app/data', null, isDirectory: true);
+    Process::fake(['*' => Process::result(output: 'OK')]);
+
+    expect(fn () => $row->saveStorageOnServer(42))
+        ->toThrow(Exception::class, "Preview path {$this->baseDir}/data-pr-42 is a file on the server, but this storage is marked as a directory.");
+
+    expect($row->fresh()->is_directory)->toBeTrue()
+        ->and($row->fresh()->content)->toBeNull()
+        ->and($row->fresh()->fs_path)->toBe("{$this->baseDir}/data");
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'head -c') || str_contains($process->command, 'stat -c%s'));
+});
+
+it('still reconciles a production file that was marked as a directory', function () {
+    $row = seedPreviewFileRow($this->application, $this->baseDir, 'data', '/app/data', null, isDirectory: true);
+    Process::fake(['*' => Process::result(output: 'OK')]);
+
+    expect(fn () => $row->saveStorageOnServer())
+        ->toThrow(Exception::class, 'The following file is a file on the server, but you are trying to mark it as a directory.');
+
+    expect($row->fresh()->is_directory)->toBeFalse()
+        ->and($row->fresh()->content)->toBe('OK');
+});
+
+it('does not mark the shared row as a directory when converting a leftover preview directory into a file', function () {
+    $row = seedPreviewFileRow($this->application, $this->baseDir, 'config.yml', '/app/config.yml', 'key: value');
+    Process::fake(function ($process) {
+        if (str_contains($process->command, 'test -f')) {
+            return Process::result(output: 'NOK');
+        }
+        if (str_contains($process->command, 'test -d')) {
+            return Process::result(output: 'OK');
+        }
+
+        return Process::result(output: 'OK');
+    });
+
+    $row->saveStorageOnServer(42);
+
+    expect($row->fresh()->is_directory)->toBeFalse()
+        ->and($row->fresh()->content)->toBe('key: value')
+        ->and($row->fresh()->fs_path)->toBe("{$this->baseDir}/config.yml");
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "rm -fr '{$this->baseDir}/config.yml-pr-42'"));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, "rm -fr '{$this->baseDir}/config.yml'"));
+});
+
 it('writes and removes the preview copy at the suffixed path', function () {
     $row = seedPreviewFileRow($this->application, $this->baseDir, 'config.yml', '/app/config.yml', 'key: value');
     Process::fake(['*' => Process::result(output: 'NOK')]);

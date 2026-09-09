@@ -1014,7 +1014,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
     }
 
-    private function removeHealthyLegacyComposePreviewContainers(string $composeProjectName, array|string $composeFile): void
+    private function removeHealthyLegacyComposePreviewContainers(string $composeProjectName, array|string|Collection $composeFile): void
     {
         $replacementContainerIds = $this->composeProjectContainerIds($composeProjectName, 'replacement_compose_preview_containers');
         if ($replacementContainerIds->isEmpty()) {
@@ -1048,7 +1048,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
     }
 
-    private function composeContainersAreHealthy(Collection $containerIds, array|string $composeFile): bool
+    private function composeContainersAreHealthy(Collection $containerIds, array|string|Collection $composeFile): bool
     {
         if (is_string($composeFile)) {
             $composeFile = Yaml::parse($composeFile);

@@ -1,9 +1,11 @@
 <?php
 
+use App\Jobs\ServerFilesFromServerJob;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
+use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -58,13 +60,47 @@ it('keeps original service keys for current parsers and skips database images', 
     expect($this->application->composeServiceNamesForPreview(5))->toBe(['web', 'worker-pr-5']);
 });
 
-it('strips the preview suffix only for legacy parsers', function () {
+it('returns original compose keys even when the legacy parser suffixes them', function () {
     $this->application->update(['compose_parsing_version' => '2']);
 
-    // The legacy parser suffixes every key; stripping one suffix restores the original names.
+    // The legacy parser suffixes every key; listing preview names still returns the original keys.
     expect(array_keys(data_get($this->application->parse(5), 'services')))->toBe(['web-pr-5', 'worker-pr-5-pr-5', 'db-pr-5'])
         ->and($this->application->composeServiceNamesForPreview(5))->toBe(['web', 'worker-pr-5']);
 });
+
+it('does not persist parser side effects when listing preview service names', function (string $version) {
+    $compose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+    volumes:
+      - data:/var/www
+      - ./config.txt:/app/config.txt
+  worker-pr-5:
+    image: nginx:latest
+  db:
+    image: postgres:16
+volumes:
+  data:
+YAML;
+
+    $this->application->update([
+        'compose_parsing_version' => $version,
+        'docker_compose_raw' => $compose,
+        'docker_compose' => null,
+    ]);
+
+    expect($this->application->composeServiceNamesForPreview(5))->toBe(['web', 'worker-pr-5']);
+
+    $fresh = $this->application->fresh();
+    expect($fresh->docker_compose)->toBeNull()
+        ->and($fresh->docker_compose_raw)->toBe($compose);
+    expect(LocalPersistentVolume::query()->count())->toBe(0);
+    Bus::assertNotDispatched(ServerFilesFromServerJob::class);
+})->with([
+    'current parser' => '3',
+    'legacy parser' => '2',
+]);
 
 it('is shared by the preview model and the preview domains component', function () {
     $this->application->update(['compose_parsing_version' => '3']);

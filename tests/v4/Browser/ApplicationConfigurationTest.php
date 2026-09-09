@@ -430,7 +430,6 @@ it('asks for confirmation once before sharing a volume with preview deployments'
         ->assertScript("({$visibleModals})() === 0")
         ->assertScript("(() => document.querySelectorAll('h3').length >= 2)()")
         ->assertScript($chooseShareVolume)
-        ->wait(1)
         ->assertSee('Production data will be shared')
         ->assertScript("({$visibleModals})() === 1")
         ->screenshot(filename: 'application-persistent-storage-share-modal-open');
@@ -438,17 +437,14 @@ it('asks for confirmation once before sharing a volume with preview deployments'
     expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
 
     $page->assertScript($clickVisibleButton('Keep isolated'))
-        ->wait(1)
         ->assertScript("({$visibleModals})() === 0")
         ->assertScript("(() => document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-trigger').textContent.includes('Add suffix'))()");
 
     expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
 
     $page->assertScript($chooseShareVolume)
-        ->wait(1)
         ->assertScript("({$visibleModals})() === 1")
         ->assertScript($clickVisibleButton('Share volume'))
-        ->wait(1)
         ->assertScript("({$visibleModals})() === 0")
         ->assertScript("(() => document.getElementById('forms.{$volume->id}.isPreviewSuffixEnabled-trigger').textContent.includes('Share volume'))()")
         ->assertNoJavaScriptErrors()
