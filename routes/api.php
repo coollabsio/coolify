@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\ServerDockerCleanupController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
+use App\Http\Controllers\Api\ServerMetricsController;
 use App\Http\Controllers\Api\ServerSentinelController;
 use App\Http\Controllers\Api\ServerTransferController;
 use App\Http\Controllers\Api\ServiceApplicationsController;
@@ -171,6 +172,7 @@ Route::group([
     Route::get('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'update'])->middleware(['api.ability:write']);
 
+    Route::get('/servers/{uuid}/metrics', [ServerMetricsController::class, 'show'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write']);
 
