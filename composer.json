@@ -16,6 +16,7 @@
         "doctrine/dbal": "^4.4.4",
         "firebase/php-jwt": "7.1.0",
         "guzzlehttp/guzzle": "^7.15.3",
+        "laravel/ai": "^0.11.2",
         "laravel/fortify": "^1.37.3",
         "laravel/framework": "^12.65.0",
         "laravel/horizon": "^5.48.2",
