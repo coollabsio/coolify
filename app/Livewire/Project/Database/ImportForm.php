@@ -160,13 +160,15 @@ class ImportForm extends Component
 
     public bool $dumpAll = false;
 
+    public bool $replaceExisting = false;
+
     public string $restoreCommandText = '';
 
     public string $customLocation = '';
 
     public ?int $activityId = null;
 
-    public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+    public string $postgresqlRestoreCommand = 'pg_restore --exit-on-error -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
 
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
 
@@ -278,11 +280,22 @@ createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}
 EOD;
                     $this->restoreCommandText = $this->postgresqlRestoreCommand.' && (gunzip -cf <temp_backup_file> 2>/dev/null || cat <temp_backup_file>) | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
                 } else {
-                    $this->postgresqlRestoreCommand = 'pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
+                    $this->syncPostgresqlRestoreCommand();
                 }
                 break;
         }
 
+    }
+
+    public function updatedReplaceExisting(): void
+    {
+        $this->syncPostgresqlRestoreCommand();
+    }
+
+    private function syncPostgresqlRestoreCommand(): void
+    {
+        $replaceExisting = $this->replaceExisting ? ' --clean --if-exists' : '';
+        $this->postgresqlRestoreCommand = 'pg_restore --exit-on-error'.$replaceExisting.' -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}';
     }
 
     public function getContainers()
@@ -449,8 +462,8 @@ EOD;
         try {
             $this->importRunning = true;
             $source = Storage::exists("upload/{$this->resourceUuid}/restore")
-                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll)
-                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll);
+                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting)
+                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -460,6 +473,7 @@ EOD;
                 'database_uuid' => $this->resource->uuid,
                 'database_name' => $this->resource->name,
                 'source' => 'file',
+                'replace_existing' => $this->replaceExisting,
             ]);
         } catch (DatabaseImportException $e) {
             $this->dispatch('error', $e->getMessage());
@@ -606,7 +620,7 @@ EOD;
 
         try {
             $this->importRunning = true;
-            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll);
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -616,6 +630,7 @@ EOD;
                 'database_uuid' => $this->resource->uuid,
                 'database_name' => $this->resource->name,
                 'source' => 's3',
+                'replace_existing' => $this->replaceExisting,
                 'storage_id' => $this->s3StorageId,
             ]);
             $this->dispatch('info', 'Restoring database from S3. Progress will be shown in the activity monitor...');
@@ -713,6 +728,6 @@ SH;
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll);
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting);
     }
 }

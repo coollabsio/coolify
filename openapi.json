@@ -21764,6 +21764,11 @@
                             "dump_all": {
                                 "type": "boolean",
                                 "default": false
+                            },
+                            "replace_existing": {
+                                "description": "Drop matching PostgreSQL objects before restoring a single-database archive.",
+                                "type": "boolean",
+                                "default": false
                             }
                         },
                         "type": "object"
@@ -21790,6 +21795,11 @@
                             "dump_all": {
                                 "type": "boolean",
                                 "default": false
+                            },
+                            "replace_existing": {
+                                "description": "Drop matching PostgreSQL objects before restoring a single-database archive.",
+                                "type": "boolean",
+                                "default": false
                             }
                         },
                         "type": "object"
@@ -21811,6 +21821,11 @@
                                 "example": "\/var\/backups\/database.sql.gz"
                             },
                             "dump_all": {
+                                "type": "boolean",
+                                "default": false
+                            },
+                            "replace_existing": {
+                                "description": "Drop matching PostgreSQL objects before restoring a single-database archive.",
                                 "type": "boolean",
                                 "default": false
                             }

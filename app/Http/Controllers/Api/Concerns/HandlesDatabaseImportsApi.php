@@ -61,13 +61,14 @@ trait HandlesDatabaseImportsApi
     {
         $this->authorize('update', $resource);
         $payload = $request->json()->all() ?: $request->request->all();
-        $allowed = ['source', 'upload_id', 's3_storage_uuid', 'path', 'dump_all'];
+        $allowed = ['source', 'upload_id', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing'];
         $validator = Validator::make($payload, [
             'source' => ['required', Rule::in(['upload', 's3', 'server'])],
             'upload_id' => ['required_if:source,upload', 'prohibited_unless:source,upload', 'uuid'],
             's3_storage_uuid' => ['required_if:source,s3', 'prohibited_unless:source,s3', 'string'],
             'path' => ['required_if:source,s3,server', 'prohibited_if:source,upload', 'string', 'max:4096'],
             'dump_all' => ['sometimes', 'boolean'],
+            'replace_existing' => ['sometimes', 'boolean'],
         ]);
         foreach (array_diff(array_keys($payload), $allowed) as $field) {
             $validator->errors()->add($field, 'This field is not allowed.');
@@ -77,7 +78,7 @@ trait HandlesDatabaseImportsApi
         }
 
         try {
-            $source = new DatabaseImportSource((string) $payload['source'], $payload['upload_id'] ?? null, $payload['path'] ?? null, $payload['s3_storage_uuid'] ?? null, (bool) ($payload['dump_all'] ?? false));
+            $source = new DatabaseImportSource((string) $payload['source'], $payload['upload_id'] ?? null, $payload['path'] ?? null, $payload['s3_storage_uuid'] ?? null, (bool) ($payload['dump_all'] ?? false), (bool) ($payload['replace_existing'] ?? false));
             $activity = app(StartDatabaseImport::class)->handle($resource, $source, $teamId);
         } catch (DatabaseImportException $exception) {
             return response()->json(['message' => $exception->getMessage()], $exception->status);
@@ -87,6 +88,7 @@ trait HandlesDatabaseImportsApi
             'database_uuid' => $resource->uuid,
             'database_name' => $resource->name,
             'source' => $source->type,
+            'replace_existing' => $source->replaceExisting,
             'activity_id' => $activity->id,
         ]);
         $url = route($statusRoute, [...$routeParameters, 'activity_id' => $activity->id], false);

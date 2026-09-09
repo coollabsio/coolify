@@ -71,6 +71,37 @@ test('audits a successfully queued standalone import', function () {
         ->and($event->metadata['activity_id'])->toBe($activity->id);
 });
 
+test('passes the replace existing option to a standalone database import', function () {
+    $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
+    $activity = Activity::create(['log_name' => 'default', 'description' => 'queued', 'properties' => ['status' => 'queued']]);
+    $action = Mockery::mock(StartDatabaseImport::class);
+    $action->shouldReceive('handle')->once()->withArgs(fn ($resource, $source, $teamId) => $resource->is($database)
+        && $source->replaceExisting === true
+        && $teamId === $this->team->id)->andReturn($activity);
+    app()->instance(StartDatabaseImport::class, $action);
+
+    $this->withHeaders($this->headers)
+        ->postJson("/api/v1/databases/{$database->uuid}/imports", [
+            'source' => 'server',
+            'path' => '/tmp/backup.dump',
+            'replace_existing' => true,
+        ])
+        ->assertAccepted();
+});
+
+test('validates replace existing as a boolean', function () {
+    $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
+
+    $this->withHeaders($this->headers)
+        ->postJson("/api/v1/databases/{$database->uuid}/imports", [
+            'source' => 'server',
+            'path' => '/tmp/backup.dump',
+            'replace_existing' => 'yes',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('replace_existing');
+});
+
 test('returns only a team and resource scoped import activity', function () {
     $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
     $activity = Activity::create(['log_name' => 'default', 'description' => json_encode([['order' => 1, 'output' => 'restored', 'type' => 'stdout']]), 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $database->uuid, 'operation' => 'database_import', 'status' => 'finished', 'exitCode' => 0]]);

@@ -7,14 +7,14 @@ use InvalidArgumentException;
 
 class DatabaseImportCommandBuilder
 {
-    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll): string
+    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false): string
     {
         $path = escapeshellarg($path);
 
         return match ($this->databaseType($resource)) {
             'postgresql' => $dumpAll
                 ? 'psql -U ${POSTGRES_USER} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && psql -U ${POSTGRES_USER} -t -c "SELECT datname FROM pg_database WHERE NOT datistemplate" | xargs -I {} dropdb -U ${POSTGRES_USER} --if-exists {} && createdb -U ${POSTGRES_USER} ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} && (gunzip -cf '.$path.' 2>/dev/null || cat '.$path.') | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}'
-                : 'pg_restore -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} '.$path,
+                : 'pg_restore --exit-on-error'.($replaceExisting ? ' --clean --if-exists' : '').' -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} '.$path,
             'mysql' => $dumpAll
                 ? $this->mysqlDumpAll('mysql', 'MYSQL', $path)
                 : 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < '.$path,

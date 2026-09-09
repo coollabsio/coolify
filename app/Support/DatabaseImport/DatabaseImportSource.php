@@ -12,6 +12,7 @@ readonly class DatabaseImportSource
         public ?string $path = null,
         public ?string $s3StorageUuid = null,
         public bool $dumpAll = false,
+        public bool $replaceExisting = false,
     ) {
         if (! in_array($type, ['upload', 's3', 'server'], true)) {
             throw new InvalidArgumentException('Invalid database import source.');

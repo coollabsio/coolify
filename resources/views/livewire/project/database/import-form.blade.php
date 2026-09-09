@@ -48,8 +48,8 @@
     </script>
     @endscript
         <div class="application-settings-workspace flex flex-col gap-6">
-            <x-callout type="danger" title="Existing data will be replaced">
-                Restoring a backup is destructive. Review the source and import command before continuing.
+            <x-callout type="danger" title="Restoring a backup changes database data">
+                Review the source and import command before continuing. Existing objects can cause the import to fail unless replacement is enabled.
             </x-callout>
 
             <x-application.settings-section title="Restore configuration"
@@ -65,8 +65,8 @@
                                 wire:model="restoreCommandText" canGate="update"
                                 :canResource="$this->resource" />
                 @else
-                            <x-forms.input label="Import command"
-                                helper="Add --clean to replace conflicting objects or --verbose for detailed logs."
+                            <x-forms.input label="Import command" readonly
+                                helper="Enable replacement below to drop and recreate matching objects from the archive."
                                 wire:model="postgresqlRestoreCommand" canGate="update"
                                 :canResource="$this->resource" />
                 @endif
@@ -95,6 +95,12 @@
                             ['value' => false, 'label' => 'Backup contains one database'],
                         ]" />
                     </div>
+                    @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+                                helper="Drops matching tables, functions, types, and other PostgreSQL objects from the archive before restoring them." />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 

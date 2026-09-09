@@ -48,6 +48,26 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->toContain('docker exec postgres-safe');
 });
 
+test('stops PostgreSQL restores on the first error without replacing existing objects by default', function () {
+    $builder = new DatabaseImportCommandBuilder;
+    $postgres = importResource(StandalonePostgresql::class);
+
+    expect($builder->buildRestoreCommand($postgres, '/tmp/backup.dump', false, false))
+        ->toContain('--exit-on-error')
+        ->not->toContain('--clean')
+        ->not->toContain('--if-exists');
+});
+
+test('replaces existing PostgreSQL objects when requested', function () {
+    $builder = new DatabaseImportCommandBuilder;
+    $postgres = importResource(StandalonePostgresql::class);
+
+    expect($builder->buildRestoreCommand($postgres, '/tmp/backup.dump', false, true))
+        ->toContain('--clean')
+        ->toContain('--if-exists')
+        ->toContain('--exit-on-error');
+});
+
 test('rejects unsupported database types', function () {
     $builder = new DatabaseImportCommandBuilder;
     $redis = importResource(StandaloneRedis::class);

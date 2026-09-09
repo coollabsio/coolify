@@ -10,4 +10,9 @@ test('documents standalone and service database import endpoints', function () {
         ->toHaveKey('/services/{uuid}/databases/{database_uuid}/imports/uploads')
         ->toHaveKey('/services/{uuid}/databases/{database_uuid}/imports')
         ->toHaveKey('/services/{uuid}/databases/{database_uuid}/imports/{activity_id}');
+
+    foreach ($document['components']['schemas']['DatabaseImportRequest']['oneOf'] as $source) {
+        expect($source['properties']['replace_existing'])
+            ->toMatchArray(['type' => 'boolean', 'default' => false]);
+    }
 });
