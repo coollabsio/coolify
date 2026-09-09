@@ -70,7 +70,7 @@ class Advanced extends Component
     #[Validate(['string', 'nullable'])]
     public ?string $customInternalName = null;
 
-    #[Validate(['string', 'nullable', 'max:47'])]
+    #[Validate(['string', 'nullable', 'max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH])]
     public ?string $customContainerNamePrefix = null;
 
     #[Validate(['boolean'])]

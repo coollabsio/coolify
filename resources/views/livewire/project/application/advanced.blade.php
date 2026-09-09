@@ -56,7 +56,7 @@
                     <form wire:submit="saveCustomNamePrefix" class="w-full">
                         <x-unsaved-bar action="saveCustomNamePrefix" targets="customContainerNamePrefix" />
                         <x-forms.input
-                            helper="Optional prefix for generated container names. Containers are named <span class='font-bold'>prefix-timestamp</span>, for example <span class='font-bold'>shop-api-20260908T141530</span>, instead of starting with <span class='font-bold'>{{ $application->uuid }}</span>.<br><br>The prefix is converted to slug format when saved, can be up to 47 characters and must be unique on this server. Rolling updates keep working."
+                            helper="Optional prefix for generated container names. Containers are named <span class='font-bold'>prefix-timestamp</span>, for example <span class='font-bold'>shop-api-20260908T141530</span>, instead of starting with <span class='font-bold'>{{ $application->uuid }}</span>.<br><br>The prefix is converted to slug format when saved, can be up to {{ \App\Models\ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH }} characters and must be unique on this server. Rolling updates keep working."
                             id="customContainerNamePrefix" label="Container name prefix" placeholder="e.g. my-api"
                             canGate="update" :canResource="$application" />
                     </form>

@@ -50,6 +50,12 @@ use OpenApi\Attributes as OA;
 )]
 class ApplicationSetting extends Model
 {
+    /**
+     * Keeps generated names (prefix, timestamp and for compose apps the service name) well below the
+     * 63 character DNS label limit, with room for a longer suffix in the future.
+     */
+    public const MAX_CONTAINER_NAME_PREFIX_LENGTH = 30;
+
     protected $casts = [
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
