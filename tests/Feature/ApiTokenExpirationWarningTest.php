@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApiTokenExpirationWarningJob;
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Notification;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -43,7 +45,7 @@ function createTokenExpiring(User $user, Team $team, ?Carbon $expiresAt, ?Carbon
 
 describe('ApiTokenExpirationWarningJob', function () {
     test('notifies team when token expires within 24h', function () {
-        $token = createTokenExpiring($this->user, $this->team, now()->addHours(23));
+        $token = createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(23));
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -52,7 +54,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('does not mark token as warned when notification fails', function () {
-        $token = createTokenExpiring($this->user, $this->team, now()->addHours(23));
+        $token = createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(23));
         $dispatcher = Mockery::mock(Dispatcher::class);
         $dispatcher->shouldReceive('send')
             ->once()
@@ -67,7 +69,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('database marker prevents duplicate warnings on repeat runs', function () {
-        createTokenExpiring($this->user, $this->team, now()->addHours(12));
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
 
         (new ApiTokenExpirationWarningJob)->handle();
         (new ApiTokenExpirationWarningJob)->handle();
@@ -76,7 +78,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('database marker prevents duplicate warnings after cache is flushed', function () {
-        createTokenExpiring($this->user, $this->team, now()->addHours(12));
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -88,7 +90,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('skips tokens that already have an expiration warning marker', function () {
-        createTokenExpiring($this->user, $this->team, now()->addHours(12), now()->subHour());
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12), Carbon::now()->subHour());
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -96,8 +98,8 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('notifies once for each unmarked expiring token', function () {
-        createTokenExpiring($this->user, $this->team, now()->addHours(12));
-        createTokenExpiring($this->user, $this->team, now()->addHours(23));
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(23));
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -105,7 +107,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('skips tokens expiring more than 24h out', function () {
-        createTokenExpiring($this->user, $this->team, now()->addDays(3));
+        createTokenExpiring($this->user, $this->team, Carbon::now()->addDays(3));
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -113,7 +115,7 @@ describe('ApiTokenExpirationWarningJob', function () {
     });
 
     test('skips already-expired tokens', function () {
-        createTokenExpiring($this->user, $this->team, now()->subHour());
+        createTokenExpiring($this->user, $this->team, Carbon::now()->subHour());
 
         (new ApiTokenExpirationWarningJob)->handle();
 
@@ -126,5 +128,26 @@ describe('ApiTokenExpirationWarningJob', function () {
         (new ApiTokenExpirationWarningJob)->handle();
 
         Notification::assertNothingSent();
+    });
+
+    test('skips tokens whose owner is no longer a team member', function () {
+        $token = createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
+        $this->team->members()->detach($this->user);
+
+        (new ApiTokenExpirationWarningJob)->handle();
+
+        Notification::assertNothingSent();
+        expect($token->fresh()->api_token_expiration_warning_sent_at)->toBeNull();
+    });
+
+    test('manage url uses the instance fqdn when configured', function () {
+        InstanceSettings::query()->update(['fqdn' => 'https://coolify.example.com']);
+        $token = createTokenExpiring($this->user, $this->team, Carbon::now()->addHours(12));
+
+        $notification = new ApiTokenExpiringNotification($token);
+
+        expect($notification->toSlack()->description)
+            ->toContain('https://coolify.example.com/security/api-tokens')
+            ->not->toContain('localhost');
     });
 });

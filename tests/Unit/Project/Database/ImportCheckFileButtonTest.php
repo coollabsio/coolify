@@ -1,14 +1,10 @@
 <?php
 
-use App\Livewire\Project\Database\Import;
-use App\Models\Server;
+use App\Livewire\Project\Database\ImportForm;
 
 test('checkFile does nothing when customLocation is empty', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $component->customLocation = '';
-
-    $mockServer = Mockery::mock(Server::class);
-    $component->server = $mockServer;
 
     // No server commands should be executed when customLocation is empty
     $component->checkFile();
@@ -17,11 +13,8 @@ test('checkFile does nothing when customLocation is empty', function () {
 });
 
 test('checkFile validates file exists on server when customLocation is filled', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $component->customLocation = '/tmp/backup.sql';
-
-    $mockServer = Mockery::mock(Server::class);
-    $component->server = $mockServer;
 
     // This test verifies the logic flows when customLocation has a value
     // The actual remote process execution is tested elsewhere
@@ -29,7 +22,7 @@ test('checkFile validates file exists on server when customLocation is filled', 
 });
 
 test('customLocation can be cleared to allow uploaded file to be used', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $component->customLocation = '/tmp/backup.sql';
 
     // Simulate clearing the customLocation (as happens when file is uploaded)
@@ -39,19 +32,17 @@ test('customLocation can be cleared to allow uploaded file to be used', function
 });
 
 test('validateBucketName accepts valid bucket names', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateBucketName');
 
     // Valid bucket names
     expect($method->invoke($component, 'my-bucket'))->toBeTrue();
-    expect($method->invoke($component, 'my_bucket'))->toBeTrue();
     expect($method->invoke($component, 'mybucket123'))->toBeTrue();
     expect($method->invoke($component, 'my.bucket.name'))->toBeTrue();
-    expect($method->invoke($component, 'Bucket-Name_123'))->toBeTrue();
 });
 
 test('validateBucketName rejects invalid bucket names', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateBucketName');
 
     // Invalid bucket names (command injection attempts)
@@ -62,10 +53,13 @@ test('validateBucketName rejects invalid bucket names', function () {
     expect($method->invoke($component, 'bucket&ls'))->toBeFalse();
     expect($method->invoke($component, "bucket\nid"))->toBeFalse();
     expect($method->invoke($component, 'bucket name'))->toBeFalse(); // Space not allowed in bucket
+    expect($method->invoke($component, 'my_bucket'))->toBeFalse();
+    expect($method->invoke($component, 'Bucket-Name'))->toBeFalse();
+    expect($method->invoke($component, '192.168.1.1'))->toBeFalse();
 });
 
 test('validateS3Path accepts valid S3 paths', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateS3Path');
 
     // Valid S3 paths
@@ -77,7 +71,7 @@ test('validateS3Path accepts valid S3 paths', function () {
 });
 
 test('validateS3Path rejects invalid S3 paths', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateS3Path');
 
     // Invalid S3 paths (command injection attempts)
@@ -97,7 +91,7 @@ test('validateS3Path rejects invalid S3 paths', function () {
 });
 
 test('validateServerPath accepts valid server paths', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateServerPath');
 
     // Valid server paths (must be absolute)
@@ -108,7 +102,7 @@ test('validateServerPath accepts valid server paths', function () {
 });
 
 test('validateServerPath rejects invalid server paths', function () {
-    $component = new Import;
+    $component = new ImportForm;
     $method = new ReflectionMethod($component, 'validateServerPath');
 
     // Invalid server paths

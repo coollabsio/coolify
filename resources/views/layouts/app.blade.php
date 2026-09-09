@@ -9,78 +9,183 @@
     @auth
         <div x-data="{
             open: false,
+            userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            autoCollapse: localStorage.getItem('sidebarAutoCollapse') !== 'false',
+            hasSecondBar: false,
             collapsed: false,
-            pageWidth: 'full',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            sidebarReady: false,
             init() {
-                this.pageWidth = localStorage.getItem('pageWidth');
-                if (!this.pageWidth) {
-                    this.pageWidth = 'full';
-                    localStorage.setItem('pageWidth', 'full');
+                this.applyCollapsed(false);
+                this.$nextTick(() => {
+                    requestAnimationFrame(() => {
+                        this.sidebarReady = true;
+                    });
+                });
+            },
+            targetCollapsed() {
+                this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
+                return this.userCollapsed || (this.autoCollapse && this.hasSecondBar);
+            },
+            applyCollapsed(animate) {
+                const target = this.targetCollapsed();
+                if (target === this.collapsed) return;
+                if (animate) {
+                    // Let the new page paint at the current width, then animate the
+                    // slide a frame later so the auto-collapse reads as a motion.
+                    this.sidebarReady = true;
+                    requestAnimationFrame(() => requestAnimationFrame(() => { this.collapsed = target; }));
+                } else {
+                    this.collapsed = target;
                 }
-                this.collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
             },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
-                localStorage.setItem('sidebarCollapsed', this.collapsed);
+                this.userCollapsed = this.collapsed;
+                localStorage.setItem('sidebarCollapsed', this.userCollapsed);
+            },
+            toggleAutoCollapse() {
+                this.autoCollapse = !this.autoCollapse;
+                localStorage.setItem('sidebarAutoCollapse', this.autoCollapse);
+                this.applyCollapsed(true);
             }
-        }" x-cloak class="mx-auto dark:text-inherit text-black"
-            :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-on:livewire:navigated.window="applyCollapsed(true)"
+            :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
+            class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
-            <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
-                <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
-                <div class="fixed inset-y-0 right-0 h-full flex">
-                    <div class="relative flex flex-1 w-full max-w-56 min-w-0">
-                        <div class="absolute top-0 flex justify-center w-16 pt-5 right-full">
-                            <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
-                                <span class="sr-only">Close sidebar</span>
-                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+
+            {{-- ============ DESKTOP TOP BAR ============ --}}
+            <header
+                x-data="{ resourceActionsOpen: false }"
+                @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
+                :class="{ 'z-[1000]': resourceActionsOpen }"
+                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
+                {{-- Brand (width tracks sidebar) --}}
+                <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
+                    :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
+                    <div class="flex shrink-0 items-baseline gap-1.5 min-w-0">
+                        <a href="/" {{ wireNavigate() }} title="Coolify"
+                            class="flex items-center hover:opacity-80 transition-opacity">
+                            <img x-show="collapsed" x-cloak src="/coolify-logo.svg" alt="Coolify"
+                                class="size-5" />
+                            <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
+                        </a>
+                        <x-version x-show="!collapsed"
+                            class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                    </div>
+                    @if (isInstanceAdmin() && !isCloud())
+                        <div x-show="!collapsed" class="ml-auto shrink-0">
+                            @persist('upgrade')
+                                <livewire:upgrade />
+                            @endpersist
+                        </div>
+                    @endif
+                </div>
+                {{-- Collapse toggle + team switcher --}}
+                <div
+                    class="flex h-full items-center gap-0.5 min-w-0 flex-1 border-b border-neutral-200 pl-3 pr-4 dark:border-white/[0.06]">
+                    <div class="relative flex min-w-0 flex-1 items-center">
+                        <x-top-breadcrumb />
+                        <div id="server-topbar-context" class="min-w-0"></div>
+                    </div>
+                    {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
+                    <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
+                    <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
+                    {{-- Resource actions dock here on desktop. --}}
+                    <div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>
+                </div>
+            </header>
+
+            {{-- ============ MOBILE SLIDE-OVER SIDEBAR (shadcn-style sheet) ============ --}}
+            <div class="mobile-sidebar-sheet relative z-[1000] lg:hidden"
+                x-on:keydown.escape.window="open = false"
+                x-on:livewire:navigated.window="open = false">
+                {{-- Scrim: fades in/out --}}
+                <div class="fixed inset-0 bg-black/50" x-show="open" x-cloak x-on:click="open = false"
+                    x-transition:enter="transition-opacity ease-out duration-300"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition-opacity ease-in duration-200"
+                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
+                {{-- Panel: slides in from the right (iOS drawer curve), exits faster --}}
+                <div class="fixed inset-y-0 right-0 flex" :class="!open && 'pointer-events-none'">
+                    <div x-show="open" x-cloak x-trap.inert.noscroll="open"
+                        role="dialog" aria-modal="true" aria-label="Navigation menu"
+                        x-transition:enter="transform transition ease-[cubic-bezier(0.32,0.72,0,1)] duration-300"
+                        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transform transition ease-in duration-200"
+                        x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                        class="relative flex h-full w-72 max-w-[85vw] min-w-0 flex-col overflow-hidden rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-panel dark:shadow-[-8px_0_30px_-4px_rgba(0,0,0,0.5)]">
+                        <div data-mobile-sidebar-brand
+                            class="flex h-12 shrink-0 items-center justify-between gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
+                            <div class="flex min-w-0 items-baseline gap-1.5">
+                                <a href="/" {{ wireNavigate() }} title="Coolify"
+                                    class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
+                                    Coolify
+                                </a>
+                                <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
+                            </div>
+                            <button type="button" x-on:click="open = false" aria-label="Close menu"
+                                class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black active:scale-95 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.75"
                                     stroke="currentColor" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-
-                        <div class="flex flex-col pb-2 overflow-y-auto min-w-56 dark:bg-coolgray-100 gap-y-5 scrollbar min-w-0">
+                        <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col min-w-0 transition-[width] duration-200"
-                :class="collapsed ? 'lg:w-16' : 'lg:w-56'">
-                <div class="flex flex-col overflow-y-auto grow gap-y-5 scrollbar min-w-0">
+            {{-- ============ DESKTOP SIDEBAR (below top bar) ============ --}}
+            <div class="hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
+                :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
+                <div class="flex grow min-w-0 flex-col overflow-visible">
                     <x-navbar />
                 </div>
-                <button type="button" @click="toggleSidebar()"
-                    :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-                    class="absolute top-8 -right-3 z-50 hidden lg:flex items-center justify-center w-6 h-6 rounded-full border bg-white dark:bg-coolgray-100 dark:border-coolgray-200 border-neutral-300 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-300 transition-transform"
-                        :class="collapsed ? '' : 'rotate-180'"
-                        fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                </button>
             </div>
 
+            {{-- ============ MOBILE TOP BAR ============ --}}
             <div
-                class="sticky top-0 z-40 flex items-center justify-between px-4 py-4 gap-x-6 sm:px-6 lg:hidden bg-white/95 dark:bg-base/95 backdrop-blur-sm border-b border-neutral-300/50 dark:border-coolgray-200/50">
-                <div class="flex items-center gap-3 flex-shrink-0">
+                class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 gap-x-4 sm:px-6 lg:hidden bg-white/95 dark:bg-panel/95 backdrop-blur-sm border-b border-neutral-200/60 dark:border-white/[0.06]">
+                <div class="flex min-w-0 flex-1 items-center gap-2.5">
                     <a href="/"
-                        class="text-xl font-bold tracking-wide dark:text-white hover:opacity-80 transition-opacity">Coolify</a>
-                    <livewire:switch-team />
+                        class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 transition-opacity hover:opacity-80 dark:bg-white/[0.06]">
+                        <img src="/coolify-logo.svg" alt="Coolify" class="w-[18px] h-[18px]" />
+                    </a>
+                    <div class="min-w-0" x-data="{ collapsed: false }">
+                        <livewire:switch-team />
+                    </div>
                 </div>
-                <button type="button" class="-m-2.5 p-2.5 dark:text-warning" x-on:click="open = !open">
-                    <span class="sr-only">Open sidebar</span>
-                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24">
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                </button>
+                <div class="flex shrink-0 items-center gap-1">
+                    {{-- Dev Server-Timing HUD docks here on <lg (desktop uses #server-timing-hud-slot) --}}
+                    <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
+                        class="hidden shrink-0 items-center"></div>
+                    <div id="configuration-warning-hud-slot-mobile" class="relative shrink-0"></div>
+                    @if (isInstanceAdmin() && !isCloud())
+                        <livewire:upgrade key="mobile-upgrade" />
+                    @endif
+                    <x-top-user-menu />
+                    <button type="button" x-on:click="open = !open"
+                        class="-mr-1 flex size-9 items-center justify-center rounded-md text-neutral-500 transition-transform duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-90 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                        <span class="sr-only">Open sidebar</span>
+                        <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                            <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            <main class="transition-[padding] duration-200 p-6" :class="collapsed ? 'lg:pl-[6rem]' : 'lg:pl-[16rem]'">
+            {{-- ============ MAIN ============ --}}
+            <main
+                class="min-h-screen bg-neutral-50 dark:bg-app px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
+                :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
+                <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
                     {{ $slot }}
+                </div>
             </main>
         </div>
     @endauth

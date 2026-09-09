@@ -15,9 +15,16 @@ trait HasMetrics
 
     public function getMemoryMetrics(int $mins = 5): ?array
     {
-        $field = $this->isServerMetrics() ? 'usedPercent' : 'used';
+        if ($this->isServerMetrics()) {
+            return $this->getMetrics('memory', $mins, 'usedPercent');
+        }
 
-        return $this->getMetrics('memory', $mins, $field);
+        $metrics = $this->getMetrics('memory', $mins, 'used');
+        if ($metrics === null) {
+            return null;
+        }
+
+        return convertContainerMemoryBytesToMegabytes($metrics);
     }
 
     private function getMetrics(string $type, int $mins, string $valueField): ?array

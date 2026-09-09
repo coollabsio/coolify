@@ -118,10 +118,14 @@ class UpdateCoolify
     {
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
+        $registryUrl = coolifyRegistryUrl();
 
         remote_process([
             "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion $latestHelperImageVersion",
+            'bash /data/coolify/source/upgrade.sh '.
+                escapeshellarg($this->latestVersion).' '.
+                escapeshellarg($latestHelperImageVersion).' '.
+                escapeshellarg($registryUrl),
         ], $this->server);
     }
 }

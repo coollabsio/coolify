@@ -28,8 +28,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,8 +36,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function update(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
-        return true;
+        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
     }
 
     /**
@@ -46,8 +44,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function delete(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
-        return true;
+        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
     }
 
     /**
@@ -55,8 +52,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function restore(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
-        return true;
+        return false;
     }
 
     /**
@@ -64,8 +60,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function forceDelete(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
-        return true;
+        return false;
     }
 
     /**
@@ -73,7 +68,6 @@ class SharedEnvironmentVariablePolicy
      */
     public function manageEnvironment(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
-        return true;
+        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
     }
 }

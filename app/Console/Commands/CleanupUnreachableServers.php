@@ -18,9 +18,13 @@ class CleanupUnreachableServers extends Command
         if ($servers->count() > 0) {
             foreach ($servers as $server) {
                 echo "Cleanup unreachable server ($server->id) with name $server->name";
-                $server->update([
-                    'ip' => '1.2.3.4',
-                ]);
+                if (isCloud()) {
+                    $server->update([
+                        'ip' => '1.2.3.4',
+                    ]);
+                } else {
+                    $server->forceDisableServer();
+                }
             }
         }
     }

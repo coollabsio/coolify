@@ -95,6 +95,6 @@ it('ensures docker_compose_raw update is wrapped in try-catch for error handling
         ->toContain('// This keeps the original user input clean while preventing content reapplication')
         ->toContain('try {')
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
-        ->toContain('} catch (\Exception $e) {')
-        ->toContain("ray('Failed to update docker_compose_raw");
+        ->toContain('} catch (Exception) {')
+        ->toContain('// If parsing fails, keep the original docker_compose_raw unchanged');
 });

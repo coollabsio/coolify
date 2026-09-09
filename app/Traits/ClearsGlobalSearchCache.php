@@ -3,6 +3,11 @@
 namespace App\Traits;
 
 use App\Livewire\GlobalSearch;
+use App\Models\Application;
+use App\Models\Environment;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 
 trait ClearsGlobalSearchCache
@@ -20,7 +25,6 @@ trait ClearsGlobalSearchCache
                 }
             } catch (\Throwable $e) {
                 // Silently fail cache clearing - don't break the save operation
-                ray('Failed to clear global search cache on saving: '.$e->getMessage());
             }
         });
 
@@ -33,7 +37,6 @@ trait ClearsGlobalSearchCache
                 }
             } catch (\Throwable $e) {
                 // Silently fail cache clearing - don't break the create operation
-                ray('Failed to clear global search cache on creation: '.$e->getMessage());
             }
         });
 
@@ -46,7 +49,6 @@ trait ClearsGlobalSearchCache
                 }
             } catch (\Throwable $e) {
                 // Silently fail cache clearing - don't break the delete operation
-                ray('Failed to clear global search cache on deletion: '.$e->getMessage());
             }
         });
     }
@@ -58,14 +60,14 @@ trait ClearsGlobalSearchCache
             $searchableFields = ['name', 'description'];
 
             // Add model-specific searchable fields
-            if ($this instanceof \App\Models\Application) {
+            if ($this instanceof Application) {
                 $searchableFields[] = 'fqdn';
                 $searchableFields[] = 'docker_compose_domains';
-            } elseif ($this instanceof \App\Models\Server) {
+            } elseif ($this instanceof Server) {
                 $searchableFields[] = 'ip';
-            } elseif ($this instanceof \App\Models\Service) {
+            } elseif ($this instanceof Service) {
                 // Services don't have direct fqdn, but name and description are covered
-            } elseif ($this instanceof \App\Models\Project || $this instanceof \App\Models\Environment) {
+            } elseif ($this instanceof Project || $this instanceof Environment) {
                 // Projects and environments only have name and description as searchable
             }
             // Database models only have name and description as searchable
@@ -81,7 +83,6 @@ trait ClearsGlobalSearchCache
             return false;
         } catch (\Throwable $e) {
             // If checking changes fails, assume changes exist to be safe
-            ray('Failed to check searchable changes: '.$e->getMessage());
 
             return true;
         }
@@ -91,18 +92,18 @@ trait ClearsGlobalSearchCache
     {
         try {
             // For Project models (has direct team_id)
-            if ($this instanceof \App\Models\Project) {
+            if ($this instanceof Project) {
                 return $this->team_id ?? null;
             }
 
             // For Environment models (get team_id through project)
-            if ($this instanceof \App\Models\Environment) {
+            if ($this instanceof Environment) {
                 return $this->project?->team_id;
             }
 
             // For database models, team is accessed through environment.project.team
             if (method_exists($this, 'team')) {
-                if ($this instanceof \App\Models\Server) {
+                if ($this instanceof Server) {
                     $team = $this->team;
                 } else {
                     $team = $this->team();
@@ -120,7 +121,6 @@ trait ClearsGlobalSearchCache
             return null;
         } catch (\Throwable $e) {
             // If we can't determine team ID, return null
-            ray('Failed to get team ID for cache: '.$e->getMessage());
 
             return null;
         }

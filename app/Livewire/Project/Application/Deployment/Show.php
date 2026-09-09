@@ -39,10 +39,11 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
+        $environment->load(['applications']);
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (! $application) {
             return redirect()->route('dashboard');
@@ -59,7 +60,9 @@ class Show extends Component
         $this->application_deployment_queue = $application_deployment_queue;
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+        $this->is_debug_enabled = auth()->user()->isMember()
+            ? false
+            : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
     }
 
@@ -110,6 +113,8 @@ class Show extends Component
 
     public function downloadAllLogs(): string
     {
+        $this->authorize('update', $this->application);
+
         $logs = decode_remote_command_output($this->application_deployment_queue, includeAll: true)
             ->map(function ($line) {
                 $prefix = '';

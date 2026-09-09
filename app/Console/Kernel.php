@@ -5,9 +5,11 @@ namespace App\Console;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
+use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
+use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
@@ -40,10 +42,19 @@ class Kernel extends ConsoleKernel
             $this->instanceTimezone = config('app.timezone');
         }
 
-        // $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
+        $this->scheduleInstance->call(fn () => app(CleanupStaleMultiplexedConnections::class)->handle())
+            ->name('cleanup:ssh-mux')
+            ->hourly()
+            ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
+        $this->scheduleInstance->command('cleanup:stucked-resources')
+            ->dailyAt('03:17')
+            ->onOneServer()
+            ->withoutOverlapping(60)
+            ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
@@ -78,7 +89,7 @@ class Kernel extends ConsoleKernel
             // Scheduled Jobs (Backups & Tasks)
             $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
 
-            $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily();
+            $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
             $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
 

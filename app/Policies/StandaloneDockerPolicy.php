@@ -28,8 +28,7 @@ class StandaloneDockerPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,7 +36,7 @@ class StandaloneDockerPolicy
      */
     public function update(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        return $user->teams->contains('id', $standaloneDocker->server->team_id);
+        return $user->isAdminOfTeam($standaloneDocker->server->team_id);
     }
 
     /**
@@ -45,7 +44,7 @@ class StandaloneDockerPolicy
      */
     public function delete(User $user, StandaloneDocker $standaloneDocker): bool
     {
-        return $user->teams->contains('id', $standaloneDocker->server->team_id);
+        return $user->isAdminOfTeam($standaloneDocker->server->team_id);
     }
 
     /**

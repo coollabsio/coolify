@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,8 +22,8 @@ use OpenApi\Attributes as OA;
 )]
 class Environment extends BaseModel
 {
+    use Auditable, HasFactory;
     use ClearsGlobalSearchCache;
-    use HasFactory;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -45,6 +46,11 @@ class Environment extends BaseModel
     public static function ownedByCurrentTeam()
     {
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function isEmpty()

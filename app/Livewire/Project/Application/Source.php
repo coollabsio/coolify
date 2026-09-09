@@ -3,7 +3,10 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use App\Rules\ValidGitBranch;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -21,13 +24,13 @@ class Source extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $privateKeyName = null;
 
-    #[Validate(['nullable', 'integer'])]
+    #[Locked]
     public ?int $privateKeyId = null;
 
     #[Validate(['required', 'string'])]
     public string $gitRepository;
 
-    #[Validate(['required', 'string'])]
+    #[Validate(['required', 'string', new ValidGitBranch])]
     public string $gitBranch;
 
     #[Validate(['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'])]
@@ -62,7 +65,7 @@ class Source extends Component
         $this->gitCommitSha = trim($this->gitCommitSha);
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -93,9 +96,19 @@ class Source extends Component
 
     private function getSources()
     {
-        // filter the current source out
-        $this->sources = currentTeam()->sources()->whereNotNull('app_id')->reject(function ($source) {
-            return $source->id === $this->application->source_id;
+        $this->sources = currentTeam()->sources()->filter(function ($source) {
+            if ($source->id === $this->application->source_id
+                && $source->getMorphClass() === $this->application->source_type) {
+                return false;
+            }
+            if ($source instanceof GithubApp) {
+                return ! is_null($source->app_id);
+            }
+            if ($source instanceof GitlabApp) {
+                return $source->isConnected();
+            }
+
+            return true;
         })->sortBy('name');
     }
 
@@ -103,7 +116,8 @@ class Source extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $this->privateKeyId = $privateKeyId;
+            $key = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
+            $this->privateKeyId = $key->id;
             $this->syncData(true);
             $this->getPrivateKeys();
             $this->application->refresh();
@@ -133,23 +147,34 @@ class Source extends Component
 
     public function changeSource($sourceId, $sourceType)
     {
-
         try {
             $this->authorize('update', $this->application);
+            $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
+            abort_unless(in_array($sourceType, $allowedSourceTypes, true), 404);
+            $source = $sourceType::ownedByCurrentTeam()->findOrFail($sourceId);
             $this->application->update([
-                'source_id' => $sourceId,
+                'source_id' => $source->id,
                 'source_type' => $sourceType,
             ]);
+            $this->dispatch('configurationChanged');
 
             ['repository' => $customRepository] = $this->application->customRepository();
-            $repository = githubApi($this->application->source, "repos/{$customRepository}");
-            $data = data_get($repository, 'data');
-            $repository_project_id = data_get($data, 'id');
-            if (isset($repository_project_id)) {
-                if ($this->application->repository_project_id !== $repository_project_id) {
-                    $this->application->repository_project_id = $repository_project_id;
-                    $this->application->save();
+            $repository_project_id = null;
+
+            if ($sourceType === GithubApp::class) {
+                $repository = githubApi($source, "repos/{$customRepository}");
+                $repository_project_id = data_get($repository, 'data.id');
+            } elseif ($sourceType === GitlabApp::class) {
+                if ($source->isConnected()) {
+                    $encoded = urlencode($customRepository);
+                    $project = gitlabApi($source, "/projects/{$encoded}");
+                    $repository_project_id = data_get($project, 'data.id');
                 }
+            }
+
+            if (isset($repository_project_id) && $this->application->repository_project_id !== $repository_project_id) {
+                $this->application->repository_project_id = $repository_project_id;
+                $this->application->save();
             }
 
             $this->application->refresh();

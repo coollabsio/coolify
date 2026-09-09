@@ -5,6 +5,7 @@ use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\Service\InvoiceService;
 use Stripe\Service\RefundService;
 use Stripe\Service\SubscriptionService;
@@ -85,6 +86,28 @@ describe('checkEligibility', function () {
         expect($result['current_period_end'])->toBe($periodEnd);
     });
 
+    test('returns eligible when subscription is set to cancel at period end', function () {
+        $this->subscription->update(['stripe_cancel_at_period_end' => true]);
+
+        $periodEnd = now()->addDays(20)->timestamp;
+        $stripeSubscription = (object) [
+            'status' => 'active',
+            'start_date' => now()->subDays(10)->timestamp,
+            'current_period_end' => $periodEnd,
+        ];
+
+        $this->mockSubscriptions
+            ->shouldReceive('retrieve')
+            ->with('sub_test_123')
+            ->andReturn($stripeSubscription);
+
+        $action = new RefundSubscription($this->mockStripe);
+        $result = $action->checkEligibility($this->team);
+
+        expect($result['eligible'])->toBeTrue();
+        expect($result['days_remaining'])->toBe(20);
+    });
+
     test('returns ineligible when subscription is not active', function () {
         $periodEnd = now()->addDays(25)->timestamp;
         $stripeSubscription = (object) [
@@ -141,7 +164,7 @@ describe('checkEligibility', function () {
         $this->mockSubscriptions
             ->shouldReceive('retrieve')
             ->with('sub_test_123')
-            ->andThrow(new \Stripe\Exception\InvalidRequestException('No such subscription'));
+            ->andThrow(new InvalidRequestException('No such subscription'));
 
         $action = new RefundSubscription($this->mockStripe);
         $result = $action->checkEligibility($this->team);
@@ -269,6 +292,7 @@ describe('execute', function () {
         $stripeSubscription = (object) [
             'status' => 'active',
             'start_date' => now()->subDays(10)->timestamp,
+            'current_period_end' => now()->addDays(20)->timestamp,
         ];
 
         $this->mockSubscriptions
@@ -298,7 +322,7 @@ describe('execute', function () {
         $this->mockSubscriptions
             ->shouldReceive('cancel')
             ->with('sub_test_123')
-            ->andThrow(new \Exception('Stripe cancel API error'));
+            ->andThrow(new Exception('Stripe cancel API error'));
 
         $action = new RefundSubscription($this->mockStripe);
         $result = $action->execute($this->team);

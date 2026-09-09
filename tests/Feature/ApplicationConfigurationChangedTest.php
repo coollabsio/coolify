@@ -58,6 +58,83 @@ it('stores a diff between successful deployments', function () {
         ->and(data_get($secondDeployment->configuration_diff, 'changes.0.label'))->toBe('Build command');
 });
 
+it('reports noindex domain changes as requiring a redeploy', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com,https://staging.example.com',
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->setNoindexDomains(['https://staging.example.com']);
+    $application->save();
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('key', 'domains.noindex_domains');
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($change)->not->toBeNull()
+        ->and($change['label'])->toBe('Search engine indexing')
+        ->and($change['impact'])->toBe('redeploy');
+});
+
+it('reports domain port-only changes as requiring a redeploy', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com',
+        'domain_port_overrides' => ['https://app.example.com' => 3000],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => ['https://app.example.com' => 8080],
+    ]);
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('key', 'domains.domain_port_overrides');
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($change)->not->toBeNull()
+        ->and($change['impact'])->toBe('redeploy');
+});
+
+it('keeps application deployment snapshots stable when port overrides are reordered', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://two.example.com' => 8080,
+            'https://one.example.com' => 3000,
+        ],
+    ]);
+
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});
+
+it('does not flag applications whose older snapshot omitted noindex domains', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $snapshot = $deployment->refresh()->configuration_snapshot;
+    $snapshot['sections']['domains']['items'] = collect($snapshot['sections']['domains']['items'])
+        ->reject(fn (array $item): bool => $item['key'] === 'noindex_domains')
+        ->values()
+        ->all();
+    $deployment->update(['configuration_snapshot' => $snapshot]);
+
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});
+
 it('checks legacy preview deployment configuration hash using preview environment variable query', function () {
     $application = configurationChangedTestApplication();
 
@@ -80,11 +157,11 @@ it('checks legacy preview deployment configuration hash using preview environmen
 
     $diff = $application->pendingDeploymentConfigurationDiff();
 
-    expect($diff->isLegacyFallback())->toBeTrue()
-        ->and($diff->isChanged())->toBeTrue();
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->count())->toBeGreaterThan(0);
 });
 
-it('falls back to legacy configuration hash when no deployment snapshot exists', function () {
+it('falls back to real diff against empty snapshot when no deployment snapshot exists', function () {
     $application = configurationChangedTestApplication();
     $application->isConfigurationChanged(save: true);
 
@@ -92,6 +169,10 @@ it('falls back to legacy configuration hash when no deployment snapshot exists',
 
     $application->update(['build_command' => 'pnpm build']);
 
-    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isLegacyFallback())->toBeTrue()
-        ->and($application->pendingDeploymentConfigurationDiff()->isChanged())->toBeTrue();
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->isLegacyFallback())->toBeFalse()
+        ->and($diff->count())->toBeGreaterThan(0)
+        ->and(collect($diff->changes())->pluck('label')->toArray())->toContain('Build command');
 });

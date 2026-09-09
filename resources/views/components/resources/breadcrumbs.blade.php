@@ -52,7 +52,7 @@
 <nav class="pt-2 pb-4 md:pb-10">
     <div class="flex min-w-0 flex-col gap-1 md:hidden">
         <div class="flex min-w-0 items-center text-xs text-neutral-400">
-            <a class="min-w-0 truncate text-neutral-300 hover:text-warning" {{ wireNavigate() }}
+            <a class="min-w-0 truncate" {{ wireNavigate() }}
                 href="{{ $isApplication
                     ? route('project.application.configuration', $routeParams)
                     : ($isService
@@ -64,6 +64,8 @@
         </div>
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
@@ -89,7 +91,7 @@
                     x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                     x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                    class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-[var(--shadow-dropdown)] py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                     @foreach ($projects as $project)
                         <a href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
                             class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $project->uuid === $currentProjectUuid ? 'dark:text-warning font-semibold' : '' }}"
@@ -128,7 +130,7 @@
                     x-init="$nextTick(() => { const rect = $el.getBoundingClientRect(); if (rect.right > window.innerWidth) { $el.style.left = 'auto'; $el.style.right = '0'; } })">
                     <!-- Environment List -->
                     <div
-                        class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                        class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-[var(--shadow-dropdown)] py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                         @foreach ($environments as $environment)
                             @php
                                 $envDatabases = collect()
@@ -203,7 +205,7 @@
                                 :style="'position: absolute; left: 100%; top: ' + (envPositions['{{ $environment->uuid }}'] || 0) + 'px; z-index: 30;'"
                                 class="flex flex-col sm:flex-row items-start pl-1">
                                 <div
-                                    class="relative w-56 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
+                                    class="relative w-56 bg-white dark:bg-coolgray-100 rounded-md shadow-[var(--shadow-dropdown)] py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
                                     @foreach ($envResources as $envResource)
                                         @php
                                             $resType = $envResource['type'];
@@ -257,6 +259,8 @@
         <!-- Current Section Status -->
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif

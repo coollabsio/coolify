@@ -20,6 +20,7 @@ class WebhookNotificationSettings extends Model
         'deployment_success_webhook_notifications',
         'deployment_failure_webhook_notifications',
         'status_change_webhook_notifications',
+        'restart_limit_reached_webhook_notifications',
         'backup_success_webhook_notifications',
         'backup_failure_webhook_notifications',
         'scheduled_task_success_webhook_notifications',
@@ -33,6 +34,10 @@ class WebhookNotificationSettings extends Model
         'traefik_outdated_webhook_notifications',
     ];
 
+    protected $hidden = [
+        'webhook_url',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -42,6 +47,7 @@ class WebhookNotificationSettings extends Model
             'deployment_success_webhook_notifications' => 'boolean',
             'deployment_failure_webhook_notifications' => 'boolean',
             'status_change_webhook_notifications' => 'boolean',
+            'restart_limit_reached_webhook_notifications' => 'boolean',
             'backup_success_webhook_notifications' => 'boolean',
             'backup_failure_webhook_notifications' => 'boolean',
             'scheduled_task_success_webhook_notifications' => 'boolean',

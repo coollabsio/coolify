@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
@@ -33,10 +35,16 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        $this->server->refresh();
+        $this->clearOutdatedInfo();
+
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value || $this->server->proxy->get('status') !== ProxyStatus::RUNNING->value) {
+            return;
+        }
+
         // Detect current version (makes SSH call)
         $currentVersion = getTraefikVersionFromDockerCompose($this->server);
 
-        // Update detected version in database
         $this->server->update(['detected_traefik_version' => $currentVersion]);
 
         if (! $currentVersion) {
@@ -111,6 +119,14 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Dispatch UI update event so warning state refreshes in real-time
         ProxyStatusChangedUI::dispatch($this->server->team_id);
+    }
+
+    private function clearOutdatedInfo(): void
+    {
+        $this->server->update([
+            'detected_traefik_version' => null,
+            'traefik_outdated_info' => null,
+        ]);
     }
 
     /**

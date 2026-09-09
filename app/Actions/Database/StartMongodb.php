@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMongodb;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartMongodb
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneMongodb $database;
 
@@ -20,7 +22,13 @@ class StartMongodb
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneMongodb $database)
+    private string $resolvedMongoUsername;
+
+    private string $resolvedMongoPassword;
+
+    private string $resolvedMongoDatabase;
+
+    public function handle(StandaloneMongodb $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -109,17 +117,11 @@ class StartMongodb
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD',
-                            'echo',
-                            'ok',
-                        ],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD',
+                        'echo',
+                        'ok',
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -253,6 +255,9 @@ class StartMongodb
             $docker_compose['services'][$container_name]['command'] = $commandParts;
         }
 
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -260,15 +265,15 @@ class StartMongodb
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        if ($this->database->enable_ssl) {
+            $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mongodb:mongodb /etc/mongo/certs/server.pem < /dev/null";
+        }
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
-        if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, 'chown mongodb:mongodb /etc/mongo/certs/server.pem');
-        }
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -306,8 +311,20 @@ class StartMongodb
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMongoUsername = (string) $this->database->mongo_initdb_root_username;
+        $this->resolvedMongoPassword = (string) $this->database->mongo_initdb_root_password;
+        $this->resolvedMongoDatabase = (string) $this->database->mongo_initdb_database;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MONGO_INITDB_ROOT_USERNAME') {
+                $this->resolvedMongoUsername = $rawValue;
+            } elseif ($env->key === 'MONGO_INITDB_ROOT_PASSWORD') {
+                $this->resolvedMongoPassword = $rawValue;
+            } elseif ($env->key === 'MONGO_INITDB_DATABASE') {
+                $this->resolvedMongoDatabase = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
@@ -340,9 +357,9 @@ class StartMongodb
 
     private function add_default_database()
     {
-        $dbJson = json_encode($this->database->mongo_initdb_database, JSON_UNESCAPED_SLASHES);
-        $userJson = json_encode($this->database->mongo_initdb_root_username, JSON_UNESCAPED_SLASHES);
-        $pwdJson = json_encode($this->database->mongo_initdb_root_password, JSON_UNESCAPED_SLASHES);
+        $dbJson = json_encode($this->resolvedMongoDatabase, JSON_UNESCAPED_SLASHES);
+        $userJson = json_encode($this->resolvedMongoUsername, JSON_UNESCAPED_SLASHES);
+        $pwdJson = json_encode($this->resolvedMongoPassword, JSON_UNESCAPED_SLASHES);
         $content = "db = db.getSiblingDB({$dbJson});db.createCollection('init_collection');db.createUser({user: {$userJson}, pwd: {$pwdJson}, roles: [{role:\"readWrite\",db:{$dbJson}}]});";
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";

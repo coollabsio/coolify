@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class CloudInitScript extends Model
+class CloudInitScript extends BaseModel
 {
     protected $fillable = [
         'team_id',
         'name',
+        'script',
+    ];
+
+    protected $hidden = [
         'script',
     ];
 

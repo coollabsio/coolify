@@ -1,70 +1,119 @@
 @props([
     'diff' => null,
-    'compact' => false,
+    'compact' => true,
 ])
 
 @php
-    $changes = data_get($diff, 'changes', []);
-    $count = data_get($diff, 'count', count($changes));
-    $requiresBuild = data_get($diff, 'requires_build', false);
+    $changes = collect(data_get($diff, 'changes', []))->values();
 @endphp
 
-@if ($count > 0)
-    <div @class([
-        'text-xs' => $compact,
-        'text-sm' => ! $compact,
-    ])>
-        <div class="mb-2 flex flex-wrap items-center gap-2 font-semibold text-black dark:text-white">
-            <span>{{ $count }} configuration {{ $count === 1 ? 'change' : 'changes' }}</span>
-            <span @class([
-                'rounded-sm px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase leading-none',
-                'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' => $requiresBuild,
-                'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' => ! $requiresBuild,
-            ])>
-                {{ $requiresBuild ? 'Rebuild' : 'Redeploy' }}
-            </span>
-        </div>
+@if ($changes->isNotEmpty())
+    <div @class(['space-y-3' => $compact, 'space-y-5' => ! $compact])>
+        @foreach ($changes->groupBy('section_label') as $sectionLabel => $sectionChanges)
+            <div>
+                <h4
+                    @class([
+                        'font-semibold uppercase tracking-wide text-neutral-500 dark:text-fg-faint',
+                        'mb-1 text-[10px]' => $compact,
+                        'mb-2 text-[11px]' => ! $compact,
+                    ])>
+                    {{ $sectionLabel }}
+                </h4>
 
-        @unless ($compact)
-            <div class="space-y-2">
-                @foreach (collect($changes)->groupBy('section_label') as $sectionLabel => $sectionChanges)
-                    <div>
-                        <div class="mb-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
-                            {{ $sectionLabel }}
+                <div class="overflow-x-auto rounded-md ring-1 ring-neutral-200 dark:ring-white/[0.08]">
+                    <div class="min-w-[560px]">
+                        <div
+                            @class([
+                                'grid grid-cols-[minmax(8rem,0.75fr)_minmax(12rem,1fr)_1.25rem_minmax(12rem,1fr)_1.5rem] items-center text-[10px] font-medium text-neutral-500 dark:bg-white/[0.04] dark:text-fg-faint bg-neutral-100',
+                                'gap-2 px-2 py-1' => $compact,
+                                'gap-3 px-3 py-2' => ! $compact,
+                            ])>
+                            <div>Field</div>
+                            <div>Current</div>
+                            <div></div>
+                            <div>New</div>
+                            <div></div>
                         </div>
-                        <div class="overflow-x-auto rounded-sm border border-neutral-300 dark:border-coolgray-200">
-                            <div class="min-w-[44rem]">
-                                <div class="grid grid-cols-[minmax(12rem,1.4fr)_7rem_minmax(8rem,1fr)_1.5rem_minmax(8rem,1fr)] items-center gap-2 bg-neutral-100 px-3 py-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-coolgray-200 dark:text-neutral-400">
-                                    <div>Field</div>
-                                    <div>Type</div>
-                                    <div>From</div>
-                                    <div></div>
-                                    <div>To</div>
+
+                        <div class="divide-y divide-neutral-200 bg-white dark:divide-white/[0.07] dark:bg-transparent">
+                            @foreach ($sectionChanges as $change)
+                                @php
+                                    $changeKey = (string) data_get($change, 'key');
+                                    $expandable = data_get($change, 'expandable', false);
+                                    $oldDisplay = (string) data_get($change, 'old_display_value');
+                                    $newDisplay = (string) data_get($change, 'new_display_value');
+                                    $oldFull = data_get($change, 'old_full_value') ?? $oldDisplay;
+                                    $newFull = data_get($change, 'new_full_value') ?? $newDisplay;
+                                    $label = (string) data_get($change, 'label');
+                                    $labelTruncated = mb_strlen($label) > 24;
+                                    $rowExpandable = $expandable || $labelTruncated;
+                                @endphp
+
+                                <div
+                                    @class([
+                                        'grid grid-cols-[minmax(8rem,0.75fr)_minmax(12rem,1fr)_1.25rem_minmax(12rem,1fr)_1.5rem] items-start transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]',
+                                        'gap-2 px-2 py-1.5 text-xs' => $compact,
+                                        'gap-3 px-3 py-2.5 text-sm' => ! $compact,
+                                    ])>
+                                    <div class="min-w-0 font-medium text-neutral-900 dark:text-fg">
+                                        @if ($rowExpandable)
+                                            <div class="break-words"
+                                                :class="expandedRows['{{ $changeKey }}'] ? '' : 'truncate'"
+                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($label) : @js((string) str($label)->limit(24))">
+                                            </div>
+                                        @else
+                                            {{ $label }}
+                                        @endif
+                                    </div>
+
+                                    <div class="min-w-0 text-red-600 dark:text-red-400">
+                                        @if ($expandable)
+                                            <div class="break-words"
+                                                :class="expandedRows['{{ $changeKey }}'] ? 'whitespace-pre-wrap' : 'truncate'"
+                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($oldFull) : @js($oldDisplay)">
+                                            </div>
+                                        @else
+                                            <div class="truncate">{{ $oldDisplay }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="flex justify-center pt-0.5 text-neutral-400 dark:text-fg-faint">
+                                        <x-reicon name="arrow-right" class="size-3" />
+                                    </div>
+
+                                    <div class="min-w-0 text-emerald-600 dark:text-emerald-400">
+                                        @if ($expandable)
+                                            <div class="break-words"
+                                                :class="expandedRows['{{ $changeKey }}'] ? 'whitespace-pre-wrap' : 'truncate'"
+                                                x-text="expandedRows['{{ $changeKey }}'] ? @js($newFull) : @js($newDisplay)">
+                                            </div>
+                                        @else
+                                            <div class="truncate">{{ $newDisplay }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="flex justify-end">
+                                        @if ($rowExpandable)
+                                            <button type="button"
+                                                x-on:click="expandedRows['{{ $changeKey }}'] = ! expandedRows['{{ $changeKey }}']"
+                                                :aria-expanded="!! expandedRows['{{ $changeKey }}']"
+                                                title="Toggle full value"
+                                                class="flex size-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                <x-reicon name="eye"
+                                                    x-show="! expandedRows['{{ $changeKey }}']"
+                                                    class="size-3" />
+                                                <x-reicon name="eye-off2"
+                                                    x-show="expandedRows['{{ $changeKey }}']"
+                                                    x-cloak class="size-3" />
+                                            </button>
+                                        @endif
+                                    </div>
                                 </div>
-                                <div class="divide-y divide-neutral-300 dark:divide-coolgray-200">
-                                    @foreach ($sectionChanges as $change)
-                                        <div class="grid grid-cols-[minmax(12rem,1.4fr)_7rem_minmax(8rem,1fr)_1.5rem_minmax(8rem,1fr)] items-center gap-2 px-3 py-1.5 text-neutral-700 dark:text-neutral-300">
-                                            <div class="truncate font-medium text-black dark:text-white" title="{{ data_get($change, 'label') }}">
-                                                {{ data_get($change, 'label') }}
-                                            </div>
-                                            <div class="text-neutral-500 dark:text-neutral-400">
-                                                {{ data_get($change, 'type') }}
-                                            </div>
-                                            <div class="truncate" title="{{ data_get($change, 'old_display_value') }}">
-                                                {{ data_get($change, 'old_display_value') }}
-                                            </div>
-                                            <div class="text-center text-neutral-500 dark:text-neutral-400">→</div>
-                                            <div class="truncate" title="{{ data_get($change, 'new_display_value') }}">
-                                                {{ data_get($change, 'new_display_value') }}
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
+                            @endforeach
                         </div>
                     </div>
-                @endforeach
+                </div>
             </div>
-        @endunless
+        @endforeach
     </div>
 @endif

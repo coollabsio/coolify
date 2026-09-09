@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedArrayCast;
+use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -43,6 +45,44 @@ use OpenApi\Attributes as OA;
 )]
 class ApplicationDeploymentQueue extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(function (ApplicationDeploymentQueue $deployment): void {
+            if (! auth()->check() || ! $deployment->rollback) {
+                return;
+            }
+
+            $application = $deployment->application;
+            $source = $deployment->is_api ? 'api' : 'ui';
+
+            auditLog("{$source}.application.rollback", [
+                'team_id' => $application?->team()?->id,
+                'application_uuid' => $application?->uuid,
+                'application_name' => $application?->name,
+                'deployment_uuid' => $deployment->deployment_uuid,
+                'commit' => $deployment->commit,
+            ]);
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! auth()->check()
+                || ! $deployment->wasChanged('status')
+                || $deployment->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                return;
+            }
+
+            $application = $deployment->application;
+            $source = $deployment->is_api ? 'api' : 'ui';
+
+            auditLog("{$source}.deployment.cancelled", [
+                'team_id' => $application?->team()?->id,
+                'application_uuid' => $application?->uuid,
+                'application_name' => $application?->name,
+                'deployment_uuid' => $deployment->deployment_uuid,
+            ]);
+        });
+    }
+
     protected $fillable = [
         'application_id',
         'deployment_uuid',
@@ -74,11 +114,25 @@ class ApplicationDeploymentQueue extends Model
         'finished_at',
     ];
 
+    /**
+     * The configuration snapshot/diff hold full (decrypted on read) configuration,
+     * including unlocked environment variable values. They are only meant for the
+     * in-app diff modal (which redacts per role) and must never be serialized by the
+     * API, so hide them globally as defense in depth.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'logs',
+        'configuration_snapshot',
+        'configuration_diff',
+    ];
+
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
-        'configuration_snapshot' => 'array',
-        'configuration_diff' => 'array',
+        'configuration_snapshot' => EncryptedArrayCast::class,
+        'configuration_diff' => EncryptedArrayCast::class,
     ];
 
     public function application()

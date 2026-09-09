@@ -4,9 +4,11 @@ namespace App\Exceptions;
 
 use App\Models\InstanceSettings;
 use App\Models\User;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
 use Psr\Log\LogLevel;
 use RuntimeException;
 use Sentry\Laravel\Integration;
@@ -69,8 +71,14 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $e)
     {
-        // Handle authorization exceptions for API routes
-        if ($e instanceof AuthorizationException) {
+        // A duplicate login or 2FA submission carries a stale token on an already authenticated session, see https://github.com/coollabsio/coolify/issues/10670
+        if ($e instanceof TokenMismatchException && $request->routeIs('login.store', 'two-factor.login.store') && $request->user()) {
+            return redirect()->intended(RouteServiceProvider::HOME);
+        }
+
+        // Handle authorization exceptions for API routes. Exceptions carrying
+        // an explicit status (e.g. denyAsNotFound) keep it via parent::render.
+        if ($e instanceof AuthorizationException && ! $e->hasStatus()) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 if ($request->is('api/*')) {
                     auditLog('api.auth.policy_denied', [

@@ -30,7 +30,7 @@ test('GET invitation shows landing page without accepting', function () {
     $response->assertStatus(200);
     $response->assertViewIs('invitation.accept');
     $response->assertSee($this->team->name);
-    $response->assertSee('Accept Invitation');
+    $response->assertSee('Accept invitation');
 
     // Invitation should NOT be deleted (not accepted yet)
     $this->assertDatabaseHas('team_invitations', [

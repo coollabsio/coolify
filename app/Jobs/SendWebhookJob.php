@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -44,33 +45,29 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
     {
         $validator = Validator::make(
             ['webhook_url' => $this->webhookUrl],
-            ['webhook_url' => ['required', 'url', new \App\Rules\SafeWebhookUrl]]
+            ['webhook_url' => ['required', 'url', new SafeWebhookUrl]]
         );
 
         if ($validator->fails()) {
             Log::warning('SendWebhookJob: blocked unsafe webhook URL', [
-                'url' => $this->webhookUrl,
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
                 'errors' => $validator->errors()->all(),
             ]);
 
             return;
         }
 
-        if (isDev()) {
-            ray('Sending webhook notification', [
-                'url' => $this->webhookUrl,
-                'payload' => $this->payload,
+        try {
+            $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
+        } catch (\RuntimeException $e) {
+            Log::warning('SendWebhookJob: blocked unsafe webhook URL at send time', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'error' => $e->getMessage(),
             ]);
+
+            return;
         }
 
-        $response = Http::post($this->webhookUrl, $this->payload);
-
-        if (isDev()) {
-            ray('Webhook response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'successful' => $response->successful(),
-            ]);
-        }
+        Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
     }
 }

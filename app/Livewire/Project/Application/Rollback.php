@@ -6,7 +6,6 @@ use App\Models\Application;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Rollback extends Component
 {
@@ -52,7 +51,7 @@ class Rollback extends Component
 
         $commit = validateGitRef($commit, 'rollback commit');
 
-        $deployment_uuid = new Cuid2;
+        $deployment_uuid = new_public_id();
 
         $result = queue_application_deployment(
             application: $this->application,

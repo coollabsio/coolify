@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Stringable;
+
 /**
  * Unit tests to verify that the applicationParser function in parsers.php
  * properly converts Stringable objects to plain strings to fix strict
@@ -26,8 +28,8 @@ it('ensures service name normalization returns plain strings not Stringable obje
     // Verify both are plain strings, not Stringable objects
     expect(is_string($originalServiceName))->toBeTrue('$originalServiceName should be a plain string');
     expect(is_string($serviceName))->toBeTrue('$serviceName should be a plain string');
-    expect($originalServiceName)->not->toBeInstanceOf(\Illuminate\Support\Stringable::class);
-    expect($serviceName)->not->toBeInstanceOf(\Illuminate\Support\Stringable::class);
+    expect($originalServiceName)->not->toBeInstanceOf(Stringable::class);
+    expect($serviceName)->not->toBeInstanceOf(Stringable::class);
 
     // Verify the transformations work correctly
     expect($originalServiceName)->toBe('my-service');
@@ -135,7 +137,7 @@ it('ensures originalServiceName conversion works for FQDN generation', function 
     $originalServiceName = str($serviceName)->replace('_', '-')->value();
 
     expect(is_string($originalServiceName))->toBeTrue();
-    expect($originalServiceName)->not->toBeInstanceOf(\Illuminate\Support\Stringable::class);
+    expect($originalServiceName)->not->toBeInstanceOf(Stringable::class);
     expect($originalServiceName)->toBe('my-service');
 
     // Verify it can be used in string interpolation (line 544)
@@ -177,6 +179,9 @@ it('verifies parsers.php has the ->value() calls', function () {
     // Line 539: Check originalServiceName conversion
     expect($parsersFile)->toContain("str(\$serviceName)->replace('_', '-')->value()");
 
-    // Line 541: Check serviceName normalization
-    expect($parsersFile)->toContain("str(\$serviceName)->replace('-', '_')->replace('.', '_')->value()");
+    // Service name normalization for env keys / domain map (helper-based)
+    expect($parsersFile)->toContain('normalizeComposeServiceName((string) $serviceName)')
+        ->and($parsersFile)->toContain('getComposeServiceDomainString')
+        ->and($parsersFile)->toContain('putComposeServiceDomain')
+        ->and($parsersFile)->toContain('findServiceApplicationForEnvName');
 });

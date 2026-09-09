@@ -2,7 +2,7 @@
 
 ## `env()` Only in Config Files
 
-Direct `env()` calls return `null` when config is cached.
+Direct `env()` calls may return `null` when config is cached.
 
 Incorrect:
 ```php

@@ -12,15 +12,14 @@ class CanCreateResources
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        return $next($request);
-        // if (! Gate::allows('createAnyResource')) {
-        //     abort(403, 'You do not have permission to create resources.');
-        // }
+        if (! Gate::allows('createAnyResource')) {
+            abort(403, 'You do not have permission to create resources.');
+        }
 
-        // return $next($request);
+        return $next($request);
     }
 }

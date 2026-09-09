@@ -3,10 +3,11 @@
 # category: productivity
 # tags: groceries, household, management, grocery, shopping
 # logo: svgs/grocy.svg
+# port: 80
 
 services:
   grocy:
-    image: lscr.io/linuxserver/grocy:latest
+    image: lscr.io/linuxserver/grocy:4.6.0
     environment:
       - SERVICE_URL_GROCY
       - PUID=1000

@@ -3,6 +3,7 @@
 namespace App\Livewire\Security;
 
 use App\Models\CloudInitScript;
+use App\Rules\ValidCloudInitYaml;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -20,15 +21,19 @@ class CloudInitScriptForm extends Component
 
     public function mount(?int $scriptId = null)
     {
-        if ($scriptId) {
-            $this->scriptId = $scriptId;
-            $cloudInitScript = CloudInitScript::ownedByCurrentTeam()->findOrFail($scriptId);
-            $this->authorize('update', $cloudInitScript);
+        try {
+            if ($scriptId) {
+                $this->scriptId = $scriptId;
+                $cloudInitScript = CloudInitScript::ownedByCurrentTeam()->findOrFail($scriptId);
+                $this->authorize('update', $cloudInitScript);
 
-            $this->name = $cloudInitScript->name;
-            $this->script = $cloudInitScript->script;
-        } else {
-            $this->authorize('create', CloudInitScript::class);
+                $this->name = $cloudInitScript->name;
+                $this->script = $cloudInitScript->script;
+            } else {
+                $this->authorize('create', CloudInitScript::class);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
@@ -36,7 +41,7 @@ class CloudInitScriptForm extends Component
     {
         return [
             'name' => 'required|string|max:255',
-            'script' => ['required', 'string', new \App\Rules\ValidCloudInitYaml],
+            'script' => ['required', 'string', new ValidCloudInitYaml],
         ];
     }
 
@@ -64,15 +69,27 @@ class CloudInitScriptForm extends Component
                     'script' => $this->script,
                 ]);
 
+                auditLog('ui.cloud_init_script.updated', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
+                ]);
+
                 $message = 'Cloud-init script updated successfully.';
             } else {
                 // Create new script
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->name,
                     'script' => $this->script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
 
                 $message = 'Cloud-init script created successfully.';

@@ -11,12 +11,21 @@ class Create extends Component
 {
     public $private_keys = [];
 
+    public ?string $selectedType = null;
+
+    public ?string $selectedTokenUuid = null;
+
     public bool $limit_reached = false;
 
     public bool $has_hetzner_tokens = false;
 
-    public function mount()
+    public function mount(?string $selectedType = null, ?string $selectedTokenUuid = null): void
     {
+        $this->selectedType = in_array($selectedType, ['hetzner', 'vultr', 'digital-ocean', 'manual'], true)
+            ? $selectedType
+            : null;
+        $this->selectedTokenUuid = $this->selectedType && $this->selectedType !== 'manual' ? $selectedTokenUuid : null;
+
         $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
         if (! isCloud()) {
             $this->limit_reached = false;

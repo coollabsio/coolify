@@ -43,22 +43,6 @@ class Create extends Component
         );
     }
 
-    public function generateNewRSAKey()
-    {
-        $this->generateNewKey('rsa');
-    }
-
-    public function generateNewEDKey()
-    {
-        $this->generateNewKey('ed25519');
-    }
-
-    private function generateNewKey($type)
-    {
-        $keyData = PrivateKey::generateNewKeyPair($type);
-        $this->setKeyData($keyData);
-    }
-
     public function updated($property)
     {
         if ($property === 'value') {
@@ -91,14 +75,6 @@ class Create extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    private function setKeyData(array $keyData)
-    {
-        $this->name = $keyData['name'];
-        $this->description = $keyData['description'];
-        $this->value = $keyData['private_key'];
-        $this->publicKey = $keyData['public_key'];
     }
 
     private function validatePrivateKey()

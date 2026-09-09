@@ -21,6 +21,7 @@ class PushoverNotificationSettings extends Model
         'deployment_success_pushover_notifications',
         'deployment_failure_pushover_notifications',
         'status_change_pushover_notifications',
+        'restart_limit_reached_pushover_notifications',
         'backup_success_pushover_notifications',
         'backup_failure_pushover_notifications',
         'scheduled_task_success_pushover_notifications',
@@ -34,6 +35,11 @@ class PushoverNotificationSettings extends Model
         'traefik_outdated_pushover_notifications',
     ];
 
+    protected $hidden = [
+        'pushover_user_key',
+        'pushover_api_token',
+    ];
+
     protected $casts = [
         'pushover_enabled' => 'boolean',
         'pushover_user_key' => 'encrypted',
@@ -42,6 +48,7 @@ class PushoverNotificationSettings extends Model
         'deployment_success_pushover_notifications' => 'boolean',
         'deployment_failure_pushover_notifications' => 'boolean',
         'status_change_pushover_notifications' => 'boolean',
+        'restart_limit_reached_pushover_notifications' => 'boolean',
         'backup_success_pushover_notifications' => 'boolean',
         'backup_failure_pushover_notifications' => 'boolean',
         'scheduled_task_success_pushover_notifications' => 'boolean',

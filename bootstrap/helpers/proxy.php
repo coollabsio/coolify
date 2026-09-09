@@ -4,8 +4,32 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
+
+function traefikAccessLogCommands(bool $enabled): array
+{
+    if (! $enabled) {
+        return [];
+    }
+
+    return [
+        '--accesslog=true',
+        '--accesslog.filepath=/traefik/access.log',
+        '--accesslog.format=json',
+        '--accesslog.fields.headers.names.Cf-Connecting-Ip=keep',
+        '--accesslog.fields.headers.names.Cf-Ipcountry=keep',
+        '--accesslog.fields.headers.names.Cf-Cache-Status=keep',
+        '--accesslog.fields.headers.names.Cf-Verified-Bot=keep',
+        '--accesslog.fields.headers.names.Cf-Ray=keep',
+        // Kept so Sentinel can resolve the real client IP behind a non-Cloudflare
+        // reverse proxy (leftmost X-Forwarded-For entry) and report User-Agents/referrers.
+        '--accesslog.fields.headers.names.X-Forwarded-For=keep',
+        '--accesslog.fields.headers.names.User-Agent=keep',
+        '--accesslog.fields.headers.names.Referer=keep',
+    ];
+}
 
 /**
  * Check if a network name is a Docker predefined system network.
@@ -106,28 +130,31 @@ function collectDockerNetworksByServer(Server $server)
 }
 function connectProxyToNetworks(Server $server)
 {
-    ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
+        ['networks' => $networks] = collectDockerNetworksByServer($server);
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
+
             return [
                 "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
-            return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
-                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
-            ];
-        });
+
+        return $commands->flatten();
     }
 
-    return $commands->flatten();
+    return collect([
+        'for network in $(docker inspect $(docker ps -a --filter label=coolify.managed=true --format "{{.ID}}") --format=\'{{range $network, $_ := .NetworkSettings.Networks}}{{println $network}}{{end}}\' 2>/dev/null | sort -u); do',
+        '    if [ -z "$network" ] || [ "$network" = "bridge" ] || [ "$network" = "host" ] || [ "$network" = "none" ] || [ "$network" = "default" ]; then',
+        '        continue',
+        '    fi',
+        '    if docker network inspect "$network" >/dev/null 2>&1; then',
+        '        docker network connect "$network" coolify-proxy >/dev/null 2>&1 || true',
+        '    fi',
+        'done',
+    ]);
 }
 
 /**
@@ -135,7 +162,7 @@ function connectProxyToNetworks(Server $server)
  * This must be called BEFORE docker compose up since the compose file declares networks as external.
  *
  * @param  Server  $server  The server to ensure networks on
- * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
+ * @return Collection Commands to create networks if they don't exist
  */
 function ensureProxyNetworksExist(Server $server)
 {
@@ -144,6 +171,7 @@ function ensureProxyNetworksExist(Server $server)
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
                 "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
@@ -152,6 +180,7 @@ function ensureProxyNetworksExist(Server $server)
     } else {
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
+
             return [
                 "echo 'Ensuring network {$safe} exists...'",
                 "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
@@ -211,7 +240,7 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
                 $custom_commands[] = $command;
             }
         }
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // If we can't parse the config, return empty array
         // Silently fail to avoid breaking the proxy regeneration
     }
@@ -319,12 +348,16 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         if (isDev()) {
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
-            $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
             $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
+        }
+        // Access logging + analytics header capture (JSON log, real-IP/UA/referrer headers)
+        // applies to both dev and production so traffic analytics can be exercised locally.
+        foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
+            $config['services']['traefik']['command'][] = $cmd;
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
@@ -351,6 +384,24 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             foreach ($custom_commands as $custom_command) {
                 $config['services']['traefik']['command'][] = $custom_command;
             }
+        }
+
+        // Traefik has no native access-log rotation. Add a minimal logrotate sidecar that
+        // rotates /traefik/access.log in copytruncate mode so the file keeps the same inode
+        // and Sentinel keeps its file handle (the tailer handles len < pos by seeking to 0).
+        // Only for the non-swarm, non-dev production path (dev uses a different access-log path).
+        if ($server->isTrafficAnalyticsEnabled() && ! $server->isSwarm() && ! isDev()) {
+            $config['services']['traefik-logrotate'] = [
+                'image' => 'alpine:3.20',
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "{$proxy_path}:/traefik",
+                ],
+                'labels' => [
+                    'coolify.managed=true',
+                ],
+                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+            ];
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
@@ -386,6 +437,9 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 ],
             ],
         ];
+        if ($server->isTrafficAnalyticsEnabled()) {
+            $config['services']['caddy']['volumes'][] = "{$proxy_path}:/traffic";
+        }
     } else {
         return null;
     }
@@ -432,7 +486,7 @@ function getExactTraefikVersionFromContainer(Server $server): ?string
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Could not detect exact version");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;
@@ -479,7 +533,7 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
         Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Image format doesn't match expected pattern: {$image}");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;

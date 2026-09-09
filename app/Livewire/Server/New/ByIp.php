@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
@@ -57,7 +58,7 @@ class ByIp extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['required', 'string', new ValidServerIp],
-            'user' => ['required', 'string', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'user' => ValidationPatterns::serverUsernameRules(),
             'port' => 'required|integer|between:1,65535',
             'is_build_server' => 'required|boolean',
         ];
@@ -75,6 +76,7 @@ class ByIp extends Component
             'ip.string' => 'The IP Address/Domain must be a string.',
             'user.required' => 'The User field is required.',
             'user.string' => 'The User field must be a string.',
+            ...ValidationPatterns::serverUsernameMessages(),
             'port.required' => 'The Port field is required.',
             'port.integer' => 'The Port field must be an integer.',
             'port.between' => 'The Port field must be between 1 and 65535.',
@@ -83,9 +85,49 @@ class ByIp extends Component
         ]);
     }
 
+    public function getListeners(): array
+    {
+        return [
+            'privateKeyCreated' => 'handlePrivateKeyCreated',
+        ];
+    }
+
     public function setPrivateKey(string $private_key_id)
     {
         $this->private_key_id = $private_key_id;
+    }
+
+    public function generatePrivateKey(string $type): void
+    {
+        try {
+            $this->authorize('create', PrivateKey::class);
+
+            if (! in_array($type, ['ed25519', 'rsa'], true)) {
+                $this->dispatch('error', 'Invalid private key type.');
+
+                return;
+            }
+
+            $keyData = PrivateKey::generateNewKeyPair($type);
+            $privateKey = PrivateKey::createAndStore([
+                'name' => $keyData['name'],
+                'description' => $keyData['description'],
+                'private_key' => $keyData['private_key'],
+                'team_id' => currentTeam()->id,
+            ]);
+
+            $this->handlePrivateKeyCreated($privateKey->id);
+            $this->dispatch('success', 'Private key created successfully.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function handlePrivateKeyCreated($keyId): void
+    {
+        $this->private_keys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->get();
+        $this->private_key_id = $keyId;
+        $this->resetErrorBag('private_key_id');
     }
 
     public function instantSave()

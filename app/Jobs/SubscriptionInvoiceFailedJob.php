@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
 class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -27,7 +28,7 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
             $subscription = $this->team->subscription;
             if ($subscription && $subscription->stripe_customer_id) {
                 try {
-                    $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                    $stripe = app(StripeClient::class);
 
                     if ($subscription->stripe_subscription_id) {
                         $stripeSubscription = $stripe->subscriptions->retrieve($subscription->stripe_subscription_id);

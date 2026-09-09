@@ -5,16 +5,17 @@ namespace App\Http\Controllers\Webhook;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
+use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Visus\Cuid2\Cuid2;
 
 class Gitea extends Controller
 {
     use DetectsSkipDeployCommits;
+    use MatchesManualWebhookApplications;
 
     public function manual(Request $request)
     {
@@ -58,15 +59,19 @@ class Gitea extends Controller
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
+            $full_name = $this->manualWebhookRepositoryFullName($full_name);
+            if ($full_name === null) {
+                return response('Nothing to do. Invalid repository.');
+            }
+            $applications = Application::query();
             if ($x_gitea_event === 'push') {
-                $applications = $applications->where('git_branch', $branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
                 }
             }
             if ($x_gitea_event === 'pull_request') {
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
                 }
@@ -80,11 +85,7 @@ class Gitea extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_gitea_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Webhook secret not configured.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -96,11 +97,7 @@ class Gitea extends Controller
                         'repository' => $full_name ?? null,
                         'event' => $x_gitea_event,
                     ]);
-                    $return_payloads->push([
-                        'application' => $application->name,
-                        'status' => 'failed',
-                        'message' => 'Invalid signature.',
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     continue;
                 }
@@ -129,7 +126,7 @@ class Gitea extends Controller
 
                                 continue;
                             }
-                            $deployment_uuid = new Cuid2;
+                            $deployment_uuid = new_public_id();
                             $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
@@ -151,7 +148,7 @@ class Gitea extends Controller
                                     'mode' => 'manual',
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
-                                    'deployment_uuid' => $deployment_uuid->toString(),
+                                    'deployment_uuid' => $deployment_uuid,
                                     'commit' => data_get($payload, 'after'),
                                     'repository' => $full_name ?? null,
                                 ]);
@@ -196,7 +193,7 @@ class Gitea extends Controller
 
                                 continue;
                             }
-                            $deployment_uuid = new Cuid2;
+                            $deployment_uuid = new_public_id();
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {

@@ -32,7 +32,7 @@ Use policies or gates in controllers. Never skip authorization.
 
 Incorrect:
 ```php
-public function update(Request $request, Post $post)
+public function update(UpdatePostRequest $request, Post $post)
 {
     $post->update($request->validated());
 }
@@ -90,7 +90,7 @@ Correct:
 
 ## CSRF Protection
 
-Include `@csrf` in all POST/PUT/DELETE Blade forms. Not needed in Inertia.
+Include `@csrf` in all POST/PUT/DELETE Blade forms. In Inertia apps, the `@csrf` directive is automatically applied.
 
 Incorrect:
 ```blade
@@ -121,7 +121,7 @@ Route::post('/login', LoginController::class)->middleware('throttle:login');
 
 ## Validate File Uploads
 
-Validate MIME type, extension, and size. Never trust client-provided filenames.
+Validate extension, MIME type, and size. The `mimes` rule checks extensions; use `mimetypes` for actual MIME type validation. Never trust client-provided filenames.
 
 ```php
 public function rules(): array

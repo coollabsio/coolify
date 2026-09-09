@@ -7,12 +7,14 @@ use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Destination extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public Collection $networks;
@@ -59,8 +61,16 @@ class Destination extends Component
     public function stop($serverId)
     {
         try {
+            $this->authorize('deploy', $this->resource);
             $server = Server::ownedByCurrentTeam()->findOrFail($serverId);
             StopApplicationOneServer::run($this->resource, $server);
+            auditLog('ui.application.destination_stopped', [
+                'team_id' => $this->resource->team()?->id,
+                'application_uuid' => $this->resource->uuid,
+                'application_name' => $this->resource->name,
+                'server_uuid' => $server->uuid,
+                'server_name' => $server->name,
+            ]);
             $this->refreshServers();
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -70,12 +80,13 @@ class Destination extends Component
     public function redeploy(int $network_id, int $server_id)
     {
         try {
+            $this->authorize('deploy', $this->resource);
             if ($this->resource->additional_servers->count() > 0 && str($this->resource->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 
                 return;
             }
-            $deployment_uuid = new Cuid2;
+            $deployment_uuid = new_public_id();
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
             $result = queue_application_deployment(
@@ -110,15 +121,26 @@ class Destination extends Component
 
     public function promote(int $network_id, int $server_id)
     {
-        $main_destination = $this->resource->destination;
-        $this->resource->update([
-            'destination_id' => $network_id,
-            'destination_type' => StandaloneDocker::class,
-        ]);
-        $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
-        $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
-        $this->refreshServers();
-        $this->resource->refresh();
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+            $this->resource->getConnection()->transaction(function () use ($network, $server) {
+                $mainDestination = $this->resource->destination;
+                $this->resource->update([
+                    'destination_id' => $network->id,
+                    'destination_type' => StandaloneDocker::class,
+                ]);
+                $this->resource->additional_networks()
+                    ->wherePivot('server_id', $server->id)
+                    ->detach($network->id);
+                $this->resource->additional_networks()->attach($mainDestination->id, ['server_id' => $mainDestination->server->id]);
+            });
+            $this->resource->refresh();
+            $this->refreshServers();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function refreshServers()
@@ -130,13 +152,22 @@ class Destination extends Component
 
     public function addServer(int $network_id, int $server_id)
     {
-        $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
-        $this->dispatch('refresh');
+        try {
+            $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+            $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
+            $this->authorize('update', $this->resource);
+
+            $this->resource->additional_networks()->attach($network->id, ['server_id' => $server->id]);
+            $this->dispatch('refresh');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function removeServer(int $network_id, int $server_id, $password, $selectedActions = [])
     {
         try {
+            $this->authorize('update', $this->resource);
             if (! verifyPasswordConfirmation($password, $this)) {
                 return 'The provided password is incorrect.';
             }
@@ -148,7 +179,9 @@ class Destination extends Component
             }
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             StopApplicationOneServer::run($this->resource, $server);
-            $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
+            $this->resource->additional_networks()
+                ->wherePivot('server_id', $server_id)
+                ->detach($network_id);
             $this->loadData();
             $this->dispatch('refresh');
             ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));

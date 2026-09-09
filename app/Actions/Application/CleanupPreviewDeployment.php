@@ -54,6 +54,14 @@ class CleanupPreviewDeployment
             $server
         );
 
+        if ($result['cancelled_deployments'] > 0) {
+            try {
+                next_after_cancel($server);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to advance deployment queue after cleaning up preview for application {$application->id}: {$e->getMessage()}");
+            }
+        }
+
         // Step 2: Stop and remove all running PR containers
         $result['killed_containers'] = $this->stopRunningContainers(
             $application,
@@ -98,13 +106,13 @@ class CleanupPreviewDeployment
                 $deployment->update([
                     'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
                 ]);
+                $cancelled++;
 
                 // Add cancellation log entry
                 $deployment->addLogEntry('Deployment cancelled: Pull request closed.', 'stderr');
 
                 // Try to kill helper container if it exists
                 $this->killHelperContainer($deployment->deployment_uuid, $server);
-                $cancelled++;
             } catch (\Throwable $e) {
                 \Log::warning("Failed to cancel deployment {$deployment->id}: {$e->getMessage()}");
             }

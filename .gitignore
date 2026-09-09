@@ -38,5 +38,18 @@ docker/coolify-realtime/node_modules
 .DS_Store
 CHANGELOG.md
 /.workspaces
+/.superpowers/
+/docs/superpowers/plans/
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
+ref
+
+# Local generated Lima configs
+.dev/bin/
+.dev/coold-assets/
+.dev/lima/ssh.config
+.dev/lima/ssh_key
+.dev/lima/hosts
+
+# Multi-instance local Coolify env files (scripts/dev-instances)
+.dev-instances/

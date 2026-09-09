@@ -1,12 +1,121 @@
 <!DOCTYPE html>
 <html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<script>
+<script data-navigate-once>
     // Immediate theme application - runs before any rendering
     (function () {
-        const t = localStorage.theme || 'dark';
-        const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList[d ? 'add' : 'remove']('dark');
-        document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+        // The OS color picker only speaks hex. Convert it once so the whole theme
+        // cascade is authored in OKLCH (sRGB -> linear -> OKLab -> OKLCH).
+        const srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        window.hexToOklch = (hex) => {
+            const [r, g, b] = hex.match(/[a-f\d]{2}/gi).map((channel) => srgbToLinear(parseInt(channel, 16) / 255));
+            const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+            const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+            const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+            const okL = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+            const okA = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+            const okB = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+            const chroma = Math.sqrt(okA * okA + okB * okB);
+            let hue = Math.atan2(okB, okA) * 180 / Math.PI;
+            if (hue < 0) hue += 360;
+            return `oklch(${(okL * 100).toFixed(2)}% ${chroma.toFixed(4)} ${hue.toFixed(2)})`;
+        };
+        window.themeAccentForeground = (color) => {
+            const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
+            const luminance = channels
+                .map(channel => channel / 255)
+                .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+                .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+
+            return luminance > 0.179 ? 'oklch(0% 0 0)' : 'oklch(100% 0 0)';
+        };
+        window.applyStoredTheme = () => {
+            const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
+            const themeColor = localStorage.themeColor || '#6b16ed';
+            const customMode = localStorage.customMode || 'dark';
+            const isDark = theme === 'dark'
+                || (theme === 'custom' && customMode === 'dark')
+                || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+
+            localStorage.theme = theme;
+            document.documentElement.classList.toggle('dark', isDark);
+            document.documentElement.dataset.theme = theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+            document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(themeColor));
+            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+        };
+        // Single source for the theme controls Alpine state, shared by the
+        // Appearance page and the profile dropdown via x-data="themeControls()".
+        window.themeControls = () => ({
+            theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
+            themeColor: localStorage.getItem('themeColor') || '#6b16ed',
+            customMode: localStorage.getItem('customMode') || 'dark',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
+            themeColorFrame: null,
+            pickerOpen: false,
+            init() {
+                localStorage.setItem('theme', this.theme);
+                this.applyTheme();
+            },
+            chooseCustom() {
+                this.setTheme('custom');
+                this.pickerOpen = !this.pickerOpen;
+            },
+            setTheme(type) {
+                this.theme = type;
+                localStorage.setItem('theme', type);
+                this.applyTheme();
+            },
+            setCustomMode(mode) {
+                this.customMode = mode;
+                localStorage.setItem('customMode', mode);
+                if (this.theme !== 'custom') {
+                    this.setTheme('custom');
+                    return;
+                }
+                this.applyTheme();
+            },
+            setWidth(width) {
+                this.pageWidth = width;
+                localStorage.setItem('pageWidth', width);
+                window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
+            },
+            previewThemeColor(color) {
+                this.themeColor = color;
+                if (this.theme !== 'custom') {
+                    this.theme = 'custom';
+                    localStorage.setItem('theme', 'custom');
+                }
+                document.documentElement.dataset.theme = 'custom';
+                document.documentElement.classList.toggle('dark', this.customMode === 'dark');
+                if (this.themeColorFrame) {
+                    return;
+                }
+                this.themeColorFrame = requestAnimationFrame(() => {
+                    document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
+                    document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+                    this.themeColorFrame = null;
+                });
+            },
+            saveThemeColor(color) {
+                this.previewThemeColor(color);
+                localStorage.setItem('themeColor', color);
+                localStorage.setItem('theme', 'custom');
+            },
+            applyTheme() {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const isDark = this.theme === 'dark'
+                    || (this.theme === 'custom' && this.customMode === 'dark')
+                    || (this.theme === 'system' && prefersDark);
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.dataset.theme = this.theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+                document.documentElement.style.setProperty('--theme-base-color', window.hexToOklch(this.themeColor));
+                document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+            },
+        });
+
+        document.addEventListener('livewire:navigated', window.applyStoredTheme);
+        window.applyStoredTheme();
     })();
 </script>
 
@@ -14,7 +123,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#ffffff" id="theme-color-meta" />
+    <meta name="theme-color" content="#101010" id="theme-color-meta" />
     <meta name="color-scheme" content="dark light" />
     <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -22,13 +131,13 @@
     <meta name="twitter:site" content="@coolifyio" />
     <meta name="twitter:title" content="Coolify" />
     <meta name="twitter:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
-    <meta name="twitter:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
+    <meta name="twitter:image" content="https://cdn.coollabs.io/og-images/coolify.png" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://coolify.io" />
     <meta property="og:title" content="Coolify" />
     <meta property="og:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
     <meta property="og:site_name" content="Coolify" />
-    <meta property="og:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
+    <meta property="og:image" content="https://cdn.coollabs.io/og-images/coolify.png" />
     @use('App\Models\InstanceSettings')
     @php
 
@@ -54,7 +163,7 @@
     <script>
         // Update theme-color meta tag (non-critical, can run async)
         const t = localStorage.theme || 'dark';
-        const isDark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = t === 'dark' || t === 'custom' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.getElementById('theme-color-meta')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
     </script>
     <style>
@@ -77,6 +186,7 @@
 
 <body class="dark:text-inherit text-black">
     <x-toast />
+    <x-icon-tooltip />
     <script data-navigate-once>
         // Global HTML sanitization function using DOMPurify
         window.sanitizeHTML = function (html) {
@@ -156,7 +266,7 @@
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }
-            if (theme == 'dark') {
+            if (theme == 'dark' || theme == 'custom') {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
                 textColor = '#ffffff'
@@ -172,7 +282,8 @@
         }
         @auth
             window.Pusher = Pusher;
-            window.Echo = new Echo({
+            const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
+            window.Echo = new EchoConstructor({
                 broadcaster: 'pusher',
                 cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 key: "{{ config('constants.pusher.app_key') }}" || 'coolify',
@@ -203,9 +314,6 @@
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
 
-        function copyToClipboard(text) {
-            navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
-        }
         document.addEventListener('livewire:init', () => {
             window.Livewire.on('reloadWindow', (timeout) => {
                 if (timeout) {

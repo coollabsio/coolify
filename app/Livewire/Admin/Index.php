@@ -33,7 +33,7 @@ class Index extends Component
         if (session('impersonating')) {
             session()->forget('impersonating');
             $user = User::find(0);
-            $team_to_switch_to = $user->teams->first();
+            $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
             Auth::login($user);
             refreshSession($team_to_switch_to);
 
@@ -54,6 +54,9 @@ class Index extends Component
 
     public function getSubscribers()
     {
+        if (Auth::id() !== 0 && ! session('impersonating')) {
+            return redirect()->route('dashboard');
+        }
         $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
         $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
     }
@@ -66,7 +69,7 @@ class Index extends Component
         if (! $user) {
             abort(404);
         }
-        $team_to_switch_to = $user->teams->first();
+        $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
         Auth::login($user);
         refreshSession($team_to_switch_to);
 

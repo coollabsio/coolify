@@ -94,7 +94,7 @@ Check sibling files, related controllers, models, or tests for established patte
 ### 9. Queue & Job Patterns → `rules/queue-jobs.md`
 
 - `retry_after` must exceed job `timeout`; use exponential backoff `[1, 5, 10]`
-- `ShouldBeUnique` to prevent duplicates; `WithoutOverlapping::untilProcessing()` for concurrency
+- `ShouldBeUnique` to prevent duplicates; `ShouldBeUniqueUntilProcessing` for early lock release
 - Always implement `failed()`; with `retryUntil()`, set `$tries = 0`
 - `RateLimited` middleware for external API calls; `Bus::batch()` for related jobs
 - Horizon for complex multi-queue scenarios

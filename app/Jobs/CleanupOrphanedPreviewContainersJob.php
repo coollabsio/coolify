@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -53,11 +54,13 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     /**
      * Get all functional servers to check for orphaned containers.
      */
-    private function getServersToCheck(): \Illuminate\Support\Collection
+    private function getServersToCheck(): Collection
     {
         $query = Server::whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_reachable', true)
-            ->where('ip', '!=', '1.2.3.4');
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->whereNotIn('ip', Server::PLACEHOLDER_IPS);
 
         if (isCloud()) {
             $query = $query->whereRelation('team.subscription', 'stripe_invoice_paid', true);
@@ -99,7 +102,7 @@ class CleanupOrphanedPreviewContainersJob implements ShouldBeEncrypted, ShouldBe
     /**
      * Get all PR containers on a server (containers with pullRequestId > 0).
      */
-    private function getPRContainersOnServer(Server $server): \Illuminate\Support\Collection
+    private function getPRContainersOnServer(Server $server): Collection
     {
         try {
             $output = instant_remote_process([

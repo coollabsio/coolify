@@ -2,12 +2,14 @@
 
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -233,6 +235,55 @@ test('deleteOldBackupsLocally identifies correct backups for deletion by retenti
     // exec-uuid-1 is newest (1 day ago), exec-uuid-2 and exec-uuid-3 should be deleted
     expect($backupsToDelete)->toHaveCount(2);
     expect($successfulBackups->first()->uuid)->toBe('exec-uuid-1');
+});
+
+test('database S3 retention remains best effort when deletion fails', function () {
+    $team = Team::factory()->create();
+    $s3 = S3Storage::create([
+        'name' => 'Test S3',
+        'region' => 'us-east-1',
+        'key' => 'test-key',
+        'secret' => 'test-secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $s3->id,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $team->id,
+        'database_backup_retention_amount_s3' => 1,
+    ]);
+    $newestExecution = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'newest-s3-backup',
+        'database_name' => 'test_db',
+        'filename' => '/backup/newest.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+    ]);
+    $oldExecution = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'old-s3-backup',
+        'database_name' => 'test_db',
+        'filename' => '/backup/old.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+    ]);
+    ScheduledDatabaseBackupExecution::whereKey($newestExecution->id)->update(['created_at' => now()]);
+    ScheduledDatabaseBackupExecution::whereKey($oldExecution->id)->update(['created_at' => now()->subDay()]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+
+    removeOldBackups($backup);
+
+    expect($oldExecution->fresh()->s3_storage_deleted)->toBeFalse()
+        ->and($backup->executions()->count())->toBe(2);
 });
 
 test('cleanup instance stuffs job throttles retention enforcement via cache', function () {

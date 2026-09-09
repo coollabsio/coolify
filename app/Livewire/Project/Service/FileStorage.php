@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Application;
 use App\Models\LocalFileVolume;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
@@ -15,6 +16,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -33,6 +35,10 @@ class FileStorage extends Component
     public bool $permanently_delete = true;
 
     public bool $isReadOnly = false;
+
+    public bool $hasEnabledBackup = false;
+
+    public ?string $backupUrl = null;
 
     #[Validate(['nullable'])]
     public ?string $content = null;
@@ -65,9 +71,56 @@ class FileStorage extends Component
 
         $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI() || $this->fileStorage->is_too_large;
         $this->syncData();
+        $this->refreshBackupStatus();
     }
 
-    public function syncData(bool $toModel = false): void
+    #[On('refreshVolumeBackups')]
+    public function refreshBackupStatus(): void
+    {
+        $backup = $this->fileStorage->is_directory
+            ? $this->fileStorage->scheduledBackups()->first()
+            : null;
+
+        $this->hasEnabledBackup = $backup?->enabled ?? false;
+        $this->backupUrl = null;
+
+        if (! $this->hasEnabledBackup) {
+            return;
+        }
+
+        if ($this->resource instanceof ServiceDatabase) {
+            $this->backupUrl = route('project.service.database.backups', [
+                'project_uuid' => $this->resource->service->project()->uuid,
+                'environment_uuid' => $this->resource->service->environment->uuid,
+                'service_uuid' => $this->resource->service->uuid,
+                'stack_service_uuid' => $this->resource->uuid,
+            ]);
+
+            return;
+        }
+
+        if (! $this->resource instanceof Application) {
+            $this->hasEnabledBackup = false;
+
+            return;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->resource->project()->uuid,
+            'environment_uuid' => $this->resource->environment->uuid,
+            'application_uuid' => $this->resource->uuid,
+        ];
+        $hasOtherBackups = ScheduledVolumeBackup::query()
+            ->forApplication($this->resource)
+            ->where('id', '!=', $backup->id)
+            ->exists();
+
+        $this->backupUrl = $hasOtherBackups
+            ? route('project.application.backup.index', [...$parameters, 'search' => $this->fileStorage->fs_path])
+            : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
+    }
+
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             if ($this->fileStorage->is_too_large) {
@@ -94,6 +147,10 @@ class FileStorage extends Component
         try {
             $this->authorize('update', $this->resource);
 
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be converted.');
+            }
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
@@ -103,15 +160,18 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
     public function loadStorageOnServer()
     {
         try {
-            // Loading content is a read operation, so we use 'view' permission
-            $this->authorize('view', $this->resource);
+            $this->authorize('update', $this->resource);
+
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be loaded from the server.');
+            }
 
             $this->fileStorage->loadStorageOnServer();
             $this->syncData();
@@ -119,7 +179,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
@@ -127,6 +187,14 @@ class FileStorage extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+
+            if ($this->fileStorage->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this directory backup schedule and its archives before converting it to a file.');
+            }
+
+            if ($this->fileStorage->is_host_file) {
+                throw new \Exception('Host file mounts are bind-only and cannot be converted.');
+            }
 
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
@@ -139,7 +207,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
@@ -151,21 +219,30 @@ class FileStorage extends Component
             return 'The provided password is incorrect.';
         }
 
+        if ($this->fileStorage->scheduledBackups()->exists()) {
+            $this->dispatch('error', 'Delete this directory backup schedule and its archives before deleting the directory.');
+
+            return false;
+        }
+
         try {
             $message = 'File deleted.';
             if ($this->fileStorage->is_directory) {
                 $message = 'Directory deleted.';
+            } elseif ($this->fileStorage->is_host_file) {
+                $message = 'Host file mount removed.';
             }
-            if ($this->permanently_delete) {
+            if ($this->permanently_delete && ! $this->fileStorage->is_host_file) {
                 $message = 'Directory deleted from the server.';
                 $this->fileStorage->deleteStorageOnServer();
             }
             $this->fileStorage->delete();
+            $this->dispatch('configurationChanged');
             $this->dispatch('success', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
 
         return true;
@@ -174,6 +251,12 @@ class FileStorage extends Component
     public function submit()
     {
         $this->authorize('update', $this->resource);
+
+        if ($this->fileStorage->is_host_file) {
+            $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
+
+            return;
+        }
 
         if ($this->fileStorage->is_too_large) {
             $this->dispatch('error', 'File on server is too large to edit from the UI.');
@@ -206,6 +289,12 @@ class FileStorage extends Component
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
+        if ($this->fileStorage->is_host_file) {
+            $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
+
+            return;
+        }
+
         if ($this->fileStorage->is_too_large) {
             $this->dispatch('error', 'File on server is too large to edit from the UI.');
 
@@ -219,10 +308,13 @@ class FileStorage extends Component
     {
         return view('livewire.project.service.file-storage', [
             'directoryDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permantely deleted form the server.'],
+                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permanently deleted from the server.'],
             ],
             'fileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted form the server.'],
+                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted from the server.'],
+            ],
+            'hostFileDeletionCheckboxes' => [
+                ['id' => 'permanently_delete', 'label' => 'Only the mount configuration will be removed. The host file will not be deleted.'],
             ],
         ]);
     }

@@ -33,6 +33,19 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            if (! $this->server->canBeValidated()) {
+                $message = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+                $this->server->update([
+                    'validation_logs' => $message,
+                    'is_validating' => false,
+                ]);
+                Log::warning('ValidateAndInstallServer: blocked for transferred server', [
+                    'server_id' => $this->server->id,
+                ]);
+
+                return;
+            }
+
             // Mark validation as in progress
             $this->server->update(['is_validating' => true]);
 
@@ -189,6 +202,9 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Broadcast events to update UI
             ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
             ServerReachabilityChanged::dispatch($this->server);
+            if ($this->server->isSentinelEnabled()) {
+                CheckAndStartSentinelJob::dispatch($this->server);
+            }
 
         } catch (\Throwable $e) {
             Log::error('ValidateAndInstallServer: Exception occurred', [

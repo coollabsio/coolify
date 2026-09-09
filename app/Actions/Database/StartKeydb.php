@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartKeydb
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneKeydb $database;
 
@@ -20,7 +22,9 @@ class StartKeydb
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneKeydb $database)
+    private string $resolvedRedisPassword;
+
+    public function handle(StandaloneKeydb $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -108,13 +112,9 @@ class StartKeydb
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => [
-                        'test' => ['CMD', 'keydb-cli', '--pass', (string) $this->database->keydb_password, 'ping'],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -197,6 +197,9 @@ class StartKeydb
         // Add custom docker run options
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -210,12 +213,12 @@ class StartKeydb
         if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
             $this->commands[] = "chown 999:999 $this->configuration_dir/keydb.conf";
         }
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -253,8 +256,14 @@ class StartKeydb
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedRedisPassword = (string) $this->database->keydb_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'REDIS_PASSWORD') {
+                $this->resolvedRedisPassword = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
@@ -281,6 +290,7 @@ class StartKeydb
     {
         $hasKeydbConf = ! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf);
         $keydbConfPath = '/etc/keydb/keydb.conf';
+        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
 
         if ($hasKeydbConf) {
             $confContent = $this->database->keydb_conf;
@@ -289,10 +299,10 @@ class StartKeydb
             if ($hasRequirePass) {
                 $command = "keydb-server $keydbConfPath";
             } else {
-                $command = "keydb-server $keydbConfPath --requirepass {$this->database->keydb_password}";
+                $command = "keydb-server $keydbConfPath --requirepass {$escapedRedisPassword}";
             }
         } else {
-            $command = "keydb-server --requirepass {$this->database->keydb_password} --appendonly yes";
+            $command = "keydb-server --requirepass {$escapedRedisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {

@@ -16,6 +16,8 @@ uses(RefreshDatabase::class);
 function createApplicationForAdvancedStopGracePeriodTest(): Application
 {
     $team = Team::factory()->create();
+    $team->members()->attach(auth()->id(), ['role' => 'owner']);
+    session(['currentTeam' => $team]);
     $server = Server::factory()->create(['team_id' => $team->id]);
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
@@ -43,7 +45,8 @@ it('saves a valid stop grace period', function () {
         ->set('stopGracePeriod', '300')
         ->call('saveStopGracePeriod')
         ->assertHasNoErrors()
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertDispatched('configurationChanged');
 
     expect($application->settings()->first()->stop_grace_period)->toBe(300);
 });

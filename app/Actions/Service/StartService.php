@@ -4,22 +4,27 @@ namespace App\Actions\Service;
 
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
 
 class StartService
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
-        if ($stopBeforeStart) {
+        if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);
         }
         $service->saveComposeConfigs();
         $service->isConfigurationChanged(save: true);
+        $service->applications()->get()->each->resetRestartLimit();
         $workdir = $service->workdir();
         // $commands[] = "cd {$workdir}";
         $commands[] = "echo 'Saved configuration files to {$workdir}.'";
@@ -46,7 +51,34 @@ class StartService
                 $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} {$safeNetwork} {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
             }
         }
+        $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+    }
+
+    private function logDrainNetworkConnectCommands(Service $service): array
+    {
+        if (! data_get($service, 'connect_to_docker_network')) {
+            return [];
+        }
+
+        if (! $service->destination?->server?->isLogDrainEnabled()) {
+            return [];
+        }
+
+        $network = data_get($service, 'destination.network');
+
+        if (blank($network)) {
+            return [];
+        }
+
+        return [
+            'docker network connect '.escapeshellarg($network).' coolify-log-drain >/dev/null 2>&1 || true',
+        ];
+    }
+
+    private function shouldStopBeforeStarting(bool $pullLatestImages, bool $stopBeforeStart): bool
+    {
+        return $stopBeforeStart && ! $pullLatestImages;
     }
 }

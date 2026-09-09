@@ -3,10 +3,10 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class EditDomain extends Component
 {
@@ -28,12 +28,15 @@ class EditDomain extends Component
 
     public $requiredPort = null;
 
-    #[Validate(['nullable'])]
+    #[Validate]
     public ?string $fqdn = null;
 
-    protected $rules = [
-        'fqdn' => 'nullable',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'fqdn' => ValidationPatterns::applicationDomainRules(),
+        ];
+    }
 
     public function mount()
     {
@@ -43,18 +46,18 @@ class EditDomain extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
 
             // Sync to model
-            $this->application->fqdn = $this->fqdn;
+            $this->application->setEditableUrls($this->fqdn);
 
             $this->application->save();
         } else {
             // Sync from model
-            $this->fqdn = $this->application->fqdn;
+            $this->fqdn = $this->application->url;
         }
     }
 
@@ -81,22 +84,20 @@ class EditDomain extends Component
     public function submit()
     {
         try {
+            $persistedApplication = $this->application->fresh();
+            $previousEditableUrls = $persistedApplication->url;
+            $previousFqdn = $persistedApplication->fqdn;
+            $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->application);
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
+            $this->validate();
 
-                return str($domain)->lower();
-            });
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
             // Sync to model for domain conflict check (without validation)
-            $this->application->fqdn = $this->fqdn;
+            $this->application->setEditableUrls($this->fqdn);
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -116,28 +117,20 @@ class EditDomain extends Component
                 $requiredPort = $this->application->getRequiredPort();
 
                 if ($requiredPort !== null) {
-                    // Check if all FQDNs have a port
-                    $fqdns = str($this->fqdn)->trim()->explode(',');
-                    $missingPort = false;
-
-                    foreach ($fqdns as $fqdn) {
-                        $fqdn = trim($fqdn);
-                        if (empty($fqdn)) {
+                    foreach (str($this->fqdn)->trim()->explode(',') as $fqdn) {
+                        $fqdn = trim((string) $fqdn);
+                        if ($fqdn === '') {
                             continue;
                         }
 
-                        $port = ServiceApplication::extractPortFromUrl($fqdn);
-                        if ($port === null) {
-                            $missingPort = true;
-                            break;
+                        if ($this->application->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                            $this->requiredPort = $requiredPort;
+                            $this->showPortWarningModal = true;
+                            $this->application->fqdn = $previousFqdn;
+                            $this->application->domain_port_overrides = $previousPortOverrides;
+
+                            return;
                         }
-                    }
-
-                    if ($missingPort) {
-                        $this->requiredPort = $requiredPort;
-                        $this->showPortWarningModal = true;
-
-                        return;
                     }
                 }
             } else {

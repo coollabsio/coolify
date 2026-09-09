@@ -20,6 +20,7 @@ class DiscordNotificationSettings extends Model
         'deployment_success_discord_notifications',
         'deployment_failure_discord_notifications',
         'status_change_discord_notifications',
+        'restart_limit_reached_discord_notifications',
         'backup_success_discord_notifications',
         'backup_failure_discord_notifications',
         'scheduled_task_success_discord_notifications',
@@ -34,6 +35,10 @@ class DiscordNotificationSettings extends Model
         'discord_ping_enabled',
     ];
 
+    protected $hidden = [
+        'discord_webhook_url',
+    ];
+
     protected $casts = [
         'discord_enabled' => 'boolean',
         'discord_webhook_url' => 'encrypted',
@@ -41,6 +46,7 @@ class DiscordNotificationSettings extends Model
         'deployment_success_discord_notifications' => 'boolean',
         'deployment_failure_discord_notifications' => 'boolean',
         'status_change_discord_notifications' => 'boolean',
+        'restart_limit_reached_discord_notifications' => 'boolean',
         'backup_success_discord_notifications' => 'boolean',
         'backup_failure_discord_notifications' => 'boolean',
         'scheduled_task_success_discord_notifications' => 'boolean',

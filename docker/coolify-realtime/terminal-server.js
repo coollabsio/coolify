@@ -1,14 +1,18 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import cookie from 'cookie';
+import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
     extractHereDocContent,
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    getTerminalProcessEnv,
+    getTerminalSessionTimeout,
     isAuthorizedTargetHost,
+    sanitizeSshArgs,
+    validateSshArgs,
 } from './terminal-utils.js';
 
 async function postToCoolify(path, headers) {
@@ -63,9 +67,11 @@ function createHttpError(response) {
 }
 
 const userSessions = new Map();
-const terminalDebugEnabled = ['1', 'true', 'yes'].includes(
-    String(process.env.TERMINAL_DEBUG || '').toLowerCase()
-);
+const envName = String(process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase();
+const debugOverride = String(process.env.TERMINAL_DEBUG || '').toLowerCase();
+const terminalDebugEnabled =
+    ['local', 'development'].includes(envName)
+    || ['1', 'true', 'yes', 'on'].includes(debugOverride);
 
 function logTerminal(level, message, context = {}) {
     if (!terminalDebugEnabled) {
@@ -93,7 +99,7 @@ const server = http.createServer((req, res) => {
 });
 
 const getSessionCookie = (req) => {
-    const cookies = cookie.parse(req.headers.cookie || '');
+    const cookies = parseCookie(req.headers.cookie || '');
     const xsrfToken = cookies['XSRF-TOKEN'];
     const appName = process.env.APP_NAME || 'laravel';
     const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
@@ -154,7 +160,6 @@ const verifyClient = async (info, callback) => {
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
 
 const HEARTBEAT_INTERVAL_MS = 30000;
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 wss.on('connection', async (ws, req) => {
     ws.isAlive = true;
@@ -168,9 +173,9 @@ wss.on('connection', async (ws, req) => {
         ptyProcess: null,
         isActive: false,
         authorizedIPs: [],
-        lastActivityAt: Date.now(),
         authReady: false,
         pendingMessages: [],
+        terminalSessionTimer: null,
     };
     const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
     const connectionContext = {
@@ -260,29 +265,6 @@ const heartbeat = setInterval(() => {
         } catch (_) {
             // ignore — close handler will follow
         }
-
-        const session = ws.userId ? userSessions.get(ws.userId) : null;
-        if (session?.isActive && session.lastActivityAt && (Date.now() - session.lastActivityAt > IDLE_TIMEOUT_MS)) {
-            const idleMs = Date.now() - session.lastActivityAt;
-            logTerminal('warn', 'Closing terminal session due to idle timeout.', {
-                userId: ws.userId,
-                idleMs,
-                idleTimeoutMs: IDLE_TIMEOUT_MS,
-            });
-            try {
-                ws.send('idle-timeout');
-            } catch (_) {
-                // ignore — close still attempted below
-            }
-            killPtyProcess(ws.userId);
-            setTimeout(() => {
-                try {
-                    ws.close(1000, 'Idle timeout');
-                } catch (_) {
-                    // ignore — already closed
-                }
-            }, 100);
-        }
     });
 }, HEARTBEAT_INTERVAL_MS);
 
@@ -290,11 +272,9 @@ wss.on('close', () => clearInterval(heartbeat));
 
 const messageHandlers = {
     message: (session, data) => {
-        session.lastActivityAt = Date.now();
         session.ptyProcess.write(data);
     },
     resize: (session, { cols, rows }) => {
-        session.lastActivityAt = Date.now();
         cols = cols > 0 ? cols : 80;
         rows = rows > 0 ? rows : 30;
         session.ptyProcess.resize(cols, rows)
@@ -365,8 +345,14 @@ async function handleCommand(ws, command, userId) {
         }
     }
 
+    if (userSession.terminalSessionTimer) {
+        clearTimeout(userSession.terminalSessionTimer);
+        userSession.terminalSessionTimer = null;
+    }
+
     const commandString = command[0].split('\n').join(' ');
-    const timeout = extractTimeout(commandString);
+    const commandTimeout = extractTimeout(commandString);
+    const terminalSessionTimeout = getTerminalSessionTimeout();
     const sshArgs = extractSshArgs(commandString);
     const hereDocContent = extractHereDocContent(commandString);
 
@@ -375,7 +361,8 @@ async function handleCommand(ws, command, userId) {
     logTerminal('log', 'Parsed terminal command metadata.', {
         userId,
         targetHost,
-        timeout,
+        commandTimeout,
+        terminalSessionTimeout,
         sshArgs,
         authorizedIPs: userSession?.authorizedIPs ?? [],
     });
@@ -400,12 +387,22 @@ async function handleCommand(ws, command, userId) {
         return;
     }
 
+    if (!validateSshArgs(sshArgs, userSession.authorizedIPs)) {
+        logTerminal('warn', 'Rejecting terminal command because its SSH arguments are not allowed.', {
+            userId,
+            targetHost,
+        });
+        ws.send('Invalid SSH command: Unsupported SSH arguments');
+        return;
+    }
+    const sanitizedSshArgs = sanitizeSshArgs(sshArgs);
+
     const options = {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
-        env: {},
+        env: getTerminalProcessEnv(),
     };
 
     // NOTE: - Initiates a process within the Terminal container
@@ -414,13 +411,13 @@ async function handleCommand(ws, command, userId) {
     logTerminal('log', 'Spawning PTY process for terminal session.', {
         userId,
         targetHost,
-        timeout,
+        commandTimeout,
+        terminalSessionTimeout,
     });
-    const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
+    const ptyProcess = pty.spawn('ssh', sanitizedSshArgs.concat([hereDocContent]), options);
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
-    userSession.lastActivityAt = Date.now();
 
     ws.send('pty-ready');
 
@@ -437,13 +434,16 @@ async function handleCommand(ws, command, userId) {
         });
         ws.send('pty-exited');
         userSession.isActive = false;
+
+        if (userSession.terminalSessionTimer) {
+            clearTimeout(userSession.terminalSessionTimer);
+            userSession.terminalSessionTimer = null;
+        }
     });
 
-    if (timeout) {
-        setTimeout(async () => {
-            await killPtyProcess(userId);
-        }, timeout * 1000);
-    }
+    userSession.terminalSessionTimer = setTimeout(async () => {
+        await killPtyProcess(userId);
+    }, terminalSessionTimeout * 1000);
 }
 
 async function handleError(err, userId) {
@@ -485,6 +485,11 @@ async function killPtyProcess(userId) {
 
             setTimeout(() => {
                 if (!session.isActive || !session.ptyProcess) {
+                    if (session.terminalSessionTimer) {
+                        clearTimeout(session.terminalSessionTimer);
+                        session.terminalSessionTimer = null;
+                    }
+
                     logTerminal('log', 'PTY process terminated successfully.', {
                         userId,
                         killAttempts,

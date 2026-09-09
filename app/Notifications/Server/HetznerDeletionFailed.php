@@ -17,10 +17,7 @@ class HetznerDeletionFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        ray('hello');
-        ray($notifiable);
-
-        return $notifiable->getEnabledChannels('hetzner_deletion_failed');
+        return $notifiable->getEnabledChannels('hetzner_deletion_failure');
     }
 
     public function toMail(): MailMessage
@@ -67,5 +64,17 @@ class HetznerDeletionFailed extends CustomEmailNotification
             description: "Failed to delete Hetzner server #{$this->hetznerServerId} from Hetzner Cloud.\n\nError: {$this->errorMessage}\n\nThe server has been removed from Coolify, but may still exist in your Hetzner Cloud account. Please check your Hetzner Cloud console and manually delete the server if needed.",
             color: SlackMessage::errorColor()
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "[ACTION REQUIRED] Failed to delete Hetzner server #{$this->hetznerServerId} from Hetzner Cloud. The server has been removed from Coolify, but may still exist in your Hetzner Cloud account.",
+            'event' => 'hetzner_deletion_failed',
+            'hetzner_server_id' => $this->hetznerServerId,
+            'error' => $this->errorMessage,
+            'url' => base_url().'/servers',
+        ];
     }
 }

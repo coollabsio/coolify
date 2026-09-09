@@ -52,7 +52,7 @@ $response = Http::retry([100, 500, 1000])
 Only retry on specific errors:
 
 ```php
-$response = Http::retry(3, 100, function (Exception $exception, PendingRequest $request) {
+$response = Http::retry(3, 100, function (Throwable $exception, PendingRequest $request) {
     return $exception instanceof ConnectionException
         || ($exception instanceof RequestException && $exception->response->serverError());
 })->post('https://api.example.com/data');

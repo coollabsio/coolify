@@ -2,16 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneRedis extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+
+    protected array $auditExclude = ['last_online_at'];
 
     protected $fillable = [
         'uuid',
@@ -43,11 +48,32 @@ class StandaloneRedis extends BaseModel
         'destination_type',
         'destination_id',
         'environment_id',
+        'health_check_enabled',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
     ];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'redis_password',
+        'internal_db_url',
+        'external_db_url',
+    ];
+
     protected $casts = [
+        'health_check_enabled' => 'boolean',
+        'health_check_interval' => 'integer',
+        'health_check_timeout' => 'integer',
+        'health_check_retries' => 'integer',
+        'health_check_start_period' => 'integer',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -115,7 +141,8 @@ class StandaloneRedis extends BaseModel
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->redis_conf;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= $this->healthCheckConfigurationHash();
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {

@@ -4,10 +4,16 @@ namespace App\Services\DeploymentConfiguration;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
+use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
+use App\Support\DomainPortOverrides;
 use Illuminate\Support\Arr;
 
 class ApplicationConfigurationSnapshot
 {
+    use SummarizesDiffText;
+
     public const SCHEMA_VERSION = 1;
 
     public function __construct(protected Application $application) {}
@@ -43,6 +49,10 @@ class ApplicationConfigurationSnapshot
                 'environment' => [
                     'label' => 'Environment Variables',
                     'items' => $this->environmentItems(),
+                ],
+                'storage' => [
+                    'label' => 'Storage',
+                    'items' => $this->storageItems(),
                 ],
             ],
         ];
@@ -99,6 +109,8 @@ class ApplicationConfigurationSnapshot
             $this->item('git_repository', 'Repository', $this->application->git_repository, 'build'),
             $this->item('git_branch', 'Branch', $this->application->git_branch, 'build'),
             $this->item('git_commit_sha', 'Commit SHA', $this->application->git_commit_sha, 'build'),
+            $this->item('source_id', 'Source ID', $this->application->source_id, 'build'),
+            $this->item('source_type', 'Source type', $this->application->source_type, 'build'),
             $this->item('private_key_id', 'Private key', $this->application->private_key_id, 'build'),
         ];
     }
@@ -110,19 +122,27 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('build_pack', 'Build pack', $this->application->build_pack, 'build'),
+            $this->item('is_static', 'Static site', data_get($this->application, 'settings.is_static'), 'build'),
+            $this->item('is_spa', 'Single-page application', data_get($this->application, 'settings.is_spa'), 'build'),
             $this->item('static_image', 'Static image', $this->application->static_image, 'build'),
             $this->item('base_directory', 'Base directory', $this->application->base_directory, 'build'),
             $this->item('publish_directory', 'Publish directory', $this->application->publish_directory, 'build'),
             $this->item('install_command', 'Install command', $this->application->install_command, 'build'),
             $this->item('build_command', 'Build command', $this->application->build_command, 'build'),
-            $this->item('dockerfile', 'Dockerfile', $this->application->dockerfile, 'build', displayValue: $this->summarizeText($this->application->dockerfile)),
+            $this->item('dockerfile', 'Dockerfile', $this->application->dockerfile, 'build', displayValue: $this->summarizeText($this->application->dockerfile), displayFull: $this->application->dockerfile),
             $this->item('dockerfile_location', 'Dockerfile location', $this->application->dockerfile_location, 'build'),
             $this->item('dockerfile_target_build', 'Dockerfile target', $this->application->dockerfile_target_build, 'build'),
             $this->item('docker_compose_location', 'Docker Compose location', $this->application->docker_compose_location, 'build'),
-            $this->item('docker_compose', 'Docker Compose', $this->application->docker_compose, 'build', displayValue: $this->summarizeText($this->application->docker_compose)),
-            $this->item('docker_compose_raw', 'Raw Docker Compose', $this->application->docker_compose_raw, 'build', displayValue: $this->summarizeText($this->application->docker_compose_raw)),
+            // The generated docker_compose is intentionally excluded: it is re-rendered
+            // from git on every parse (resolved env, generated labels, deployment context),
+            // so comparing it would flag a permanent change for git-based compose apps.
+            $this->item('docker_compose_raw', 'Docker Compose', $this->application->docker_compose_raw, 'build', displayValue: $this->summarizeText($this->application->docker_compose_raw), displayFull: $this->application->docker_compose_raw, diffMode: 'lines'),
             $this->item('docker_compose_custom_build_command', 'Docker Compose custom build command', $this->application->docker_compose_custom_build_command, 'build'),
-            $this->item('custom_docker_run_options', 'Custom Docker run options', $this->application->custom_docker_run_options, 'build'),
+            $this->item('is_git_submodules_enabled', 'Git submodules', data_get($this->application, 'settings.is_git_submodules_enabled'), 'build'),
+            $this->item('is_git_lfs_enabled', 'Git LFS', data_get($this->application, 'settings.is_git_lfs_enabled'), 'build'),
+            $this->item('is_git_shallow_clone_enabled', 'Shallow clone', data_get($this->application, 'settings.is_git_shallow_clone_enabled'), 'build'),
+            $this->item('is_env_sorting_enabled', 'Sort environment variables', data_get($this->application, 'settings.is_env_sorting_enabled'), 'build'),
+            $this->item('custom_docker_run_options', 'Custom Docker run options', $this->application->custom_docker_run_options, 'redeploy'),
             $this->item('use_build_secrets', 'Use build secrets', data_get($this->application, 'settings.use_build_secrets'), 'build'),
             $this->item('inject_build_args_to_dockerfile', 'Inject build args to Dockerfile', data_get($this->application, 'settings.inject_build_args_to_dockerfile'), 'build'),
             $this->item('include_source_commit_in_build', 'Include source commit in build', data_get($this->application, 'settings.include_source_commit_in_build'), 'build'),
@@ -137,13 +157,27 @@ class ApplicationConfigurationSnapshot
     private function runtimeItems(): array
     {
         return [
+            $this->item('docker_registry_image_name', 'Docker image', $this->application->docker_registry_image_name, 'redeploy'),
+            $this->item('docker_registry_image_tag', 'Docker image tag or hash', $this->application->docker_registry_image_tag, 'redeploy'),
             $this->item('start_command', 'Start command', $this->application->start_command, 'redeploy'),
+            $this->item('pre_deployment_command', 'Pre-deployment command', $this->application->pre_deployment_command, 'redeploy'),
+            $this->item('pre_deployment_command_container', 'Pre-deployment command container', $this->application->pre_deployment_command_container, 'redeploy'),
+            $this->item('post_deployment_command', 'Post-deployment command', $this->application->post_deployment_command, 'redeploy'),
+            $this->item('post_deployment_command_container', 'Post-deployment command container', $this->application->post_deployment_command_container, 'redeploy'),
             $this->item('docker_compose_custom_start_command', 'Docker Compose custom start command', $this->application->docker_compose_custom_start_command, 'redeploy'),
             $this->item('ports_exposes', 'Exposed ports', $this->application->ports_exposes, 'redeploy'),
             $this->item('ports_mappings', 'Port mappings', $this->application->ports_mappings, 'redeploy'),
             $this->item('custom_network_aliases', 'Network aliases', $this->application->custom_network_aliases, 'redeploy'),
             $this->item('connect_to_docker_network', 'Connect to Docker network', data_get($this->application, 'settings.connect_to_docker_network'), 'redeploy'),
             $this->item('custom_internal_name', 'Custom container name', data_get($this->application, 'settings.custom_internal_name'), 'redeploy'),
+            $this->item('custom_container_name_prefix', 'Container name prefix', data_get($this->application, 'settings.custom_container_name_prefix'), 'redeploy'),
+            $this->item('is_consistent_container_name_enabled', 'Consistent container name', data_get($this->application, 'settings.is_consistent_container_name_enabled'), 'redeploy'),
+            $this->item('is_container_label_escape_enabled', 'Escape container labels', data_get($this->application, 'settings.is_container_label_escape_enabled'), 'redeploy'),
+            $this->item('is_container_label_readonly_enabled', 'Read-only container labels', data_get($this->application, 'settings.is_container_label_readonly_enabled'), 'redeploy'),
+            $this->item('is_log_drain_enabled', 'Log drain', data_get($this->application, 'settings.is_log_drain_enabled'), 'redeploy'),
+            $this->item('is_swarm_only_worker_nodes', 'Swarm worker nodes only', data_get($this->application, 'settings.is_swarm_only_worker_nodes'), 'redeploy'),
+            $this->item('stop_grace_period', 'Stop grace period', $this->normalizedStopGracePeriod(), 'redeploy'),
+            $this->item('is_preserve_repository_enabled', 'Preserve repository', data_get($this->application, 'settings.is_preserve_repository_enabled'), 'redeploy'),
             $this->item('is_raw_compose_deployment_enabled', 'Raw Compose deployment', data_get($this->application, 'settings.is_raw_compose_deployment_enabled'), 'redeploy'),
             $this->item('is_gpu_enabled', 'GPU enabled', data_get($this->application, 'settings.is_gpu_enabled'), 'redeploy'),
             $this->item('gpu_driver', 'GPU driver', data_get($this->application, 'settings.gpu_driver'), 'redeploy'),
@@ -162,9 +196,12 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('domain_port_overrides', 'Domain port overrides', DomainPortOverrides::sorted($this->application->domain_port_overrides), 'redeploy'),
+            $this->item('noindex_domains', 'Search engine indexing', $this->application->noindexDomains()->all(), 'redeploy'),
+            $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),
-            $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->application->custom_labels)),
-            $this->item('custom_nginx_configuration', 'Custom Nginx configuration', $this->application->custom_nginx_configuration, 'redeploy', displayValue: $this->summarizeText($this->application->custom_nginx_configuration)),
+            $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->decodeCustomLabels($this->application->custom_labels)), displayFull: $this->decodeCustomLabels($this->application->custom_labels), diffMode: 'lines'),
+            $this->item('custom_nginx_configuration', 'Custom Nginx configuration', $this->application->custom_nginx_configuration, 'build', displayValue: $this->summarizeText($this->application->custom_nginx_configuration), displayFull: $this->application->custom_nginx_configuration),
             $this->item('is_force_https_enabled', 'Force HTTPS', data_get($this->application, 'settings.is_force_https_enabled'), 'redeploy'),
             $this->item('is_gzip_enabled', 'Gzip', data_get($this->application, 'settings.is_gzip_enabled'), 'redeploy'),
             $this->item('is_stripprefix_enabled', 'Strip prefix', data_get($this->application, 'settings.is_stripprefix_enabled'), 'redeploy'),
@@ -185,6 +222,40 @@ class ApplicationConfigurationSnapshot
             ->values()
             ->map(fn (EnvironmentVariable $environmentVariable): array => $this->environmentItem($environmentVariable))
             ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function storageItems(): array
+    {
+        $volumes = $this->application->persistentStorages()
+            ->orderBy('id')
+            ->get(['id', 'name', 'mount_path', 'host_path'])
+            ->map(function (LocalPersistentVolume $volume): array {
+                $source = $volume->host_path ?: $volume->name;
+
+                return $this->item(
+                    key: 'volume_'.$volume->id,
+                    label: 'Volume mount',
+                    value: ['source' => $source, 'destination' => $volume->mount_path],
+                    impact: 'redeploy',
+                    displayValue: "{$source} → {$volume->mount_path}",
+                );
+            });
+
+        $fileMounts = $this->application->fileStorages()
+            ->orderBy('id')
+            ->get(['id', 'fs_path', 'mount_path', 'is_directory'])
+            ->map(fn (LocalFileVolume $file): array => $this->item(
+                key: 'file_'.$file->id,
+                label: $file->is_directory ? 'Directory mount' : 'File mount',
+                value: ['source' => $file->fs_path, 'destination' => $file->mount_path],
+                impact: 'redeploy',
+                displayValue: "{$file->fs_path} → {$file->mount_path}",
+            ));
+
+        return collect($volumes->all())->merge($fileMounts->all())->values()->all();
     }
 
     /**
@@ -234,6 +305,7 @@ class ApplicationConfigurationSnapshot
     private function environmentItem(EnvironmentVariable $environmentVariable): array
     {
         $impact = $environmentVariable->is_buildtime ? 'build' : 'redeploy';
+        $locked = (bool) $environmentVariable->is_shown_once;
         $compareValue = [
             'value_hash' => $this->sensitiveHash($environmentVariable->value),
             'is_multiline' => $environmentVariable->is_multiline,
@@ -242,20 +314,62 @@ class ApplicationConfigurationSnapshot
             'is_runtime' => $environmentVariable->is_runtime,
         ];
 
+        // Locked (is_shown_once) variables are always redacted and never store a value.
+        if ($locked) {
+            return $this->item(
+                key: (string) $environmentVariable->key,
+                label: (string) $environmentVariable->key,
+                value: $compareValue,
+                impact: $impact,
+                sensitive: true,
+                displayValue: $this->environmentDisplayValue($environmentVariable),
+            );
+        }
+
+        // Unlocked variables expose their value so owners/admins can see the change.
+        // The compare value is pre-hashed (identical formula to the locked branch) so
+        // change detection stays stable and never carries the raw value; members are
+        // redacted at render time in ConfigurationChecker; the column is encrypted at rest.
+        // The value and each scope flag are rendered as their own line and diffed by line,
+        // so a change to one or more attributes shows exactly what changed (one line each).
+        $value = (string) $environmentVariable->value;
+
         return $this->item(
             key: (string) $environmentVariable->key,
             label: (string) $environmentVariable->key,
-            value: $compareValue,
+            value: $this->sensitiveHash($this->normalizeValue($compareValue)),
             impact: $impact,
-            sensitive: true,
-            displayValue: $this->environmentDisplayValue($environmentVariable),
+            sensitive: false,
+            displayValue: $this->summarizeText($value),
+            displayFull: $this->environmentLines($environmentVariable),
+            diffMode: 'lines',
         );
+    }
+
+    /**
+     * One line per attribute so the line diff surfaces exactly which value/flags changed.
+     */
+    private function environmentLines(EnvironmentVariable $environmentVariable): string
+    {
+        $lines = collect();
+
+        $value = (string) $environmentVariable->value;
+        if (filled($value)) {
+            $lines->push($value);
+        }
+
+        $lines->push('Available at build: '.($environmentVariable->is_buildtime ? 'enabled' : 'disabled'));
+        $lines->push('Available at runtime: '.($environmentVariable->is_runtime ? 'enabled' : 'disabled'));
+        $lines->push('Multiline: '.($environmentVariable->is_multiline ? 'enabled' : 'disabled'));
+        $lines->push('Literal: '.($environmentVariable->is_literal ? 'enabled' : 'disabled'));
+
+        return $lines->implode("\n");
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function item(string $key, string $label, mixed $value, string $impact, bool $sensitive = false, mixed $displayValue = null): array
+    private function item(string $key, string $label, mixed $value, string $impact, bool $sensitive = false, mixed $displayValue = null, ?string $displayFull = null, string $diffMode = 'default'): array
     {
         $normalizedValue = $this->normalizeValue($value);
 
@@ -264,21 +378,39 @@ class ApplicationConfigurationSnapshot
             'label' => $label,
             'impact' => $impact,
             'sensitive' => $sensitive,
+            'diff_mode' => $diffMode,
             'compare_value' => $sensitive ? $this->sensitiveHash($normalizedValue) : $normalizedValue,
             'display_value' => $displayValue ?? $this->displayValue($normalizedValue),
+            'display_full' => $sensitive ? null : $this->expandableText($displayFull ?? $this->stringifyValue($normalizedValue)),
         ];
     }
 
     private function environmentDisplayValue(EnvironmentVariable $environmentVariable): string
     {
-        $flags = collect([
+        $flags = $this->environmentFlags($environmentVariable);
+
+        return $flags ? "Hidden ({$flags})" : 'Hidden';
+    }
+
+    private function normalizedStopGracePeriod(): ?int
+    {
+        $stopGracePeriod = data_get($this->application, 'settings.stop_grace_period');
+
+        if ($stopGracePeriod === null || (int) $stopGracePeriod === DEFAULT_STOP_GRACE_PERIOD_SECONDS) {
+            return null;
+        }
+
+        return (int) $stopGracePeriod;
+    }
+
+    private function environmentFlags(EnvironmentVariable $environmentVariable): string
+    {
+        return collect([
             $environmentVariable->is_buildtime ? 'build-time' : null,
             $environmentVariable->is_runtime ? 'runtime' : null,
             $environmentVariable->is_multiline ? 'multiline' : null,
             $environmentVariable->is_literal ? 'literal' : null,
         ])->filter()->implode(', ');
-
-        return $flags ? "Hidden ({$flags})" : 'Hidden';
     }
 
     private function sensitiveHash(mixed $value): string
@@ -306,7 +438,7 @@ class ApplicationConfigurationSnapshot
     private function displayValue(mixed $value): string
     {
         if ($value === null) {
-            return 'Not set';
+            return '-';
         }
 
         if (is_bool($value)) {
@@ -320,10 +452,62 @@ class ApplicationConfigurationSnapshot
         return $this->summarizeText((string) $value);
     }
 
+    private function stringifyValue(mixed $value): ?string
+    {
+        if ($value === null || is_bool($value)) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return json_encode($value, JSON_THROW_ON_ERROR);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodedComposeDomains(): ?array
+    {
+        if (blank($this->application->docker_compose_domains)) {
+            return null;
+        }
+
+        $decoded = json_decode((string) $this->application->docker_compose_domains, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function composeDomainsText(): ?string
+    {
+        $decoded = $this->decodedComposeDomains();
+
+        if (blank($decoded)) {
+            return null;
+        }
+
+        return collect($decoded)
+            ->map(fn ($value, $service): string => $service.': '.(filled(data_get($value, 'domain')) ? data_get($value, 'domain') : '-'))
+            ->sort()
+            ->implode("\n");
+    }
+
+    private function decodeCustomLabels(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $decoded = base64_decode($value, true);
+
+        return $decoded === false ? $value : $decoded;
+    }
+
     private function summarizeText(?string $value): string
     {
         if (blank($value)) {
-            return 'Not set';
+            return '-';
         }
 
         $value = trim((string) $value);
@@ -333,6 +517,6 @@ class ApplicationConfigurationSnapshot
             return str($value)->limit(80)." ({$lines} lines)";
         }
 
-        return str($value)->limit(120)->value();
+        return str($value)->limit(self::SINGLE_LINE_LIMIT)->value();
     }
 }

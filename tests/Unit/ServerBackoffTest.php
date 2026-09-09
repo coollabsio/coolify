@@ -127,22 +127,49 @@ describe('shouldSkipDueToBackoff', function () {
 });
 
 describe('ServerConnectionCheckJob unreachable_count', function () {
-    it('increments unreachable_count on timeout', function () {
+    it('marks servers unreachable when SSH is unavailable', function () {
         Event::fake([ServerReachabilityChanged::class]);
 
         $settings = Mockery::mock();
         $settings->is_reachable = true;
+        $settings->force_disabled = false;
         $settings->shouldReceive('update')
             ->with(['is_reachable' => false, 'is_usable' => false])
             ->once();
 
         $server = Mockery::mock(Server::class)->makePartial()->shouldAllowMockingProtectedMethods();
-        $server->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
-        $server->shouldReceive('getAttribute')->with('unreachable_notification_sent')->andReturn(false);
+        $server->shouldReceive('getAttribute')->andReturnUsing(fn (string $key) => match ($key) {
+            'settings' => $settings,
+            'unreachable_notification_sent' => false,
+            'ip' => '203.0.113.10',
+            'id' => 1,
+            'name' => 'test-server',
+            'unreachable_count' => 1,
+            default => null,
+        });
         $server->shouldReceive('increment')->with('unreachable_count')->once();
         $server->id = 1;
         $server->name = 'test-server';
-        $server->unreachable_count = 1; // Will become 2 after increment in real code; mock keeps value as-is
+        $server->uuid = 'server-uuid';
+
+        $job = new ServerConnectionCheckJob($server);
+        $job->handle();
+    });
+
+    it('does not change reachability on a job-level timeout', function () {
+        Event::fake([ServerReachabilityChanged::class]);
+
+        $settings = Mockery::mock();
+        $settings->is_reachable = true;
+        $settings->shouldNotReceive('update');
+
+        $server = Mockery::mock(Server::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $server->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
+        $server->shouldReceive('getAttribute')->with('unreachable_notification_sent')->andReturn(false);
+        $server->shouldNotReceive('increment');
+        $server->id = 1;
+        $server->name = 'test-server';
+        $server->unreachable_count = 1;
 
         $job = new ServerConnectionCheckJob($server);
         $job->failed(new TimeoutExceededException);

@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Str;
 use Mail;
 
 use function Laravel\Prompts\confirm;

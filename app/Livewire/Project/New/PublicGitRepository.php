@@ -6,16 +6,18 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
-use App\Models\Service;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class PublicGitRepository extends Component
 {
+    use AuthorizesRequests;
+
     public string $repository_url;
 
     public int $port = 3000;
@@ -54,7 +56,7 @@ class PublicGitRepository extends Component
 
     public string $git_repository;
 
-    public $build_pack = 'nixpacks';
+    public $build_pack = 'railpack';
 
     public bool $show_is_static = true;
 
@@ -135,10 +137,9 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
             }
 
-            if (str($this->repository_url)->startsWith('git@')) {
-                $github_instance = str($this->repository_url)->after('git@')->before(':');
-                $repository = str($this->repository_url)->after(':')->before('.git');
-                $this->repository_url = 'https://'.str($github_instance).'/'.$repository;
+            $httpsRepositoryUrl = scpStyleGitUrlToHttps($this->repository_url);
+            if (is_string($httpsRepositoryUrl)) {
+                $this->repository_url = $httpsRepositoryUrl;
             }
             if (
                 (str($this->repository_url)->startsWith('https://') ||
@@ -260,6 +261,8 @@ class PublicGitRepository extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Application::class);
+
             $this->validate();
 
             // Additional validation for git repository and branch
@@ -286,7 +289,7 @@ class PublicGitRepository extends Component
             $project_uuid = $this->parameters['project_uuid'];
             $environment_uuid = $this->parameters['environment_uuid'];
 
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
@@ -295,33 +298,6 @@ class PublicGitRepository extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
 
-            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
-                $server = $destination->server;
-                $new_service = [
-                    'name' => 'service'.str()->random(10),
-                    'docker_compose_raw' => 'coolify',
-                    'environment_id' => $environment->id,
-                    'server_id' => $server->id,
-                ];
-                if ($this->git_source === 'other') {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                } else {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                    $new_service['source_id'] = $this->git_source->id;
-                    $new_service['source_type'] = $this->git_source->getMorphClass();
-                }
-                $service = Service::create($new_service);
-
-                return redirect()->route('project.service.configuration', [
-                    'service_uuid' => $service->uuid,
-                    'environment_uuid' => $environment->uuid,
-                    'project_uuid' => $project->uuid,
-                ]);
-
-                return;
-            }
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
@@ -359,7 +335,8 @@ class PublicGitRepository extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::create($application_init);
+            $application = new Application($application_init);
+            $application->save();
 
             $application->settings->is_static = $this->isStatic;
             $application->settings->save();

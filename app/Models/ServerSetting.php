@@ -15,6 +15,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
         'deployment_queue_limit' => ['type' => 'integer'],
+        'backup_compression_cpu_percentage' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
@@ -26,6 +27,13 @@ use OpenApi\Attributes as OA;
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
+        'is_traffic_analytics_enabled' => ['type' => 'boolean'],
+        'traffic_topn' => ['type' => 'integer'],
+        'traffic_sample_threshold' => ['type' => 'integer'],
+        'traffic_retention_1h_days' => ['type' => 'integer'],
+        'traffic_retention_1d_days' => ['type' => 'integer'],
+        'is_geoip_enabled' => ['type' => 'boolean'],
+        'geoip_refresh_days' => ['type' => 'integer'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -51,6 +59,10 @@ use OpenApi\Attributes as OA;
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds.'],
+        'docker_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Engine version on the server.'],
+        'docker_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Engine version was last detected.'],
+        'compose_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Compose plugin version on the server.'],
+        'compose_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Compose version was last detected.'],
     ]
 )]
 class ServerSetting extends Model
@@ -98,8 +110,21 @@ class ServerSetting extends Model
         'server_disk_usage_check_frequency',
         'is_terminal_enabled',
         'deployment_queue_limit',
+        'backup_compression_cpu_percentage',
         'disable_application_image_retention',
         'connection_timeout',
+        'is_traffic_analytics_enabled',
+        'traffic_topn',
+        'traffic_sample_threshold',
+        'traffic_retention_1h_days',
+        'traffic_retention_1d_days',
+        'is_geoip_enabled',
+        'geoip_refresh_days',
+        'geoip_maxmind_license_key',
+        'docker_version',
+        'docker_version_checked_at',
+        'compose_version',
+        'compose_version_checked_at',
     ];
 
     protected $casts = [
@@ -109,9 +134,36 @@ class ServerSetting extends Model
         'sentinel_token' => 'encrypted',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
+        'is_build_server' => 'boolean',
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'is_traffic_analytics_enabled' => 'boolean',
+        'traffic_topn' => 'integer',
+        'traffic_sample_threshold' => 'integer',
+        'traffic_retention_1h_days' => 'integer',
+        'traffic_retention_1d_days' => 'integer',
+        'is_geoip_enabled' => 'boolean',
+        'geoip_refresh_days' => 'integer',
+        'geoip_maxmind_license_key' => 'encrypted',
+        'docker_version_checked_at' => 'datetime',
+        'compose_version_checked_at' => 'datetime',
+        'backup_compression_cpu_percentage' => 'integer',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'sentinel_token',
+        'sentinel_custom_url',
+        'logdrain_newrelic_license_key',
+        'logdrain_axiom_api_key',
+        'logdrain_custom_config',
+        'logdrain_custom_config_parser',
+        'geoip_maxmind_license_key',
     ];
 
     protected static function booted()
@@ -134,9 +186,21 @@ class ServerSetting extends Model
                 $settings->wasChanged('sentinel_custom_url') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
-                $settings->wasChanged('sentinel_push_interval_seconds')
+                $settings->wasChanged('sentinel_push_interval_seconds') ||
+                $settings->wasChanged('traffic_topn') ||
+                $settings->wasChanged('traffic_sample_threshold') ||
+                $settings->wasChanged('traffic_retention_1h_days') ||
+                $settings->wasChanged('traffic_retention_1d_days') ||
+                $settings->wasChanged('is_geoip_enabled') ||
+                $settings->wasChanged('geoip_refresh_days') ||
+                $settings->wasChanged('geoip_maxmind_license_key')
             ) {
-                $settings->server->restartSentinel();
+                // Only recreate Sentinel when it is already enabled. Otherwise a change to a
+                // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
+                // StartSentinel unconditionally sets is_sentinel_enabled = true.
+                if ($settings->is_sentinel_enabled) {
+                    $settings->server->restartSentinel();
+                }
             }
         });
     }
@@ -204,7 +268,22 @@ class ServerSetting extends Model
         return $token;
     }
 
-    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false)
+    public function ensureSentinelUrl(): string
+    {
+        $url = $this->sentinel_custom_url;
+
+        if (blank($url)) {
+            $url = $this->generateSentinelUrl(ignoreEvent: true);
+        }
+
+        if (blank($url)) {
+            throw new \RuntimeException('Set an instance FQDN, public IP, or reachable Coolify URL before enabling Sentinel.');
+        }
+
+        return $url;
+    }
+
+    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();
@@ -216,6 +295,8 @@ class ServerSetting extends Model
             $domain = 'http://'.$settings->public_ipv4.':8000';
         } elseif ($settings->public_ipv6) {
             $domain = 'http://'.$settings->public_ipv6.':8000';
+        } else {
+            $domain = $this->sentinelUrlFromCurrentRequest();
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
@@ -227,6 +308,29 @@ class ServerSetting extends Model
         }
 
         return $domain;
+    }
+
+    private function sentinelUrlFromCurrentRequest(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+        $host = strtolower($request->getHost());
+
+        if (
+            $host === 'localhost' ||
+            str_ends_with($host, '.localhost') ||
+            $host === '::1' ||
+            $host === '::' ||
+            $host === '0.0.0.0' ||
+            str_starts_with($host, '127.')
+        ) {
+            return null;
+        }
+
+        return $request->getSchemeAndHttpHost();
     }
 
     public function server()

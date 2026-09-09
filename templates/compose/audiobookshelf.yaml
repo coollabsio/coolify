@@ -7,7 +7,7 @@
 
 services:
   audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:latest
+    image: ghcr.io/advplyr/audiobookshelf:2.34.0
     environment:
       - SERVICE_URL_AUDIOBOOKSHELF_80
       - TZ=${TIMEZONE:-America/Toronto}

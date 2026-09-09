@@ -7,7 +7,8 @@
 
 services:
   espocrm:
-    image: espocrm/espocrm:9
+    image: espocrm/espocrm:10
+    container_name: espocrm
     environment:
       - SERVICE_URL_ESPOCRM
       - ESPOCRM_ADMIN_USERNAME=${ESPOCRM_ADMIN_USERNAME:-admin}
@@ -19,30 +20,39 @@ services:
       - ESPOCRM_DATABASE_PASSWORD=${SERVICE_PASSWORD_MARIADB}
       - ESPOCRM_SITE_URL=${SERVICE_URL_ESPOCRM}
     volumes:
-      - espocrm:/var/www/html
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
-      interval: 2s
-      start_period: 60s
-      timeout: 10s
-      retries: 15
+      - espocrm-data:/var/www/html/data
+      - espocrm-custom:/var/www/html/custom
+      - espocrm-custom-client:/var/www/html/client/custom
+    restart: unless-stopped
     depends_on:
       espocrm-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bin/command", "app-check"]
+      start_period: 20s
+      interval: 60s
+      timeout: 20s
+      retries: 3
 
   espocrm-daemon:
-    image: espocrm/espocrm:9
+    image: espocrm/espocrm:10
     container_name: espocrm-daemon
-    volumes:
-      - espocrm:/var/www/html
-    restart: always
+    volumes_from:
+      - espocrm
+    restart: unless-stopped
     entrypoint: docker-daemon.sh
     depends_on:
       espocrm:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bin/command", "app-check"]
+      start_period: 20s
+      interval: 180s
+      timeout: 20s
+      retries: 3
 
   espocrm-websocket:
-    image: espocrm/espocrm:9
+    image: espocrm/espocrm:10
     container_name: espocrm-websocket
     environment:
       - SERVICE_URL_ESPOCRM_WEBSOCKET_8080
@@ -50,16 +60,23 @@ services:
       - ESPOCRM_CONFIG_WEB_SOCKET_URL=$SERVICE_URL_ESPOCRM_WEBSOCKET
       - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBSCRIBER_DSN=tcp://*:7777
       - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBMISSION_DSN=tcp://espocrm-websocket:7777
-    volumes:
-      - espocrm:/var/www/html
-    restart: always
+    volumes_from:
+      - espocrm
+    restart: unless-stopped
     entrypoint: docker-websocket.sh
     depends_on:
       espocrm:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bin/command", "app-check"]
+      start_period: 20s
+      interval: 180s
+      timeout: 20s
+      retries: 3
 
   espocrm-db:
-    image: mariadb:11.8
+    image: mariadb:12.3
+    container_name: espocrm-db
     environment:
       - MARIADB_DATABASE=${MARIADB_DATABASE:-espocrm}
       - MARIADB_USER=${SERVICE_USER_MARIADB}
@@ -67,6 +84,7 @@ services:
       - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
     volumes:
       - espocrm-db:/var/lib/mysql
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 20s

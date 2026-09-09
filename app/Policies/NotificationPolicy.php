@@ -12,13 +12,11 @@ class NotificationPolicy
      */
     public function view(User $user, Model $notificationSettings): bool
     {
-        // Check if the notification settings belong to the user's current team
         if (! $notificationSettings->team) {
             return false;
         }
 
-        // return $user->teams()->where('teams.id', $notificationSettings->team->id)->exists();
-        return true;
+        return $user->teams->contains('id', $notificationSettings->team->id);
     }
 
     /**
@@ -26,14 +24,13 @@ class NotificationPolicy
      */
     public function update(User $user, Model $notificationSettings): bool
     {
-        // Check if the notification settings belong to the user's current team
         if (! $notificationSettings->team) {
             return false;
         }
 
-        // Only owners and admins can update notification settings
-        //  return $user->isAdmin() || $user->isOwner();
-        return true;
+        $teamId = $notificationSettings->team->id;
+
+        return $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -41,8 +38,7 @@ class NotificationPolicy
      */
     public function manage(User $user, Model $notificationSettings): bool
     {
-        // return $this->update($user, $notificationSettings);
-        return true;
+        return $this->update($user, $notificationSettings);
     }
 
     /**
@@ -50,7 +46,6 @@ class NotificationPolicy
      */
     public function sendTest(User $user, Model $notificationSettings): bool
     {
-        // return $this->update($user, $notificationSettings);
-        return true;
+        return $this->update($user, $notificationSettings);
     }
 }

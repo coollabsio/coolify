@@ -1,0 +1,32 @@
+# documentation: https://stalw.art/docs/
+# slogan: Modern mail server platform
+# category: Mail
+# tags: mail,smtp,imap,pop3,jmap,email,sieve,messaging
+# logo: svgs/stalwart.svg
+# port: 8080
+
+services:
+  stalwart:
+    image: 'stalwartlabs/stalwart:v0.16.13'
+    environment:
+    - SERVICE_URL_STALWART_8080
+    expose:
+    - '8080'
+    ports:
+      - '25:25'
+      - '465:465'
+      - '587:587'
+      - '993:993'
+      - '995:995'
+      - '143:143'
+      - '110:110'
+      - '4190:4190'
+    volumes:
+      - 'stalwart-mail:/etc/stalwart'
+      - 'stalwart-data:/var/lib/stalwart'
+      - '/etc/localtime:/etc/localtime:ro'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

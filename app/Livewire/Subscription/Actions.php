@@ -32,6 +32,8 @@ class Actions extends Component
 
     public bool $refundAlreadyUsed = false;
 
+    public bool $refundLatestPayment = false;
+
     public string $billingInterval = 'monthly';
 
     public ?string $nextBillingDate = null;
@@ -100,7 +102,7 @@ class Actions extends Component
             return 'Invalid password.';
         }
 
-        $result = (new RefundSubscription)->execute(currentTeam());
+        $result = app(RefundSubscription::class)->execute(currentTeam());
 
         if ($result['success']) {
             $this->dispatch('success', 'Subscription refunded successfully.');
@@ -114,10 +116,26 @@ class Actions extends Component
         return true;
     }
 
-    public function cancelImmediately(string $password): bool|string
+    public function cancelImmediately(string $password, array $selectedActions = []): bool|string
     {
         if (! shouldSkipPasswordConfirmation() && ! Hash::check($password, auth()->user()->password)) {
             return 'Invalid password.';
+        }
+
+        if (in_array('refundLatestPayment', $selectedActions, true)) {
+            // Eligibility is re-validated server-side inside RefundSubscription::execute()
+            $result = app(RefundSubscription::class)->execute(currentTeam());
+
+            if ($result['success']) {
+                $this->dispatch('success', 'Subscription refunded and cancelled successfully.');
+                $this->redirect(route('subscription.index'), navigate: true);
+
+                return true;
+            }
+
+            $this->dispatch('error', 'Something went wrong with the refund. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
+
+            return true;
         }
 
         $team = currentTeam();
@@ -130,7 +148,7 @@ class Actions extends Component
         }
 
         try {
-            $stripe = new StripeClient(config('subscription.stripe_api_key'));
+            $stripe = app(StripeClient::class);
             $stripe->subscriptions->cancel($subscription->stripe_subscription_id);
 
             $subscription->update([

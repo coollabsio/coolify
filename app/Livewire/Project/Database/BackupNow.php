@@ -14,9 +14,27 @@ class BackupNow extends Component
 
     public function backupNow()
     {
-        $this->authorize('manageBackups', $this->backup->database);
+        try {
+            $this->authorize('manageBackups', $this->backup->database);
 
-        DatabaseBackupJob::dispatch($this->backup);
-        $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
+            $database = $this->backup->database->refresh();
+            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
+                $this->dispatch('error', 'The database must be running to start a backup.');
+
+                return;
+            }
+
+            DatabaseBackupJob::dispatch($this->backup);
+            $database = $this->backup->database;
+            auditLog('ui.database.backup_started', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $this->backup->uuid,
+            ]);
+            $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }

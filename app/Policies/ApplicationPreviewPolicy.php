@@ -21,8 +21,9 @@ class ApplicationPreviewPolicy
      */
     public function view(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationPreview);
+
+        return $teamId !== null && $user->teams->contains('id', $teamId);
     }
 
     /**
@@ -30,21 +31,25 @@ class ApplicationPreviewPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, ApplicationPreview $applicationPreview)
+    public function update(User $user, ApplicationPreview $applicationPreview): Response
     {
-        // if ($user->isAdmin()) {
-        //    return Response::allow();
-        // }
+        $teamId = $this->getTeamId($applicationPreview);
 
-        // return Response::deny('As a member, you cannot update this preview.<br/><br/>You need at least admin or owner permissions.');
-        return true;
+        if ($teamId === null) {
+            return Response::deny('Application preview team not found.');
+        }
+
+        if ($user->isAdminOfTeam($teamId)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need at least admin or owner permissions to update this preview.');
     }
 
     /**
@@ -52,8 +57,9 @@ class ApplicationPreviewPolicy
      */
     public function delete(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationPreview);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -61,8 +67,7 @@ class ApplicationPreviewPolicy
      */
     public function restore(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -70,8 +75,7 @@ class ApplicationPreviewPolicy
      */
     public function forceDelete(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -79,8 +83,9 @@ class ApplicationPreviewPolicy
      */
     public function deploy(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationPreview);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -88,7 +93,13 @@ class ApplicationPreviewPolicy
      */
     public function manageDeployments(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationPreview);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    }
+
+    private function getTeamId(ApplicationPreview $applicationPreview): ?int
+    {
+        return $applicationPreview->application?->team()?->id;
     }
 }

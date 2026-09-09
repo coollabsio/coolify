@@ -1,52 +1,88 @@
-<tr @class([
-    'dark:text-white text-black dark:bg-coolblack dark:hover:bg-coolgray-100',
-    'dark:bg-coolgray-100 bg-neutral-200' => $member->id == Auth::id(),
-])>
-    <td class="px-5 py-4 text-sm whitespace-nowrap">
-        {{ $member->name }}
-    </td>
-    <td class="px-5 py-4 text-sm whitespace-nowrap">
-        {{ $member->email }}
-    </td>
-    <td class="px-5 py-4 text-sm whitespace-nowrap">
-        {{ data_get($member, 'pivot.role') }}
-    </td>
-    <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
+<div wire:key="team-member-row-{{ $member->id }}"
+    x-cloak x-show="isMemberVisible({{ $member->id }})"
+    x-bind:style="{ order: memberOrder({{ $member->id }}) }"
+    @class([
+        'data-table-row team-members-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]',
+        'team-members-table-grid-2fa' => auth()->user()?->can('manageMembers', currentTeam()),
+    ])>
+    <div>
+        <div class="flex items-center gap-2">
+            <div
+                class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                {{ Str::upper(Str::substr($member->name ?: $member->email, 0, 1)) }}
+            </div>
+            <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $member->name }}</span>
+            @if ($member->id === Auth::id())
+                <span
+                    class="rounded-full bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-medium text-coollabs dark:bg-warning/15 dark:text-warning">
+                    You
+                </span>
+            @endif
+        </div>
+    </div>
+    <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $member->email }}</div>
+    <div>
+        <span
+            class="inline-flex rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium capitalize text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+            {{ data_get($member, 'pivot.role') }}
+        </span>
+    </div>
+    @can('manageMembers', currentTeam())
+        <div class="flex items-center">
+            <x-two-factor-badge :enabled="filled($member->two_factor_confirmed_at)" />
+        </div>
+    @endcan
+    <div class="flex justify-end">
         @can('manageMembers', currentTeam())
             @if ($member->id !== Auth::id())
-                @if (Auth::user()->isOwner())
-                    @if (data_get($member, 'pivot.role') === 'owner')
-                        <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
-                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
-                    @endif
-                    @if (data_get($member, 'pivot.role') === 'admin')
-                        <x-forms.button wire:click="makeOwner">To Owner</x-forms.button>
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
-                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
-                    @endif
-                    @if (data_get($member, 'pivot.role') === 'member')
-                        <x-forms.button wire:click="makeOwner">To Owner</x-forms.button>
-                        <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
-                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
-                    @endif
-                @elseif (Auth::user()->isAdmin())
-                    @if (data_get($member, 'pivot.role') === 'admin')
-                        <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
-                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
-                    @endif
-                    @if (data_get($member, 'pivot.role') === 'member')
-                        <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
-                        <x-forms.button isError wire:click="remove">Remove</x-forms.button>
-                    @endif
-                @endif
-            @else
-                <div>(This is you)</div>
-            @endif
-        @else
-            @if ($member->id === Auth::id())
-                <div>(This is you)</div>
+                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false"
+                    @click.outside="open = false">
+                    <button type="button" class="button h-7! px-2.5! text-[11px]!" @click="open = !open"
+                        aria-haspopup="menu" :aria-expanded="open">
+                        Manage
+                    </button>
+                    <div x-show="open" x-cloak role="menu"
+                        class="listbox-panel top-full! right-0! left-auto! mt-1! w-36! min-w-0!">
+                        @if (Auth::user()->isOwner())
+                            @if (data_get($member, 'pivot.role') !== 'owner')
+                                <button type="button" class="listbox-option justify-start!" wire:click="makeOwner"
+                                    @click="open = false">
+                                    Make owner
+                                </button>
+                            @endif
+                            @if (data_get($member, 'pivot.role') !== 'admin')
+                                <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
+                                    @click="open = false">
+                                    Make admin
+                                </button>
+                            @endif
+                            @if (data_get($member, 'pivot.role') !== 'member')
+                                <button type="button" class="listbox-option justify-start!"
+                                    wire:click="makeReadonly" @click="open = false">
+                                    Make member
+                                </button>
+                            @endif
+                        @elseif (Auth::user()->isAdmin())
+                            @if (data_get($member, 'pivot.role') === 'admin')
+                                <button type="button" class="listbox-option justify-start!"
+                                    wire:click="makeReadonly" @click="open = false">
+                                    Make member
+                                </button>
+                            @elseif (data_get($member, 'pivot.role') === 'member')
+                                <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
+                                    @click="open = false">
+                                    Make admin
+                                </button>
+                            @endif
+                        @endif
+                        <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                        <button type="button" class="listbox-option justify-start! text-error! hover:text-error!"
+                            wire:click="remove" @click="open = false">
+                            Remove member
+                        </button>
+                    </div>
+                </div>
             @endif
         @endcan
-    </td>
-</tr>
+    </div>
+</div>

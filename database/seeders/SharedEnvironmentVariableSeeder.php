@@ -35,7 +35,7 @@ class SharedEnvironmentVariableSeeder extends Seeder
         ]);
 
         // Add predefined server variables to all existing servers
-        $servers = \App\Models\Server::all();
+        $servers = Server::all();
         foreach ($servers as $server) {
             SharedEnvironmentVariable::firstOrCreate([
                 'key' => 'COOLIFY_SERVER_UUID',

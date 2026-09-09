@@ -6,6 +6,8 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -21,7 +23,12 @@ class LocalFileVolume extends BaseModel
         // 'mount_path' => 'encrypted',
         'content' => 'encrypted',
         'is_directory' => 'boolean',
+        'is_host_file' => 'boolean',
         'is_preview_suffix_enabled' => 'boolean',
+    ];
+
+    protected $hidden = [
+        'content',
     ];
 
     use HasFactory;
@@ -33,6 +40,7 @@ class LocalFileVolume extends BaseModel
         'resource_type',
         'resource_id',
         'is_directory',
+        'is_host_file',
         'chown',
         'chmod',
         'is_based_on_git',
@@ -44,8 +52,18 @@ class LocalFileVolume extends BaseModel
     protected static function booted()
     {
         static::created(function (LocalFileVolume $fileVolume) {
+            if ($fileVolume->is_host_file) {
+                return;
+            }
+
             $fileVolume->load(['service']);
             dispatch(new ServerStorageSaveJob($fileVolume));
+        });
+
+        static::deleting(function (LocalFileVolume $fileVolume): void {
+            if ($fileVolume->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this directory backup schedule and its archives before deleting the directory.');
+            }
         });
     }
 
@@ -63,13 +81,34 @@ class LocalFileVolume extends BaseModel
         );
     }
 
-    public function service()
+    public function resource(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function service(): MorphTo
     {
         return $this->morphTo('resource');
     }
 
+    public function scheduledBackups(): MorphMany
+    {
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
+    }
+
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this directory backup schedule and its archives before deleting the directory.');
+        }
+    }
+
     public function loadStorageOnServer()
     {
+        if ($this->is_host_file) {
+            return;
+        }
+
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
         if ($isService) {
@@ -99,9 +138,9 @@ class LocalFileVolume extends BaseModel
 
                 return;
             }
-            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+            $content = $this->readRemoteFileContent($escapedPath, $server);
             // Check if content contains binary data by looking for null bytes or non-printable characters
-            if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
+            if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
                 $content = self::BINARY_PLACEHOLDER;
             }
             $this->content = $content;
@@ -122,8 +161,33 @@ class LocalFileVolume extends BaseModel
         return $size > self::MAX_CONTENT_SIZE;
     }
 
+    /**
+     * Cap the remote read itself so a file that grows after the size check
+     * cannot be fully slurped into PHP memory.
+     */
+    protected function readRemoteFileContent(string $escapedPath, $server): string
+    {
+        $readLimit = self::MAX_CONTENT_SIZE + 1;
+        $content = instant_remote_process(["head -c {$readLimit} {$escapedPath}"], $server, false);
+
+        return self::contentFromBoundedRead($content);
+    }
+
+    public static function contentFromBoundedRead(?string $content): string
+    {
+        if (strlen((string) $content) > self::MAX_CONTENT_SIZE) {
+            return self::TOO_LARGE_PLACEHOLDER;
+        }
+
+        return (string) $content;
+    }
+
     public function deleteStorageOnServer()
     {
+        if ($this->is_host_file) {
+            return;
+        }
+
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
         if ($isService) {
@@ -161,6 +225,10 @@ class LocalFileVolume extends BaseModel
 
     public function saveStorageOnServer()
     {
+        if ($this->is_host_file) {
+            return;
+        }
+
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
         if ($isService) {
@@ -171,26 +239,26 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-
-        // Validate fs_path early before any shell interpolation
-        validateShellSafePath($this->fs_path, 'storage path');
-        $escapedFsPath = escapeshellarg($this->fs_path);
         $escapedWorkdir = escapeshellarg($workdir);
 
         if ($this->is_directory) {
+            // Validate fs_path early before any shell interpolation
+            validateShellSafePath($this->fs_path, 'storage path');
+            $escapedFsPath = escapeshellarg($this->fs_path);
             $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
             $commands->push("cd {$escapedWorkdir}");
         }
-        if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {
-            $parent_dir = str($this->fs_path)->beforeLast('/');
+        $path = data_get_str($this, 'fs_path');
+        $content = data_get($this, 'content');
+        $pathForParentDirectory = str($this->fs_path);
+        if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
+            $parent_dir = $pathForParentDirectory->beforeLast('/');
             if ($parent_dir != '') {
                 $escapedParentDir = escapeshellarg($parent_dir);
                 $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
             }
         }
-        $path = data_get_str($this, 'fs_path');
-        $content = data_get($this, 'content');
         if ($path->startsWith('.')) {
             $path = $path->after('.');
             $path = $workdir.$path;
@@ -206,7 +274,7 @@ class LocalFileVolume extends BaseModel
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
-                $this->content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+                $this->content = $this->readRemoteFileContent($escapedPath, $server);
             }
             $this->is_directory = false;
             $this->save();
@@ -348,7 +416,6 @@ class LocalFileVolume extends BaseModel
 
             return false;
         } catch (\Throwable $e) {
-            ray($e->getMessage(), 'Error checking read-only volume');
 
             return false;
         }
