@@ -1,7 +1,7 @@
 @php
     $showServiceColumn = $showServiceColumn ?? false;
     $showHeader = $showHeader ?? true;
-    $gridClass = $showServiceColumn ? 'domains-table-grid-compose' : 'domains-table-grid';
+    $gridClass = 'service-domains-overview-grid';
 @endphp
 
 <div class="data-table w-full">
@@ -11,10 +11,12 @@
             @if ($showServiceColumn)
                 <span>Service</span>
             @endif
-            <span>DNS Check</span>
-            <span class="whitespace-nowrap">Search engine indexing</span>
-            <span>Direction</span>
-            <span></span>
+            <span>Protocol redirect</span>
+                <span>Domain redirect</span>
+                <span>Internal port</span>
+                <span>Search indexing</span>
+                <span>DNS status</span>
+            <span class="text-right">Actions</span>
         </div>
     @endif
     @foreach ($rows as $row)
@@ -32,35 +34,28 @@
                 default => 'neutral',
             };
             $dnsLabel = match ($row['dns_status']) {
-                'ok' => 'DNS OK',
+                'ok' => 'DNS matches',
                 'failed' => 'DNS mismatch',
                 'skipped' => 'DNS skipped',
                 'checking' => 'Checking DNS...',
-                'pending' => 'DNS pending',
+                'pending' => 'Not checked',
                 default => 'DNS unknown',
             };
             $serviceLabel = filled($row['service_name'] ?? null)
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
-            $domainParts = $isSuggested ? null : parse_url($row['url']);
+            $publicUrl = getFqdnWithoutPort($row['url']);
+            $domainParts = $isSuggested ? null : parse_url($publicUrl);
+            $isNoindexed = $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']);
+            $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
+            $directionLabel = match ($rowDirection) {
+                'www' => 'Redirect to www',
+                'non-www' => 'Redirect to non-www',
+                default => 'Both www and non-www',
+            };
             $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
                 ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
                 : null;
-            $redirectPairKey = function (string $url): string {
-                $parts = parse_url($url);
-                if (! is_array($parts) || ! isset($parts['host'])) {
-                    return $url;
-                }
-
-                $host = preg_replace('/^www\./i', '', $parts['host']);
-
-                return strtolower(($parts['scheme'] ?? '').'://'.$host.':'.($parts['port'] ?? '').($parts['path'] ?? ''));
-            };
-            $pairKey = $redirectPairKey($row['url']);
-            $firstPairRowUrl = collect($rows)
-                ->reject(fn ($item) => (bool) ($item['is_suggested'] ?? false))
-                ->first(fn ($item) => $redirectPairKey($item['url']) === $pairKey)['url'] ?? null;
-            $showDirection = ! $isSuggested && $firstPairRowUrl === $row['url'];
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
         @endphp
 
@@ -70,10 +65,9 @@
                 'data-table-row',
                 $gridClass,
                 'domains-row-suggested' => $isSuggested,
-                'domains-row-without-direction' => ! $showDirection,
             ])>
                 <div class="flex min-w-0 flex-col gap-1">
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <div class="flex min-w-0 items-center gap-2">
                         @if ($isSuggested)
                             <span
                                 class="min-w-0 text-[13px] text-black sm:truncate dark:text-white"
@@ -93,17 +87,11 @@
                                         class="invisible absolute inset-0 size-4 rounded-sm" />
                                 </span>
                             @endif
-                            <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
-                                class="min-w-0 flex-1 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
-                                title="{{ $row['url'] }}">
-                                {{ $row['url'] }}
+                            <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
+                                class="min-w-0 flex-1 truncate text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs [overflow-wrap:anywhere] dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                title="{{ $publicUrl }}">
+                                {{ $publicUrl }}
                             </a>
-                            @if (filled($row['internal_port'] ?? null) && (int) $row['internal_port'] > 0)
-                                <span class="table-badge shrink-0"
-                                    title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from the Coolify service port' }}">
-                                    Internal port {{ $row['internal_port'] }}
-                                </span>
-                            @endif
                         @endif
                         @if ($isSuggested && ! empty($row['suggestion_label']))
                             <span class="table-badge table-badge-warning shrink-0">{{ $row['suggestion_label'] }}</span>
@@ -124,7 +112,41 @@
                     </div>
                 @endif
 
-                <div class="flex min-w-0 items-center">
+                <div class="service-domain-detail" title="Protocol redirect">
+                    <span class="service-domain-detail-label">Protocol redirect</span>
+                    <span>{{ str_starts_with($row['url'], 'https://') && ($forceHttpsRedirects[$row['service_application_id']] ?? true) ? 'HTTP → HTTPS' : 'Disabled' }}</span>
+                </div>
+                <div class="service-domain-detail" title="{{ $directionLabel }}">
+                    <span class="service-domain-detail-label">Domain redirect</span>
+                    <span>{{ match ($rowDirection) { 'www' => 'non-www → www', 'non-www' => 'www → non-www', default => 'Disabled' } }}</span>
+                </div>
+                <div class="service-domain-detail"
+                    title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from the Coolify service port' }}">
+                    <span class="service-domain-detail-label">Internal port</span>
+                    <span @if (filled($row['internal_port'] ?? null)) aria-label="Internal port {{ $row['internal_port'] }}" @endif>{{ $row['internal_port'] ?? '—' }}</span>
+                </div>
+                <div class="service-domain-detail">
+                    <span class="service-domain-detail-label">Search indexing</span>
+                    <span role="img" aria-label="{{ $isNoindexed ? 'Search indexing blocked' : 'Search indexing allowed' }}"
+                        title="{{ $isNoindexed ? 'Search indexing blocked' : 'Search indexing allowed' }}">
+                        <x-reicon :name="$isNoindexed ? 'x' : 'check'" class="size-4" />
+                    </span>
+                </div>
+
+                <div class="service-domain-mobile-summary" aria-label="Domain routing summary">
+                    @if (str_starts_with($row['url'], 'https://') && ($forceHttpsRedirects[$row['service_application_id']] ?? true))
+                        <span>HTTP → HTTPS</span>
+                    @endif
+                    @if (in_array($rowDirection, ['www', 'non-www'], true))
+                        <span>{{ $rowDirection === 'www' ? 'non-www → www' : 'www → non-www' }}</span>
+                    @elseif (! str_starts_with($row['url'], 'https://') || ! ($forceHttpsRedirects[$row['service_application_id']] ?? true))
+                        <span>No redirects</span>
+                    @endif
+                    <span>Port {{ $row['internal_port'] ?? 'missing' }}</span>
+                    <span>{{ $isNoindexed ? 'Noindex' : 'Indexable' }}</span>
+                </div>
+
+                <div class="service-domain-dns flex min-w-0 items-center">
                     @if ($row['dns_status'] === 'failed')
                         <x-status-badge as="button" @click="$dispatch('open-dns-records-modal')" :status="$dnsLabel" :type="$dnsType"
                             title="View DNS records to fix" class="cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/[0.1]" />
@@ -134,55 +156,7 @@
                     @endif
                 </div>
 
-                <div class="min-w-0">
-                    @unless ($isSuggested)
-                        <span class="domains-mobile-label">Search engine indexing</span>
-                    @endunless
-                    @if ($isSuggested)
-                        <span class="text-[13px] text-neutral-500 dark:text-fg-dim">-</span>
-                    @elseif (auth()->user()?->can('update', $service))
-                        <x-forms.listbox id="service-domain-indexing-{{ $row['service_application_id'] }}-{{ $index }}"
-                            :wire="false"
-                            preserveValue
-                            :value="$service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']) ? 'noindex' : 'index'"
-                            onChange="toggleNoindexDomain"
-                            :onChangeArgs="[(int) $row['service_application_id'], $row['url']]" portal :options="[
-                                ['value' => 'index', 'label' => 'Indexable'],
-                                ['value' => 'noindex', 'label' => 'Noindex'],
-                            ]" />
-                    @else
-                        <span class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                            {{ $service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']) ? 'Noindex' : 'Indexable' }}
-                        </span>
-                    @endif
-                </div>
-
-                <div class="min-w-0">
-                    @php
-                        $rowDirection = $serviceRedirects[$row['service_application_id']] ?? 'both';
-                        $directionLabel = match ($rowDirection) {
-                            'www' => 'Redirect to www',
-                            'non-www' => 'Redirect to non-www',
-                            default => 'Allow both',
-                        };
-                    @endphp
-                    @if ($showDirection)
-                        <span class="domains-mobile-label">Direction</span>
-                    @endif
-                    @if ($showDirection && auth()->user()?->can('update', $service))
-                        <x-forms.listbox id="service-domain-direction-{{ $row['service_application_id'] }}-{{ $index }}"
-                            :wire="false" :value="$rowDirection" preserveValue onChange="updateServiceRedirect"
-                            :onChangeArgs="[(int) $row['service_application_id']]" portal :options="[
-                                ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                ['value' => 'www', 'label' => 'Redirect to www'],
-                                ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                            ]" />
-                    @elseif ($showDirection)
-                        <span class="text-[13px] text-neutral-500 dark:text-fg-dim">{{ $directionLabel }}</span>
-                    @endif
-                </div>
-
-                <div class="flex items-center justify-end gap-1">
+                <div class="service-domain-actions flex items-center justify-end gap-1">
                     @can('update', $service)
                         <button type="button" wire:click="checkDomainDns({{ $index }})"
                             wire:loading.attr="disabled"
@@ -209,8 +183,8 @@
                                 </x-forms.button>
                             @endif
                         @else
-                            <button type="button" wire:click="startEdit({{ $index }})"
-                                class="icon-button shrink-0" title="Edit domain" aria-label="Edit domain">
+                            <button type="button" class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ $publicUrl }}"
+                                wire:click="startEdit({{ $index }})" wire:loading.attr="disabled" wire:target="startEdit">
                                 <x-reicon name="settings" class="size-3.5" />
                             </button>
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"

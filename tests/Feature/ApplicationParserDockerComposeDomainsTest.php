@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -570,17 +571,19 @@ YAML,
         ->toBeTrue();
 });
 
-test('applicationParser compose labels use the first ports_exposes value when a portless domain has no override', function () {
+test('single-service compose leaves undeclared ports to proxy discovery', function (int $parserVersion, string $extraService, bool $isPreview) {
     $application = disableExactProxyLabels(Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => StandaloneDocker::class,
         'build_pack' => 'dockercompose',
+        'compose_parsing_version' => $parserVersion,
         'ports_exposes' => '3000,8080',
-        'docker_compose_raw' => <<<'YAML'
+        'docker_compose_raw' => <<<YAML
 services:
   frontend:
-    image: myapp/frontend:latest
+    image: httpd:2.4-alpine
+{$extraService}
 YAML,
         'fqdn' => null,
         'domain_port_overrides' => null,
@@ -589,16 +592,29 @@ YAML,
         ]),
     ]));
 
-    $parsedCompose = applicationParser($application->fresh());
-    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+    $preview = $isPreview ? ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 1,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/1',
+        'docker_compose_domains' => $application->docker_compose_domains,
+    ]) : null;
 
-    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=3000')))
-        ->toBeTrue()
-        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 3000}}')))
+    $parsedCompose = $application->fresh()->parse(
+        pull_request_id: $preview?->pull_request_id ?? 0,
+        preview_id: $preview?->id,
+    );
+    $labels = collect(data_get($parsedCompose, 'services'))->flatMap(fn ($service) => data_get($service, 'labels', []));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams}}')))
         ->toBeTrue()
         ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
         ->toBeTrue();
-});
+})->with([2, 3])->with([
+    'web only' => '',
+    'web and database' => "  database:\n    image: postgres:16-alpine",
+])->with([false, true]);
 
 test('applicationParser compose labels prefer the service exposed port over application ports_exposes', function (string $portConfiguration) {
     $application = disableExactProxyLabels(Application::factory()->create([

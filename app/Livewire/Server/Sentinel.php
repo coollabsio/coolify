@@ -2,8 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Server\StartSentinel;
-use App\Actions\Server\StopSentinel;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
@@ -34,8 +32,6 @@ class Sentinel extends Component
     #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;
 
-    public bool $isSentinelEnabled;
-
     public bool $isSentinelDebugEnabled;
 
     public ?string $sentinelCustomDockerImage = null;
@@ -64,7 +60,6 @@ class Sentinel extends Component
             $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
             $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
-            $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
             $this->server->settings->save();
         } else {
@@ -74,7 +69,6 @@ class Sentinel extends Component
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
             $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
-            $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
         }
@@ -100,33 +94,6 @@ class Sentinel extends Component
             $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        }
-    }
-
-    public function toggleSentinel(): void
-    {
-        try {
-            $this->authorize('manageSentinel', $this->server);
-            if (! $this->isSentinelEnabled) {
-                if ($this->server->isBuildServer()) {
-                    $this->dispatch('error', 'Sentinel cannot be enabled on build servers.');
-
-                    return;
-                }
-                $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
-                StartSentinel::run($this->server, true, null, $customImage);
-                $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
-                $this->isSentinelEnabled = true;
-            } else {
-                $this->isSentinelEnabled = false;
-                $this->isMetricsEnabled = false;
-                $this->isSentinelDebugEnabled = false;
-                StopSentinel::dispatch($this->server);
-            }
-            $this->submit();
-            $this->dispatch('refreshServerShow');
-        } catch (\Throwable $e) {
-            handleError($e, $this);
         }
     }
 

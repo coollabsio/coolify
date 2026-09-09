@@ -35,12 +35,12 @@ it('uses a single unified navbar for application, service, database, and server 
 
 it('uses interactive status summaries in mobile resource headings', function () {
     $headings = [
-        resource_path('views/livewire/project/application/heading.blade.php') => '<x-status-summary :status="$application->status" />',
-        resource_path('views/livewire/project/database/heading.blade.php') => '<x-status-summary :status="$database->status" title="Database status" />',
-        resource_path('views/livewire/project/service/heading.blade.php') => '<x-status-summary :status="$service->status" title="Service status" container-name="Containers" />',
+        resource_path('views/livewire/project/application/heading.blade.php'),
+        resource_path('views/livewire/project/database/heading.blade.php'),
+        resource_path('views/livewire/project/service/heading.blade.php'),
     ];
 
-    foreach ($headings as $path => $statusSummary) {
+    foreach ($headings as $path) {
         $mobileHeading = str(file_get_contents($path))
             ->after('<div class="mb-3 w-full xl:hidden">')
             ->before('<div class="w-full xl:hidden">')
@@ -49,7 +49,7 @@ it('uses interactive status summaries in mobile resource headings', function () 
         expect($mobileHeading)
             ->toContain('flex min-w-0 flex-col items-start gap-2')
             ->toContain('min-w-0 max-w-full truncate')
-            ->toContain($statusSummary)
+            ->toContain('<x-status-summary')
             ->not->toContain('<x-status-badge');
     }
 });
@@ -519,25 +519,33 @@ it('builds application sidebar routes independently of the current request route
         ->toContain("'application_uuid' => \$application->uuid");
 });
 
-it('keeps the deployment log sidebar fixed in the layout without a top gap', function () {
+it('welds the deployment log sidebar to the main sidebar', function () {
     $deployment = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
-    expect($deployment)->toContain(':flush="true"')
-        ->and($css)->toContain('.application-settings-navigation.is-flush')
-        ->and($css)->toContain('position: static;')
-        ->and($css)->toContain('overflow: visible;');
+    expect($deployment)->not->toContain(':flush="true"')
+        ->and($css)->toContain('left: var(--sidebar-w, 14rem);')
+        ->and($css)->toContain('position: fixed;');
 });
 
-it('uses the same mobile heading gap on deployment pages as application settings', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
-    $deploymentIndex = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
-    $deploymentShow = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+it('uses the same mobile heading gap on application pages', function () {
+    $views = [
+        resource_path('views/livewire/project/application/configuration.blade.php'),
+        resource_path('views/livewire/project/application/backup/index.blade.php'),
+        resource_path('views/livewire/project/application/backup/show.blade.php'),
+        resource_path('views/livewire/project/application/deployment/show.blade.php'),
+        resource_path('views/livewire/project/shared/logs.blade.php'),
+        resource_path('views/livewire/project/shared/execute-container-command.blade.php'),
+    ];
 
-    expect($configuration)->toContain('application-settings-workspace mt-4')
-        ->and($deploymentIndex)->toContain("'mt-4 max-w-[1180px] lg:mt-0' => ! \$embedded")
-        ->and($deploymentShow)->toContain('application-settings-workspace mt-4')
-        ->toContain('lg:mt-0');
+    foreach ($views as $view) {
+        expect(file_get_contents($view))
+            ->toContain('application-settings-workspace mt-4')
+            ->toContain('lg:mt-0');
+    }
+
+    expect(file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php')))
+        ->toContain("'mt-4 max-w-none lg:mt-0' => ! \$embedded");
 });
 
 it('removes desktop top spacing from the deployment log viewer', function () {

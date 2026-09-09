@@ -201,7 +201,7 @@ class ServiceApplication extends BaseModel
     }
 
     /**
-     * Return the public URLs with their persisted internal port overrides.
+     * Return editable URLs with persisted overrides or legacy embedded ports.
      */
     protected function url(): Attribute
     {
@@ -220,7 +220,7 @@ class ServiceApplication extends BaseModel
                         $port = $overrides[$canonical] ?? null;
 
                         if ($port === null) {
-                            return $canonical;
+                            return $url;
                         }
 
                         $parts = DomainUrlParts::split($canonical);
@@ -366,7 +366,7 @@ class ServiceApplication extends BaseModel
             }
 
             $dockerCompose = Yaml::parse($dockerComposeRaw);
-            $serviceConfig = data_get($dockerCompose, "services.{$this->name}");
+            $serviceConfig = $dockerCompose['services'][$this->name] ?? null;
             if (! $serviceConfig) {
                 return $this->service->getRequiredPort();
             }
@@ -417,9 +417,21 @@ class ServiceApplication extends BaseModel
                 return $portFound;
             }
 
+            $composePort = firstDockerComposeServicePort($serviceConfig);
+            if ($composePort !== null) {
+                return $composePort;
+            }
+
             // HTTP-facing compose services that only declare SERVICE_URL/FQDN (no _PORT
             // suffix), such as WordPress, inherit the one-click template `# port:`.
             if ($declaresHttpUrl) {
+                if (blank($this->service->service_type)) {
+                    $savedPort = $this->getSavedLegacyRoutingPort($serviceConfig);
+                    if ($savedPort !== null) {
+                        return $savedPort;
+                    }
+                }
+
                 return $this->service->getRequiredPort();
             }
 
@@ -427,5 +439,53 @@ class ServiceApplication extends BaseModel
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Preserve only an unambiguous upstream from this legacy container's saved labels.
+     */
+    private function getSavedLegacyRoutingPort(array $serviceConfig): ?int
+    {
+        $savedCompose = Yaml::parse($this->service->docker_compose ?? '');
+        $savedService = $savedCompose['services'][$this->name] ?? null;
+        $image = $serviceConfig['image'] ?? null;
+        if (! is_string($image) || $image === '' || ($savedService['image'] ?? null) !== $image) {
+            return null;
+        }
+
+        $labels = $savedService['labels'] ?? [];
+        if (! is_array($labels)) {
+            return null;
+        }
+
+        $ports = [];
+        foreach ($labels as $key => $value) {
+            if (is_int($key)) {
+                if (! is_string($value)) {
+                    return null;
+                }
+                [$key, $value] = array_pad(explode('=', $value, 2), 2, null);
+            }
+
+            if (preg_match('/^traefik\.http\.services\.[^.]+\.loadbalancer\.server\.port$/', $key)) {
+                $port = $value;
+            } elseif (preg_match('/^caddy(?:_\d+)?\..*reverse_proxy$/', $key)) {
+                if (! is_string($value) || ! preg_match('/^\{\{upstreams ([0-9]+)\}\}$/', $value, $matches)) {
+                    return null;
+                }
+                $port = $matches[1];
+            } else {
+                continue;
+            }
+
+            if ((! is_string($port) && ! is_int($port)) || ! preg_match('/^[0-9]+$/', (string) $port) || (int) $port < 1 || (int) $port > 65535) {
+                return null;
+            }
+            $ports[] = (int) $port;
+        }
+
+        $ports = array_values(array_unique($ports));
+
+        return count($ports) === 1 ? $ports[0] : null;
     }
 }

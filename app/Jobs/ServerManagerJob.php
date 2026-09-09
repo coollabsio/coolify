@@ -166,14 +166,6 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $isSentinelEnabled = $server->isSentinelEnabled();
-        $shouldRestartSentinel = $isSentinelEnabled && shouldRunCronNow('0 0 * * *', $serverTimezone, "sentinel-restart:{$server->id}", $this->executionTime);
-        // Dispatch Sentinel restart if due (daily for Sentinel-enabled servers)
-
-        if ($shouldRestartSentinel) {
-            CheckAndStartSentinelJob::dispatch($server);
-        }
-
         // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
         // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
         if ($sentinelOutOfSync) {
@@ -195,7 +187,6 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             ServerPatchCheckJob::dispatch($server);
         }
 
-        // Note: CheckAndStartSentinelJob is only dispatched daily (line above) for version updates.
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
     }
 

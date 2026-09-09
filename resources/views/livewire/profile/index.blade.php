@@ -218,8 +218,9 @@
                     <h2>Two-factor authentication</h2>
                     <p>Add a time-based one-time password to protect your account.</p>
                 </div>
-                @if (! request()->user()->two_factor_confirmed_at
-                        && session('status') !== 'two-factor-authentication-enabled')
+                @if (request()->user()->two_factor_confirmed_at)
+                    <x-status-badge status="Enabled" type="success" />
+                @elseif (session('status') !== 'two-factor-authentication-enabled')
                     <form action="/user/two-factor-authentication" method="POST">
                         @csrf
                         <x-forms.button type="submit">Configure 2FA</x-forms.button>
@@ -275,7 +276,7 @@
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
                             <div
-                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.05] dark:text-fg-dim">
                                 @foreach (request()->user()->recoveryCodes() as $code)
                                     <div>{{ $code }}</div>
                                 @endforeach
