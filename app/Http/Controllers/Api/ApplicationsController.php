@@ -1460,7 +1460,13 @@ class ApplicationsController extends Controller
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
                 $application->domain_port_overrides = $domainPortOverrides;
             }
-            $repository_url_parsed = Url::fromString($request->git_repository);
+            $gitRepository = $application->git_repository;
+            $httpsRepository = scpStyleGitUrlToHttps($gitRepository);
+            if (is_string($httpsRepository)) {
+                $gitRepository = $httpsRepository;
+                $application->git_repository = $httpsRepository;
+            }
+            $repository_url_parsed = Url::fromString($gitRepository);
             $git_host = $repository_url_parsed->getHost();
             if ($git_host === 'github.com') {
                 $application->source_type = GithubApp::class;
@@ -1622,11 +1628,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Failed to generate Github App token.'], 400);
             }
 
-            $gitRepository = $request->git_repository;
-            if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
-                $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
-            }
-            $gitRepository = str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+            $gitRepository = gitRepositorySlug($request->git_repository);
 
             // Use direct API call to verify repository access instead of loading all repositories
             // This is much faster and avoids timeouts for GitHub Apps with many repositories

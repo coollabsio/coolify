@@ -1477,7 +1477,10 @@ class Service extends BaseModel
     {
         try {
             $services = get_service_templates();
-            $serviceName = $this->service_type ?: str($this->name)->beforeLast('-')->value();
+            if (blank($this->service_type)) {
+                return null;
+            }
+            $serviceName = $this->service_type;
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 

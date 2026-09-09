@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Events\ServerValidated;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -275,6 +276,9 @@ class ValidateAndInstall extends Component
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
                 ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
+                if ($this->server->isSentinelEnabled()) {
+                    CheckAndStartSentinelJob::dispatch($this->server);
+                }
                 $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if (! $proxyShouldRun) {

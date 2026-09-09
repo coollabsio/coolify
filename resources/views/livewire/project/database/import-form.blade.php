@@ -105,7 +105,7 @@
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
                             ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                             <x-reicon name="file" class="size-4" />
@@ -122,7 +122,7 @@
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
                                 ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                                 <x-reicon name="storages" class="size-4" />
@@ -139,7 +139,7 @@
             {{-- File Restore Section --}}
             @can('update', $this->resource)
                 <div x-cloak x-show="restoreType === 'file'"
-                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div class="min-w-0 flex-1">
                             <x-forms.input label="File path on the server"
@@ -158,7 +158,7 @@
                     </div>
 
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
-                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.025]!"
+                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
                         id="my-dropzone" wire:ignore>
                         @csrf
                     </form>
@@ -206,7 +206,7 @@
                             ->all();
                     @endphp
                     <div x-cloak x-show="restoreType === 's3'"
-                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
                                 placeholder="Select storage" live />

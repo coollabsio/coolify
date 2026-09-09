@@ -43,6 +43,15 @@ it('does not dispatch CheckAndStartSentinelJob hourly anymore', function () {
     Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
+it('does not schedule periodic Sentinel restart checks', function () {
+    $root = dirname(__DIR__, 2);
+    $manager = file_get_contents($root.'/app/Jobs/ServerManagerJob.php');
+    $diagnostics = file_get_contents($root.'/app/Console/Commands/ScheduledJobDiagnostics.php');
+
+    expect($manager)->not->toContain('sentinel-restart:')
+        ->and($diagnostics)->not->toContain('sentinel-restart:');
+});
+
 it('skips ServerConnectionCheckJob when sentinel is live', function () {
     $settings = Mockery::mock(InstanceSettings::class);
     $settings->instance_timezone = 'UTC';

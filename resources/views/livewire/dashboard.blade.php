@@ -17,21 +17,8 @@
         <livewire:dashboard.active-deployments />
 
         <section class="mb-0! min-w-0">
-            <div class="mb-3 flex items-end justify-between gap-4">
-                <div>
-                    <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
-                        Projects
-                    </h2>
-                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                        Your deployment workspaces
-                    </p>
-                </div>
-                <a href="{{ route('project.index') }}" {{ wireNavigate() }}
-                    class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
-                    View all
-                    <x-reicon name="arrow-right" class="size-3" />
-                </a>
-            </div>
+            <x-section-heading title="Projects" subtitle="Your deployment workspaces"
+                :href="route('project.index')" />
 
             @if ($dashboardProjects->isEmpty())
                 <x-empty title="No projects yet"
@@ -57,7 +44,7 @@
                         @endphp
 
                         <article
-                            class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }}
                                 class="absolute inset-0 rounded-xl"
                                 aria-label="Open {{ $project->name }}"></a>
@@ -125,21 +112,8 @@
         </section>
 
         <section class="mb-0! min-w-0">
-            <div class="mb-3 flex items-end justify-between gap-4">
-                <div>
-                    <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
-                        Servers
-                    </h2>
-                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                        Infrastructure available for deployments
-                    </p>
-                </div>
-                <a href="{{ route('server.index') }}" {{ wireNavigate() }}
-                    class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
-                    View all
-                    <x-reicon name="arrow-right" class="size-3" />
-                </a>
-            </div>
+            <x-section-heading title="Servers" subtitle="Infrastructure available for deployments"
+                :href="route('server.index')" />
 
             @if ($dashboardServers->isEmpty())
                 @if ($privateKeys->isEmpty())
@@ -190,7 +164,7 @@
 
                         <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
                             {{ wireNavigate() }} aria-label="Open {{ $server->name }}"
-                            class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             @if ($server->isMetricsEnabled())
                                 <livewire:dashboard.server-metrics-chart :server="$server"
                                     :key="'dashboard-server-metrics-'.$server->uuid" />

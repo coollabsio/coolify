@@ -48,7 +48,7 @@
                     $domainCount = countDomains($fqdn);
                 }
             @endphp
-            <div class="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
+            <div class="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.05]">
                 <div class="flex min-w-0 flex-1 items-center gap-3">
                     <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-200/70 text-neutral-600 dark:bg-white/[0.07] dark:text-fg-dim">
                         <x-reicon name="globe" class="size-4" />

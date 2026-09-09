@@ -47,7 +47,7 @@
                                             step2ButtonText="Permanently Delete" canGate="delete"
                                             :canResource="$destination" />
                                     @else
-                                        <x-forms.button disabled tooltip="The default Coolify destination cannot be deleted.">
+                                        <x-forms.button isError disabled tooltip="The default Coolify destination cannot be deleted.">
                                             Delete destination
                                         </x-forms.button>
                                     @endif

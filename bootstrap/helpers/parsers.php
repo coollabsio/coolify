@@ -390,9 +390,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
-    $applicationServiceCount = collect($services)
-        ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
-        ->count();
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1345,9 +1342,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $domainPortOverrides = $isPullRequest
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
-            $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
-            $onlyPort = firstDockerComposeServicePort($service)
-                ?? ($applicationServiceCount === 1 ? ($exposedPorts[0] ?? null) : null);
+            $onlyPort = firstDockerComposeServicePort($service);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1553,7 +1548,6 @@ function serviceParser(Service $resource): Collection
     $envComments = extractYamlEnvironmentComments($compose);
 
     $server = data_get($resource, 'server');
-    $allServices = get_service_templates();
 
     try {
         $yaml = Yaml::parse($compose);
@@ -1686,22 +1680,7 @@ function serviceParser(Service $resource): Collection
 
         $containerName = "$serviceName-{$resource->uuid}";
 
-        if ($serviceName === 'registry') {
-            $tempServiceName = 'docker-registry';
-        } else {
-            $tempServiceName = $serviceName;
-        }
-        if (str(data_get($service, 'image'))->contains('glitchtip')) {
-            $tempServiceName = 'glitchtip';
-        }
-        if ($serviceName === 'supabase-kong') {
-            $tempServiceName = 'supabase';
-        }
-        $serviceDefinition = data_get($allServices, $tempServiceName);
-        $predefinedPort = data_get($serviceDefinition, 'port');
-        if ($serviceName === 'plausible') {
-            $predefinedPort = '8000';
-        }
+        $predefinedPort = $resource->getRequiredPort();
 
         if ($migratedApp || $migratedDb) {
             // Use the already determined migrated service
@@ -2071,22 +2050,7 @@ function serviceParser(Service $resource): Collection
 
         $containerName = "$serviceName-{$resource->uuid}";
 
-        if ($serviceName === 'registry') {
-            $tempServiceName = 'docker-registry';
-        } else {
-            $tempServiceName = $serviceName;
-        }
-        if (str(data_get($service, 'image'))->contains('glitchtip')) {
-            $tempServiceName = 'glitchtip';
-        }
-        if ($serviceName === 'supabase-kong') {
-            $tempServiceName = 'supabase';
-        }
-        $serviceDefinition = data_get($allServices, $tempServiceName);
-        $predefinedPort = data_get($serviceDefinition, 'port');
-        if ($serviceName === 'plausible') {
-            $predefinedPort = '8000';
-        }
+        $predefinedPort = $resource->getRequiredPort();
 
         if ($migratedApp || $migratedDb) {
             // Use the already determined migrated service
@@ -2629,7 +2593,7 @@ function serviceParser(Service $resource): Collection
                 ? data_get($originalResource, 'redirect')
                 : 'both';
             $onlyPort = $originalResource instanceof ServiceApplication
-                ? ($originalResource->getRequiredPort() ?? $predefinedPort)
+                ? $originalResource->getRequiredPort()
                 : $predefinedPort;
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
@@ -2664,7 +2628,7 @@ function serviceParser(Service $resource): Collection
                             service_name: $serviceName,
                             image: $image,
                             onlyPort: $onlyPort,
-                            predefinedPort: $predefinedPort,
+                            predefinedPort: $onlyPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
@@ -2697,7 +2661,7 @@ function serviceParser(Service $resource): Collection
                     service_name: $serviceName,
                     image: $image,
                     onlyPort: $onlyPort,
-                    predefinedPort: $predefinedPort,
+                    predefinedPort: $onlyPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
