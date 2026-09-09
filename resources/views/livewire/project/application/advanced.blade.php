@@ -45,17 +45,28 @@
                         ['value' => true, 'label' => 'Consistent name (no rolling updates)'],
                     ]" :disabled="! $canUpdate" />
                 @if ($isConsistentContainerNameEnabled === true)
-                    <x-forms.input
-                        helper="You can add a custom name for your container.<br><br>The name is saved automatically and converted to slug format. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
-                        id="customInternalName" label="Custom container name" canGate="update"
-                        wire:change="saveCustomName" :canResource="$application" />
+                    <form wire:submit="saveCustomName" class="w-full">
+                        <x-unsaved-bar action="saveCustomName" targets="customInternalName" />
+                        <x-forms.input
+                            helper="You can add a custom name for your container.<br><br>The name is converted to slug format when saved. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
+                            id="customInternalName" label="Custom container name" canGate="update"
+                            :canResource="$application" />
+                    </form>
+                @else
+                    <form wire:submit="saveCustomNamePrefix" class="w-full">
+                        <x-unsaved-bar action="saveCustomNamePrefix" targets="customContainerNamePrefix" />
+                        <x-forms.input
+                            helper="Optional prefix for generated container names. Containers are named <span class='font-bold'>prefix-timestamp</span>, for example <span class='font-bold'>shop-api-20260908T141530</span>, instead of starting with <span class='font-bold'>{{ $application->uuid }}</span>.<br><br>The prefix is converted to slug format when saved, can be up to {{ \App\Models\ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH }} characters and must be unique on this server. Rolling updates keep working."
+                            id="customContainerNamePrefix" label="Container name prefix" placeholder="e.g. my-api"
+                            canGate="update" :canResource="$application" />
+                    </form>
                 @endif
             </div>
         </x-application.settings-section>
 
         @if ($application->git_based())
             <x-application.settings-section id="advanced-deployment-section" title="Deployment"
-                helper="Automatic deployments and pull request previews.">
+                helper="Automatic deployments from Git webhooks.">
                 <div class="grid w-full gap-4 sm:grid-cols-2">
                     <x-forms.listbox id="isAutoDeployEnabled" label="Auto deploy" onChange="instantSave"
                         helper="Automatically deploy new commits based on Git webhooks."
@@ -63,18 +74,6 @@
                             ['value' => true, 'label' => 'Deploy on push (webhooks)'],
                             ['value' => false, 'label' => 'Manual deployments only'],
                         ]" :disabled="! $canUpdate" />
-                    <x-forms.listbox id="isPreviewDeploymentsEnabled" label="Preview deployments" onChange="instantSave"
-                        helper="Automatically deploy Preview Deployments for all opened PRs.<br><br>Closing a PR deletes its Preview Deployment."
-                        :options="[
-                            ['value' => false, 'label' => 'Disabled'],
-                            ['value' => true, 'label' => 'Deploy opened pull requests'],
-                        ]" :disabled="! $canUpdate" />
-                    <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="instantSave"
-                        helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
-                        :options="[
-                            ['value' => false, 'label' => 'Repository members only'],
-                            ['value' => true, 'label' => 'Public (fork PRs allowed)'],
-                        ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
                 </div>
             </x-application.settings-section>
 

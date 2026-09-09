@@ -997,17 +997,25 @@ $siteAddress {
         return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
     }
 
-    public function isSentinelEnabled()
+    public function isSentinelEnabled(): bool
     {
-        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && ! $this->isBuildServer();
+        return ! $this->isBuildServer()
+            && ! $this->isSwarm()
+            && ! $this->isForceDisabled()
+            && ! $this->isTransferredAway();
     }
 
-    public function isMetricsEnabled()
+    public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
     }
 
-    public function isServerApiEnabled()
+    public function isTrafficAnalyticsEnabled(): bool
+    {
+        return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
+    }
+
+    public function isServerApiEnabled(): bool
     {
         return $this->settings->is_sentinel_enabled;
     }
@@ -1837,6 +1845,8 @@ $siteAddress {
             $this->proxy->set('last_saved_proxy_configuration', null);
             $this->proxy->set('last_saved_settings', null);
             $this->proxy->set('last_applied_settings', null);
+            $this->detected_traefik_version = null;
+            $this->traefik_outdated_info = null;
             $this->save();
             if ($this->proxySet()) {
                 if ($async) {

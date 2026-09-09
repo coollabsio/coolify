@@ -165,6 +165,61 @@ test('changing a domain port regenerates managed labels with the requested port'
         ->and($labels)->not->toContain('loadbalancer.server.port=3000');
 });
 
+test('compose domain ports are stored as overrides when updating through the API', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx\n  frontend:\n    image: nginx\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [
+                ['name' => 'api', 'domain' => 'https://api.example.com'],
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
+test('compose domain ports are stored as overrides when creating through the API', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/compose-domain-port-test',
+            'git_branch' => 'main',
+            'build_pack' => 'dockercompose',
+            'autogenerate_domain' => false,
+            'docker_compose_domains' => [
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
 test('http basic auth updates regenerate managed labels', function () {
     $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
     $this->application->update([
@@ -412,3 +467,32 @@ test('rejects swarm fields on application update', function (string $field, mixe
     'swarm_placement_constraints' => ['swarm_placement_constraints', 'node.role==worker'],
     'is_swarm_only_worker_nodes' => ['is_swarm_only_worker_nodes', true],
 ]);
+
+test('PATCH /api/v1/applications/{uuid} saves a slugged container name prefix', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'My API'])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBe('my-api');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$this->application->uuid}")
+        ->assertOk()
+        ->assertJsonPath('settings.custom_container_name_prefix', 'my-api');
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is in use', function () {
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherApplication->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});

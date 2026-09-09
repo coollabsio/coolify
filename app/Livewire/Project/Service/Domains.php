@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
@@ -12,6 +13,7 @@ use App\Models\ServiceApplication;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,7 @@ class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+    use InteractsWithDnsProviders;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -108,6 +111,13 @@ class Domains extends Component
         'confirmDomainUsage',
     ];
 
+    public function getListeners(): array
+    {
+        return array_merge($this->listeners, [
+            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
+        ]);
+    }
+
     protected function rules(): array
     {
         return [
@@ -129,9 +139,17 @@ class Domains extends Component
 
     public function refreshDomains(): void
     {
+        $editingRow = $this->editingIndex !== null ? ($this->domainRows[$this->editingIndex] ?? null) : null;
+
         $this->service->refresh();
         $this->service->load(['applications', 'server']);
         $this->loadDomainState();
+
+        if ($editingRow !== null) {
+            $index = collect($this->domainRows)->search(fn (array $row): bool => $row['url'] === $editingRow['url']
+                && (int) $row['service_application_id'] === (int) $editingRow['service_application_id']);
+            $this->editingIndex = $index === false ? null : (int) $index;
+        }
     }
 
     public function pollDnsChecks(): void
@@ -239,9 +257,14 @@ class Domains extends Component
             ])
             ->all();
 
+        $pendingRedirect = $this->serviceRedirects[$this->pendingRedirectServiceApplicationId] ?? null;
         $this->serviceRedirects = [];
         foreach ($this->service->applications as $app) {
-            $this->serviceRedirects[$app->id] = $this->normalizeRedirect($app->redirect ?? null);
+            $this->serviceRedirects[$app->id] = $this->normalizeRedirect(
+                $this->pendingAction === 'redirect' && $app->id === $this->pendingRedirectServiceApplicationId
+                    ? $pendingRedirect
+                    : $app->redirect
+            );
         }
 
         if ($this->newServiceApplicationId === null && count($this->serviceApps) > 0) {
@@ -459,6 +482,11 @@ class Domains extends Component
         $this->authorize('update', $this->service);
     }
 
+    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    {
+        return $this->service->server?->id === 0;
+    }
+
     public function checkAllDns(): void
     {
         $this->authorize('update', $this->service);
@@ -562,6 +590,11 @@ class Domains extends Component
         $this->domainRows[$index]['dns_message'] = $meta['pending_message'];
         $this->domainRows[$index]['suggestion_label'] = null;
         $this->domainRows[$index]['suggestion_role'] = $meta['role'];
+    }
+
+    protected function persistDomainDnsStatuses(): void
+    {
+        $this->persistAllDomainDnsStatuses();
     }
 
     protected function persistAllDomainDnsStatuses(): void
@@ -919,6 +952,7 @@ class Domains extends Component
         }
 
         $toAdd = collect();
+        $portOverrides = $app->domain_port_overrides ?? [];
         foreach ($current as $url) {
             $counterpart = $this->wwwCounterpartUrl($url, forRedirectPairing: true);
             if ($counterpart === null) {
@@ -935,6 +969,11 @@ class Domains extends Component
                 continue;
             }
 
+            $port = $this->effectiveDomainInternalPort($url, $app);
+            if ($port['has_port_override']) {
+                $portOverrides[DomainPortOverrides::withoutPort($counterpart)] = $port['internal_port'];
+            }
+
             $knownHosts[$hostKey] = true;
             $toAdd->push($counterpart);
         }
@@ -943,12 +982,13 @@ class Domains extends Component
             return true;
         }
 
+        $app->domain_port_overrides = $portOverrides ?: null;
         $merged = $current->merge($toAdd)->unique()->values();
         $this->pendingAction = 'redirect';
         $this->pendingRedirectServiceApplicationId = $app->id;
 
-        // Skip DNS: pairing for redirects must still be configured even when DNS is not ready.
-        if (! $this->saveDomainListForApp($app, $merged)) {
+        // Counterparts inherit an existing port, so only domain conflicts need confirmation.
+        if (! $this->saveDomainListForApp($app, $merged, checkPorts: false)) {
             return false;
         }
 
@@ -975,11 +1015,24 @@ class Domains extends Component
             return;
         }
 
+        if ($this->pendingAction === 'redirect' && $this->pendingRedirectServiceApplicationId) {
+            $this->setServiceRedirect($this->pendingRedirectServiceApplicationId);
+
+            return;
+        }
+
         $this->addDomain();
     }
 
     public function cancelRemovePort(): void
     {
+        $this->authorize('update', $this->service);
+
+        if ($this->pendingAction === 'redirect' && $this->pendingRedirectServiceApplicationId) {
+            $app = $this->findServiceApp($this->pendingRedirectServiceApplicationId);
+            $this->serviceRedirects[$this->pendingRedirectServiceApplicationId] = $this->normalizeRedirect($app?->redirect);
+        }
+        $this->pendingRedirectServiceApplicationId = null;
         $this->showPortWarningModal = false;
         $this->forceSaveDomains = false;
         $this->forceRemovePort = false;
@@ -1047,9 +1100,15 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('close-modal');
             $this->refreshDomains();
-            $urlsToCheck = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            $addedUrls = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            if ($this->configureDnsAfterDomainAdd($addedUrls)) {
+                $this->dispatch('success', 'Domain added.');
+
+                return;
+            }
+
             $serviceApplicationId = (int) $app->id;
-            $dnsChecks = collect($urlsToCheck)->map(fn (string $url) => [
+            $dnsChecks = collect($addedUrls)->map(fn (string $url) => [
                 'url' => $url,
                 'check_id' => new_public_id(),
             ]);
@@ -1257,7 +1316,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomain(int $index): void
+    public function removeDomain(int $index, string $password = '', array $selectedActions = []): void
     {
         try {
             $this->authorize('update', $this->service);
@@ -1280,6 +1339,10 @@ class Domains extends Component
                 return;
             }
 
+            if (in_array('deleteManagedDns', $selectedActions, true)) {
+                $this->deleteManagedDnsForUrl($url);
+            }
+
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain removed.');
@@ -1290,7 +1353,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomainByKey(string $domainKey): void
+    public function removeDomainByKey(string $domainKey, string $password = '', array $selectedActions = []): void
     {
         $index = collect($this->domainRows)->search(
             fn (array $row): bool => ! ($row['is_suggested'] ?? false)
@@ -1301,7 +1364,7 @@ class Domains extends Component
             return;
         }
 
-        $this->removeDomain((int) $index);
+        $this->removeDomain((int) $index, $password, $selectedActions);
     }
 
     /**
@@ -1310,6 +1373,18 @@ class Domains extends Component
     private function domainRowKey(array $row): string
     {
         return hash('sha256', $row['url'].'|'.$row['service_application_id']);
+    }
+
+    protected function dnsResourceForHostname(string $hostname): ?Model
+    {
+        foreach ($this->domainRows as $row) {
+            $rowHostname = parse_url((string) ($row['url'] ?? ''), PHP_URL_HOST);
+            if (is_string($rowHostname) && strtolower($rowHostname) === strtolower($hostname)) {
+                return $this->findServiceApp((int) $row['service_application_id']);
+            }
+        }
+
+        return null;
     }
 
     public function addSuggestedDomain(int $index): void
@@ -1416,6 +1491,7 @@ class Domains extends Component
         ServiceApplication $app,
         Collection $domains,
         bool $checkConflicts = true,
+        bool $checkPorts = true,
     ): bool {
         $domainString = $domains->filter()->unique()->implode(',');
         $domainString = $domainString === '' ? null : ValidationPatterns::normalizeApplicationDomains($domainString);
@@ -1442,7 +1518,7 @@ class Domains extends Component
             }
         }
 
-        if (! $this->forceRemovePort) {
+        if ($checkPorts && ! $this->forceRemovePort) {
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null && $domainString) {
                 $previousFqdn = $app->getOriginal('fqdn');

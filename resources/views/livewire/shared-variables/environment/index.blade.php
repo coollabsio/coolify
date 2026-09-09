@@ -22,17 +22,14 @@
                             $project->description,
                             ...$project->environments->flatMap(fn ($environment) => [$environment->name, $environment->description])->all(),
                         ]))">
-                            <div class="mb-3">
-                                <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">{{ $project->name }}</h2>
-                                <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">{{ $project->description ?: 'Project environments' }}</p>
-                            </div>
+                            <x-section-heading :title="$project->name" :subtitle="$project->description ?: 'Project environments'" />
                             @if ($project->environments->isEmpty())
                                 <x-empty title="No environments in this project." size="sm" />
                             @else
                                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                     @foreach ($project->environments as $environment)
                                         <a x-show="matches(@js([$environment->name, $environment->description, $project->name]))"
-                                            class="group flex min-h-24 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                                            class="group flex min-h-24 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                                             href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}" {{ wireNavigate() }}>
                                             <div class="flex items-start gap-3">
                                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim"><x-reicon name="layers" class="size-4" /></div>
@@ -46,7 +43,7 @@
                     @endforeach
                 </div>
 
-                <div x-show="viewMode === 'list'" class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div x-show="viewMode === 'list'" class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                     @foreach ($projects as $project)
                         @foreach ($project->environments as $environment)
                             <a x-show="matches(@js([$environment->name, $environment->description, $project->name]))"

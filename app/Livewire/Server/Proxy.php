@@ -56,7 +56,6 @@ class Proxy extends Component
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
         $this->syncData(false);
-        $this->loadProxyConfiguration();
         $this->clearAppliedTraefikBranchWarning();
     }
 
@@ -106,6 +105,8 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->server->proxy = null;
+            $this->server->detected_traefik_version = null;
+            $this->server->traefik_outdated_info = null;
             $this->server->save();
 
             $this->dispatch('reloadWindow');

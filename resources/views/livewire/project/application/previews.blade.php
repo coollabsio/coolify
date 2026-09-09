@@ -1,4 +1,36 @@
 <div class="flex flex-col gap-6">
+    @if ($application->git_based())
+        @php
+            $canUpdate = auth()->user()->can('update', $application);
+        @endphp
+        <x-application.settings-section id="preview-settings-section" title="Preview settings"
+            helper="Automatic pull request deployments and who can trigger them.">
+            <x-slot:actions>
+                @can('update', $application)
+                    @if ($isPreviewDeploymentsEnabled)
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments">
+                            Disable preview deployments
+                        </x-forms.button>
+                    @else
+                        <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments"
+                            isHighlighted>
+                            Enable preview deployments
+                        </x-forms.button>
+                    @endif
+                @endcan
+            </x-slot:actions>
+
+            <div class="w-full">
+                <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
+                    helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
+                    :options="[
+                        ['value' => false, 'label' => 'Repository members only'],
+                        ['value' => true, 'label' => 'Public (fork PRs allowed)'],
+                    ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+            </div>
+        </x-application.settings-section>
+    @endif
+
     <livewire:project.application.preview.form :application="$application" />
 
     @if (count($application->additional_servers) > 0)

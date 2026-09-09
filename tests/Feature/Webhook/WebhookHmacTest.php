@@ -542,6 +542,52 @@ describe('Manual Webhook Repository Matching', function () {
         expect($response->getContent())->not->toContain('No applications found');
     });
 
+    test('github matches an ssh repository URL with a non-git username', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'custom-user@git.example.com:test-org/test-repo.git',
+        ]);
+        $secret = $app->manual_webhook_secret_github;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
+    test('github matches an ssh repository URL with a non-git username and custom port', function () {
+        $app = createApplicationWithWebhook(overrides: [
+            'git_repository' => 'custom-user@git.example.com:2222/test-org/test-repo.git',
+        ]);
+        $secret = $app->manual_webhook_secret_github;
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('No applications found');
+    });
+
     test('gitlab matches scp-style ssh repository URL with custom port', function () {
         $app = createApplicationWithWebhook(overrides: [
             'git_repository' => 'git@gitlab.example.com:2222/services/xyz.git',

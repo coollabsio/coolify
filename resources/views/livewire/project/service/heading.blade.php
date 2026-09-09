@@ -42,6 +42,13 @@
         ));
 
         $serviceStatus = str($service->status ?? 'exited');
+        $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
+        $selectedResource = $selectedResourceUuid
+            ? $service->applications->firstWhere('uuid', $selectedResourceUuid)
+                ?? $service->databases->firstWhere('uuid', $selectedResourceUuid)
+            : null;
+        $displayStatus = $selectedResource?->status ?? $service->status;
+        $selectedResourceStatus = str($selectedResource?->status ?? '');
         $environmentVariablesUrl = route('project.service.environment-variables', [
             'project_uuid' => $service->environment->project->uuid,
             'environment_uuid' => $service->environment->uuid,
@@ -67,6 +74,11 @@
                 <div class="relative flex w-full min-w-0 items-center gap-2">
                     <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
                     <x-services.links :service="$service" compact />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    @if ($selectedResource)
+                        <x-application.restart-limit-warning :application="$selectedResource" />
+                    @endif
                 </div>
             </div>
         </div>
@@ -127,10 +139,29 @@
                     </x-split-action>
                 @endcan
             @else
-                <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                    class="mb-3 inline-flex" aria-label="Open required environment variables">
-                    <x-status-badge status="Required variables missing" type="error" />
-                </a>
+                @can('deploy', $service)
+                    <div id="service-mobile-actions" class="relative mb-3"
+                        x-data="{ open: false }" @click.outside="open = false"
+                        @keydown.escape.window="open = false">
+                        <button type="button" class="button w-full justify-between" @click="open = !open"
+                            :aria-expanded="open" aria-haspopup="menu">
+                            <span>Actions</span>
+                            <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                                <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                            </span>
+                        </button>
+
+                        <div x-cloak x-show="open" x-transition.origin.top.left
+                            class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                            <div class="listbox-option cursor-default! justify-start! gap-2.5! text-neutral-400! dark:text-fg-faint!"
+                                role="menuitem" aria-disabled="true">
+                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                <span>Deploy (<a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                                        class="cursor-pointer underline underline-offset-2">missing required env vars</a>)</span>
+                            </div>
+                        </div>
+                    </div>
+                @endcan
             @endif
 
         </div>
@@ -198,10 +229,26 @@
                             </x-split-action>
                         @endcan
                     @else
-                        <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                            aria-label="Open required environment variables">
-                            <x-status-badge status="Required variables missing" type="error" />
-                        </a>
+                        @can('deploy', $service)
+                            <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
+                                x-effect="$dispatch('resource-actions-toggled', { open })"
+                                @click.outside="open = false" @keydown.escape.window="open = false">
+                                <button type="button" class="button button-highlighted" @click="open = !open"
+                                    :aria-expanded="open" aria-haspopup="menu">
+                                    Actions
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="open" x-transition.origin.top.right
+                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-64! min-w-0!" role="menu">
+                                    <div class="listbox-option cursor-default! justify-start! gap-2.5! text-neutral-400! dark:text-fg-faint!"
+                                        role="menuitem" aria-disabled="true">
+                                        <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                        <span>Deploy (<a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                                                class="cursor-pointer underline underline-offset-2">missing required env vars</a>)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endcan
                     @endif
                 </div>
             </div>

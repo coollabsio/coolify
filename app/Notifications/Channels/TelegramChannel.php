@@ -9,6 +9,7 @@ use App\Notifications\Application\RestartLimitReached;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Database\BackupFailed;
+use App\Notifications\Database\BackupMissing;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
@@ -17,6 +18,7 @@ use App\Notifications\Server\DockerCleanupSuccess;
 use App\Notifications\Server\HighDiskUsage;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\ServerPatchCheck;
+use App\Notifications\Server\TraefikVersionOutdated;
 use App\Notifications\Server\Unreachable;
 
 class TelegramChannel
@@ -39,7 +41,8 @@ class TelegramChannel
             RestartLimitReached::class => $settings->telegram_notifications_restart_limit_reached_thread_id,
 
             BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
-            BackupFailed::class => $settings->telegram_notifications_backup_failure_thread_id,
+            BackupFailed::class,
+            BackupMissing::class => $settings->telegram_notifications_backup_failure_thread_id,
 
             TaskSuccess::class => $settings->telegram_notifications_scheduled_task_success_thread_id,
             TaskFailed::class => $settings->telegram_notifications_scheduled_task_failure_thread_id,
@@ -50,7 +53,7 @@ class TelegramChannel
             Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
             Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
             ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
-
+            TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
             default => null,
         };
 

@@ -19,6 +19,19 @@ it('auto-disables listboxes when the gate denies access', function () {
     expect($html)->toMatch('/<button[^>]*id="status-trigger"[^>]*\sdisabled(?:[=\s>])/');
 });
 
+it('auto-disables checkboxes when the gate denies access', function () {
+    Gate::define('update-checkbox-test', fn (): bool => false);
+
+    $html = Blade::render(<<<'BLADE'
+        <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+            canGate="update-checkbox-test" :canResource="new stdClass" />
+    BLADE);
+
+    expect($html)
+        ->toMatch('/<input[^>]*type="checkbox"[^>]*\sdisabled(?:[=\s>])/')
+        ->not->toContain('canGate');
+});
+
 it('declares gate attributes on form controls with update permission checks', function () {
     $controlPattern = '/<x-forms\.(?:listbox|input|select|checkbox|textarea|button|toggle)\b.*?(?:\/>|<\/x-forms\.[^>]+>)/s';
 
@@ -66,6 +79,19 @@ it('declares deploy authorization on the service container removal confirmation'
 
     expect($source)->toMatch(
         '/<x-modal-confirmation(?=[^>]*title="Confirm Container Removal\?")(?=[^>]*canGate="deploy")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+});
+
+it('declares update authorization on application and service domain removal confirmations', function () {
+    $applicationRow = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
+    $serviceTable = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect($applicationRow)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/'
+    );
+
+    expect($serviceTable)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
     );
 });
 

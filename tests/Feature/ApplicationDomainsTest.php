@@ -1,13 +1,17 @@
 <?php
 
 use App\Jobs\CheckDomainDnsJob;
+use App\Jobs\ConfigureDnsRecordJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -16,6 +20,7 @@ use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -109,6 +114,33 @@ it('does not add a single-label hostname as an application domain', function () 
         ->assertDispatched('error');
 
     expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('keeps a compose domain removed when the service declares a magic URL variable', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      SERVICE_URL_WEB: /api
+YAML,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com/api'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $domainKey = hash('sha256', 'https://web.example.com/api|web');
+
+    $component
+        ->call('removeDomainByKey', $domainKey)
+        ->assertDispatched('success')
+        ->assertSet('domainRows', []);
+
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true))
+        ->toMatchArray(['web' => ['domain' => null]]);
 });
 
 it('generates a preview domain when the application has no domain', function () {
@@ -591,10 +623,10 @@ it('lists existing domains as individual rows', function () {
         ->assertSee('class="invisible absolute inset-0 size-4 rounded-sm"', false)
         ->assertSee('$el.previousElementSibling.classList.add(\'hidden\')', false)
         ->assertSee('x-on:error="$el.remove()"', false)
-        ->assertSee('class="min-w-0 flex-1 text-[13px]', false)
+        ->assertSee('class="min-w-0 flex-1 truncate text-[13px]', false)
         ->html();
 
-    expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(2);
+    expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0);
 });
 
 it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
@@ -618,7 +650,7 @@ it('hides the HTTP redirect control for HTTP-only domains', function () {
         ->assertDontSee('Redirect HTTP to HTTPS');
 });
 
-it('shows one redirect direction control in each compose service header', function () {
+it('shows the compose service redirect control in domain settings', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
         'docker_compose_raw' => "services:\n  api:\n    image: nginx:alpine\n",
@@ -633,11 +665,13 @@ it('shows one redirect direction control in each compose service header', functi
     $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSuccessful()
         ->assertSee('api')
+        ->call('startEdit', 0)
+        ->assertSee('www redirect')
         ->html();
 
     expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(1)
         ->and(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0)
-        ->and(substr_count($html, 'domain-direction-service-api'))->toBeGreaterThan(0);
+        ->and(substr_count($html, 'application-domain-direction-'))->toBeGreaterThan(0);
 });
 
 it('shows dns entries control next to Add', function () {
@@ -689,6 +723,63 @@ it('lists dns entries for domains that still need dns and omits working configur
         ->not->toContain('app.example.com');
 });
 
+it('does not use instance network addresses for dns entries on a remote server', function () {
+    InstanceSettings::get()->update([
+        'public_ipv4' => '198.51.100.20',
+        'public_ipv6' => '2001:db8::20',
+    ]);
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $records = $component->instance()->dnsRecordHints();
+
+    expect($records)->toBe([
+        [
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'value' => '203.0.113.10',
+        ],
+    ]);
+});
+
+it('uses instance network addresses for dns entries on the localhost server', function () {
+    InstanceSettings::get()->update([
+        'public_ipv4' => '198.51.100.20',
+        'public_ipv6' => '2001:db8::20',
+    ]);
+    $localhost = Server::factory()->create([
+        'id' => 0,
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+        'ip' => 'localhost',
+    ]);
+    $destination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'localhost-docker',
+        'network' => 'coolify-localhost',
+        'server_id' => $localhost->id,
+    ]));
+    $this->application->update([
+        'destination_id' => $destination->id,
+        'fqdn' => 'https://app.example.com',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    expect($component->instance()->dnsRecordHints())->toBe([
+        [
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'value' => '198.51.100.20',
+        ],
+        [
+            'type' => 'AAAA',
+            'name' => 'app.example.com',
+            'value' => '2001:db8::20',
+        ],
+    ]);
+});
+
 it('shows cloudflare domain connect only on cloud with a key', function () {
     config([
         'constants.coolify.self_hosted' => false,
@@ -721,7 +812,7 @@ it('shows cloudflare domain connect only on cloud with a key', function () {
 
 it('adds a domain to the application', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSee('+ Add')
+        ->assertSee('Add domain')
         ->set('newDomain', 'https://app.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
@@ -733,6 +824,29 @@ it('adds a domain to the application', function () {
 
     expect(explode(',', (string) $this->application->fqdn))
         ->toBe(['https://app.example.com', 'https://www.app.example.com']);
+});
+
+it('does not dispatch configure dns jobs when the server ip is missing or invalid', function () {
+    Queue::fake();
+
+    $this->server->update(['ip' => 'not-an-ip']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($token)->create(['name' => 'example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertNotDispatched('error');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://app.example.com');
+
+    Queue::assertNotPushed(ConfigureDnsRecordJob::class);
 });
 
 it('composes the complete port on the server without duplicating an existing www domain', function () {
@@ -825,7 +939,7 @@ it('updates a domain in place via modal', function () {
         ->call('startEdit', 0)
         ->assertSet('showEditDomainModal', true)
         ->assertSet('editingDomain', 'https://old.example.com')
-        ->assertSee('Direction')
+        ->assertSee('www redirect')
         ->assertSee('Search engine indexing')
         ->set('editingDomainParts.scheme', 'https')
         ->set('editingDomainParts.host', 'new.example.com')
@@ -899,6 +1013,79 @@ it('removes consecutive domains by stable row identity after indexes change', fu
         ->assertDispatched('success');
 
     expect($this->application->fresh()->fqdn)->toBe('https://third.example.com');
+});
+
+it('deletes the managed dns record when removing a domain by key with deleteManagedDns', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'token' => 'secret',
+    ]);
+    $zone = DnsProviderZone::factory()->for($token)->create([
+        'provider_zone_id' => 'zone-1',
+        'name' => 'example.com',
+    ]);
+    $record = ManagedDnsRecord::factory()->create([
+        'team_id' => $this->team->id,
+        'integration_token_id' => $token->id,
+        'dns_provider_zone_id' => $zone->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->getKey(),
+        'provider_record_id' => 'record-1',
+        'type' => 'A',
+        'name' => 'app.example.com',
+        'content' => '203.0.113.10',
+    ]);
+
+    Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
+        ->push(['success' => true, 'result' => [
+            'id' => 'record-1',
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'content' => '203.0.113.10',
+        ]])
+        ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
+
+    $domainKey = hash('sha256', 'https://app.example.com|');
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomainByKey', $domainKey, '', ['deleteManagedDns'])
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBeNull()
+        ->and(ManagedDnsRecord::query()->find($record->id))->toBeNull();
+});
+
+it('leaves the managed dns record when removing a domain by key without deleteManagedDns', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'token' => 'secret',
+    ]);
+    $zone = DnsProviderZone::factory()->for($token)->create([
+        'provider_zone_id' => 'zone-1',
+        'name' => 'example.com',
+    ]);
+    $record = ManagedDnsRecord::factory()->create([
+        'team_id' => $this->team->id,
+        'integration_token_id' => $token->id,
+        'dns_provider_zone_id' => $zone->id,
+        'provider_record_id' => 'record-1',
+        'type' => 'A',
+        'name' => 'app.example.com',
+        'content' => '203.0.113.10',
+    ]);
+
+    $domainKey = hash('sha256', 'https://app.example.com|');
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomainByKey', $domainKey, '')
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBeNull()
+        ->and(ManagedDnsRecord::query()->find($record->id))->not->toBeNull();
 });
 
 it('does not revalidate dns on remaining domains when removing one', function () {
@@ -1151,6 +1338,60 @@ it('hides dns check buttons from members', function () {
         ->assertDontSee('Check DNS');
 });
 
+it('disables create dns record for members and hides replace confirmation', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    $proposal = [
+        'hostname' => 'app.example.com',
+        'zone_id' => 1,
+        'zone' => 'example.com',
+        'credential' => 'Cloudflare',
+        'target' => '203.0.113.10',
+        'managed' => false,
+    ];
+
+    $createHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [$proposal])
+        ->html();
+
+    expect($createHtml)->toContain('Create DNS record')
+        ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
+
+    $replaceHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [$proposal])
+        ->set('dnsProviderConflicts', [
+            'app.example.com|1' => [
+                'record_id' => 'rec-1',
+                'current' => '198.51.100.10',
+                'proposed' => '203.0.113.10',
+            ],
+        ])
+        ->html();
+
+    expect($replaceHtml)->toContain('Currently 198.51.100.10')
+        ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Replace record/s');
+});
+
+it('shows create dns record enabled for owners', function () {
+    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [[
+            'hostname' => 'app.example.com',
+            'zone_id' => 1,
+            'zone' => 'example.com',
+            'credential' => 'Cloudflare',
+            'target' => '203.0.113.10',
+            'managed' => false,
+        ]])
+        ->html();
+
+    expect($html)->toContain('Create DNS record')
+        ->not->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
+});
+
 it('loads persisted dns status on page load', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com',
@@ -1203,7 +1444,7 @@ it('hides dns message text when dns status is ok', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('domainRows.0.dns_status', 'ok')
-        ->assertSee('DNS OK')
+        ->assertSee('DNS matches')
         ->assertDontSee('DNS points to 203.0.113.10')
         ->assertDontSee('Last checked');
 });
@@ -1350,7 +1591,7 @@ it('resolves hostname server addresses to a real ip for dns messages', function 
 
     // Failed checks show required DNS record guidance; ok checks mention the hostname label.
     if ($component->get('domainRows.0.dns_status') === 'failed') {
-        expect($message)->toBe("{$recordType} record → {$resolvedIp}")
+        expect($message)->toBe("Required DNS record type {$recordType} pointing to {$resolvedIp}")
             ->and($message)->not->toContain('CNAME');
     } else {
         expect($message)->toContain($resolvedIp)
@@ -1802,33 +2043,38 @@ it('uses the compact service domains layout for compose applications', function 
         ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
         ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
         ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
-        ->toContain('class="data-table-header domains-table-grid-service"')
-        ->toContain('<span>Direction</span>')
-        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>')
+        ->toContain('class="data-table-header service-domains-overview-grid"')
+        ->toContain('<span>Domain redirect</span>')
+        ->toContain('<span>Search indexing</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain('id="edit-domain-direction"')
-        ->toContain('id="domain-direction-service-{{ $redirectWireKey }}"')
-        ->toContain('onChange="updateServiceRedirect"')
-        ->toContain("'showDirectionControl' => false")
+        ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"')
+        ->toContain('id="application-domain-direction-{{ $editingKey }}"')
+        ->toContain("\$isCompose ? 'updateServiceRedirect' : 'updateRedirect'")
         ->not->toContain('title="No domains for this service"');
 });
 
-it('keeps search engine indexing table headers on one line', function () {
+it('uses concise search indexing headers in application and service domain tables', function () {
     $applicationView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
     $serviceView = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
 
-    expect(substr_count($applicationView, '<span class="whitespace-nowrap">Search engine indexing</span>'))
-        ->toBe(2)
+    expect(substr_count($applicationView, '<span>Search indexing</span>'))
+        ->toBe(1)
         ->and($serviceView)
-        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>');
+        ->toContain('<span>Search indexing</span>');
 });
 
-it('shows domain guidance in the application domains section', function () {
+it('shows a form save button at the bottom of application domain settings', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
 
     expect($view)
-        ->toContain('<p class="text-sm text-neutral-500 dark:text-fg-dim">')
-        ->toContain('{{ $helperText }}');
+        ->not->toContain('Indexing and redirect changes save automatically.')
+        ->toContain('data-testid="domain-settings-scroll"')
+        ->toContain('data-testid="domain-settings-footer"')
+        ->toContain('class="shrink-0 border-t')
+        ->toContain('<x-forms.button type="submit" wire:target="updateDomain" isHighlighted>')
+        ->toContain('Save')
+        ->not->toContain('<x-unsaved-bar action="updateDomain"');
 });
 
 it('does not render a last checked column in the domains table', function () {
@@ -1844,13 +2090,15 @@ it('uses compact labeled domain cards on mobile', function () {
     $row = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
 
     expect($styles)
-        ->toContain('@media (max-width: 768px)')
-        ->toContain('.domains-mobile-label')
-        ->toContain('.domains-table-grid .listbox-trigger')
+        ->toContain('@container service-domains (max-width: 980px)')
+        ->toContain('.service-domain-detail-label')
+        ->toContain('.service-domains-overview-grid')
+        ->toContain('@container service-domains (max-width: 600px)')
+        ->toContain('.service-domain-mobile-summary')
         ->and($row)
-        ->toContain('domains-mobile-label')
-        ->toContain('Search engine indexing')
-        ->toContain('Direction');
+        ->toContain('service-domain-mobile-summary')
+        ->toContain('No redirects')
+        ->toContain('Noindex');
 });
 
 it('uses segmented fields when adding and editing application domains', function () {
@@ -2048,10 +2296,11 @@ it('updates search engine indexing from the domains view', function () {
     $this->application->update(['fqdn' => 'https://app.example.com,https://staging.example.com']);
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
         ->assertSee('Noindex')
         ->assertSee('Indexable')
         ->assertSee('Search engine indexing')
-        ->assertSee('Direction')
+        ->assertSee('www redirect')
         ->assertSee('toggleNoindexDomain', false)
         ->assertSee('updateRedirect', false)
         ->assertSee('wire:ignore', false)
@@ -2064,6 +2313,28 @@ it('updates search engine indexing from the domains view', function () {
 
     expect($this->application->refresh()->noindexDomains()->all())
         ->toBe(['https://staging.example.com']);
+});
+
+it('updates search engine indexing for a git docker compose domain', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose.example.com'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('toggleNoindexDomain', 'https://compose.example.com', 'noindex')
+        ->assertDispatched('configurationChanged')
+        ->assertDispatched('success');
+
+    expect($this->application->refresh()->noindexDomains()->all())
+        ->toBe(['https://compose.example.com']);
+
+    $component->call('toggleNoindexDomain', 'https://compose.example.com', 'index');
+
+    expect($this->application->refresh()->noindexDomains()->all())->toBe([]);
 });
 
 it('keeps noindex domains when normalizing a custom domain port', function () {
@@ -2270,7 +2541,7 @@ it('renders a portless domain link with an internal port badge for overrides', f
         ->not->toContain('Inherited from Ports Exposes');
 });
 
-it('shows an error badge when a domain has no internal port and ports exposes is empty', function () {
+it('shows a warning when a domain has no internal port and ports exposes is empty', function () {
     $this->application->update([
         'ports_exposes' => null,
         'fqdn' => 'https://example.com',
@@ -2281,7 +2552,8 @@ it('shows an error badge when a domain has no internal port and ports exposes is
         ->assertSet('domainRows.0.internal_port', null)
         ->assertSee('No internal port')
         ->assertDontSee('Internal port ')
-        ->assertSee('table-badge-danger', false);
+        ->assertSee('aria-label="No internal port"', false)
+        ->assertSee('Set Ports Exposes or a per-domain internal port', false);
 });
 
 it('keeps the internal port badge when a domain override exists without ports exposes', function () {
@@ -2307,8 +2579,90 @@ it('distinguishes an inherited internal port from a domain port override', funct
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSee('Internal port 3000')
-        ->assertSee('Inherited from Ports Exposes', false)
+        ->assertSee('Inherited from the application or Compose service port', false)
         ->assertDontSee('Custom internal port for this domain', false);
+});
+
+it('shows the detected compose service port as the inherited internal port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose:\n      - '8069'\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
+it('does not show an application port as the inherited port for a compose service without a declared port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  backend:\n    build: ./backend\n  frontend:\n    build: ./frontend\n",
+        'docker_compose_domains' => json_encode([
+            'backend' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', null)
+        ->assertSet('domainRows.1.internal_port', null)
+        ->assertDontSee('Internal port 3000');
+});
+
+it('shows the detected compose service port for preview domains', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    ports:\n      - '18069:8069'\n",
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 8069,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/8069',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://preview.example.com'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
+it('does not show an application port for a preview compose service without a declared port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  backend:\n    build: ./backend\n  frontend:\n    build: ./frontend\n",
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 8070,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/8070',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://preview.example.com'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.internal_port', null)
+        ->assertDontSee('Internal port 3000');
 });
 
 it('keeps a legacy port-bearing url port in the edit field as an internal port override', function () {
@@ -2336,7 +2690,7 @@ it('stores compose domain port overrides without wiping other services', functio
         'build_pack' => 'dockercompose',
         'fqdn' => null,
         'ports_exposes' => '3000,8080',
-        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n",
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [8080]\n  api:\n    image: node:alpine\n",
         'docker_compose_domains' => json_encode([
             'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
         ]),
@@ -2364,6 +2718,31 @@ it('stores compose domain port overrides without wiping other services', functio
         ->and($this->application->domain_port_overrides)
         ->toHaveKey('https://web.example.com', 8080)
         ->toHaveKey('https://api.example.com', 4000);
+});
+
+it('saves an unrecognized compose domain port after confirming the warning', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  frontend:\n    build: ./frontend\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.port', '80')
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmUseUnknownPort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->domain_port_overrides)
+        ->toBe(['https://app.example.com' => 80]);
 });
 
 it('prunes a compose domain port override when that domain is removed', function () {
@@ -2559,4 +2938,256 @@ it('does not warn when editing an application domain to a port already used by a
         ->call('updateDomain')
         ->assertSet('showPortWarningModal', false)
         ->assertDispatched('success');
+});
+
+it('does not inherit the application port for single-service compose domains', function (string $extraService, bool $isPreview, bool $isStatic) {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: httpd:2.4-alpine\n".$extraService,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://apache.example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    $this->application->settings()->update(['is_static' => $isStatic]);
+
+    if ($isPreview) {
+        $preview = ApplicationPreview::create([
+            'application_id' => $this->application->id,
+            'pull_request_id' => 1,
+            'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/1',
+            'docker_compose_domains' => $this->application->docker_compose_domains,
+        ]);
+        $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+    } else {
+        $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    }
+
+    $component->assertSet('domainRows.0.internal_port', null)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertDontSee('Internal port 3000');
+})->with([
+    'web only' => '',
+    'web and database' => "  database:\n    image: postgres:16-alpine\n",
+])->with([false, true])->with([false, true]);
+
+it('checks compose ports against the selected service when saving domains', function (string $action, int $port, bool $warn) {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - 8080
+      - 8081
+    ports:
+      - target: 8082
+        published: 18082
+      - "18083:8083"
+  api:
+    image: nginx:alpine
+    expose:
+      - 9090
+YAML,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://existing.example.com'],
+            'api' => ['domain' => 'https://api.example.com:9090'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    if ($action === 'add') {
+        $component->set('newDomainService', 'web')
+            ->set('newDomainParts.host', 'new.example.com')
+            ->set('newDomainParts.port', (string) $port)
+            ->call('addDomain');
+        $domain = 'https://new.example.com';
+    } else {
+        $component->call('startEdit', 0)
+            ->set('editingDomainParts.port', (string) $port)
+            ->call('updateDomain');
+        $domain = 'https://existing.example.com';
+    }
+
+    $component->assertHasNoErrors()->assertSet('showPortWarningModal', $warn);
+
+    if ($warn) {
+        expect($this->application->fresh()->domain_port_overrides ?? [])->not->toHaveKey($domain);
+        $component->assertSet('unrecognizedPort', $port)
+            ->call('confirmUseUnknownPort')
+            ->assertSet('showPortWarningModal', false);
+    }
+
+    $component->assertDispatched('success');
+    expect($this->application->fresh()->domain_port_overrides[$domain] ?? null)->toBe($port);
+})->with(['add', 'edit'])->with([
+    'first exposed port' => [8080, false],
+    'second exposed port' => [8081, false],
+    'long syntax target' => [8082, false],
+    'short syntax target' => [8083, false],
+    'global port' => [3000, true],
+    'another service port' => [9090, true],
+    'published host port' => [18082, true],
+]);
+
+it('keeps an existing custom compose port without another warning', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [8080]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://existing.example.com:7070']]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '7070')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->domain_port_overrides['https://existing.example.com'] ?? null)->toBe(7070);
+});
+
+it('keeps the selected application domain when a refresh reorders dns rows', function (bool $compose) {
+    $first = 'https://first.example.com';
+    $second = 'https://second.example.com';
+    $this->application->update($compose ? [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [80]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => "$first,$second"]]),
+    ] : ['fqdn' => "$first,$second"]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'renamed.example.com');
+    $this->application->update(['domain_dns_statuses' => [
+        ($compose ? 'web|' : '').$second => ['status' => 'failed', 'message' => 'Mismatch'],
+    ]]);
+
+    $component->call('refreshDomains')
+        ->assertSet('editingIndex', 1)
+        ->assertSet('editingDomainParts.host', 'renamed.example.com')
+        ->call('toggleNoindexDomain', $first, 'noindex')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    $this->application->refresh();
+    $domains = $compose ? json_decode($this->application->docker_compose_domains, true)['web']['domain'] : $this->application->fqdn;
+    expect(explode(',', $domains))->toBe(['https://renamed.example.com', $second]);
+})->with([false, true]);
+
+it('inherits application counterpart ports without changing configured counterparts', function (bool $compose, ?int $override, string $redirect) {
+    $host = $redirect === 'www' ? 'app.example.com' : 'www.app.example.com';
+    $counterpart = $redirect === 'www' ? 'www.app.example.com' : 'app.example.com';
+    $url = "https://$host/blog";
+    $pairedUrl = "https://$counterpart/blog";
+    $existing = 'http://existing.example.com,https://www.existing.example.com';
+    $this->application->update(array_merge([
+        'ports_exposes' => '80',
+        'domain_port_overrides' => array_filter([
+            $url => $override,
+            'https://www.existing.example.com' => 9090,
+        ], fn ($port) => $port !== null),
+    ], $compose ? [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [80]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => "$url,$existing"]]),
+    ] : ['fqdn' => "$url,$existing"]));
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    if ($compose) {
+        $component->call('updateServiceRedirect', 'web', $redirect);
+    } else {
+        $component->call('updateRedirect', $redirect);
+    }
+    $component->assertHasNoErrors()->assertSet('showPortWarningModal', false);
+
+    $this->application->refresh();
+    $domains = $compose ? json_decode($this->application->docker_compose_domains, true)['web']['domain'] : $this->application->fqdn;
+    expect($domains)->toContain($pairedUrl)->toContain($existing)
+        ->and($this->application->domain_port_overrides[$pairedUrl] ?? 80)->toBe($override ?? 80)
+        ->and($this->application->domain_port_overrides[$url] ?? null)->toBe($override)
+        ->and($this->application->domain_port_overrides['https://www.existing.example.com'])->toBe(9090);
+})->with([false, true])->with([null, 8080])->with(['www', 'non-www']);
+
+it('preserves pending application redirect through refresh and resolves its domain conflict', function (bool $compose, bool $cancel) {
+    Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://www.pending.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+    $url = 'https://pending.example.com';
+    $this->application->update(array_merge([
+        'domain_port_overrides' => [$url => 8080],
+    ], $compose ? [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web.app:\n    image: nginx:alpine\n    expose: [80]\n",
+        'docker_compose_domains' => json_encode([
+            'web.app' => ['domain' => $url, 'redirect' => 'both'],
+            'occupied' => ['domain' => 'https://www.pending.example.com'],
+        ]),
+    ] : ['fqdn' => $url]));
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $property = $compose ? 'serviceRedirects.'.str_replace('.', '__dot__', 'web.app') : 'redirect';
+    if ($compose) {
+        $component->call('updateServiceRedirect', 'web.app', 'www');
+    } else {
+        $component->call('updateRedirect', 'www');
+    }
+    $component->assertSet('showDomainConflictModal', true)
+        ->call('refreshDomains')
+        ->assertSet($property, 'www');
+
+    if ($cancel) {
+        $component->set('showDomainConflictModal', false)
+            ->assertSet($property, 'both')
+            ->assertSet('pendingAction', null)
+            ->assertSet('pendingRedirectService', null);
+    } else {
+        $component->call('confirmDomainUsage')
+            ->assertHasNoErrors()
+            ->assertSet('pendingAction', null)
+            ->assertSet('pendingRedirectService', null)
+            ->assertSet($property, 'www');
+    }
+
+    $this->application->refresh();
+    $storedRedirect = $compose ? json_decode($this->application->docker_compose_domains, true)['web.app']['redirect'] : $this->application->redirect;
+    expect($storedRedirect)->toBe($cancel ? 'both' : 'www');
+    if (! $cancel) {
+        expect($this->application->domain_port_overrides['https://www.pending.example.com'] ?? null)->toBe(8080);
+    }
+})->with([false, true])->with([false, true]);
+
+it('keeps the selected application domain when removing an earlier row', function () {
+    $this->application->update(['fqdn' => 'https://first.example.com,https://second.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 1)
+        ->call('removeDomain', 0)
+        ->assertSet('editingIndex', 0)
+        ->set('editingDomainParts.host', 'renamed.example.com')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    expect($this->application->fresh()->fqdn)->toBe('https://renamed.example.com');
+});
+
+it('prevents members from cancelling protected application redirect conflict state', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDomainConflictModal', true)
+        ->set('showDomainConflictModal', false)
+        ->assertForbidden();
 });

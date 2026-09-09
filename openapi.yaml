@@ -3810,6 +3810,91 @@ paths:
       security:
         -
           bearerAuth: []
+  '/databases/{uuid}/imports/uploads':
+    post:
+      tags:
+        - Databases
+      summary: 'Upload database import'
+      operationId: upload-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Upload completed'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/imports':
+    post:
+      tags:
+        - Databases
+      summary: 'Import database backup'
+      operationId: create-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabaseImportRequest'
+      responses:
+        '202':
+          description: 'Import queued'
+        '409':
+          description: 'Import already active'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/imports/{activity_id}':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database import status'
+      operationId: get-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'Import activity ID.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Import status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseImportStatus'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /databases:
     get:
       tags:
@@ -3933,6 +4018,12 @@ paths:
                   type: integer
                   description: 'Backup job timeout in seconds (min: 60, max: 36000)'
                   default: 3600
+                missing_backup_notification_days:
+                  type: integer
+                  description: 'Alert after this many days without an execution; 0 disables alerts'
+                  minimum: 0
+                  maximum: 365
+                  default: 0
               type: object
       responses:
         '201':
@@ -4352,6 +4443,11 @@ paths:
                   type: integer
                   description: 'Backup job timeout in seconds (min: 60, max: 36000)'
                   default: 3600
+                missing_backup_notification_days:
+                  type: integer
+                  description: 'Alert after this many days without an execution; 0 disables alerts'
+                  minimum: 0
+                  maximum: 365
               type: object
       responses:
         '200':
@@ -10102,6 +10198,13 @@ paths:
                   sentinel_push_interval_seconds: { type: integer }
                   sentinel_custom_url: { description: 'Only present with read:sensitive.', type: string }
                   sentinel_updated_at: { type: [string, 'null'] }
+                  traffic_topn: { type: integer }
+                  traffic_sample_threshold: { type: integer }
+                  traffic_retention_1h_days: { type: integer }
+                  traffic_retention_1d_days: { type: integer }
+                  is_geoip_enabled: { type: boolean }
+                  geoip_refresh_days: { type: integer }
+                  geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -10150,6 +10253,25 @@ paths:
                   type: integer
                   minimum: 10
                 sentinel_custom_url:
+                  type: [string, 'null']
+                traffic_topn:
+                  type: integer
+                  minimum: 1
+                traffic_sample_threshold:
+                  type: integer
+                  minimum: 0
+                traffic_retention_1h_days:
+                  type: integer
+                  minimum: 1
+                traffic_retention_1d_days:
+                  type: integer
+                  minimum: 1
+                is_geoip_enabled:
+                  type: boolean
+                geoip_refresh_days:
+                  type: integer
+                  minimum: 1
+                geoip_maxmind_license_key:
                   type: [string, 'null']
               type: object
       responses:
@@ -11138,6 +11260,112 @@ paths:
           $ref: '#/components/responses/404'
         '501':
           description: 'Swarm not supported.'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/imports/uploads':
+    post:
+      tags:
+        - 'Service databases'
+      summary: 'Upload service database import'
+      operationId: upload-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: 'Upload completed'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/imports':
+    post:
+      tags:
+        - 'Service databases'
+      summary: 'Import service database backup'
+      operationId: create-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabaseImportRequest'
+      responses:
+        '202':
+          description: 'Import queued'
+        '409':
+          description: 'Import already active'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/databases/{database_uuid}/imports/{activity_id}':
+    get:
+      tags:
+        - 'Service databases'
+      summary: 'Get service database import status'
+      operationId: get-service-database-import
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Service UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: database_uuid
+          in: path
+          description: 'Service database UUID.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'Import activity ID.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Import status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseImportStatus'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -13833,6 +14061,106 @@ paths:
           bearerAuth: []
 components:
   schemas:
+    DatabaseImportRequest:
+      type: object
+      oneOf:
+        -
+          required:
+            - source
+            - upload_id
+          properties:
+            source:
+              type: string
+              enum:
+                - upload
+            upload_id:
+              type: string
+              format: uuid
+            dump_all:
+              type: boolean
+              default: false
+            replace_existing:
+              description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
+              type: boolean
+              default: false
+          type: object
+          additionalProperties: false
+        -
+          required:
+            - source
+            - s3_storage_uuid
+            - path
+          properties:
+            source:
+              type: string
+              enum:
+                - s3
+            s3_storage_uuid:
+              type: string
+            path:
+              type: string
+            dump_all:
+              type: boolean
+              default: false
+            replace_existing:
+              description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
+              type: boolean
+              default: false
+          type: object
+          additionalProperties: false
+        -
+          required:
+            - source
+            - path
+          properties:
+            source:
+              type: string
+              enum:
+                - server
+            path:
+              type: string
+              example: /var/backups/database.sql.gz
+            dump_all:
+              type: boolean
+              default: false
+            replace_existing:
+              description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
+              type: boolean
+              default: false
+          type: object
+          additionalProperties: false
+    DatabaseImportStatus:
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - queued
+            - in_progress
+            - finished
+            - error
+            - killed
+            - cancelled
+            - closed
+        exit_code:
+          type:
+            - integer
+            - 'null'
+        output:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        finished_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+      type: object
     VolumeBackupScheduleRequest:
       required:
         - frequency
@@ -14685,6 +15013,20 @@ components:
           type: boolean
         is_metrics_enabled:
           type: boolean
+        is_traffic_analytics_enabled:
+          type: boolean
+        traffic_topn:
+          type: integer
+        traffic_sample_threshold:
+          type: integer
+        traffic_retention_1h_days:
+          type: integer
+        traffic_retention_1d_days:
+          type: integer
+        is_geoip_enabled:
+          type: boolean
+        geoip_refresh_days:
+          type: integer
         is_reachable:
           type: boolean
         is_sentinel_enabled:

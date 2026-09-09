@@ -20,51 +20,196 @@
     --font-geist-sans: 'Geist Sans', Inter, sans-serif;
     --font-logs: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 
-    --color-base: #101010;
-    --color-warning: #fcd452;
-    --color-warning-50: #fefce8;
-    --color-warning-100: #fef9c3;
-    --color-warning-200: #fef08a;
-    --color-warning-300: #fde047;
-    --color-warning-400: #fcd452;
-    --color-warning-500: #facc15;
-    --color-warning-600: #ca8a04;
-    --color-warning-700: #a16207;
-    --color-warning-800: #854d0e;
-    --color-warning-900: #713f12;
-    --color-success: #22C55E;
-    --color-error: #dc2626;
-    --color-coollabs-50: #f5f0ff;
-    --color-coollabs: #6b16ed;
-    --color-coollabs-100: #7317ff;
-    --color-coollabs-200: #5a12c7;
-    --color-coollabs-300: #4a0fa3;
-    --color-coolgray-100: #181818;
-    --color-coolgray-200: #202020;
-    --color-coolgray-300: #242424;
-    --color-coolgray-400: #282828;
-    --color-coolgray-500: #323232;
+    --color-base: oklch(17.3% 0 0);
+    --color-warning: oklch(88.13% 0.1507 91.7);
+    --color-warning-50: oklch(98.73% 0.0262 102.21);
+    --color-warning-100: oklch(97.29% 0.0693 103.19);
+    --color-warning-200: oklch(94.51% 0.1243 101.54);
+    --color-warning-300: oklch(90.52% 0.1657 98.11);
+    --color-warning-400: oklch(88.13% 0.1507 91.7);
+    --color-warning-500: oklch(86.06% 0.1731 91.94);
+    --color-warning-600: oklch(68.06% 0.1423 75.83);
+    --color-warning-700: oklch(55.38% 0.1207 66.44);
+    --color-warning-800: oklch(47.62% 0.1034 61.91);
+    --color-warning-900: oklch(42.1% 0.0897 57.71);
+    --color-success: oklch(72.27% 0.192 149.58);
+    --color-error: oklch(57.71% 0.2152 27.33);
+    --color-coollabs-50: oklch(96.33% 0.0206 301.15);
+    --color-coollabs: oklch(49.65% 0.2709 289.33);
+    --color-coollabs-100: oklch(52.34% 0.287 289.16);
+    --color-coollabs-200: oklch(43.76% 0.2369 289.82);
+    --color-coollabs-300: oklch(38.04% 0.2031 290.47);
+    --color-coolgray-100: oklch(20.9% 0 0);
+    --color-coolgray-200: oklch(24.35% 0 0);
+    --color-coolgray-300: oklch(26.03% 0 0);
+    --color-coolgray-400: oklch(27.68% 0 0);
+    --color-coolgray-500: oklch(31.71% 0 0);
 
     /* Graphite design language (ported from ref/frontend). Layered neutral
        surfaces + translucent hairlines. See DESIGN.md. */
-    --color-app: #0c0c0d;
-    /* Canvas: neutral near-black (oklch), not pure black */
-    --color-panel: oklch(10% 0 0);
-    --color-surface: #161618;
-    --color-raised: #1c1c1e;
-    --color-selected: #26262a;
-    --color-fg: #f2f2f2;
-    --color-fg-dim: #b4b4b8;
-    --color-fg-faint: #6e6e74;
-    --color-accent: #6b16ed;
-    --color-accent-foreground: #ffffff;
-    --color-hairline: rgba(255, 255, 255, 0.08);
-    --color-nav-text: #525252;
-    --color-nav-muted: #666666;
-    --color-nav-active: #171717;
-    --color-log: #0d0d0d;
+    /* Content canvas: the darkest shell layer (sRGB ~10). Hex, not oklch:
+       oklch lightness compresses to near-black below ~15%, so oklch(7.5%)
+       renders as sRGB 1 with no visible step. */
+    --color-app: oklch(14.48% 0 0);
+    /* Sidebar + topbar chrome (sRGB ~20): a clear step lighter than the content
+       canvas so the shell chrome separates from the content area. */
+    --color-panel: oklch(19.13% 0 0);
+    /* Pure neutral (r=g=b). Were cool-tinted (#161618/#1c1c1e/#26262a, b>r),
+       which clashed with the neutral panel ladder. */
+    --color-surface: oklch(20.02% 0 0);
+    --color-raised: oklch(22.64% 0 0);
+    --color-selected: oklch(26.86% 0 0);
+    --color-fg: oklch(96.12% 0 0);
+    --color-fg-dim: oklch(76.99% 0 0);
+    /* Tertiary text. Raised from #6e6e74 (3.78:1 on base, failed WCAG AA)
+       to #7e7e84 so 13-14px text clears 4.5:1 on the dark surface ladder. */
+    --color-fg-faint: oklch(59.31% 0 0);
+    --color-accent: oklch(49.65% 0.2709 289.33);
+    --color-accent-foreground: oklch(100.0% 0 0);
+    --color-hairline: oklch(100.0% 0 0 / 0.08);
+    --color-nav-text: oklch(43.86% 0 0);
+    --color-nav-muted: oklch(51.03% 0 0);
+    --color-nav-active: oklch(20.46% 0 0);
+    --color-log: oklch(15.91% 0 0);
 
     --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.4);
+    /* One restrained lift shared by every dropdown/menu/listbox panel and the
+       command palette. Lighter and consistent, replacing the old scattered
+       0.45 / 0.35 / shadow-lg / shadow-sm mix. Modals keep --shadow-modal. */
+    --shadow-dropdown: 0 4px 12px rgb(0 0 0 / 0.12), 0 2px 4px rgb(0 0 0 / 0.08);
+
+    /* Shared motion curves (stronger than the built-in CSS easings). Use these
+       for consistency: --ease-out for UI enter/press, --ease-drawer for
+       drawers/sheets, --ease-in-out for on-screen movement. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Standard buttons have a compact physical edge. Hover lifts the face by 1px;
+   pressing nudges it down while the depth disappears. */
+.button:not(:disabled) {
+    --button-depth-color: rgb(0 0 0 / 0.22);
+    --button-depth: 0 2px 0 var(--button-depth-color);
+    --button-depth-hover: 0 3px 0 var(--button-depth-color);
+
+    box-shadow: var(--button-depth);
+}
+
+.button.button-highlighted:not(:disabled),
+.button[isHighlighted]:not(:disabled) {
+    --button-depth-color: var(--color-coollabs-300);
+}
+
+.dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
+    --button-depth-color: rgb(255 255 255 / 0.08);
+}
+
+.button.button-error:not(:disabled) {
+    --button-depth-color: var(--color-red-300);
+}
+
+.dark .button.button-error:not(:disabled) {
+    --button-depth-color: var(--color-red-800);
+}
+
+/* Keep the shared focus indicator when the depth shadow owns box-shadow. */
+.button:not(:disabled):focus-visible {
+    box-shadow: var(--button-depth), 0 0 0 1px var(--color-accent);
+}
+
+.button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--button-depth-hover);
+}
+
+.button:not(:disabled):hover:focus-visible {
+    box-shadow: var(--button-depth-hover), 0 0 0 1px var(--color-accent);
+}
+
+/* Other button-like controls retain the lighter scale feedback. */
+.button,
+.icon-button,
+.app-tab,
+.split-action-main,
+.split-action-caret {
+    transition-property: color, background-color, border-color, box-shadow, transform;
+    transition-timing-function: var(--ease-out);
+    transition-duration: 120ms;
+}
+
+.button {
+    transition-duration: 120ms, 120ms, 120ms, 80ms, 80ms;
+}
+
+.icon-button:not(:disabled):active,
+.app-tab:active,
+.split-action-main:not(:disabled):active,
+.split-action-caret:not(:disabled):active {
+    transform: scale(0.97);
+}
+
+.button:not(:disabled):active {
+    transform: translateY(2px);
+    box-shadow: none;
+}
+
+/* Focus border/ring on any form control should ease, not snap. The accent
+   focus indicator is a border-color and/or box-shadow (ring) change, which the
+   utilities' `transition-colors` did not fully animate. Target the elements
+   themselves (covers bespoke search fields too) plus the div-based controls. */
+input,
+textarea,
+select,
+.listbox-trigger,
+.chip-input {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-timing-function: var(--ease-out);
+    transition-duration: 120ms;
+}
+
+/*
+  Traffic-analytics chart tokens (light defaults; dark overrides below).
+  One source of truth shared by ApexCharts donuts, the geo choropleth SVG,
+  and proportional bars — JS reads them at runtime via getComputedStyle.
+  Palette validated with the dataviz skill; contrast ratios are recorded in
+  the PR description. See resources/views/livewire/traffic/_geo.blade.php.
+*/
+:root {
+    /* Categorical HTTP status palette (labelled 2xx/3xx/4xx/5xx in every legend). */
+    --chart-status-2xx: #15803d;
+    --chart-status-3xx: #2563eb;
+    --chart-status-4xx: #d97706;
+    --chart-status-5xx: #dc2626;
+
+    /* KPI sparkline accent for Bandwidth (violet — distinct from the status hues). */
+    --chart-spark-bandwidth: #7c3aed;
+
+    /* Sequential 5-step geo ramp (low -> high traffic) + neutral empty. */
+    --chart-geo-1: #3b82f6;
+    --chart-geo-2: #2563eb;
+    --chart-geo-3: #1d4ed8;
+    --chart-geo-4: #1e40af;
+    --chart-geo-5: #172554;
+    --chart-geo-empty: #e5e7eb;
+    --chart-geo-stroke: #ffffff;
+}
+
+.dark {
+    --chart-status-2xx: #22c55e;
+    --chart-status-3xx: #3b82f6;
+    --chart-status-4xx: #f59e0b;
+    --chart-status-5xx: #ef4444;
+
+    --chart-spark-bandwidth: #a78bfa;
+
+    --chart-geo-1: #2563eb;
+    --chart-geo-2: #3b82f6;
+    --chart-geo-3: #60a5fa;
+    --chart-geo-4: #93c5fd;
+    --chart-geo-5: #bfdbfe;
+    --chart-geo-empty: #262626;
+    --chart-geo-stroke: #101010;
 }
 
 /*
@@ -258,7 +403,7 @@
 */
 html,
 body {
-    @apply w-full min-h-full bg-gray-50 dark:bg-app dark:text-fg-dim;
+    @apply w-full min-h-full bg-neutral-50 dark:bg-app dark:text-fg-dim;
 }
 
 body {
@@ -284,8 +429,16 @@ option {
     @apply dark:text-white dark:bg-coolgray-100;
 }
 
-button[isError]:not(:disabled) {
-    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800 hover:bg-red-300 hover:text-white dark:hover:bg-red-800 dark:hover:text-white;
+.button.button-error {
+    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+}
+
+.button.button-error:disabled {
+    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800;
+}
+
+.button-error:not(:disabled) {
+    @apply hover:bg-red-100 hover:text-red-900 dark:hover:bg-red-700 dark:hover:text-white;
 }
 
 button[isHighlighted]:not(:disabled) {
@@ -505,25 +658,24 @@ html[data-theme="custom"] #nprogress .spinner-icon {
 
 .application-console-shell[data-console-theme="system"],
 .terminal-fullscreen-shell[data-console-theme="system"] {
-    --console-theme-background: #fff;
-    --console-theme-border: #d4d4d8;
+    --console-theme-background: oklch(100.0% 0 0);
+    --console-theme-border: oklch(87.11% 0.0055 286.29);
     --console-theme-opacity: 1;
 }
 
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header {
-    background: transparent;
-    color: #52525b;
-    border-color: rgb(0 0 0 / 0.1);
-    backdrop-filter: none;
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"] {
+/* Session toolbar (selected-target trigger + label) sits over the white
+   system console in light mode. Without this its text-white/* stayed white on
+   white and the selected server was invisible (issue #11532). */
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-toolbar[class*="text-white"],
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-toolbar [class*="text-white"],
+html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-toolbar[class*="text-white"],
+html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-toolbar [class*="text-white"] {
     color: #52525b !important;
 }
 
 html.dark .application-console-shell[data-console-theme="system"],
 html.dark .terminal-fullscreen-shell[data-console-theme="system"] {
-    --console-theme-background: #121214;
+    --console-theme-background: oklch(18.31% 0.004 285.99);
     --console-theme-border: rgb(255 255 255 / 0.08);
 }
 
@@ -531,6 +683,19 @@ html[data-theme="custom"] .application-console-shell[data-console-theme="system"
 html[data-theme="custom"] .terminal-fullscreen-shell[data-console-theme="system"] {
     --console-theme-background: var(--color-log);
     --console-theme-border: var(--coollabs-line);
+}
+
+/* Docked System console only: the fill behind the terminal panel is the
+   elevated (header) surface, so the panel's rounded-corner notch reads as the
+   header colour — the card's figure/ground. The panel paints its own base
+   surface over this fill, so only the notch shows it. The fullscreen shell has
+   no panel, so it is intentionally excluded and keeps its plain terminal fill. */
+.application-console-shell[data-console-theme="system"] {
+    --console-theme-background: var(--coollabs-elevated);
+}
+
+html.dark .application-console-shell[data-console-theme="system"] {
+    --console-theme-background: var(--coollabs-elevated);
 }
 
 .console-theme-selector {
@@ -656,6 +821,10 @@ html.dark .console-theme-selector::-webkit-scrollbar-thumb {
     flex: 1 1 0%;
     flex-direction: column;
     overflow: hidden;
+    /* Breathing room so the console's box-shadow ring + lift are not clipped by
+       this overflow-hidden, viewport-height container (the card gets this from
+       the scrollable page around it). */
+    padding: 6px;
 }
 
 .terminal-page-console > .application-console-shell {
@@ -712,11 +881,71 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     touch-action: manipulation;
 }
 
-.application-console-header {
+/* Session header band: an attached card-style header on top of the console,
+   mirroring the page card header (elevated surface + hairline divider). The
+   System theme uses the neutral card surface in both modes; colorful themes
+   fall back to a translucent dark band so the white controls stay legible. */
+.terminal-session-toolbar {
     position: relative;
     z-index: 2;
-    background: rgb(0 0 0 / 0.24);
-    backdrop-filter: blur(20px);
+    flex-shrink: 0;
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    /* No border-radius: the shell is overflow-hidden + rounded and clips the
+       header's top corners, so rounding here only risks a sub-pixel seam. */
+    border-bottom: 1px solid var(--terminal-header-border, rgb(255 255 255 / 0.1));
+    background: var(--terminal-header-bg, rgb(0 0 0 / 0.28));
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+/* System header has no bottom border: the body panel's ring is the divider, and
+   its rounded top corners tuck under the header — the same merge the
+   target-picker card uses (elevated header meeting a base body panel). */
+.application-console-shell[data-console-theme="system"] .terminal-session-toolbar {
+    --terminal-header-bg: var(--coollabs-elevated);
+    --terminal-header-border: transparent;
+    /* Shell no longer clips (overflow: visible), so the header rounds its own
+       top corners — matching the card header. */
+    border-radius: 8px 8px 0 0;
+    /* Drop the z-index:2 stacking context: it painted the header OVER the body
+       panel, hiding the panel's ring (the divider). The header only had z-2 to
+       beat ::before, but its dropdowns sit in their own .relative wrappers, so
+       z:auto is safe and lets the body panel's ring paint over the header —
+       exactly how the card body overlaps the card header. */
+    z-index: auto;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* System console body: the terminal panel, a full rounded box-shadow ring like
+   the card body. Its base surface is the terminal fill; the elevated surface
+   behind it (::before) shows only through the rounded-corner notch, reading as
+   the header colour — the card's figure/ground. */
+.application-console-shell[data-console-theme="system"] .terminal-session-panel {
+    background: var(--coollabs-base);
+    /* The body panel is a full rounded ring (like the card body). position:
+       relative puts it (and its ring) above ::before AND, because it comes
+       after the now-z:auto header in the DOM, above the header — so the ring's
+       top edge is the divider and its rounded top corners connect down into the
+       side ring, which coincides with the shell's ring (one hairline, no
+       doubling). A box-shadow ring rounds and connects cleanly; a border-top
+       cannot (square corners, or a disconnected transparent edge). */
+    position: relative;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+}
+
+/* Connected System console frame = the target-picker card recipe: a hairline
+   box-shadow ring + a restrained lift. overflow stays visible so the ring is
+   not clipped (the .terminal-page-console padding gives it room inside the
+   viewport-locked, overflow-hidden page). Colorful themes keep the themed,
+   overflow-hidden shell. */
+.application-console-shell[data-console-theme="system"] {
+    overflow: visible;
+    box-shadow:
+        0 0 0 1px var(--coollabs-hairline),
+        0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .terminal-loading-label {
@@ -824,7 +1053,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-panel {
-    background: transparent;
+    background: var(--coollabs-base);
 }
 
 .terminal-target-list {
@@ -851,7 +1080,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     color: #52525b;
     background: #fff;
     border-color: #d4d4d8;
-    box-shadow: 0 18px 50px rgb(0 0 0 / 0.18);
+    box-shadow: var(--shadow-dropdown);
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker [class*="text-white"] {
@@ -924,75 +1153,166 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
 * utility classes placed in the card markup.
 */
 :root {
-    --coollabs-canvas: oklch(98.75% 0 0);
+    /* Page canvas is a faint off-white so white/elevated cards lift off it
+       (shadcn pattern), instead of card and page reading as one flat color. */
+    --coollabs-canvas: oklch(97% 0 0);
     --coollabs-elevated: oklch(98% 0 0);
     --coollabs-recessed: oklch(96% 0 0);
-    --coollabs-base: #ffffff;
+    --coollabs-base: oklch(100.0% 0 0);
     --coollabs-fill: oklch(92.2% 0 0);
     --coollabs-line: oklch(14.5% 0 0 / 0.1);
-    --coollabs-hairline: oklch(93.5% 0 0);
-    --coollabs-subtle: oklch(55.6% 0 0);
+    /* Card/table edge ring. Crisped from 93.5% (1.17:1 on canvas, invisible)
+       to 85.5% (1.51:1) so surfaces read as bordered cards, not flat fills. */
+    --coollabs-hairline: oklch(85.5% 0 0);
+    /* Muted labels/titles. Darkened from 55.6% (failed WCAG AA on elevated
+       4.46, recessed 4.24, fill 3.76) to 50% so muted text clears 4.5:1 on
+       every light surface above white. Dark stays 70.8% (already passes). */
+    --coollabs-subtle: oklch(50% 0 0);
 }
 
 .dark {
-    --color-accent: #fcd452;
-    --coollabs-canvas: oklch(10% 0 0);
-    /* elevated (card shells/headers) and recessed (input fills) sit a touch
-       above the canvas so they read lighter than near-black */
-    --coollabs-elevated: oklch(15% 0 0);
-    --coollabs-recessed: oklch(20% 0 0);
-    --coollabs-base: oklch(17% 0 0);
-    --coollabs-fill: oklch(26.9% 0 0);
+    --color-accent: oklch(88.13% 0.1507 91.7);
+    /* Dark surface ladder in hex (sRGB), not oklch: oklch lightness compresses
+       to near-black below ~15%, so oklch(15%) rendered as sRGB 11 and cards
+       could not lift off the content canvas (sRGB 10). These give clear,
+       visible steps: content 10 -> elevated 22 -> base 28 -> recessed 34.
+       Pure neutral (r=g=b), matching the neutral borders/text and the light
+       ladder, so every panel shares one temperature (no blue cast). */
+    --coollabs-canvas: oklch(14.48% 0 0);
+    --coollabs-elevated: oklch(20.02% 0 0);
+    --coollabs-recessed: oklch(25.2% 0 0);
+    --coollabs-base: oklch(22.64% 0 0);
+    --coollabs-fill: oklch(29.31% 0 0);
     --coollabs-line: oklch(32% 0 0);
-    --coollabs-hairline: oklch(26.9% 0 0);
+    /* Crisped from 26.9% (1.36:1 on canvas) to 32% (1.63:1) so dark cards
+       and tables show a visible edge instead of blending into the canvas. */
+    --coollabs-hairline: oklch(32% 0 0);
     --coollabs-subtle: oklch(70.8% 0 0);
-    --color-nav-text: #a8a8b0;
-    --color-nav-muted: #7a7a84;
-    --color-nav-active: #f2f2f2;
+    /* Neutral (was #a8a8b0 / #7a7a84, both cool-tinted). Sidebar text now shares
+       the same neutral temperature as the content text, so the sidebar no longer
+       reads cooler than the panels/cards. */
+    --color-nav-text: oklch(73.8% 0 0);
+    /* Raised from 58.97% (4.47:1 on panel, just under AA) to 61% (4.86:1) so the
+       11px sidebar section labels clear 4.5:1. */
+    --color-nav-muted: oklch(61% 0 0);
+    --color-nav-active: oklch(96.12% 0 0);
+    /* Tertiary text. Base token (59.31%) only clears 4.5:1 on app/panel; it
+       failed on surface/raised/selected (4.46/4.20/3.73). Raised to 64% so the
+       313 dark:text-fg-faint usages clear AA across the whole surface ladder,
+       while staying clearly dimmer than fg-dim (76.99%). */
+    --color-fg-faint: oklch(65% 0 0);
+    /* Error text. The base error red (57.71%) failed on every dark surface
+       (4.10/3.75/3.53). Brightened for dark mode so text-error clears AA on the
+       card ladder while staying unmistakably red. */
+    --color-error: oklch(66% 0.2 27.33);
+}
+
+/* Light-mode semantic text.
+   warning / success / error double as the bright brand accent and as solid
+   fills, which only appear under `dark:` — so in light mode these tokens are
+   used almost entirely as text, translucent tints (bg-warning/10) and borders.
+   The bright values (yellow 88%, green 72%) and the base red (57.71%) fail AA
+   as text on white and the light surface ladder (warning 1.43, success 2.28,
+   error 4.43 on canvas). Scoped to `:not(.dark)` so dark keeps the brand
+   colors and the custom theme keeps its own overrides. Every value clears
+   4.5:1 on white, canvas, elevated, recessed and fill, and is in sRGB gamut. */
+html:not(.dark) {
+    --color-warning: oklch(50% 0.105 80);
+    --color-success: oklch(48% 0.135 149.58);
+    --color-error: oklch(52% 0.2 27.33);
 }
 
 /* Theme surfaces are derived from one brand color. Changing
    --theme-base-color is enough to generate a complete dark surface ladder. */
 html[data-theme="custom"] {
-    --theme-base-color: #6b16ed;
-    --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, white);
+    --theme-base-color: oklch(49.65% 0.2709 289.33);
+    --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, oklch(100% 0 0));
     --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
-    --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, #52525b);
-    --theme-placeholder-color: color-mix(in srgb, white 20%, var(--theme-base-color));
+    --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, oklch(44.19% 0.0146 285.79));
+    /* Accent text/icons sit directly on dark surfaces. Force the lightness into a
+       readable band (and tame chroma) so any picked hue keeps enough contrast. */
+    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.72, l, 0.86) min(c, 0.13) h);
+    /* Placeholders read as a light, near-neutral hint of the hue - never the raw
+       (possibly dark) base color, which is invisible on the dark input. */
+    --theme-placeholder-color: oklch(from var(--theme-base-color) 0.62 min(c, 0.03) h);
     --color-accent: var(--theme-bright-color);
     --color-coollabs: var(--theme-bright-color);
-    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, white);
-    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, black);
-    --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, black);
+    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(100% 0 0));
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, oklch(0% 0 0));
+    --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, oklch(0% 0 0));
     /* Legacy dark-theme accent utilities use warning as the brand color. */
     --color-warning: var(--theme-bright-color);
     --color-accent-foreground: var(--theme-accent-foreground);
-    --color-app: color-mix(in oklab, var(--theme-base-color) 12%, #09090a);
-    --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, #0c0c0d);
-    --color-surface: color-mix(in oklab, var(--theme-base-color) 18%, #101011);
-    --color-raised: color-mix(in oklab, var(--theme-base-color) 24%, #141416);
-    --color-selected: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --color-app: color-mix(in oklab, var(--theme-base-color) 12%, oklch(14.03% 0.0022 286.11));
+    --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, oklch(15.48% 0.0021 286.15));
+    --color-surface: color-mix(in oklab, var(--theme-base-color) 18%, oklch(17.35% 0.0020 286.18));
+    --color-raised: color-mix(in oklab, var(--theme-base-color) 24%, oklch(19.21% 0.0040 286.02));
+    --color-selected: color-mix(in oklab, var(--theme-base-color) 32%, oklch(20.99% 0.0039 286.06));
     --color-coolgray-100: var(--color-surface);
     --color-coolgray-200: var(--color-raised);
     --color-coolgray-300: var(--color-selected);
-    --color-coolgray-400: color-mix(in oklab, var(--theme-base-color) 28%, #1b1b1e);
-    --color-coolgray-500: color-mix(in oklab, var(--theme-base-color) 32%, #202024);
+    --color-coolgray-400: color-mix(in oklab, var(--theme-base-color) 28%, oklch(22.34% 0.0058 285.92));
+    --color-coolgray-500: color-mix(in oklab, var(--theme-base-color) 32%, oklch(24.52% 0.0075 285.83));
     --coollabs-canvas: var(--color-app);
     --coollabs-elevated: var(--color-surface);
     --coollabs-recessed: var(--color-raised);
-    --coollabs-base: color-mix(in oklab, var(--theme-base-color) 22%, #111112);
+    --coollabs-base: color-mix(in oklab, var(--theme-base-color) 22%, oklch(17.81% 0.0020 286.19));
     --color-content-surface: var(--coollabs-base);
-    --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, oklch(20.99% 0.0039 286.06));
     --coollabs-line: var(--theme-border-color);
     --coollabs-hairline: color-mix(in srgb, var(--theme-border-color) 55%, var(--color-panel));
-    --color-nav-text: #e4dfea;
-    --color-nav-muted: #d8d2df;
-    --color-nav-active: #ffffff;
-    --color-log: color-mix(in oklab, var(--theme-base-color) 20%, #080809);
-    --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, #101011);
-    --color-fg-dim: #e4dfea;
-    --color-fg-faint: #d8d2df;
-    --coollabs-subtle: #d8d2df;
+    --color-nav-text: oklch(91.08% 0.0157 306.4);
+    --color-nav-muted: oklch(87.24% 0.0188 306.63);
+    --color-nav-active: oklch(100.0% 0 0);
+    --color-log: color-mix(in oklab, var(--theme-base-color) 20%, oklch(13.49% 0.0024 286.07));
+    --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, oklch(17.35% 0.0020 286.18));
+    --color-fg-dim: oklch(91.08% 0.0157 306.4);
+    --color-fg-faint: oklch(87.24% 0.0188 306.63);
+    --coollabs-subtle: oklch(87.24% 0.0188 306.63);
+}
+
+/* Light custom theme: the same single brand color, but surfaces tint toward
+   white and every foreground token flips to a dark, readable band. This selector
+   outranks the plain html:not(.dark) light palette, so it wins where they meet.
+   Accent fills (--theme-bright-color, --color-warning/coollabs) are inherited from
+   the block above so the JS-computed --theme-accent-foreground stays consistent. */
+html[data-theme="custom"]:not(.dark) {
+    --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-base-color) 45%, oklch(60% 0 0));
+    /* Accent text/icons on light surfaces: force lightness into a dark band. */
+    --theme-fg-on-surface: oklch(from var(--theme-base-color) clamp(0.30, l, 0.48) min(c, 0.16) h);
+    /* Placeholder: medium-dark, near-neutral hint of the hue. */
+    --theme-placeholder-color: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    /* Surfaces hold a fixed high lightness (stays light, keeps dark text readable)
+       while injecting the base hue's chroma, so the tint is actually visible.
+       color-mix into white coupled lightness to the base and washed the tint out
+       (a 4% mix of any color into near-white is imperceptible). */
+    --color-app: oklch(from var(--theme-base-color) 96.5% min(c, 0.035) h);
+    --color-panel: oklch(from var(--theme-base-color) 98.5% min(c, 0.025) h);
+    --color-surface: oklch(from var(--theme-base-color) 98% min(c, 0.03) h);
+    --color-raised: oklch(from var(--theme-base-color) 95.5% min(c, 0.04) h);
+    --color-selected: oklch(from var(--theme-base-color) 92% min(c, 0.05) h);
+    --color-coolgray-100: var(--color-surface);
+    --color-coolgray-200: var(--color-raised);
+    --color-coolgray-300: var(--color-selected);
+    --color-coolgray-400: oklch(from var(--theme-base-color) 90% min(c, 0.05) h);
+    --color-coolgray-500: oklch(from var(--theme-base-color) 87% min(c, 0.055) h);
+    --coollabs-canvas: var(--color-app);
+    --coollabs-elevated: oklch(from var(--theme-base-color) 98.5% min(c, 0.025) h);
+    --coollabs-recessed: var(--color-raised);
+    --coollabs-base: oklch(from var(--theme-base-color) 99.3% min(c, 0.018) h);
+    --color-content-surface: var(--coollabs-base);
+    --coollabs-fill: oklch(from var(--theme-base-color) 91% min(c, 0.05) h);
+    --coollabs-line: oklch(from var(--theme-base-color) 82% min(c, 0.055) h);
+    --coollabs-hairline: oklch(from var(--theme-base-color) 88% min(c, 0.04) h);
+    --color-nav-text: oklch(from var(--theme-base-color) 0.40 min(c, 0.04) h);
+    --color-nav-muted: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    --color-nav-active: oklch(from var(--theme-base-color) 0.22 min(c, 0.05) h);
+    --color-log: oklch(from var(--theme-base-color) 96.5% min(c, 0.035) h);
+    --color-log-toolbar: oklch(from var(--theme-base-color) 93% min(c, 0.045) h);
+    --color-fg: oklch(from var(--theme-base-color) 0.22 min(c, 0.04) h);
+    --color-fg-dim: oklch(from var(--theme-base-color) 0.40 min(c, 0.04) h);
+    --color-fg-faint: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
+    --coollabs-subtle: oklch(from var(--theme-base-color) 0.50 min(c, 0.03) h);
 }
 
 html[data-theme="custom"] .control-selected,
@@ -1051,7 +1371,55 @@ html[data-theme="custom"] [class~="dark:bg-white/[0.025]"] {
 html[data-theme="custom"] input::placeholder,
 html[data-theme="custom"] textarea::placeholder {
     color: var(--theme-placeholder-color) !important;
-    opacity: 0.7;
+    /* The token is already a readable light tone; no extra opacity dampening,
+       which would drop it back below the contrast floor. */
+    opacity: 1;
+}
+
+/* Accent text/icons (links, badges, "update available" pill, check marks) use the
+   brand color as foreground on dark surfaces. Route them to the clamped, always
+   readable token; fills (bg-*) keep the brighter accent + its computed foreground. */
+html[data-theme="custom"] :is(
+    [class~="text-coollabs"],
+    [class~="text-warning"],
+    [class~="text-accent"],
+    [class~="dark:text-coollabs"],
+    [class~="dark:text-warning"]
+) {
+    color: var(--theme-fg-on-surface) !important;
+}
+
+html[data-theme="custom"] [class~="hover:text-coollabs"]:hover,
+html[data-theme="custom"] [class~="hover:text-warning"]:hover,
+html[data-theme="custom"] [class~="dark:hover:text-warning"]:hover,
+html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
+    color: var(--theme-fg-on-surface) !important;
+}
+
+/* Light custom theme reaches raw neutral utilities too. Dark mode tints
+   everything through the pervasive dark:bg-*/dark:border-* utilities (which
+   resolve to --color-* vars the block overrides); light mode has no equivalent,
+   so components fall back to hardcoded neutrals. Remap the dominant light
+   surface/border utilities to the tinted custom vars so the color reaches the
+   whole UI, not just design-system classes. */
+html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]) {
+    background-color: var(--coollabs-elevated) !important;
+}
+
+html[data-theme="custom"]:not(.dark) [class~="bg-neutral-50"] {
+    background-color: var(--coollabs-canvas) !important;
+}
+
+html[data-theme="custom"]:not(.dark) :is([class~="bg-neutral-100"], [class~="bg-neutral-200"]) {
+    background-color: var(--coollabs-fill) !important;
+}
+
+html[data-theme="custom"]:not(.dark) [class~="border-neutral-200"] {
+    border-color: var(--coollabs-hairline) !important;
+}
+
+html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
+    border-color: var(--coollabs-line) !important;
 }
 
 html[data-theme="custom"] input:read-only,
@@ -1318,27 +1686,6 @@ html[data-theme="custom"] textarea:disabled {
     margin-top: 1.75rem;
 }
 
-.error-contact-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-left: 0.25rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: #525252;
-    text-underline-offset: 3px;
-    transition: color 0.15s ease;
-}
-
-.dark .error-contact-link {
-    color: var(--color-fg-dim);
-}
-
-.error-contact-link:hover {
-    color: var(--color-accent);
-    text-decoration: underline;
-}
-
 /* Layer card root: elevated shell with a hairline ring. overflow stays
    visible so floating panels (listbox, tooltips) can escape the card. */
 .application-settings-section {
@@ -1349,7 +1696,9 @@ html[data-theme="custom"] textarea:disabled {
     border-radius: 8px;
     border: none;
     background: var(--coollabs-elevated);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+    /* crisp ring + a restrained lift so the card separates from the canvas
+       (shadcn-style), not a heavy floating shadow */
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 1px 2px 0 rgb(0 0 0 / 0.05);
     /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar + layer-2 nav */
     scroll-margin-top: 7rem;
 }
@@ -1415,7 +1764,14 @@ html[data-theme="custom"] textarea:disabled {
     font-weight: 500;
     line-height: 1.25rem;
     letter-spacing: 0;
-    color: inherit;
+    /* Card title is a heading, so give it a readable strength instead of the
+       muted --coollabs-subtle (5.66:1 light / 6.98:1 dark). ~8.7:1 in both
+       modes (comfortable AAA) while descriptions/labels stay muted. */
+    color: oklch(40% 0 0);
+}
+
+.dark .application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) {
+    color: var(--color-fg-dim);
 }
 
 .application-settings-section > .application-settings-section-header p {
@@ -1425,12 +1781,16 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--coollabs-subtle);
 }
 
-/* Layer card body: nested rounded panel with base bg + fill ring */
+/* Layer card body: nested rounded panel with base bg. Ring uses the same
+   --coollabs-hairline as the card shell (line ~1456) so the body edge and the
+   header edge read as one continuous border instead of two different grays
+   (fill was lighter than hairline, so the header sides and body sides did not
+   match). */
 .application-settings-section-body {
     position: relative;
     border-radius: 8px;
     background: var(--coollabs-base);
-    box-shadow: 0 0 0 1px var(--coollabs-fill);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline);
     padding: 1rem;
 }
 
@@ -1469,28 +1829,71 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 @media (min-width: 1280px) {
+    /* Fixed like the main sidebar (3rem → bottom); left tracks its width (--sidebar-w).
+       Fixed leaves the grid, so the content sibling is pinned to column 2 below. */
     .application-settings-navigation {
-        position: sticky;
-        top: calc(3rem + 1.75rem);
-        align-self: start;
-        max-height: calc(100dvh - 5.5rem);
-        padding-right: 0.375rem;
+        position: fixed;
+        top: 3rem;
+        left: var(--sidebar-w, 14rem);
+        width: calc(210px + 2.5rem);
+        height: calc(100dvh - 3rem);
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-width: thin;
+        scrollbar-color: var(--coollabs-fill) transparent;
+        scrollbar-gutter: stable;
+        --rail-fill: var(--coollabs-elevated);
+        padding: 0.5rem;
+        background: var(--rail-fill);
+        border-right: 1px solid var(--coollabs-hairline);
+        transition: left 200ms ease;
     }
 
-    /* Resource pages have a second fixed header row below the main header. */
-    .application-settings-workspace > .application-settings-navigation {
-        top: 4rem;
-        max-height: calc(100dvh - 5rem);
+    .application-settings-navigation ~ * {
+        grid-column: 2;
     }
 
+    html:not(.dark) .application-settings-navigation {
+        --rail-fill: var(--coollabs-base);
+    }
+
+    .application-settings-navigation::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: var(--coollabs-fill);
+    }
+
+    .application-settings-navigation::-webkit-scrollbar-thumb:hover {
+        background: var(--coollabs-line);
+    }
+
+    /* Embeds: keep the surface, drop the fixed positioning. */
     .application-settings-navigation.is-flush {
         position: static;
-        max-height: none;
+        inset: auto;
+        width: auto;
+        height: auto;
         overflow: visible;
+        transition: none;
+    }
+}
+
+/* Honor reduced-motion for the settings nav disclosure/accordion and the mobile
+   sidebar sheet: keep open/close functional but drop the height/slide/fade. */
+@media (prefers-reduced-motion: reduce) {
+    .application-settings-navigation,
+    .application-settings-navigation *,
+    .mobile-sidebar-sheet * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
     }
 }
 
@@ -1560,7 +1963,7 @@ html[data-theme="custom"] textarea:disabled {
 .application-settings-form .input:focus-visible,
 .application-settings-form .select:focus-visible {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent) !important;
+    box-shadow: none !important;
 }
 
 .application-settings-workspace textarea.input,
@@ -1603,7 +2006,7 @@ html[data-theme="custom"] textarea:disabled {
  * Circular chevrons sit over gradient fades when more tabs are off-screen.
  */
 .resource-heading-tabs-scroller {
-    --resource-heading-tabs-fade: #f5f5f5; /* neutral-100, matches pill track */
+    --resource-heading-tabs-fade: oklch(97.02% 0 0); /* neutral-100, matches pill track */
 }
 
 .dark .resource-heading-tabs-scroller {
@@ -1662,7 +2065,7 @@ html[data-theme="custom"] textarea:disabled {
     margin-inline: 0.25rem;
     border-radius: 9999px;
     color: #737373;
-    background: #ffffff;
+    background: var(--coollabs-base);
     box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.06),
         0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -1734,20 +2137,6 @@ html[data-theme="custom"] textarea:disabled {
     border: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-}
-
-.resource-heading-overflow-separator {
-    width: 1px;
-    align-self: stretch;
-    margin: 0.25rem 0.25rem;
-    background: color-mix(in srgb, var(--coollabs-line) 80%, transparent);
-}
-
-.resource-heading-overflow.is-collapsed .resource-heading-overflow-separator {
-    width: auto;
-    height: 1px;
-    align-self: auto;
-    margin: 0.25rem 0.375rem;
 }
 
 .resource-heading-overflow.is-collapsed .resource-heading-overflow-items > .button,
@@ -1974,7 +2363,7 @@ html[data-theme="custom"] textarea:disabled {
 .listbox-trigger:focus-visible {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 .listbox-panel {
@@ -1999,7 +2388,7 @@ html[data-theme="custom"] textarea:disabled {
     border-radius: 10px;
     border: 1px solid var(--coollabs-line);
     background: var(--coollabs-recessed);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-dropdown);
 }
 
 @media (max-width: 767px) {
@@ -2095,7 +2484,7 @@ html[data-theme="custom"] textarea:disabled {
 .searchable-listbox-search-input:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 /* Hide native WebKit search clear so custom clear buttons are not doubled */
@@ -2576,7 +2965,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 7.5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 12.5rem;
     width: 100%;
 }
 
@@ -2728,7 +3117,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-col-backup {
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
     }
 
     .volumes-cell-actions {
@@ -3061,7 +3453,7 @@ input[type="search"]::-webkit-search-results-decoration {
 /* Shared logs viewer (deployment + runtime) — mobile-first toolbar
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
 .logs-viewer {
-    background: #fff;
+    background: var(--coollabs-base);
     color: #262626;
 }
 
@@ -3562,7 +3954,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .runtime-log-viewport {
     min-height: 12rem;
     border-radius: 0 0 8px 8px;
-    background: #fafafa;
+    background: var(--coollabs-elevated);
     color: #262626;
 }
 
@@ -3575,6 +3967,228 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .dark .runtime-log-viewport {
     background: var(--color-log);
     color: var(--color-fg-dim);
+}
+
+.runtime-log-panel {
+    --runtime-log-line: rgba(0, 0, 0, 0.08);
+    --runtime-log-muted: #66666f;
+    --runtime-log-hover: rgba(0, 0, 0, 0.04);
+    --runtime-log-detail: rgba(0, 0, 0, 0.03);
+    --runtime-log-columns: 12.75rem 5.5rem minmax(0, 1fr);
+}
+
+.dark .runtime-log-panel {
+    --runtime-log-line: var(--glass-line, rgba(255, 255, 255, 0.065));
+    --runtime-log-muted: #a09da5;
+    --runtime-log-hover: rgba(255, 255, 255, 0.035);
+    --runtime-log-detail: rgba(0, 0, 0, 0.24);
+}
+
+.runtime-log-viewport.logs-viewer-viewport {
+    container: runtime-log-explorer / inline-size;
+    padding: 0;
+}
+
+.runtime-log-viewport.logs-viewer-viewport::after {
+    display: none;
+}
+
+.runtime-log-columns,
+.runtime-log-viewport [data-log-line]:not(.hidden) {
+    display: grid;
+    grid-template-columns: var(--runtime-log-columns);
+    gap: 0.625rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    align-items: center;
+    padding: 0.6875rem 1.875rem 0.6875rem 1rem;
+}
+
+.runtime-log-columns {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 1px solid var(--runtime-log-line);
+    background: #f0eff2;
+    color: var(--runtime-log-muted);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.dark .runtime-log-columns {
+    background: var(--coollabs-elevated);
+}
+
+html[data-theme="custom"] .runtime-log-columns {
+    background: var(--color-log-toolbar);
+}
+
+.runtime-log-viewport [data-log-line] {
+    position: relative;
+    border-bottom: 1px solid var(--runtime-log-line);
+    border-radius: 0;
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+}
+
+.runtime-log-viewport [data-log-line]:hover,
+.runtime-log-viewport [data-log-line][aria-expanded="true"] {
+    background: var(--runtime-log-hover);
+}
+
+.runtime-log-viewport [data-log-line]:focus-visible {
+    outline: 2px solid var(--color-accent, #b93642);
+    outline-offset: -2px;
+}
+
+.runtime-log-viewport [data-log-line]::before {
+    content: "[" attr(data-log-level) "]";
+    grid-column: 2;
+    grid-row: 1;
+    color: var(--runtime-log-muted);
+    text-transform: uppercase;
+}
+
+.runtime-log-viewport [data-log-line]::after {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 0.75rem;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-right: 1.5px solid var(--runtime-log-muted);
+    border-bottom: 1.5px solid var(--runtime-log-muted);
+    transform: rotate(45deg);
+}
+
+.runtime-log-viewport [data-log-line][aria-expanded="true"]::after {
+    top: 1.1875rem;
+    transform: rotate(225deg);
+}
+
+.runtime-log-viewport .log-error::before { color: #e55e73; }
+.runtime-log-viewport .log-warning::before { color: #d79945; }
+.runtime-log-viewport .log-debug::before { color: #929099; }
+.runtime-log-viewport .log-info::before { color: #8891f0; }
+
+.runtime-log-viewport .logs-viewer-timestamp {
+    grid-column: 1;
+    grid-row: 1;
+    color: var(--runtime-log-muted);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.runtime-log-viewport [data-line-text] {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-log-detail {
+    margin: 0 0 0.25rem;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--runtime-log-line);
+    background: var(--runtime-log-detail);
+    color: inherit;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.8;
+}
+
+.dark .runtime-log-detail {
+    color: #adbdc9;
+}
+
+.runtime-log-viewport [data-log-line].hidden + .runtime-log-detail {
+    display: none !important;
+}
+
+.runtime-log-without-time {
+    --runtime-log-columns: 5.5rem minmax(0, 1fr);
+}
+
+.runtime-log-without-time [data-log-line]::before {
+    grid-column: 1;
+}
+
+.runtime-log-without-time [data-line-text] {
+    grid-column: 2;
+}
+
+@container runtime-log-explorer (max-width: 650px) {
+    .runtime-log-columns,
+    .runtime-log-viewport [data-log-line]:not(.hidden) {
+        grid-template-columns: minmax(0, 1fr) 5.5rem;
+        gap: 0.1875rem 0.5rem;
+    }
+
+    .runtime-log-columns > :last-child,
+    .runtime-log-viewport [data-line-text] {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .runtime-log-without-time [data-line-text] {
+        grid-column: 1 / -1;
+    }
+}
+
+.runtime-log-empty {
+    display: flex;
+    min-height: 18rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    color: var(--runtime-log-muted);
+    text-align: left;
+}
+
+.runtime-log-loading {
+    min-height: 18rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 2rem;
+    color: var(--runtime-log-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.runtime-log-empty-icon {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--runtime-log-line);
+    border-radius: 0.5rem;
+    background: var(--runtime-log-detail);
+}
+
+.runtime-log-empty p {
+    color: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.runtime-log-empty div > span {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
 }
 
 .env-table-detail {
@@ -3658,7 +4272,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .chip-input:focus-within {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: none;
 }
 
 .chip-input input {
@@ -3729,93 +4343,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .chip-remove:hover {
     color: inherit;
-}
-
-/* Detached pill options (segmented radio groups rendered as separate pills) */
-.option-pill-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.option-pill-group label {
-    margin-bottom: 0;
-}
-
-.option-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    height: 2rem;
-    padding: 0 0.875rem;
-    border-radius: 8px;
-    border: 1px solid var(--coollabs-line);
-    background: var(--coollabs-elevated);
-    font-size: 0.875rem;
-    font-weight: 500;
-    white-space: nowrap;
-    color: #000000;
-    transition: background-color 0.15s, border-color 0.15s;
-}
-
-.dark .option-pill {
-    color: var(--color-fg);
-}
-
-.option-pill:hover {
-    background: var(--coollabs-recessed);
-}
-
-.peer:checked + .option-pill {
-    background: var(--coollabs-fill);
-    border-color: var(--coollabs-line);
-}
-
-.peer:disabled + .option-pill {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* Label column + content rows inside a card body */
-.application-purpose-row {
-    display: grid;
-    gap: 1rem;
-    border-top: 1px solid var(--coollabs-fill);
-    padding-top: 1.25rem;
-}
-
-@media (min-width: 768px) {
-    .application-purpose-row {
-        grid-template-columns: 13rem minmax(0, 1fr);
-        gap: 2rem;
-    }
-}
-
-.application-purpose-copy h4 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #000000;
-}
-
-.dark .application-purpose-copy h4 {
-    color: var(--color-fg);
-}
-
-.application-purpose-copy p {
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    color: #71717a;
-}
-
-.dark .application-purpose-copy p {
-    color: var(--color-fg-dim);
-}
-
-.application-details-card .application-purpose-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
 }
 
 /* In-card sub-headings (e.g. "Container labels", "Docker Compose") */
@@ -3974,7 +4501,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overflow: hidden;
     border-radius: 10px;
     background: var(--coollabs-elevated);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown);
 }
 
 .command-palette-header {
@@ -4447,4 +4974,123 @@ a.command-palette-item:focus-visible {
 
 .dark .command-palette-arch-badge {
     color: #fcd34d;
+}
+
+/* Service domains prioritize public addresses; configuration lives in settings. */
+#service-domains-section,
+.domains-overview-container {
+    container: service-domains / inline-size;
+}
+
+.service-domains-overview-grid {
+    grid-template-columns: minmax(0, 1fr) 7.25rem 7.5rem 5.5rem 6.5rem 8rem 6.5rem;
+    column-gap: 0.75rem;
+}
+
+.data-table-row.service-domains-overview-grid {
+    padding-block: 0.5rem;
+}
+
+.service-domain-detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.service-domains-overview-grid > span:not(:first-child):not(:last-child) {
+    text-align: center;
+}
+
+.service-domain-detail-label {
+    display: none;
+}
+
+.service-domain-mobile-summary {
+    display: none;
+}
+
+.service-domains-https .listbox-trigger {
+    min-width: 7rem;
+}
+
+@container service-domains (max-width: 980px) {
+    .data-table-header.service-domains-overview-grid {
+        display: none;
+    }
+
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .service-domain-detail {
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .service-domain-detail-label {
+        display: inline;
+        color: var(--coollabs-fg-dim);
+    }
+}
+
+@container service-domains (max-width: 600px) {
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.625rem 0.75rem;
+        padding: 0.875rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child a,
+    .data-table-row.service-domains-overview-grid > :first-child span[title] {
+        overflow: visible;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+
+    .service-domain-detail,
+    .domains-service-desktop {
+        display: none;
+    }
+
+    .service-domain-mobile-summary {
+        display: flex;
+        grid-column: 1 / -1;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem 0.75rem;
+        color: var(--coollabs-fg-dim);
+        font-size: 12px;
+        line-height: 1.25rem;
+    }
+
+    .service-domain-mobile-summary > span:not(:last-child)::after {
+        margin-left: 0.75rem;
+        color: var(--coollabs-line);
+        content: "·";
+    }
+
+    .service-domain-dns {
+        justify-self: start;
+    }
+
+    .service-domain-actions {
+        justify-self: end;
+    }
+
+    .service-domain-actions .icon-button {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 }

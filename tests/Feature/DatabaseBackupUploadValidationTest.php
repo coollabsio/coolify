@@ -1,9 +1,9 @@
 <?php
 
 use App\Http\Controllers\UploadController;
-use App\Livewire\Project\Database\ImportForm;
 use App\Models\StandalonePostgresql;
 use App\Support\DatabaseBackupFileValidator;
+use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Process;
 
@@ -67,18 +67,12 @@ function invokeHasAllowedExtension(string $name): bool
     return $method->invoke(null, $name);
 }
 
-function backupValidationImportFormWithResource(string $modelClass): ImportForm
+function postgresScanScript(string $path): ?string
 {
-    $component = new class extends ImportForm
-    {
-        public $resource;
-    };
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-    $database = Mockery::mock($modelClass);
-    $database->shouldReceive('getMorphClass')->andReturn($modelClass);
-    $component->resource = $database;
-
-    return $component;
+    return (new DatabaseImportCommandBuilder)->buildPostgresRestoreScanScript($database, $path);
 }
 
 function makeTemporaryUpload(string $name, string $content): UploadedFile
@@ -173,39 +167,21 @@ SQL;
 });
 
 test('postgresql restore commands include a safety check before execution', function () {
-    $component = new class extends ImportForm
-    {
-        public function __get($property)
-        {
-            if ($property === 'resource') {
-                return new class
-                {
-                    public function getMorphClass(): string
-                    {
-                        return StandalonePostgresql::class;
-                    }
-                };
-            }
+    $database = Mockery::mock(StandalonePostgresql::class);
+    $database->shouldReceive('getMorphClass')->andReturn(StandalonePostgresql::class);
 
-            return parent::__get($property);
-        }
-    };
-    $component->container = 'postgres-test';
-
-    $command = $component->buildRestoreSafetyCheckCommand('/tmp/restore_test');
+    $command = (new DatabaseImportCommandBuilder)->buildPostgresSafetyCommand(
+        $database,
+        'postgres-test',
+        '/tmp/restore_test',
+    );
 
     expect($command)
         ->toContain('docker exec postgres-test')
         ->toContain('COPY ... PROGRAM')
         ->toContain('/tmp/restore_test')
-        ->toContain('grep -Eiq');
-});
-
-test('non postgresql restore commands do not include a safety check', function () {
-    $component = backupValidationImportFormWithResource('App\Models\StandaloneMysql');
-    $component->container = 'mysql-test';
-
-    expect($component->buildRestoreSafetyCheckCommand('/tmp/restore_test'))->toBeNull();
+        ->toContain('grep -Eiq')
+        ->toContain('pg_restore -l');
 });
 
 test('file scanner detects program execution payloads inside gzipped backups', function () {
@@ -220,16 +196,16 @@ test('file scanner allows ordinary gzipped dumps', function () {
     expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($gzClean))->toBeFalse();
 });
 
-test('file scanner detects program execution payloads inside custom format archives', function () {
+test('file scanner defers custom format archives to pg_restore inspection', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload");
 
-    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
 });
 
-test('file scanner detects program execution payloads inside gzipped custom format archives', function () {
+test('file scanner defers gzipped custom format archives to pg_restore inspection', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload", gzip: true);
 
-    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
 });
 
 test('file scanner allows custom format archives without program execution', function () {
@@ -251,11 +227,8 @@ test('backup validator rejects plaintext .dump containing program execution', fu
 });
 
 test('remote postgresql scanner blocks bypass payloads', function (string $content, bool $gzip) {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
-    $component->container = 'postgres-test';
-
     $payload = writeScanPayload($content, $gzip);
-    $script = $component->buildPostgresRestoreScanScript($payload);
+    $script = postgresScanScript($payload);
 
     expect(scannerBlocks($script))->toBeTrue();
 })->with([
@@ -272,11 +245,8 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
 ]);
 
 test('remote postgresql scanner allows legitimate restores', function (string $content, bool $gzip) {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
-    $component->container = 'postgres-test';
-
     $payload = writeScanPayload($content, $gzip);
-    $script = $component->buildPostgresRestoreScanScript($payload);
+    $script = postgresScanScript($payload);
 
     expect(scannerBlocks($script))->toBeFalse();
 })->with([
@@ -288,7 +258,6 @@ test('remote postgresql scanner allows legitimate restores', function (string $c
 ]);
 
 test('remote postgresql scanner inspects custom archives instead of skipping them', function () {
-    $component = backupValidationImportFormWithResource(StandalonePostgresql::class);
     $safeArchive = writeScanPayload("PGDMP\0binary archive");
     $maliciousSql = "COPY x FROM PROGRAM 'id';\n";
     $safeSql = "CREATE TABLE users (id integer);\nCOPY users FROM stdin;\n1\tTaylor\n\\.\n";
@@ -298,10 +267,10 @@ test('remote postgresql scanner inspects custom archives instead of skipping the
     $unreadablePath = fakePgRestorePath($safeSql, listExitCode: 1);
     $path = getenv('PATH') ?: '/usr/bin:/bin';
 
-    expect(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $maliciousPath.':'.$path]))->toBeTrue()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $safePath.':'.$path]))->toBeFalse()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive), ['PATH' => $unreadablePath.':'.$path]))->toBeTrue()
-        ->and(scannerBlocks($component->buildPostgresRestoreScanScript($safeArchive)))->toBeTrue();
+    expect(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $maliciousPath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $safePath.':'.$path]))->toBeFalse()
+        ->and(scannerBlocks(postgresScanScript($safeArchive), ['PATH' => $unreadablePath.':'.$path]))->toBeTrue()
+        ->and(scannerBlocks(postgresScanScript($safeArchive)))->toBeTrue();
 });
 
 test('MAX_BYTES constant is 10 GiB', function () {

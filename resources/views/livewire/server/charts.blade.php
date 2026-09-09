@@ -14,33 +14,50 @@
                 @if ($poll) wire:poll.5000ms="pollData" @endif
             @endif>
             @if ($server->isMetricsEnabled())
-                <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
-                    helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-slot:actions>
-                        <div class="flex items-center gap-2">
-                            <x-status-badge :status="$poll ? 'Live updates' : 'Historical range'"
-                                :type="$poll ? 'success' : 'neutral'" />
-                            <x-forms.button canGate="update" :canResource="$server" wire:click="toggleMetrics">
-                                Disable metrics
-                            </x-forms.button>
-                        </div>
-                    </x-slot:actions>
+                <form wire:submit.prevent="saveMetricsSettings" class="contents">
+                    <x-unsaved-bar action="saveMetricsSettings"
+                        targets="sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
 
-                    <div class="max-w-xs">
-                        <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
-                            ['value' => 5, 'label' => 'Last 5 minutes · live'],
-                            ['value' => 10, 'label' => 'Last 10 minutes · live'],
-                            ['value' => 30, 'label' => 'Last 30 minutes'],
-                            ['value' => 60, 'label' => 'Last hour'],
-                            ['value' => 720, 'label' => 'Last 12 hours'],
-                            ['value' => 10080, 'label' => 'Last week'],
-                            ['value' => 43200, 'label' => 'Last 30 days'],
-                        ]" />
-                    </div>
-                    <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                        Five and ten minute ranges refresh automatically every five seconds.
-                    </p>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
+                        helper="Inspect recent CPU and memory usage reported by Sentinel.">
+                        <x-slot:actions>
+                            <div class="flex items-center gap-2">
+                                <x-status-badge :status="$poll ? 'Live updates' : 'Historical range'"
+                                    :type="$poll ? 'success' : 'neutral'" />
+                                <x-forms.button canGate="update" :canResource="$server" wire:click="toggleMetrics">
+                                    Disable metrics
+                                </x-forms.button>
+                            </div>
+                        </x-slot:actions>
+
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                                id="sentinelMetricsRefreshRateSeconds" label="Collection rate" required
+                                helper="Seconds between metric samples." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                                id="sentinelMetricsHistoryDays" label="History retention" required
+                                helper="Days of CPU and memory history to retain." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
+                                id="sentinelPushIntervalSeconds" label="Push interval" required
+                                helper="Seconds between health reports sent to Coolify." />
+                        </div>
+
+                        <div class="mt-4 max-w-xs">
+                            <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
+                                ['value' => 5, 'label' => 'Last 5 minutes · live'],
+                                ['value' => 10, 'label' => 'Last 10 minutes · live'],
+                                ['value' => 30, 'label' => 'Last 30 minutes'],
+                                ['value' => 60, 'label' => 'Last hour'],
+                                ['value' => 720, 'label' => 'Last 12 hours'],
+                                ['value' => 10080, 'label' => 'Last week'],
+                                ['value' => 43200, 'label' => 'Last 30 days'],
+                            ]" />
+                        </div>
+                        <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                            Five and ten minute ranges refresh automatically every five seconds.
+                        </p>
+                    </x-application.settings-section>
+                </form>
 
                 <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage"
                     helper="Percentage of available CPU capacity used by this server.">
@@ -64,14 +81,15 @@
                                 return `${Number(number.toFixed(precision))}%`;
                             };
 
-                            const formatTimestamp = timestamp => {
-                                const date = new Date(timestamp);
-
-                                return `${date.toLocaleString(undefined, {
-                                    timeZone: 'UTC',
-                                    hour12: false
-                                })} UTC`;
-                            };
+                            const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
+                                hour12: false,
+                                timeZoneName: 'short',
+                            });
+                            const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
+                                hour12: false,
+                                timeZone: 'UTC',
+                                timeZoneName: 'short',
+                            });
 
                             const chartOptions = (name, color, loadingText) => ({
                                 chart: {
@@ -118,7 +136,7 @@
                                 xaxis: {
                                     type: 'datetime',
                                     labels: {
-                                        datetimeUTC: true,
+                                        datetimeUTC: false,
                                         style: {
                                             colors: textColor,
                                         },
@@ -163,7 +181,8 @@
 
                                         return `<div class="apexcharts-tooltip-custom">
                                             <div class="apexcharts-tooltip-custom-value">${name}: <span class="apexcharts-tooltip-value-bold">${formatPercent(value)}</span></div>
-                                            <div class="apexcharts-tooltip-custom-title">${formatTimestamp(timestamp)}</div>
+                                            <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
+                                            <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
                                         </div>`;
                                     },
                                 },
@@ -181,18 +200,20 @@
                             cpuChart.render();
                             memoryChart.render();
 
-                            Livewire.on('refreshChartData-{!! $chartId !!}-cpu', chartData => {
+                            Livewire.on('refreshChartData-{!! $chartId !!}-metrics', chartData => {
                                 checkTheme();
+                                const data = Array.isArray(chartData) ? chartData[0] : chartData;
+
                                 cpuChart.updateOptions({
                                     colors: [cpuColor],
                                     series: [{
                                         name: 'CPU',
-                                        data: chartData[0].seriesData,
+                                        data: data.cpuSeries,
                                     }],
                                     xaxis: {
                                         type: 'datetime',
                                         labels: {
-                                            datetimeUTC: true,
+                                            datetimeUTC: false,
                                             style: {
                                                 colors: textColor,
                                             },
@@ -217,20 +238,16 @@
                                         },
                                     },
                                 });
-                            });
-
-                            Livewire.on('refreshChartData-{!! $chartId !!}-memory', chartData => {
-                                checkTheme();
                                 memoryChart.updateOptions({
                                     colors: [ramColor],
                                     series: [{
                                         name: 'Memory',
-                                        data: chartData[0].seriesData,
+                                        data: data.memorySeries,
                                     }],
                                     xaxis: {
                                         type: 'datetime',
                                         labels: {
-                                            datetimeUTC: true,
+                                            datetimeUTC: false,
                                             style: {
                                                 colors: textColor,
                                             },
@@ -262,10 +279,6 @@
             @elseif ($server->isSentinelEnabled())
                 <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
                     helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-slot:actions>
-                        <x-status-badge status="Disabled" type="neutral" />
-                    </x-slot:actions>
-
                     <x-empty size="sm" title="Metrics are disabled"
                         description="Enable metrics to begin collecting CPU and memory history for this server."
                         icon-name="dashboard">
@@ -280,20 +293,21 @@
             @else
                 <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
                     helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-empty size="sm" title="Sentinel is required"
-                        description="Enable Sentinel before collecting CPU and memory metrics for this server."
+                    <x-empty size="sm" title="Metrics unavailable"
+                        description="Sentinel metrics are unavailable on build and Swarm servers."
                         icon-name="dashboard">
                         <x-slot:contents>
                             <a class="button"
                                 href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}"
                                 {{ wireNavigate() }}>
-                                Configure Sentinel
+                                View Sentinel
                                 <x-external-link />
                             </a>
                         </x-slot:contents>
                     </x-empty>
                 </x-application.settings-section>
             @endif
+
         </div>
     </div>
 </div>

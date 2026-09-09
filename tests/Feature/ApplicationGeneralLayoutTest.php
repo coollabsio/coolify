@@ -21,6 +21,12 @@ test('compose file loading waits for the user to confirm the file location', fun
         ->not->toContain('x-init="$wire.dispatch(\'loadCompose\', true)"');
 });
 
+test('traffic analytics is only shown on the dedicated analytics page', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+
+    expect($view)->not->toContain('<livewire:project.application.traffic-overview');
+});
+
 test('docker compose heading separates its title and action', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
 

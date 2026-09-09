@@ -48,8 +48,8 @@
     </script>
     @endscript
         <div class="application-settings-workspace flex flex-col gap-6">
-            <x-callout type="danger" title="Existing data will be replaced">
-                Restoring a backup is destructive. Review the source and import command before continuing.
+            <x-callout type="danger" title="Restoring a backup changes database data">
+                Review the source and import command before continuing. Existing objects can cause the import to fail unless replacement is enabled.
             </x-callout>
 
             <x-application.settings-section title="Restore configuration"
@@ -65,8 +65,8 @@
                                 wire:model="restoreCommandText" canGate="update"
                                 :canResource="$this->resource" />
                 @else
-                            <x-forms.input label="Import command"
-                                helper="Add --clean to replace conflicting objects or --verbose for detailed logs."
+                            <x-forms.input label="Import command" readonly
+                                helper="Enable replacement below to drop and recreate matching objects from the archive."
                                 wire:model="postgresqlRestoreCommand" canGate="update"
                                 :canResource="$this->resource" />
                 @endif
@@ -95,6 +95,13 @@
                             ['value' => false, 'label' => 'Backup contains one database'],
                         ]" />
                     </div>
+                    @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+                                helper="Drops matching tables, functions, types, and other PostgreSQL objects from the archive before restoring them."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 
@@ -105,7 +112,7 @@
                         class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                         :class="restoreType === 'file'
                             ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                         <span
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                             <x-reicon name="file" class="size-4" />
@@ -122,7 +129,7 @@
                             class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
                             :class="restoreType === 's3'
                                 ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
                             <span
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
                                 <x-reicon name="storages" class="size-4" />
@@ -139,7 +146,7 @@
             {{-- File Restore Section --}}
             @can('update', $this->resource)
                 <div x-cloak x-show="restoreType === 'file'"
-                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div class="min-w-0 flex-1">
                             <x-forms.input label="File path on the server"
@@ -158,7 +165,7 @@
                     </div>
 
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
-                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.025]!"
+                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
                         id="my-dropzone" wire:ignore>
                         @csrf
                     </form>
@@ -185,7 +192,7 @@
                                     <li>Copy backup file to database container</li>
                                     <li>Execute restore command</li>
                                 </ul>
-                                <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                             </x-modal-confirmation>
                         </div>
                     </div>
@@ -206,7 +213,7 @@
                             ->all();
                     @endphp
                     <div x-cloak x-show="restoreType === 's3'"
-                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
                                 placeholder="Select storage" live />
@@ -245,7 +252,7 @@
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>
-                                        <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
+                                        <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                                         </x-modal-confirmation>
                                 </div>
                             </div>

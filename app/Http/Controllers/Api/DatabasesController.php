@@ -32,7 +32,86 @@ use OpenApi\Attributes as OA;
 
 class DatabasesController extends Controller
 {
+    use Concerns\HandlesDatabaseImportsApi;
     use Concerns\HandlesTagsApi;
+
+    #[OA\Post(
+        path: '/databases/{uuid}/imports/uploads',
+        operationId: 'upload-database-import',
+        summary: 'Upload database import',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 201, description: 'Upload completed'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function upload_import(Request $request, string $uuid): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+
+        return $database ? $this->uploadDatabaseImport($request, $database, $teamId) : response()->json(['message' => 'Database not found.'], 404);
+    }
+
+    #[OA\Post(
+        path: '/databases/{uuid}/imports',
+        operationId: 'create-database-import',
+        summary: 'Import database backup',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportRequest')),
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 202, description: 'Import queued'),
+            new OA\Response(response: 409, description: 'Import already active'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function create_import(Request $request, string $uuid): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+
+        return $database ? $this->startDatabaseImport($request, $database, $teamId, 'api.databases.imports.show', ['uuid' => $uuid]) : response()->json(['message' => 'Database not found.'], 404);
+    }
+
+    #[OA\Get(
+        path: '/databases/{uuid}/imports/{activity_id}',
+        operationId: 'get-database-import',
+        summary: 'Get database import status',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'activity_id', in: 'path', required: true, description: 'Import activity ID.', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Import status', content: new OA\JsonContent(ref: '#/components/schemas/DatabaseImportStatus')),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function show_import(Request $request, string $uuid, int $activity_id): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+
+        return $database ? $this->showDatabaseImport($database, $teamId, $activity_id) : response()->json(['message' => 'Database not found.'], 404);
+    }
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
     {
@@ -769,6 +848,7 @@ class DatabasesController extends Controller
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage (GB) for S3 backups'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+                        'missing_backup_notification_days' => ['type' => 'integer', 'description' => 'Alert after this many days without an execution; 0 disables alerts', 'minimum' => 0, 'maximum' => 365, 'default' => 0],
                     ],
                 ),
             )
@@ -805,7 +885,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -833,6 +913,7 @@ class DatabasesController extends Controller
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
 
         if ($validator->fails()) {
@@ -1025,6 +1106,7 @@ class DatabasesController extends Controller
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage of the backup in S3'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+                        'missing_backup_notification_days' => ['type' => 'integer', 'description' => 'Alert after this many days without an execution; 0 disables alerts', 'minimum' => 0, 'maximum' => 365],
                     ],
                 ),
             )
@@ -1054,7 +1136,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1080,6 +1162,7 @@ class DatabasesController extends Controller
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -4885,6 +4968,8 @@ class DatabasesController extends Controller
                 'id',
                 'created_at',
                 'updated_at',
+                'last_execution_at',
+                'missing_backup_notification_sent_at',
             ])->fill([
                 'uuid' => new_public_id(),
                 'database_id' => $newDatabase->id,

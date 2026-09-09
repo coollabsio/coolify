@@ -39,6 +39,13 @@
                     <span class="text-xs text-red-500">{{ $message }}</span>
                 @enderror
             </fieldset>
+            <div class="rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                <x-forms.checkbox id="edit-automatic-dns" label="Automatically configure DNS" fullWidth
+                    wire:model.live="automaticDns" canGate="update" :canResource="$integrationToken" />
+                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Create DNS records automatically when a new domain has one unambiguous matching credential.
+                </p>
+            </div>
         @else
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Capability: Secrets (read-only)</div>
@@ -59,6 +66,39 @@
                     class="font-medium text-coollabs hover:underline dark:text-warning">
                     Create a replacement token in Cloudflare
                 </a>
+            </div>
+            <div class="rounded-lg border border-neutral-200 dark:border-white/[0.08]">
+                <div class="flex items-center justify-between gap-3 p-3">
+                    <div class="text-xs text-neutral-600 dark:text-fg-dim">
+                        <div class="font-medium text-black dark:text-fg">Domains this token can manage</div>
+                        <div>{{ $zoneCount }} accessible {{ Str::plural('zone', $zoneCount) }}</div>
+                    @if (data_get($integrationToken->metadata, 'zones_synced_at'))
+                        <div>Last refreshed {{ \Carbon\Carbon::parse(data_get($integrationToken->metadata, 'zones_synced_at'))->diffForHumans() }}</div>
+                    @endif
+                    </div>
+                    <x-forms.button type="button" wire:click="refreshZones" wire:target="refreshZones"
+                        canGate="update" :canResource="$integrationToken">Refresh zones</x-forms.button>
+                </div>
+                @if ($zones !== [])
+                    <div class="max-h-48 overflow-y-auto border-t border-neutral-200 dark:border-white/[0.08]">
+                        @foreach ($zones as $zone)
+                            <div wire:key="integration-token-zone-{{ $zone['id'] }}"
+                                class="flex items-center justify-between gap-3 border-b border-neutral-200 px-3 py-2.5 last:border-b-0 dark:border-white/[0.08]">
+                                <div class="min-w-0">
+                                    <div class="truncate text-sm font-medium text-black dark:text-fg">{{ $zone['name'] }}</div>
+                                    @if ($zone['account_name'])
+                                        <div class="truncate text-[11px] text-neutral-500 dark:text-fg-dim">{{ $zone['account_name'] }}</div>
+                                    @endif
+                                </div>
+                                @if ($zone['managed_records_count'] > 0)
+                                    <div class="shrink-0 text-[11px] text-neutral-500 dark:text-fg-dim">
+                                        {{ $zone['managed_records_count'] }} managed {{ Str::plural('record', $zone['managed_records_count']) }}
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         @endif
 
