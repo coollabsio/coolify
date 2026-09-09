@@ -102,6 +102,23 @@ test('validates replace existing as a boolean', function () {
         ->assertJsonValidationErrors('replace_existing');
 });
 
+test('rejects unknown fields on standalone import', function () {
+    $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
+    $activity = Activity::create(['log_name' => 'default', 'description' => 'queued', 'properties' => ['status' => 'queued']]);
+    $action = Mockery::mock(StartDatabaseImport::class);
+    $action->shouldReceive('handle')->andReturn($activity);
+    app()->instance(StartDatabaseImport::class, $action);
+
+    $this->withHeaders($this->headers)
+        ->postJson("/api/v1/databases/{$database->uuid}/imports", [
+            'source' => 'server',
+            'path' => '/tmp/backup.sql',
+            'unknown_field' => 'nope',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.unknown_field.0', 'This field is not allowed.');
+});
+
 test('returns only a team and resource scoped import activity', function () {
     $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
     $activity = Activity::create(['log_name' => 'default', 'description' => json_encode([['order' => 1, 'output' => 'restored', 'type' => 'stdout']]), 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $database->uuid, 'operation' => 'database_import', 'status' => 'finished', 'exitCode' => 0]]);

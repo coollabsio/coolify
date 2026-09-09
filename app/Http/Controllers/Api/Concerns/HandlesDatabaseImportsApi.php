@@ -70,11 +70,14 @@ trait HandlesDatabaseImportsApi
             'dump_all' => ['sometimes', 'boolean'],
             'replace_existing' => ['sometimes', 'boolean'],
         ]);
-        foreach (array_diff(array_keys($payload), $allowed) as $field) {
-            $validator->errors()->add($field, 'This field is not allowed.');
-        }
-        if ($validator->fails() || $validator->errors()->isNotEmpty()) {
-            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        $extraFields = array_diff(array_keys($payload), $allowed);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
 
         try {
