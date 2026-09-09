@@ -7,6 +7,8 @@ $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-
 
 $spark = 'refreshChartData-'.$chartId.'-status';
 ?>
+<div class="contents">
+@if ($servers->isNotEmpty() && $overview)
 <section class="mb-0! min-w-0">
     <div class="mb-3 flex items-end justify-between gap-4">
         <div>
@@ -42,29 +44,14 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             @endif
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
+                class="group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-medium text-neutral-600 transition-[color,background-color,transform] duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-[0.97] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim dark:hover:bg-white/[0.1] dark:hover:text-fg">
                 Open analytics
-                <x-reicon name="arrow-right" class="size-3" />
+                <x-reicon name="arrow-right" class="size-3 opacity-70 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
             </a>
         </div>
     </div>
 
-    @if ($servers->isEmpty())
-        <x-empty size="sm" title="Traffic analytics is not enabled"
-            description="Enable Sentinel traffic analytics on a server to see a team-wide summary here."
-            icon-name="network">
-            <x-slot:contents>
-                <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
-                    View servers
-                </a>
-            </x-slot:contents>
-        </x-empty>
-    @elseif (! $overview)
-        <x-empty size="sm" title="No analytics data yet"
-            description="We could not load traffic analytics for the selected range. Try a different range or check back shortly."
-            icon-name="network" />
-    @else
-        {{-- Sparkline KPI cards. Each links through to the full analytics page. --}}
+    {{-- Sparkline KPI cards. Each links through to the full analytics page. --}}
         <div class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/[0.08] dark:bg-white/[0.07]">
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
                 class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)] dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]">
@@ -128,5 +115,6 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             </a>
         </div>
-    @endif
 </section>
+@endif
+</div>

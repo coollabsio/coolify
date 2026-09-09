@@ -46,7 +46,8 @@
             @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
             @elseif ($currentRoute === 'project.application.analytics')
-                <livewire:project.application.analytics :application="$application" />
+                <livewire:project.application.analytics :application="$application"
+                    :lazy="$application->destination?->server?->isTrafficAnalyticsEnabled()" />
             @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
             @elseif ($currentRoute === 'project.application.danger')
