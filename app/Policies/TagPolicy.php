@@ -28,7 +28,7 @@ class TagPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -36,7 +36,7 @@ class TagPolicy
      */
     public function update(User $user, Tag $tag): bool
     {
-        return $user->isAdminOfTeam((int) $tag->team_id);
+        return $user->canManageResourcesOfTeam((int) $tag->team_id);
     }
 
     /**
@@ -44,7 +44,7 @@ class TagPolicy
      */
     public function delete(User $user, Tag $tag): bool
     {
-        return $user->isAdminOfTeam((int) $tag->team_id);
+        return $user->canManageResourcesOfTeam((int) $tag->team_id);
     }
 
     /**

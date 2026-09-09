@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -970,8 +971,8 @@ class GlobalSearch extends Component
             ]);
         }
 
-        // GitHub Source - can be created if user has createAnyResource permission
-        if ($user->can('createAnyResource')) {
+        // GitHub Source - can be created if user can create GitHub apps
+        if ($user->can('create', GithubApp::class)) {
             $items->push([
                 'name' => 'GitHub App',
                 'description' => 'Connect a GitHub app for source control',

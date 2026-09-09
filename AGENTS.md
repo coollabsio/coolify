@@ -133,7 +133,7 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - **Services/** — Business logic services (ConfigurationGenerator, DockerImageParser, ContainerStatusAggregator, HetznerService, etc.). Use Services for complex orchestration; use Actions for single-purpose domain operations.
 - **Helpers/** — Global helpers loaded via `bootstrap/includeHelpers.php` from `bootstrap/helpers/` — organized into `shared.php`, `constants.php`, `versions.php`, `subscriptions.php`, `domains.php`, `docker.php`, `services.php`, `github.php`, `proxy.php`, `notifications.php`.
 - **Data/** — Spatie Laravel Data DTOs (e.g., `ServerMetadata`).
-- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
+- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/OPERATOR/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
 - **Rules/** — Custom validation rules (`ValidGitRepositoryUrl`, `ValidServerIp`, `ValidHostname`, `DockerImageFormat`, etc.).
 
 ### API Layer
@@ -146,7 +146,7 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 ### Authorization
 - Policy-based authorization with ~15 model-to-policy mappings in `AuthServiceProvider`
 - Custom gates: `createAnyResource`, `canAccessTerminal`
-- Role hierarchy: `Role::MEMBER` (1) < `Role::ADMIN` (2) < `Role::OWNER` (3) with `lt()`/`gt()` comparison methods
+- Role hierarchy: `Role::MEMBER` (1) < `Role::OPERATOR` (2) < `Role::ADMIN` (3) < `Role::OWNER` (4) with `lt()`/`gt()` comparison methods. Operator manages the resource lifecycle (`User::canManageResources()`/`canManageResourcesOfTeam()`) but has no access to terminals, team management, credentials (keys, git apps, cloud/API tokens), servers, or instance settings — those still require `isAdmin()`/`isAdminOfTeam()`
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
 - Authorize every server-side read and mutation where access can vary by user, role, team, or resource. Use policies, gates, or `$this->authorize(...)`; never rely on hidden Blade/Livewire controls such as `@can` for security.
 - Scope queries to the current team before returning records. Treat route and model identifiers as untrusted, and prevent users from reading or changing resources owned by another team.

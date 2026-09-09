@@ -39,6 +39,7 @@ class ExecuteContainerCommand extends Component
 
     public function mount(): void
     {
+        $this->authorize('canAccessTerminal');
         $this->parameters = get_route_parameters();
         $this->containers = collect();
         $this->servers = collect();
@@ -87,6 +88,8 @@ class ExecuteContainerCommand extends Component
 
     public function loadContainers(): void
     {
+        $this->authorize('canAccessTerminal');
+
         if ($this->containersLoaded) {
             return;
         }

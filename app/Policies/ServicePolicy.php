@@ -30,7 +30,7 @@ class ServicePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -40,7 +40,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -50,7 +50,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -76,7 +76,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -86,7 +86,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -96,7 +96,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -106,7 +106,7 @@ class ServicePolicy
     {
         $teamId = $this->getTeamId($service);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**

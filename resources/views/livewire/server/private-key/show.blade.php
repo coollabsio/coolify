@@ -20,7 +20,7 @@
                             Check connection
                         </x-forms.button>
 
-                        @can('createAnyResource')
+                        @can('create', App\Models\PrivateKey::class)
                             <div x-data="{ open: false }" class="relative" @click.outside="open = false"
                                 @keydown.escape.window="open = false">
                                 <x-forms.button isHighlighted type="button" @click="open = !open"

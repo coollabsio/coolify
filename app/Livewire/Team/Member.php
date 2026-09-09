@@ -58,6 +58,26 @@ class Member extends Component
         }
     }
 
+    public function makeOperator()
+    {
+        try {
+            $this->authorize('manageMembers', currentTeam());
+
+            if (Role::from(auth()->user()->role())->lt(Role::ADMIN)
+                || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
+                throw new \Exception('You are not authorized to perform this action.');
+            }
+            $teamId = currentTeam()->id;
+            DB::transaction(function () use ($teamId): void {
+                $this->member->teams()->updateExistingPivot($teamId, ['role' => Role::OPERATOR->value]);
+                RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
+            });
+            $this->dispatch('reloadWindow');
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
     public function makeReadonly()
     {
         try {
