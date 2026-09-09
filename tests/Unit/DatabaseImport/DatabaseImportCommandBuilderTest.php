@@ -48,6 +48,27 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->toContain('docker exec postgres-safe');
 });
 
+test('dump-all mysql and mariadb commands use valid shell parameter expansions', function (string $class, string $binary, string $prefix) {
+    $builder = new DatabaseImportCommandBuilder;
+
+    $command = $builder->buildRestoreCommand(importResource($class), '/tmp/dump.sql.gz', true);
+
+    $rootPassword = '${'.$prefix.'_ROOT_PASSWORD}';
+    $database = '${'.$prefix.'_DATABASE:-default}';
+
+    expect($command)
+        ->toContain($binary)
+        ->toContain("gunzip -cf '/tmp/dump.sql.gz'")
+        ->toContain('-p'.$rootPassword)
+        ->toContain('CREATE DATABASE IF NOT EXISTS \`'.$database.'\`')
+        ->and(substr_count($command, $rootPassword))->toBe(6)
+        ->and(substr_count($command, $database))->toBe(2)
+        ->and($command)->not->toContain('${{');
+})->with([
+    'mysql' => [StandaloneMysql::class, 'mysql', 'MYSQL'],
+    'mariadb' => [StandaloneMariadb::class, 'mariadb', 'MARIADB'],
+]);
+
 test('stops PostgreSQL restores on the first error without replacing existing objects by default', function () {
     $builder = new DatabaseImportCommandBuilder;
     $postgres = importResource(StandalonePostgresql::class);

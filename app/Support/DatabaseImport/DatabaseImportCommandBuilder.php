@@ -62,6 +62,9 @@ class DatabaseImportCommandBuilder
 
     private function mysqlDumpAll(string $binary, string $prefix, string $path): string
     {
-        return "for pid in \$({$binary} -u root -p\${{$prefix}_ROOT_PASSWORD} -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do {$binary} -u root -p\${{$prefix}_ROOT_PASSWORD} -e \"KILL \$pid\" 2>/dev/null || true; done && {$binary} -u root -p\${{$prefix}_ROOT_PASSWORD} -N -e \"SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');\" | {$binary} -u root -p\${{$prefix}_ROOT_PASSWORD} && {$binary} -u root -p\${{$prefix}_ROOT_PASSWORD} -e \"CREATE DATABASE IF NOT EXISTS \\`\${{{$prefix}_DATABASE:-default}}\\`;\" && (gunzip -cf {$path} 2>/dev/null || cat {$path}) | {$binary} -u root -p\${{{$prefix}_ROOT_PASSWORD}} \${{{$prefix}_DATABASE:-default}}";
+        $rootPassword = '${'.$prefix.'_ROOT_PASSWORD}';
+        $database = '${'.$prefix.'_DATABASE:-default}';
+
+        return "for pid in \$({$binary} -u root -p{$rootPassword} -N -e \"SELECT id FROM information_schema.processlist WHERE user != 'root';\"); do {$binary} -u root -p{$rootPassword} -e \"KILL \$pid\" 2>/dev/null || true; done && {$binary} -u root -p{$rootPassword} -N -e \"SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');\" | {$binary} -u root -p{$rootPassword} && {$binary} -u root -p{$rootPassword} -e \"CREATE DATABASE IF NOT EXISTS \\`{$database}\\`;\" && (gunzip -cf {$path} 2>/dev/null || cat {$path}) | {$binary} -u root -p{$rootPassword} {$database}";
     }
 }
