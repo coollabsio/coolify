@@ -141,6 +141,7 @@ function sharedDataApplications()
         'gpu_options' => 'string|nullable',
         'is_consistent_container_name_enabled' => 'boolean',
         'custom_internal_name' => 'string|nullable',
+        'custom_container_name_prefix' => 'string|nullable|max:47',
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
@@ -408,6 +409,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('gpu_options');
     $request->offsetUnset('is_consistent_container_name_enabled');
     $request->offsetUnset('custom_internal_name');
+    $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');
     $request->offsetUnset('tags');
 }
