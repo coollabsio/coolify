@@ -45,10 +45,21 @@
                         ['value' => true, 'label' => 'Consistent name (no rolling updates)'],
                     ]" :disabled="! $canUpdate" />
                 @if ($isConsistentContainerNameEnabled === true)
-                    <x-forms.input
-                        helper="You can add a custom name for your container.<br><br>The name is saved automatically and converted to slug format. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
-                        id="customInternalName" label="Custom container name" canGate="update"
-                        wire:change="saveCustomName" :canResource="$application" />
+                    <form wire:submit="saveCustomName" class="w-full">
+                        <x-unsaved-bar action="saveCustomName" targets="customInternalName" />
+                        <x-forms.input
+                            helper="You can add a custom name for your container.<br><br>The name is converted to slug format when saved. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
+                            id="customInternalName" label="Custom container name" canGate="update"
+                            :canResource="$application" />
+                    </form>
+                @else
+                    <form wire:submit="saveCustomNamePrefix" class="w-full">
+                        <x-unsaved-bar action="saveCustomNamePrefix" targets="customContainerNamePrefix" />
+                        <x-forms.input
+                            helper="Optional prefix for generated container names. Containers are named <span class='font-bold'>prefix-timestamp</span>, for example <span class='font-bold'>shop-api-20260908T141530</span>, instead of starting with <span class='font-bold'>{{ $application->uuid }}</span>.<br><br>The prefix is converted to slug format when saved, can be up to 47 characters and must be unique on this server. Rolling updates keep working."
+                            id="customContainerNamePrefix" label="Container name prefix" placeholder="e.g. my-api"
+                            canGate="update" :canResource="$application" />
+                    </form>
                 @endif
             </div>
         </x-application.settings-section>
