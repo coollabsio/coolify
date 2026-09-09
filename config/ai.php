@@ -155,4 +155,8 @@ return [
         ],
     ],
 
+    'docs' => [
+        'base_url' => env('AI_DOCS_BASE_URL', 'https://coolify.io/docs'),
+    ],
+
 ];
