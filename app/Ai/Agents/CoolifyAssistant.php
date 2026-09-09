@@ -8,13 +8,16 @@ use App\Ai\Tools\DeleteServer;
 use App\Ai\Tools\RunServerCommand;
 use App\Ai\Tools\UpsertEnvironmentVariable;
 use App\Mcp\Servers\CoolifyServer;
+use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Contracts\RemembersConversations as RemembersConversationsContract;
 use Laravel\Ai\Promptable;
 
-class CoolifyAssistant implements Agent, HasTools
+class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContract
 {
     use Promptable;
+    use RemembersConversations;
 
     public function instructions(): string
     {
