@@ -570,8 +570,11 @@ function refreshSession(?Team $team = null): void
             $team = Team::find($currentTeam->id);
         }
         if (! $team) {
-            // Fall back to any team the user still belongs to.
-            $team = User::query()->find(Auth::id())?->teams()->first();
+            // Fall back to the user's resolvable team (stored choice, or their
+            // sole team). Returns null for a multi-team user with no valid stored
+            // choice, so an arbitrary first team is never silently persisted —
+            // the user is sent to the selection screen instead.
+            $team = User::query()->find(Auth::id())?->resolveStoredTeam();
         }
     }
 
@@ -581,8 +584,13 @@ function refreshSession(?Team $team = null): void
     if (! $team) {
         // The user has no team left (e.g. just deleted their current team and
         // belongs to no other): clear the stale session reference instead of
-        // dereferencing null.
+        // dereferencing null, and drop the persisted choice so it is not
+        // restored on next login.
         session()->forget('currentTeam');
+        $user = Auth::user();
+        if ($user && ! is_null($user->current_team_id)) {
+            $user->forceFill(['current_team_id' => null])->saveQuietly();
+        }
 
         return;
     }
@@ -593,6 +601,15 @@ function refreshSession(?Team $team = null): void
         return $team;
     });
     session(['currentTeam' => $team]);
+
+    // Persist the active team so it can be restored after logout/login — but
+    // never while an admin is impersonating, so viewing another user's account
+    // does not overwrite that user's real last-active team.
+    $user = Auth::user();
+    if ($user && ! session('impersonating') && $user->current_team_id !== $team->id) {
+        $user->current_team_id = $team->id;
+        $user->saveQuietly();
+    }
 }
 function handleError(?Throwable $error = null, ?Component $livewire = null, ?string $customErrorMessage = null)
 {
@@ -4341,6 +4358,62 @@ NGINX;
     }
 }
 
+/**
+ * Parse an scp-style SSH Git URL (`user@host:path` or `user@host:port/path`).
+ *
+ * @return array{user: string, host: string, port: ?string, path: string}|null
+ */
+function parseScpStyleGitUrl(?string $gitRepository): ?array
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return null;
+    }
+
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>[^:]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+        return null;
+    }
+
+    $host = trim($matches['host']);
+    $path = ltrim($matches['path'], '/');
+
+    if ($host === '' || $path === '') {
+        return null;
+    }
+
+    return [
+        'user' => $matches['user'],
+        'host' => $host,
+        'port' => ($matches['port'] ?? '') === '' ? null : $matches['port'],
+        'path' => $path,
+    ];
+}
+
+function scpStyleGitUrlToHttps(?string $gitRepository): ?string
+{
+    $parts = parseScpStyleGitUrl($gitRepository);
+
+    if ($parts === null) {
+        return null;
+    }
+
+    return 'https://'.$parts['host'].'/'.$parts['path'];
+}
+
+function gitRepositorySlug(?string $gitRepository): string
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return '';
+    }
+
+    if (($scp = parseScpStyleGitUrl($gitRepository)) !== null) {
+        $gitRepository = $scp['path'];
+    } elseif (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
+        $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
+    }
+
+    return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+}
+
 function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
 {
     $repository = $gitRepository;
@@ -4351,7 +4424,6 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
         'repository' => $gitRepository,
     ];
     $sshMatches = [];
-    $matches = [];
 
     // Let's try and parse the string to detect if it's a valid SSH string or not
     preg_match('/((.*?)\:\/\/)?(.*@.*:.*)/', $gitRepository, $sshMatches);
@@ -4386,11 +4458,11 @@ function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|
             $providerInfo['port'] = (string) $parsedRepository['port'];
         }
     } else {
-        preg_match('/^(?<host>[^:]+):(?<port>\d+)\/(?<path>.+)$/', $normalizedRepository, $matches);
+        $scp = parseScpStyleGitUrl($normalizedRepository);
 
-        if (! empty($matches['port'])) {
-            $providerInfo['port'] = $matches['port'];
-            $repository = "{$matches['host']}:{$matches['path']}";
+        if ($scp !== null && $scp['port'] !== null) {
+            $providerInfo['port'] = $scp['port'];
+            $repository = "{$scp['user']}@{$scp['host']}:{$scp['path']}";
         }
     }
 

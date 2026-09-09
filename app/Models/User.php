@@ -49,6 +49,7 @@ class User extends Authenticatable implements SendsEmail
         'name',
         'email',
         'password',
+        'current_team_id',
         'force_password_reset',
         'marketing_emails',
         'pending_email',
@@ -67,6 +68,7 @@ class User extends Authenticatable implements SendsEmail
     ];
 
     protected $casts = [
+        'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
@@ -373,6 +375,54 @@ class User extends Authenticatable implements SendsEmail
         return Cache::remember('user:'.$this->id.':team:'.$sessionTeamId, 3600, function () use ($sessionTeamId) {
             return Team::find($sessionTeamId);
         });
+    }
+
+    /**
+     * Resolve the team to activate when the session has no current team
+     * (fresh login or an invalidated session).
+     *
+     * Returns the user's last active team when they still belong to it, or the
+     * sole team of a single-team user. Returns null when the choice is ambiguous
+     * (more than one team and no valid stored preference) — the caller must then
+     * prompt the user to pick a team instead of defaulting silently.
+     */
+    public function resolveStoredTeam(): ?Team
+    {
+        if (! is_null($this->current_team_id)) {
+            $storedTeam = $this->teams->firstWhere('id', $this->current_team_id);
+            if ($storedTeam) {
+                return $storedTeam;
+            }
+        }
+
+        if ($this->teams->count() === 1) {
+            return $this->teams->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Reset the persisted active team when it points to the given team.
+     *
+     * Called when the user is removed from a team (or the team is deleted) so a
+     * stale current_team_id can never be trusted after the fact. Read paths
+     * already re-validate membership; this is defense-in-depth that clears the
+     * dangling value at the source event instead of relying on self-healing.
+     */
+    public function clearStoredTeamIfMatches(int $teamId): void
+    {
+        // Atomic conditional update: only null the column when the database value
+        // still points at this team, so a newer team selection made concurrently
+        // (in another request) is preserved rather than clobbered.
+        static::query()
+            ->whereKey($this->getKey())
+            ->where('current_team_id', $teamId)
+            ->update(['current_team_id' => null]);
+
+        if ($this->current_team_id === $teamId) {
+            $this->current_team_id = null;
+        }
     }
 
     public function role(): ?string

@@ -213,11 +213,15 @@ it('shows danger zone for application deletion', function () {
         ->screenshot(filename: 'application-danger-zone');
 });
 
-it('uses compact application domains with unified settings and a floating save bar', function () {
+it('uses compact application domains with unified settings and a form save button', function () {
     config()->set('app.maintenance.store', 'array');
     InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
     Cache::forget('instance_settings');
-    $this->application->update(['fqdn' => 'https://first.example.com,https://second.example.com', 'redirect' => 'both']);
+    $this->application->update([
+        'fqdn' => 'https://first.example.com,https://second.example.com',
+        'ports_exposes' => '3000,8069',
+        'redirect' => 'both',
+    ]);
     loginAndSkipBoarding();
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
     $page = visit($url);
@@ -232,19 +236,21 @@ it('uses compact application domains with unified settings and a floating save b
         ->click('[aria-label="Settings for https://first.example.com"]')
         ->assertSee('Domain settings')
         ->assertValue('#editingDomainParts-host', 'first.example.com')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->fill('#editingDomainParts-port', '8069')
         ->fill('#editingDomainParts-path', '/blog')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->click('[id^="application-domain-indexing-"][id$="-trigger"]')
         ->click('Noindex')
         ->assertSee('Search engine indexing updated.')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->screenshot(filename: 'application-domain-unified-settings')
-        ->click('[wire\\:click="updateDomain"]')
+        ->click('Save')
         ->assertDontSee('Domain settings')
         ->assertSee('https://first.example.com/blog')
+        ->assertSee('Internal port 8069')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-domains-compact');
+
+    expect($this->application->fresh()->domain_port_overrides)
+        ->toHaveKey('https://first.example.com/blog', 8069);
 
     $page->click('[aria-label="Settings for https://second.example.com"]')
         ->fill('#editingDomainParts-path', '/discard')

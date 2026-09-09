@@ -21,14 +21,8 @@
                             displayName="Sentinel" :collapsible="false" />
                     </div>
                 @else
-                    <x-slot:actions>
-                        <x-forms.button canGate="manageSentinel" :canResource="$server" isHighlighted
-                            wire:click="enableSentinel">
-                            Enable Sentinel
-                        </x-forms.button>
-                    </x-slot:actions>
-                    <x-empty size="sm" title="Sentinel is disabled"
-                        description="Enable Sentinel to view its logs."
+                    <x-empty size="sm" title="Sentinel is unavailable"
+                        description="Sentinel does not run on build or Swarm servers."
                         icon-name="dashboard" />
                 @endif
             </x-application.settings-section>

@@ -16,21 +16,13 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        editingDomainBaseline: null,
-        get hasAddressChanges() {
-            return this.modalOpen && this.editingDomainBaseline !== null
-                && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
-                && !$wire.showPortWarningModal && !$wire.showDomainConflictModal;
-        },
         openEditDomain() {
-            this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
             this.editingServiceLabel = $wire.editingService || '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainParts-host')?.focus?.());
         },
         closeEditDomain() {
             this.modalOpen = false;
-            this.editingDomainBaseline = null;
             this.editingServiceLabel = '';
         },
         matchesDomainSearch(value) {
@@ -299,13 +291,11 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
-                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
-                                <template x-if="modalOpen">
-                                    <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges"
-                                        targets="updateDomain,confirmUpdateDomainDespiteDns" />
-                                </template>
+                        <div class="application-settings-section-body relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                            <form wire:submit="updateDomain" class="flex min-h-0 flex-1 flex-col">
+                                <div data-testid="domain-settings-scroll"
+                                    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
+                                    style="-webkit-overflow-scrolling: touch;">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service</label>
@@ -326,23 +316,18 @@
                                     </x-callout>
                                 @endif
 
-                                @if ($editDomainDnsFailed)
-                                    <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">Continue</x-forms.button>
-                                @endif
-                            </form>
-                            @php
-                                $editingRow = $editingIndex !== null ? ($domainRows[$editingIndex] ?? null) : null;
-                            @endphp
-                            @if ($editingRow && ! $labelsAreWritable)
-                                @can('update', $application)
-                                    @php
-                                        $editingKey = hash('sha256', $editingRow['url'].'|'.($editingRow['service'] ?? ''));
-                                        $editingRedirectKey = $isCompose ? $this->serviceRedirectWireKey($editingRow['service']) : null;
-                                        $editingRedirectProperty = $isCompose ? 'serviceRedirects.'.$editingRedirectKey : 'redirect';
-                                    @endphp
-                                    <div wire:key="editing-application-domain-settings-{{ $editingKey }}"
-                                        class="mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
-                                        <p class="sm:col-span-2 text-[12px] text-neutral-500 dark:text-fg-dim">Indexing and redirect changes save automatically.</p>
+                                @php
+                                    $editingRow = $editingIndex !== null ? ($domainRows[$editingIndex] ?? null) : null;
+                                @endphp
+                                @if ($editingRow && ! $labelsAreWritable)
+                                    @can('update', $application)
+                                        @php
+                                            $editingKey = hash('sha256', $editingRow['url'].'|'.($editingRow['service'] ?? ''));
+                                            $editingRedirectKey = $isCompose ? $this->serviceRedirectWireKey($editingRow['service']) : null;
+                                            $editingRedirectProperty = $isCompose ? 'serviceRedirects.'.$editingRedirectKey : 'redirect';
+                                        @endphp
+                                        <div wire:key="editing-application-domain-settings-{{ $editingKey }}"
+                                            class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
                                         <x-forms.listbox id="application-domain-indexing-{{ $editingKey }}"
                                             label="Search engine indexing" :wire="false" preserveValue
                                             :value="$application->isDomainNoindexed($editingRow['url']) ? 'noindex' : 'index'"
@@ -363,10 +348,26 @@
                                                 ['value' => 'www', 'label' => 'Redirect to www'],
                                                 ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                             ]" />
-                                    </div>
-                                @endcan
-                            @endif
+                                        </div>
+                                    @endcan
+                                @endif
+                                </div>
 
+                                <div data-testid="domain-settings-footer"
+                                    class="shrink-0 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
+                                    @if ($editDomainDnsFailed)
+                                        <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">
+                                            Continue
+                                        </x-forms.button>
+                                    @else
+                                        <x-forms.button type="submit" wire:target="updateDomain" isHighlighted>
+                                            Save
+                                        </x-forms.button>
+                                    @endif
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

@@ -25,7 +25,7 @@
                 </a>
             </x-slot:actions>
             <x-empty size="sm" title="Metrics are not enabled"
-                description="Enable Sentinel and metrics for this server before collecting application usage data."
+                description="Enable metrics for this server before collecting application usage data."
                 icon-name="dashboard" />
         </x-application.settings-section>
     @elseif (!str($resource->status)->contains('running'))
