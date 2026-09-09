@@ -90,7 +90,7 @@
 
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
                     <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
-                        x-init="$wire.loadProxyConfiguration"
+                        x-init="$wire.loadProxyConfiguration()"
                         helper="Edit the generated proxy compose configuration used on this server.">
                         <x-slot:actions>
                             @can('update', $server)

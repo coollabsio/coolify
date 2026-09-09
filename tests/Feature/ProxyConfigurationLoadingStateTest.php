@@ -21,7 +21,7 @@ it('loads only the compose file from the frontend and shows the shared loading i
         ->not->toContain('<livewire:server.proxy :server="$server" lazy />');
 
     expect($proxy)
-        ->toContain('x-init="$wire.loadProxyConfiguration"')
+        ->toContain('x-init="$wire.loadProxyConfiguration()"')
         ->toContain('wire:loading.flex wire:target="loadProxyConfiguration"')
         ->toContain('<x-loading text="Loading proxy configuration…" />');
 
