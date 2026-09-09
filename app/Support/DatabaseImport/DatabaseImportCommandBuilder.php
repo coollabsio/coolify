@@ -17,10 +17,10 @@ class DatabaseImportCommandBuilder
                 : 'pg_restore --exit-on-error'.($replaceExisting ? ' --clean --if-exists' : '').' -U $POSTGRES_USER -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} '.$path,
             'mysql' => $dumpAll
                 ? $this->mysqlDumpAll('mysql', 'MYSQL', $path)
-                : 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < '.$path,
+                : '(gunzip -cf '.$path.' 2>/dev/null || cat '.$path.') | mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE',
             'mariadb' => $dumpAll
                 ? $this->mysqlDumpAll('mariadb', 'MARIADB', $path)
-                : 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE < '.$path,
+                : '(gunzip -cf '.$path.' 2>/dev/null || cat '.$path.') | mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE',
             'mongodb' => 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive='.$path,
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };

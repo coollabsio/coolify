@@ -36,6 +36,21 @@ test('builds database-specific restore commands', function (string $class, ?stri
     'service mongo' => [ServiceDatabase::class, 'mongodb', 'mongorestore'],
 ]);
 
+test('decompresses gzip backups for single-database mysql and mariadb restores', function (string $class, ?string $type, string $client) {
+    $builder = new DatabaseImportCommandBuilder;
+
+    $command = $builder->buildRestoreCommand(importResource($class, $type), '/tmp/restore file.sql.gz', false);
+
+    expect($command)->toBe(
+        "(gunzip -cf '/tmp/restore file.sql.gz' 2>/dev/null || cat '/tmp/restore file.sql.gz') | {$client}"
+    );
+})->with([
+    'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+]);
+
 test('builds dump-all commands and postgres safety scan', function () {
     $builder = new DatabaseImportCommandBuilder;
     $postgres = importResource(StandalonePostgresql::class);
