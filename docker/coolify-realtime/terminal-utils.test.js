@@ -6,11 +6,22 @@ import {
     extractTargetHost,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
+    isAttachCommand,
     isAuthorizedTargetHost,
     normalizeHostForAuthorization,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
+
+test('isAttachCommand detects a docker attach session', () => {
+    assert.equal(isAttachCommand('docker attach --detach-keys="ctrl-p,ctrl-q" --sig-proxy=false \'minecraft\''), true);
+    assert.equal(isAttachCommand('sudo docker attach --sig-proxy=false \'minecraft\''), true);
+});
+
+test('isAttachCommand does not match a docker exec shell session', () => {
+    assert.equal(isAttachCommand("docker exec -it 'web-1' sh -c 'exec $SHELL'"), false);
+    assert.equal(isAttachCommand(''), false);
+});
 
 test('getTerminalProcessEnv preserves the PATH needed by SSH proxy commands', () => {
     assert.deepEqual(getTerminalProcessEnv({
