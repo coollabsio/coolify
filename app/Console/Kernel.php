@@ -5,6 +5,7 @@ namespace App\Console;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
+use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
@@ -47,11 +48,13 @@ class Kernel extends ConsoleKernel
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('cleanup:stucked-resources')
-            ->daily()
+            ->dailyAt('03:17')
             ->onOneServer()
-            ->withoutOverlapping(60);
+            ->withoutOverlapping(60)
+            ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

@@ -82,13 +82,31 @@ it('docks desktop resource actions in the top bar instead of floating over conte
     }
 });
 
-it('links the service header missing variables warning to environment variables', function () {
+it('shows disabled deploy actions when service variables are missing', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileActions = str($heading)
+        ->after('<div class="w-full xl:hidden">')
+        ->before("@teleport('#resource-action-hud-slot')")
+        ->toString();
+    $desktopActions = str($heading)
+        ->after("@teleport('#resource-action-hud-slot')")
+        ->before('@endteleport')
+        ->toString();
 
-    expect($heading)
-        ->toContain("route('project.service.environment-variables'")
-        ->toContain('Required variables missing')
-        ->toContain('href="{{ $environmentVariablesUrl }}"');
+    expect($mobileActions)
+        ->toContain('id="service-mobile-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline')
+        ->and($desktopActions)
+        ->toContain('id="service-desktop-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline');
 });
 
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
@@ -398,7 +416,7 @@ it('moves application terminal and logs from the top tabs into the settings side
         ->toContain("'label' => 'Terminal'")
         ->toContain("'label' => 'Deployment Logs'")
         ->toContain("'label' => 'Runtime Logs'")
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics']")
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 
@@ -498,14 +516,13 @@ it('builds application sidebar routes independently of the current request route
         ->toContain("'application_uuid' => \$application->uuid");
 });
 
-it('keeps the deployment log sidebar fixed in the layout without a top gap', function () {
+it('welds the deployment log sidebar to the main sidebar', function () {
     $deployment = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
-    expect($deployment)->toContain(':flush="true"')
-        ->and($css)->toContain('.application-settings-navigation.is-flush')
-        ->and($css)->toContain('position: static;')
-        ->and($css)->toContain('overflow: visible;');
+    expect($deployment)->not->toContain(':flush="true"')
+        ->and($css)->toContain('left: var(--sidebar-w, 14rem);')
+        ->and($css)->toContain('position: fixed;');
 });
 
 it('uses the same mobile heading gap on deployment pages as application settings', function () {
@@ -690,4 +707,12 @@ it('uses overflow scroll arrows on resource heading navbars', function () {
     foreach ($files as $path) {
         expect(file_get_contents($path))->toContain('<x-resource-heading-tabs');
     }
+});
+
+it('renders dropdown chevrons smaller than regular button icons', function () {
+    $icons = file_get_contents(resource_path('views/components/reicon.blade.php'));
+
+    expect($icons)
+        ->toContain("'chevron-down' => '<polyline points=\"5 9 12 16 19 9\"")
+        ->not->toContain('chevron-down\' => \'<g transform="scale(1.33333)"');
 });

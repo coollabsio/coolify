@@ -53,8 +53,7 @@
     x-transition:leave-end="translate-y-3 opacity-0"
     class="fixed right-4 z-999 {{ $position === 'top-right' ? 'top-16' : 'bottom-4' }}">
     <template x-if="iconOnly">
-        <button type="button" @click="restore()" aria-label="Restore warning" class="flex rounded-lg p-2"
-            style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">
+        <button type="button" @click="restore()" aria-label="Restore warning" class="surface-popover flex rounded-lg p-2">
             @isset($icon)
                 <span
                     class="flex size-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning">
@@ -65,12 +64,11 @@
     </template>
 
     <template x-if="!iconOnly">
-    <div class="relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
+    <div class="surface-popover relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
         :class="compact
             ? 'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'
             : 'w-[calc(100vw-2rem)] max-w-sm'"
-        @click="restore()"
-        style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">
+        @click="restore()">
         @isset($icon)
             <div
                 class="flex size-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning">

@@ -818,19 +818,21 @@ class All extends Component
     {
         $isMember = auth()->user()?->isMember();
 
-        return $variables->map(function ($item) use ($isMember) {
-            if ($isMember) {
-                return "$item->key=(Hidden, only admins can view)";
-            }
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
+        return $variables
+            ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
+            ->map(function ($item) use ($isMember) {
+                if ($isMember) {
+                    return "$item->key=(Hidden, only admins can view)";
+                }
+                if ($item->is_shown_once) {
+                    return "$item->key=(Locked Secret, delete and add again to change)";
+                }
+                if ($item->is_multiline) {
+                    return "$item->key=(Multiline environment variable, edit in normal view)";
+                }
 
-            return "$item->key=$item->value";
-        })->join("\n");
+                return "$item->key=$item->value";
+            })->join("\n");
     }
 
     public function switch()
@@ -908,8 +910,7 @@ class All extends Component
         $deletedCount = $this->deleteRemovedVariables(false, $variables);
         if ($deletedCount > 0) {
             $changesMade = true;
-        } elseif ($deletedCount === 0 && $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->exists()) {
-            // If we tried to delete but couldn't (due to Docker Compose), mark as error
+        } elseif ($deletedCount < 0) {
             $errorOccurred = true;
         }
 
@@ -926,8 +927,7 @@ class All extends Component
             $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
             if ($deletedPreviewCount > 0) {
                 $changesMade = true;
-            } elseif ($deletedPreviewCount === 0 && $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($previewVariables))->exists()) {
-                // If we tried to delete but couldn't (due to Docker Compose), mark as error
+            } elseif ($deletedPreviewCount < 0) {
                 $errorOccurred = true;
             }
 
@@ -988,6 +988,12 @@ class All extends Component
         // Get all environment variables that will be deleted
         $variablesToDelete = $this->resource->$method()->whereNotIn('key', array_keys($variables))->get();
 
+        // Generated Compose variables are managed by Coolify and must survive a bulk
+        // replacement even when they are omitted from the pasted environment file.
+        $variablesToDelete = $variablesToDelete->reject(
+            fn (EnvironmentVariable $environmentVariable): bool => $this->isProtectedEnvironmentVariable($environmentVariable->key)
+        );
+
         // If there are no variables to delete, return 0
         if ($variablesToDelete->isEmpty()) {
             return 0;
@@ -1001,13 +1007,13 @@ class All extends Component
                 if ($isUsed) {
                     $this->dispatch('error', "Cannot delete environment variable '{$envVar->key}' <br><br>Please remove it from the Docker Compose file first.");
 
-                    return 0;
+                    return -1;
                 }
             }
         }
 
         // If we get here, no variables are used in Docker Compose, so we can delete them
-        $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
+        $this->resource->$method()->whereKey($variablesToDelete->modelKeys())->delete();
 
         return $variablesToDelete->count();
     }
