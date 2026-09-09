@@ -7,6 +7,12 @@ import {
     formatTerminalSessionRemainingTime,
 } from './terminal-session-timer.js';
 import { FitAddon } from '@xterm/addon-fit';
+import {
+    TERMINAL_RENDERER_STORAGE_KEY,
+    resolveTerminalRenderer,
+    translateKeyEventResult,
+    createTerminal,
+} from './terminal-renderer.js';
 
 const terminalDebugParameter = new URLSearchParams(window.location.search).get('terminal-debug');
 
@@ -217,6 +223,17 @@ export function initializeTerminalComponent() {
             selectedTheme: applicationTerminalThemes[localStorage.getItem('coolify-console-theme')]
                 ? localStorage.getItem('coolify-console-theme')
                 : 'system',
+            selectedRenderer: resolveTerminalRenderer(localStorage.getItem(TERMINAL_RENDERER_STORAGE_KEY)),
+            // ghostty-web needs a settled paint before its first writes render, so
+            // PTY output is buffered until the terminal is ready. xterm marks itself
+            // ready immediately.
+            terminalWriteReady: false,
+            pendingTerminalOutput: [],
+            // Guards setTerminalRenderer against overlapping switches. Each switch
+            // tears down and rebuilds the terminal + websocket asynchronously, so a
+            // second switch while one is in flight would leave two terminals bound
+            // to one host, duplicate onData handlers, and a leaked websocket.
+            rendererSwitchInFlight: false,
 
             init() {
                 this.starting = this.$el.dataset.autoStart === 'true';
@@ -281,14 +298,21 @@ export function initializeTerminalComponent() {
                 // Recover if a previous portal build left the terminal on <body>.
                 this.$nextTick(() => this.salvageStrayFullscreenNodes());
 
-                this.setupTerminal();
+                // setupTerminal is async because ghostty-web loads its WASM module
+                // before the first terminal can be constructed. Wire the input
+                // listeners and open the websocket only once the terminal exists.
+                this.setupTerminal().then(() => {
+                    this.setupTerminalEventListeners();
 
-                // Add a small delay for initial connection to ensure everything is ready
-                setTimeout(() => {
-                    this.initializeWebSocket();
-                }, 100);
-
-                this.setupTerminalEventListeners();
+                    // Add a small delay for initial connection to ensure everything is ready
+                    setTimeout(() => {
+                        this.initializeWebSocket();
+                    }, 100);
+                }).catch((error) => {
+                    logTerminal('error', '[Terminal] Failed to initialize terminal:', error);
+                    this.starting = false;
+                    this.$wire.dispatch('error', 'The terminal failed to start. Please reload the page.');
+                });
 
                 this.$wire.on('send-back-command', (command) => {
                     this.sendCommandWhenReady({ command: command });
@@ -479,10 +503,18 @@ export function initializeTerminalComponent() {
                 localStorage.setItem('coolify-console-theme', themeName);
 
                 if (this.term) {
+                    // ghostty-web has no `.refresh()`; assigning `options.theme`
+                    // re-themes it live on its own, so the refresh is xterm-only.
+                    const refresh = () => {
+                        if (typeof this.term?.refresh === 'function') {
+                            this.term.refresh(0, Math.max(0, this.term.rows - 1));
+                        }
+                    };
+
                     const cursorBlink = this.term.options.cursorBlink;
                     this.term.options.cursorBlink = false;
                     this.term.options.theme = { ...applicationTerminalThemes[themeName] };
-                    this.term.refresh(0, Math.max(0, this.term.rows - 1));
+                    refresh();
 
                     requestAnimationFrame(() => {
                         if (!this.term) {
@@ -490,7 +522,7 @@ export function initializeTerminalComponent() {
                         }
 
                         this.term.options.cursorBlink = cursorBlink;
-                        this.term.refresh(0, Math.max(0, this.term.rows - 1));
+                        refresh();
                         this.term.focus();
                         logTerminal('log', '[Terminal Theme] Theme applied', this.terminalThemeDebugSnapshot(themeName));
                     });
@@ -552,34 +584,68 @@ export function initializeTerminalComponent() {
                 }
             },
 
-            setupTerminal() {
+            async setupTerminal() {
                 const terminalElement = document.getElementById('terminal');
-                if (terminalElement) {
-                    const isApplicationConsole = terminalElement.dataset.terminalStyle === 'application';
-                    this.term = new Terminal({
-                        cols: 80,
-                        rows: 30,
-                        fontFamily: '"Geist Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace, "Powerline Extra Symbols"',
-                        fontSize: isApplicationConsole ? 13 : 14,
-                        fontWeight: isApplicationConsole ? 550 : 'normal',
-                        fontWeightBold: 700,
-                        lineHeight: isApplicationConsole ? 1.15 : 1,
-                        cursorBlink: true,
-                        cursorStyle: 'block',
-                        rendererType: 'canvas',
-                        convertEol: true,
-                        disableStdin: false,
-                        scrollback: 5000,
-                        theme: isApplicationConsole
-                            ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes.system
-                            : undefined
-                    });
-                    this.fitAddon = new FitAddon();
-                    this.term.loadAddon(this.fitAddon);
-                    this.$nextTick(() => {
-                        this.resizeTerminal();
-                    });
+                if (!terminalElement) {
+                    return;
                 }
+
+                const isApplicationConsole = terminalElement.dataset.terminalStyle === 'application';
+                // fontWeight/fontWeightBold/rendererType are xterm-only options and
+                // are silently ignored by ghostty-web.
+                const options = {
+                    cols: 80,
+                    rows: 30,
+                    fontFamily: '"Geist Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace, "Powerline Extra Symbols"',
+                    fontSize: isApplicationConsole ? 13 : 14,
+                    fontWeight: isApplicationConsole ? 550 : 'normal',
+                    fontWeightBold: 700,
+                    lineHeight: isApplicationConsole ? 1.15 : 1,
+                    cursorBlink: true,
+                    cursorStyle: 'block',
+                    rendererType: 'canvas',
+                    convertEol: true,
+                    disableStdin: false,
+                    scrollback: 5000,
+                    theme: isApplicationConsole
+                        ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes.system
+                        : undefined
+                };
+
+                try {
+                    const { term, fitAddon } = await createTerminal(this.selectedRenderer, options, {
+                        XtermTerminal: Terminal,
+                        XtermFitAddon: FitAddon,
+                    });
+                    this.term = term;
+                    this.fitAddon = fitAddon;
+                } catch (error) {
+                    logTerminal('error', '[Terminal] Failed to create terminal renderer:', error);
+                    // Fall back to xterm if the experimental renderer fails to load.
+                    if (this.selectedRenderer !== 'xterm') {
+                        this.selectedRenderer = 'xterm';
+                        // Persist + announce the fallback so the next page load does not
+                        // retry the failing renderer forever, and the toolbar selector
+                        // converges on the renderer that is actually running.
+                        localStorage.setItem(TERMINAL_RENDERER_STORAGE_KEY, 'xterm');
+                        window.dispatchEvent(new CustomEvent('terminal-renderer-fallback', {
+                            detail: { renderer: 'xterm' },
+                        }));
+                        this.$wire.dispatch('error', 'The experimental renderer failed to load. Falling back to xterm.js.');
+                        const { term, fitAddon } = await createTerminal('xterm', options, {
+                            XtermTerminal: Terminal,
+                            XtermFitAddon: FitAddon,
+                        });
+                        this.term = term;
+                        this.fitAddon = fitAddon;
+                    } else {
+                        throw error;
+                    }
+                }
+
+                this.$nextTick(() => {
+                    this.resizeTerminal();
+                });
             },
 
             initializeWebSocket() {
@@ -783,21 +849,19 @@ export function initializeTerminalComponent() {
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
+                        this.markTerminalWriteReady();
                     } else {
                         // Already initialized — this is a reconnect or a follow-up command.
                         // Preserve scrollback so the user keeps context. Write a visible
                         // separator so the new shell prompt is easy to spot.
-                        try {
-                            const stamp = new Date().toLocaleTimeString();
-                            this.term.write(`\r\n\x1b[32m── Reconnected at ${stamp} ──\x1b[0m\r\n`);
-                        } catch (_) {
-                            // ignore — fall through; xterm will render the new prompt anyway
-                        }
+                        const stamp = new Date().toLocaleTimeString();
+                        this.writeToTerminal(`\r\n\x1b[32m── Reconnected at ${stamp} ──\x1b[0m\r\n`);
                     }
                     this.terminalActive = true;
                     this.startTerminalSessionCountdown();
                     this.term.focus();
-                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
+                    // ghostty-web renders its own scrollbar and has no `.xterm-viewport`.
+                    document.querySelector('.xterm-viewport')?.classList.add('scrollbar', 'rounded-sm');
 
                     // Initial resize after terminal is ready
                     this.resizeTerminal();
@@ -851,7 +915,7 @@ export function initializeTerminalComponent() {
                 } else {
                     try {
                         this.pendingWrites++;
-                        this.term.write(event.data, (err) => {
+                        this.writeToTerminal(event.data, (err) => {
                             if (err) {
                                 logTerminal('error', '[Terminal] Write error:', err);
                             }
@@ -891,21 +955,152 @@ export function initializeTerminalComponent() {
                     }
                 });
 
-                // Copy and paste functionality
+                // Copy and paste functionality. The inner logic uses xterm's
+                // convention (return false to stop the terminal handling the key);
+                // translateKeyEventResult flips it for ghostty-web's inverse convention.
                 this.term.attachCustomKeyEventHandler((arg) => {
-                    if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
-                        return false;
-                    }
-
-                    if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
-                        const selection = this.term.getSelection();
-                        if (selection) {
-                            navigator.clipboard.writeText(selection);
+                    const handle = () => {
+                        if (arg.ctrlKey && arg.code === "KeyV" && arg.type === "keydown") {
                             return false;
                         }
-                    }
-                    return true;
+
+                        if (arg.ctrlKey && arg.code === "KeyC" && arg.type === "keydown") {
+                            const selection = this.term.getSelection();
+                            if (selection) {
+                                navigator.clipboard.writeText(selection);
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+
+                    return translateKeyEventResult(this.selectedRenderer, handle());
                 });
+            },
+
+            /**
+             * Write to the terminal, buffering until the renderer is ready to paint.
+             * ghostty-web drops writes that arrive before its first settled paint, so
+             * output is queued and flushed once ready. For xterm this is a passthrough.
+             */
+            writeToTerminal(data, cb) {
+                if (!this.term) {
+                    // Terminal is gone (teardown / renderer switch). Release the pending
+                    // write so flow-control accounting (pendingWrites) stays balanced and
+                    // the PTY is not paused forever after enough dropped writes.
+                    cb?.();
+                    return;
+                }
+
+                if (this.terminalWriteReady) {
+                    this.term.write(data, cb);
+                    return;
+                }
+
+                this.pendingTerminalOutput.push([data, cb]);
+            },
+
+            markTerminalWriteReady() {
+                if (this.selectedRenderer === 'ghostty') {
+                    // Wait two frames + a tick for ghostty's first paint to settle
+                    // before flushing, mirroring the ghostty-web integration guidance.
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        setTimeout(() => this.flushPendingTerminalOutput(), 0);
+                    }));
+                    return;
+                }
+
+                this.flushPendingTerminalOutput();
+            },
+
+            flushPendingTerminalOutput() {
+                this.terminalWriteReady = true;
+                if (!this.term || this.pendingTerminalOutput.length === 0) {
+                    return;
+                }
+
+                const pending = this.pendingTerminalOutput;
+                this.pendingTerminalOutput = [];
+                for (const [data, cb] of pending) {
+                    this.term.write(data, cb);
+                }
+            },
+
+            /**
+             * Switch the active terminal frontend (xterm ↔ ghostty). Tears down the
+             * current terminal and websocket, rebuilds with the new renderer, and
+             * reconnects — the last SSH command is replayed so the session respawns.
+             */
+            async setTerminalRenderer(renderer) {
+                const resolved = resolveTerminalRenderer(renderer);
+                // Serialize switches: selectedRenderer updates synchronously below but
+                // the rebuild awaits (ghostty WASM load makes that window long). Without
+                // this guard, rapid clicks interleave into two terminals on one host,
+                // duplicate keystrokes, and a leaked websocket.
+                if (resolved === this.selectedRenderer || this.rendererSwitchInFlight) {
+                    return;
+                }
+
+                this.rendererSwitchInFlight = true;
+                try {
+                    this.selectedRenderer = resolved;
+                    localStorage.setItem(TERMINAL_RENDERER_STORAGE_KEY, resolved);
+
+                    // Preserve the last command so reconnect respawns the same target session.
+                    const replayCommand = this.lastSentCommand;
+
+                    this.terminalActive = false;
+                    this.terminalWriteReady = false;
+                    this.pendingTerminalOutput = [];
+                    this.pendingWrites = 0;
+                    this.paused = false;
+                    this.pendingCommand = null;
+                    this.clearAllTimers();
+                    this.resetTerminalSessionCountdown();
+
+                    if (this.socket) {
+                        // Detach handlers first so the old socket's async onclose cannot
+                        // clear timers / reset state after the new connection is set up.
+                        this.socket.onopen = null;
+                        this.socket.onmessage = null;
+                        this.socket.onerror = null;
+                        this.socket.onclose = null;
+                        this.socket.close(1000, 'Renderer switch');
+                        this.socket = null;
+                    }
+
+                    if (this.term) {
+                        try {
+                            this.term.dispose();
+                        } catch (_) {
+                            // ignore — renderer may have already torn down its DOM
+                        }
+                        this.term = null;
+                    }
+                    this.fitAddon = null;
+
+                    const host = document.getElementById('terminal');
+                    if (host) {
+                        host.replaceChildren();
+                    }
+
+                    this.connectionState = 'disconnected';
+                    this.reconnectAttempts = 0;
+                    this.starting = Boolean(replayCommand);
+                    this.lastSentCommand = replayCommand;
+
+                    await this.setupTerminal();
+                    this.setupTerminalEventListeners();
+                    this.initializeWebSocket();
+                } catch (error) {
+                    // Handle failures internally so the Alpine renderer-change action
+                    // never produces an unhandled rejection.
+                    logTerminal('error', '[Terminal] Renderer switch failed:', error);
+                    this.starting = false;
+                    this.$wire.dispatch('error', 'Failed to switch the terminal renderer. Please reload the page.');
+                } finally {
+                    this.rendererSwitchInFlight = false;
+                }
             },
 
             destroy() {

@@ -5,6 +5,7 @@
 <div id="terminal-container" x-data="terminalData()" data-auto-start="{{ $autoStart ? 'true' : 'false' }}"
     x-on:terminal-starting.window="starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')"
     x-on:terminal-theme-change.window="setTerminalTheme($event.detail.theme)"
+    x-on:terminal-renderer-change.window="setTerminalRenderer($event.detail.renderer)"
     @class([
         'group/terminal relative h-full min-h-0 bg-transparent' => $isApplicationConsole,
     ])>
