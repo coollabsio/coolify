@@ -362,8 +362,9 @@ class User extends Authenticatable implements SendsEmail
             return null;
         }
 
-        // Check if user actually belongs to this team
-        if (! $this->teams->contains('id', $sessionTeamId)) {
+        // Regular users may only use teams they belong to.
+        // Instance administrators can operate in any existing team context.
+        if (! $this->isInstanceAdmin() && ! $this->teams->contains('id', $sessionTeamId)) {
             session()->forget('currentTeam');
             Cache::forget('user:'.$this->id.':team:'.$sessionTeamId);
 
