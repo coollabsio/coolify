@@ -64,3 +64,22 @@ it('recognises generated container names in both timestamp formats', function ()
         ->and(isGeneratedContainerName('application-uuid-pr-42'))->toBeFalse()
         ->and(isGeneratedContainerName('my-api'))->toBeFalse();
 });
+
+function applicationWithContainerNamePrefix(string $prefix = 'my-api', bool $consistent = false): Application
+{
+    $application = new Application;
+    $application->forceFill(['uuid' => 'application-uuid']);
+    $application->setRelation('settings', new ApplicationSetting([
+        'custom_container_name_prefix' => $prefix,
+        'is_consistent_container_name_enabled' => $consistent,
+    ]));
+
+    return $application;
+}
+
+it('uses the container name prefix for generated container names only', function () {
+    expect(generateApplicationContainerName(applicationWithContainerNamePrefix()))->toMatch('/^my-api-\d{8}T\d{6}$/')
+        ->and(generateApplicationContainerName(applicationWithContainerNamePrefix('')))->toMatch('/^application-uuid-\d{8}T\d{6}$/')
+        ->and(generateApplicationContainerName(applicationWithContainerNamePrefix(consistent: true)))->toBe('application-uuid')
+        ->and(generateApplicationContainerName(applicationWithContainerNamePrefix(), 42))->toBe('application-uuid-pr-42');
+});
