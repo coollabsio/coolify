@@ -11,12 +11,15 @@
         $dashboardItemLimit = 8;
         $dashboardProjects = $projects->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
         $dashboardServers = $servers->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
+        $hasTrafficAnalytics = $servers->contains(fn ($server) => $server->isTrafficAnalyticsEnabled());
     @endphp
 
     <div class="flex min-w-0 flex-col gap-8">
         <livewire:dashboard.active-deployments />
 
-        <livewire:dashboard.traffic-analytics />
+        @if ($hasTrafficAnalytics)
+            <livewire:dashboard.traffic-analytics />
+        @endif
 
         <section class="mb-0! min-w-0">
             <x-section-heading title="Projects" subtitle="Your deployment workspaces"

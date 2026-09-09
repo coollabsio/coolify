@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\TrafficAnalytics;
 use App\Models\Application;
 use App\Models\Environment;
@@ -65,6 +66,19 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+});
+
+it('hides traffic analytics from the dashboard when no server has it enabled', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(Dashboard::class)
+        ->assertOk()
+        ->assertDontSee('Traffic analytics');
 });
 
 it('renders the team traffic summary aggregated across servers with an approximate badge', function () {
@@ -150,6 +164,14 @@ it('shows loading states while the dashboard range refreshes', function () {
         ->toContain('aria-label="Loading analytics"');
 });
 
+it('styles the open analytics link as a dashboard action button', function () {
+    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
+
+    expect($view)
+        ->toContain('class="group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5')
+        ->toContain('group-hover:translate-x-0.5');
+});
+
 it('uses the dashboard surface treatment for the analytics KPI group', function () {
     $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
 
@@ -162,7 +184,7 @@ it('uses the dashboard surface treatment for the analytics KPI group', function 
         ->not->toContain('dark:bg-base dark:hover:bg-white/[0.03]');
 });
 
-it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {
+it('hides dashboard analytics when every server fetch fails', function () {
     $serverOne = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -183,12 +205,14 @@ it('shows a failure empty-state instead of an all-zero KPI panel when every serv
 
     loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
-        ->assertSee('No analytics data yet')
+        ->assertSeeHtml('class="contents"')
+        ->assertDontSee('Traffic analytics')
+        ->assertDontSee('No analytics data yet')
         ->assertDontSee('Unique visitors')
         ->assertDontSee('Error rate');
 });
 
-it('shows an empty state when no server in the team has traffic analytics enabled', function () {
+it('renders nothing when no server in the team has traffic analytics enabled', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -200,5 +224,13 @@ it('shows an empty state when no server in the team has traffic analytics enable
     loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         ->assertDontSee('Unique visitors')
-        ->assertSee('not enabled');
+        ->assertDontSee('Traffic analytics');
+});
+
+it('uses an empty lazy placeholder so analytics only appears after data loads', function () {
+    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics-placeholder.blade.php'));
+
+    expect($view)
+        ->toContain('class="contents"')
+        ->not->toContain('Traffic analytics');
 });

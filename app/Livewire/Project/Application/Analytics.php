@@ -221,8 +221,17 @@ class Analytics extends Component
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
     }
 
-    public function placeholder(): View
+    public function placeholder(array $params = []): View
     {
+        $application = $params['application'] ?? null;
+
+        if ($application instanceof Application && ! $application->destination?->server?->isTrafficAnalyticsEnabled()) {
+            $this->application = $application;
+            $this->enabled = false;
+
+            return view('livewire.project.application.analytics');
+        }
+
         // Rendered instantly; the Sentinel round-trip runs in the deferred lazy-load request.
         return view('livewire.project.application.analytics-placeholder');
     }
