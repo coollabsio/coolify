@@ -1,5 +1,15 @@
 # Lessons
 
+## Confirm which surface becomes the modal
+- When a user wants two settings pages replaced by a modal, identify the parent page that owns the trigger and confirm that the complete child settings view moves into that modal.
+- Do not make one child page a modal inside the other child page when the user wants both child URLs removed.
+- When the modal itself supplies the title and subtitle, do not repeat page-style section cards inside it. Use a flat input layout and one footer for actions.
+- Put destructive actions on the footer's left. Put conversion and the primary Save action on the right, with Save last.
+- Do not repeat domain-port guidance in a resource settings modal when domain ports have their own input in the domain editor.
+- A flat modal form can still use a bordered summary box for a distinct linked resource, such as the domain count and Manage domains action.
+- For compact modal headers, show the descriptive subtitle as hover text on an underlined title instead of adding a second visible line.
+- Reuse `x-helper` and the plain `underline underline-offset-4` trigger for title help. Do not use a native `title` tooltip or a dotted underline when the project already has a shared title-tooltip pattern.
+
 ## Alpine x-transition + tw-animate-css exit animations flash at the end
 - Symptom: a modal/overlay fades out, then flashes fully visible for 1-2 frames before it disappears.
 - Cause: `animate-out` keyframes default to `animation-fill-mode: none`. The element snaps back to its natural state when the keyframe ends. Alpine hides the element (display: none) only after its own timer (read from `transition-duration`), which starts ~2 rAF later than the animation. The gap shows the element at full opacity.
@@ -52,3 +62,23 @@
 ## Verify reported fixes against the running development app
 - When a user asks for before-and-after verification, test the unchanged and fixed production code against the same Jean Run environment.
 - Cover each requested interface, such as UI and API, and record the exact URL, response, persisted state, and relevant logs.
+
+## Do not infer that “Pro” means paid
+- When the user calls a setting “Pro,” confirm whether it means advanced-user functionality or a subscription entitlement.
+- Do not add billing or Cloud-only checks unless the user explicitly requests them.
+
+## Verify compound status layouts visually
+- When a status component can render more than one badge, give its root an explicit horizontal flex layout.
+- Inspect the real top-bar layout with every conditional badge visible before calling a UI change complete.
+
+## Keep a requested security control at its stated scope
+- If the user specifies one team-level redaction flag, do not introduce per-secret policy questions.
+- Explain storage constraints as implementation details, then preserve the requested single control.
+
+## Use shared section title helpers in edit modals
+- When modal section descriptions should appear on hover, use `x-application.settings-section` instead of a manual heading and visible paragraph.
+- Keep text labels for direct actions such as Back up now. Use a standard icon button with a tooltip for familiar secondary actions such as settings.
+
+
+## Keep modal actions in the footer
+- When a modal has a large editable body, put preview, validation, and save controls in a fixed footer. Keep the title bar for the title and close action.

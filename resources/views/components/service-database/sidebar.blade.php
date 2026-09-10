@@ -3,25 +3,6 @@
     'serviceDatabase',
 ])
 
-@php
-    $items = [
-        [
-            'label' => 'General',
-            'route' => 'project.service.index',
-            'icon' => 'settings',
-            'active' => request()->routeIs('project.service.index'),
-        ],
-        [
-            'label' => 'Advanced',
-            'route' => 'project.service.index.advanced',
-            'icon' => 'grid',
-            'active' => request()->routeIs('project.service.index.advanced'),
-        ],
-    ];
-
-    $items = array_values(array_filter($items, fn (array $item): bool => $item['visible'] ?? true));
-@endphp
-
 <aside class="application-settings-navigation min-w-0 xl:self-start">
     <nav aria-label="Compose resource settings"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -32,16 +13,10 @@
             <span class="menu-item-label">Back to service</span>
         </a>
 
-        @foreach ($items as $item)
-            <a @class([
-                'menu-item',
-                'menu-item-active' => $item['active'],
-            ])
-                @if ($item['navigate'] ?? true) {{ wireNavigate() }} @endif
-                href="{{ route($item['route'], $item['parameters'] ?? $parameters) }}">
-                <x-reicon :name="$item['icon']" class="menu-item-icon" />
-                <span class="menu-item-label">{{ $item['label'] }}</span>
-            </a>
-        @endforeach
+        <a class="menu-item menu-item-active" {{ wireNavigate() }}
+            href="{{ route('project.service.index', $parameters) }}">
+            <x-reicon name="settings" class="menu-item-icon" />
+            <span class="menu-item-label">General</span>
+        </a>
     </nav>
 </aside>

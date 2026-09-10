@@ -296,7 +296,11 @@
                                     wire:click.stop="backupNow('database', '{{ $databaseBackup->uuid }}')"
                                     wire:target="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-forms.button>
                                 <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    wire:click.stop="openSchedule('{{ $databaseBackup->uuid }}')">Settings</x-forms.button>
+                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
+                                    title="Edit backup schedule" aria-label="Edit backup schedule"
+                                    wire:click.stop="openSchedule('{{ $databaseBackup->uuid }}')">
+                                    <x-reicon name="settings" class="size-4" />
+                                </x-forms.button>
                             </span>
                         </div>
                     @endforeach
@@ -346,7 +350,11 @@
                                     wire:click.stop="backupNow('storage', '{{ $backup->uuid }}')"
                                     wire:target="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-forms.button>
                                 <x-forms.button type="button" canGate="update" :canResource="$service"
-                                    wire:click.stop="openSchedule('{{ $backup->uuid }}')">Settings</x-forms.button>
+                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
+                                    title="Edit backup schedule" aria-label="Edit backup schedule"
+                                    wire:click.stop="openSchedule('{{ $backup->uuid }}')">
+                                    <x-reicon name="settings" class="size-4" />
+                                </x-forms.button>
                             </span>
                         </div>
                     @endforeach
