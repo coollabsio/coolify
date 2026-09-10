@@ -17,3 +17,11 @@ test('dashboard navbar keeps the original side-by-side tab and actions layout', 
         ->toContain('flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between')
         ->toContain('flex min-w-0 w-full items-center gap-0.5 overflow-x-auto');
 });
+
+test('dashboard view all links use the shared button style', function () {
+    $contents = file_get_contents(resource_path('views/components/section-heading.blade.php'));
+
+    expect($contents)
+        ->toContain('class="button group"')
+        ->not->toContain('class="group inline-flex h-7');
+});
