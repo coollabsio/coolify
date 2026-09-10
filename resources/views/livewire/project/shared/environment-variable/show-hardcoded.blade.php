@@ -28,7 +28,10 @@
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @unless (auth()->user()?->isMember() ?? true)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endunless
             <x-modal-input title="Environment variable details" :closeOutside="false">
                 <x-slot:content>
                     <button type="button" data-env-settings-trigger class="icon-button shrink-0"

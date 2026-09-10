@@ -20,15 +20,6 @@ class Sentinel extends Component
 
     public ?string $sentinelUpdatedAt = null;
 
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsRefreshRateSeconds;
-
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int|string $sentinelMetricsHistoryDays;
-
-    #[Validate(['required', 'integer', 'min:10'])]
-    public int|string $sentinelPushIntervalSeconds;
-
     #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;
 
@@ -56,18 +47,12 @@ class Sentinel extends Component
             $this->validate();
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
-            $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
-            $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
-            $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
             $this->server->settings->save();
         } else {
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
-            $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
-            $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
-            $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;

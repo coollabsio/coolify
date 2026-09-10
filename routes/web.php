@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
@@ -49,10 +50,12 @@ use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
 use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenShow;
 use App\Livewire\Security\CloudTokens;
+use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\Analytics\Show as ServerAnalytics;
 use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnel;
@@ -99,6 +102,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\AuditLog as TeamAuditLog;
 use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
@@ -156,6 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/analytics', Analytics::class)->name('analytics');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
@@ -169,6 +174,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
+    Route::get('/settings/oauth/{provider}', SettingsOauth::class)
+        ->where('provider', '[A-Za-z0-9_-]+')
+        ->name('settings.oauth.provider');
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
@@ -208,6 +216,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });
@@ -286,6 +295,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -370,6 +380,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.metrics');
+        Route::get('/analytics', ServerAnalytics::class)->name('server.analytics');
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
@@ -392,6 +403,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+    Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');
     Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
     Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');

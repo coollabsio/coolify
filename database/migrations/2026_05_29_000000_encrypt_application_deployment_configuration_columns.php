@@ -8,6 +8,12 @@ return new class extends Migration
     /**
      * The configuration snapshot/diff now store an encrypted blob (not valid
      * JSON), so the columns must hold arbitrary text instead of json.
+     *
+     * Coolify's own backend runs exclusively on PostgreSQL in production and
+     * SQLite in testing (see config/database.php — the only configured
+     * connections are `pgsql` and `testing`). MySQL/MariaDB are user-managed
+     * resources, never Coolify's application database, so no driver path is
+     * needed for them here.
      */
     public function up(): void
     {

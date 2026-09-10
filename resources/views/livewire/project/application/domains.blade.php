@@ -421,4 +421,5 @@
             </template>
         </div>
     @endif
+    @include('livewire.project.shared.dns-provider-management')
 </div>

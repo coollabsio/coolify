@@ -104,3 +104,47 @@ it('only shows the custom container name for consistent naming', function () {
         ->set('isConsistentContainerNameEnabled', true)
         ->assertSee('Custom container name');
 });
+
+it('saves a slugged container name prefix in generated naming mode', function () {
+    $otherTeamApplication = createApplicationForContainerNamingTest();
+    $otherTeamApplication->settings->update(['custom_container_name_prefix' => 'my-api']);
+
+    $application = createApplicationForContainerNamingTest();
+    $application->settings->update(['custom_internal_name' => 'legacy-name']);
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->assertSee('Container name prefix')
+        ->set('customContainerNamePrefix', 'My API')
+        ->call('saveCustomNamePrefix')
+        ->assertDispatched('success')
+        ->assertSet('customContainerNamePrefix', 'my-api');
+
+    $settings = $application->settings()->first();
+    expect($settings->custom_container_name_prefix)->toBe('my-api')
+        ->and($settings->custom_internal_name)->toBe('legacy-name');
+});
+
+it('rejects a container name prefix already used on the server', function () {
+    $application = createApplicationForContainerNamingTest();
+    $sibling = fn () => Application::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $prefixedApplication = $sibling();
+    $prefixedApplication->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+    $sibling()->settings->update(['custom_internal_name' => 'api']);
+
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+    $component = Livewire::test(Advanced::class, ['application' => $application]);
+
+    foreach (['shared-prefix', 'api', $prefixedApplication->uuid] as $takenPrefix) {
+        $component->set('customContainerNamePrefix', $takenPrefix)
+            ->call('saveCustomNamePrefix')
+            ->assertDispatched('error')
+            ->assertSet('customContainerNamePrefix', null);
+    }
+
+    expect($application->settings()->first()->custom_container_name_prefix)->toBeNull();
+});

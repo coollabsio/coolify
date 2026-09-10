@@ -5,7 +5,7 @@
              `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
              flashes this bar on every page open. --}}
         <x-unsaved-bar action="submit"
-            targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
+            targets="sentinelCustomUrl,sentinelToken" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
@@ -60,21 +60,6 @@
                 </div>
             </x-application.settings-section>
 
-            <x-application.settings-section id="server-sentinel-metrics-section" title="Metrics collection"
-                helper="Control collection frequency, retention, and the push interval.">
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                        id="sentinelMetricsRefreshRateSeconds" label="Collection rate" required
-                        helper="Seconds between metric samples." />
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                        id="sentinelMetricsHistoryDays" label="History retention" required
-                        helper="Days of CPU and memory history to retain." />
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
-                        id="sentinelPushIntervalSeconds" label="Push interval" required
-                        helper="Seconds between health reports sent to Coolify." />
-                </div>
-            </x-application.settings-section>
-
             @if (isDev())
                 <x-application.settings-section id="server-sentinel-development-section"
                     title="Development overrides"
@@ -87,19 +72,27 @@
                             ]" />
                         <div x-data="{
                             customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
-                            saveCustomImage() {
+                            async applyCustomImage() {
                                 localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                                $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.restartSentinel();
                             }
                         }"
                             {{-- Only hydrate Livewire when a real override exists. Unconditional
                                  $wire.set('', null→'') on every open marks the component dirty and
                                  flashes the unsaved bar until the round-trip completes. --}}
                             x-init="if (customImage) { $wire.set('sentinelCustomDockerImage', customImage) }">
-                            <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
-                                @input.debounce.500ms="saveCustomImage()"
-                                placeholder="sentinel:latest" label="Custom Docker image"
-                                helper="Leave empty to use the default Sentinel image." />
+                            <div class="flex items-end gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
+                                        placeholder="sentinel:latest" label="Custom Docker image"
+                                        helper="Leave empty to use the default Sentinel image." />
+                                </div>
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    x-on:click="applyCustomImage()">
+                                    Apply and restart
+                                </x-forms.button>
+                            </div>
                         </div>
                     </div>
                 </x-application.settings-section>
