@@ -1587,7 +1587,7 @@ class Service extends BaseModel
         Storage::disk('local')->delete("tmp/{$filename}");
 
         $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        $environmentFilename = new_public_id().'.env.tmp';
 
         $envs = collect([]);
 
@@ -1618,10 +1618,10 @@ class Service extends BaseModel
             $envs->push("{$env->key}={$env->real_value}");
         }
         if ($envs->count() === 0) {
-            $commands[] = 'touch .env';
+            $commands[] = "touch {$environmentFilename} && mv {$environmentFilename} .env";
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFilename} > /dev/null && mv {$environmentFilename} .env";
         }
 
         instant_remote_process($commands, $this->server);
