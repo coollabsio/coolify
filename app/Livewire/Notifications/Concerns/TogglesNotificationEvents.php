@@ -8,6 +8,7 @@ trait TogglesNotificationEvents
         'deploymentSuccess',
         'deploymentFailure',
         'statusChange',
+        'restartLimitReached',
         'backupSuccess',
         'backupFailure',
         'scheduledTaskSuccess',

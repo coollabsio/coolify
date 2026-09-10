@@ -288,6 +288,18 @@ test('admin can update email notification settings', function () {
     expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
+test('admin can disable restart limit email notifications', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->assertSet('restartLimitReachedEmailNotifications', true)
+        ->call('toggleEvent', 'restartLimitReachedEmailNotifications')
+        ->assertSet('restartLimitReachedEmailNotifications', false);
+
+    expect($this->team->emailNotificationSettings->fresh()->restart_limit_reached_email_notifications)->toBeFalse();
+});
+
 test('admin can save team smtp settings without a resend api key when resend is disabled', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
