@@ -6,6 +6,12 @@
             'active' => request()->routeIs('security.private-key.*'),
             'icon' => 'keys',
         ],
+        auth()->user()?->can('viewAny', App\Models\DockerRegistry::class) ? [
+            'label' => 'Docker Registries',
+            'route' => 'security.docker-registry.index',
+            'active' => request()->routeIs('security.docker-registry.*'),
+            'icon' => 'layers',
+        ] : null,
         auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class) ? [
             'label' => 'Cloud Tokens',
             'route' => 'security.cloud-tokens',

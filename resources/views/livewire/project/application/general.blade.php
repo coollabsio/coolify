@@ -7,7 +7,7 @@
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit"
-            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
+            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,dockerRegistryId,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
             @if ($buildPack === 'dockercompose')
@@ -393,6 +393,20 @@
                                 label="Tag" x-bind:disabled="!canUpdate" />
                         @endif
                     @endif
+                </div>
+                <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.select id="dockerRegistryId" label="Registry credentials"
+                            helper="Optional. Manage credentials in Keys &amp; Tokens &gt; Docker Registries."
+                            x-bind:disabled="!canUpdate">
+                            <option value="">No credentials (public)</option>
+                            @foreach ($dockerRegistries as $registry)
+                                <option value="{{ $registry->id }}">
+                                    {{ $registry->name }} ({{ $registry->registry_url ?? 'docker.io' }})
+                                </option>
+                            @endforeach
+                        </x-forms.select>
+                    </div>
                 </div>
                 </x-application.settings-section>
             @endif
