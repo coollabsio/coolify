@@ -12,6 +12,12 @@ Design: one `LocalFileVolume` row per mount stays on the application with the pr
 - [x] Tests: `tests/Feature/ComposePreviewFileStorageTest.php`, `tests/Feature/ComposeServiceNamesForPreviewTest.php`.
 - [x] Dev instance smoke test with `coolify-examples` `docker-compose-test/docker-compose-local-volumes.yaml`: production deploy, new preview deploy, existing preview redeploy from legacy rows (rows healed, copies kept with content, shared mount uses production dir, production not restarted), production redeploy, preview delete via API (copies removed and not recreated).
 
+## Post-commit check (2026-09-09, after ce4e22a64)
+
+- [x] Regression found by `tests/Feature/ApplicationDomainsTest.php` "does not erase preview domains when parse fails": `composeServiceNamesForPreview()` swallowed YAML errors and returned `[]`, so `PreviewDomains::persistDomains()` erased all stored preview domains on an unparsable compose file. Fixed: the helper throws on invalid YAML (blank compose still returns `[]`); `ApplicationPreview` keeps tolerating it for FQDN generation.
+- [x] Dev instance smoke test after the commit: production deploy, new preview, existing preview redeploy from legacy rows, production redeploy, preview delete, plus redeploy of the existing "Docker Compose Example" app. All good.
+- [ ] Full suite on this host has pre-existing failures unrelated to the branch (host PHP has no phpredis, DNS-dependent assertions, Mockery `setAttribute` on model mocks, `S3StorageFormTest` double `uses()` breaks a whole-Feature run).
+
 ## Deferred
 
 - [ ] Legacy `-pr-N` volume rows on the application (previews parsed before the ownership fix) stay after preview delete. Cleanup later.

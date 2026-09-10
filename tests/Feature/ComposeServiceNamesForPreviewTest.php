@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
+use Symfony\Component\Yaml\Exception\ParseException;
 
 uses(RefreshDatabase::class);
 
@@ -115,4 +116,16 @@ it('is shared by the preview model and the preview domains component', function 
 
     expect($component->get('newDomainService'))->toBe($names[0]);
     $component->assertSee('worker-pr-5');
+});
+
+it('throws on an unparsable compose file so callers do not treat it as no services', function () {
+    $this->application->update(['docker_compose_raw' => "services: [unclosed\n  web:\n"]);
+
+    expect(fn () => $this->application->composeServiceNamesForPreview(5))->toThrow(ParseException::class);
+});
+
+it('returns no names for an empty compose file', function () {
+    $this->application->update(['docker_compose_raw' => null]);
+
+    expect($this->application->composeServiceNamesForPreview(5))->toBe([]);
 });

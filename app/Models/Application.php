@@ -2153,12 +2153,8 @@ class Application extends BaseModel
             return [];
         }
 
-        try {
-            $services = data_get(Yaml::parse($compose), 'services', []);
-        } catch (\Throwable) {
-            return [];
-        }
-
+        // Invalid YAML throws on purpose: callers that persist domains must not treat it as "no services".
+        $services = data_get(Yaml::parse($compose), 'services', []);
         if (! is_iterable($services)) {
             return [];
         }

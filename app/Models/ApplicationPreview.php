@@ -310,6 +310,11 @@ class ApplicationPreview extends BaseModel
      */
     private function composeServiceNamesForPreview(): array
     {
-        return $this->application->composeServiceNamesForPreview($this->pull_request_id);
+        try {
+            return $this->application->composeServiceNamesForPreview($this->pull_request_id);
+        } catch (\Throwable) {
+            // FQDN generation tolerates an unparsable compose file, as parse() did before.
+            return [];
+        }
     }
 }

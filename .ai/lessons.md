@@ -10,3 +10,5 @@
 - Never put `pkill -f <pattern>` in the same Bash command as a literal that matches `<pattern>`; the shell kills itself (exit 143/144, empty output). Run the kill in its own command and bracket one character: `pkill -f "playwright run-serve[r]"`.
 - Do not pipe `php artisan test tests/v4/Browser/...` output into `sed | grep` with a `timeout`; the Playwright child keeps stdout open and the pipeline never ends, which looks like a hung test. Redirect to a log file, then read the file.
 - Browser tests need `config()->set('app.maintenance.store', 'array')` before `visit()` on hosts without phpredis; otherwise every page is a 500.
+- When replacing a `parse()` call with a raw YAML read, keep the failure semantics: callers that persist data may rely on an exception to abort. Swallowing the parse error and returning `[]` wiped preview domains (`PreviewDomains::persistDomains`).
+- To compare test results with `origin/main` without a worktree: `git archive origin/main | tar -x -C /tmp/x`, copy `vendor` (a symlink makes Pest compute wrong namespaces), `composer dump-autoload -o`, create `storage/framework/*` and `bootstrap/cache`, then run the same files in both trees.

@@ -251,9 +251,8 @@ it('does not erase preview domains when compose parsing fails during persistence
 
     $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
 
-    $application = Mockery::mock($component->instance()->preview->application)->makePartial();
-    $application->shouldReceive('parse')->once()->andThrow(new RuntimeException('Temporary parse failure'));
-    $component->instance()->preview->setRelation('application', $application);
+    // Service names are read from docker_compose_raw; an unparsable file must abort, not erase domains.
+    $component->instance()->preview->application->docker_compose_raw = "services: [unclosed\n  web:\n";
 
     $component->instance()->removeDomain(0);
 
