@@ -46,6 +46,23 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            // Recover executions orphaned by an interrupted worker. The
+            // WithoutOverlapping middleware guarantees no other cleanup job
+            // for this server is running right now, and its lock expires
+            // after the job timeout, so any record still "running" past the
+            // timeout belongs to a dead worker and would otherwise stay
+            // "running" forever (failed() never runs on a hard kill).
+            DockerCleanupExecution::query()
+                ->where('server_id', $this->server->id)
+                ->where('status', 'running')
+                ->whereNull('finished_at')
+                ->where('created_at', '<', Carbon::now()->subSeconds($this->timeout))
+                ->update([
+                    'status' => 'failed',
+                    'message' => 'Marked as failed: the queue worker was interrupted before this execution finished.',
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
             ]);
