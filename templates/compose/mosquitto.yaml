@@ -40,7 +40,7 @@ services:
       touch /mosquitto/config/passwords &&
       chmod 0700 /mosquitto/config/passwords &&
       chown root:root /mosquitto/config/passwords &&
-      mosquitto_passwd -b -c /mosquitto/config/passwords $SERVICE_USER_MOSQUITTO $SERVICE_PASSWORD_MOSQUITTO &&
+      mosquitto_passwd -b /mosquitto/config/passwords $SERVICE_USER_MOSQUITTO $SERVICE_PASSWORD_MOSQUITTO &&
       chown mosquitto:mosquitto /mosquitto/config/passwords;
       fi &&
       exec mosquitto -c /mosquitto/config/mosquitto.conf
