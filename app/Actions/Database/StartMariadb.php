@@ -287,5 +287,13 @@ class StartMariadb
         $content = $this->database->mariadb_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The file is bind-mounted into the container, where mysqld reads it
+        // as the mysql user. When the server is connected over a non-root SSH
+        // user, tee leaves the host file owned by that user with the SSH
+        // user's umask (e.g. 0600), so mysqld gets EACCES on the includedir
+        // directive and silently skips ALL custom configuration. Make the
+        // file world-readable; the owner stays the SSH user, so later
+        // rewrites via tee keep working.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 }
