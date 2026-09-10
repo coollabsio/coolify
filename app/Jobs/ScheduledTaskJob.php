@@ -18,6 +18,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
@@ -64,6 +65,20 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     public array $containers = [];
 
     public string $server_timezone = 'UTC';
+
+    /**
+     * Prevent overlapping runs of the same task.
+     *
+     * A job recovered after the Redis visibility timeout (retry_after) can be
+     * replayed while its remote command is still executing, and a later cron
+     * dispatch would collide with it. The lock is scoped to the task and held
+     * for the task timeout plus a safety margin, so a recovered or concurrent
+     * dispatch is discarded instead of starting a second run.
+     */
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping('scheduled-task-'.$this->task->id))->expireAfter($this->timeout + 300)->dontRelease()];
+    }
 
     public function __construct(ScheduledTask $task)
     {
