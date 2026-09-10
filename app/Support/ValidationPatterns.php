@@ -96,11 +96,11 @@ class ValidationPatterns
     /**
      * Pattern for S3 bucket names.
      *
-     * Bucket names must be 3-63 lowercase characters, start and end with a
-     * letter or digit, and contain only lowercase letters, digits, dots, and
-     * hyphens. Additional semantic checks live in isValidS3BucketName().
+     * Bucket names must be 3-63 characters, start and end with a letter or
+     * digit, and contain only letters, digits, dots, and hyphens. Uppercase
+     * letters remain supported for legacy and S3-compatible buckets.
      */
-    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[a-z0-9][a-z0-9.-]*[a-z0-9]\z/';
+    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]\z/';
 
     /**
      * Pattern for Docker-compatible environment variable keys.

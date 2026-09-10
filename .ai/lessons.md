@@ -48,3 +48,7 @@
 ## Compare routing identity, not complete domain URLs
 - Domain-conflict checks must treat `http://host` and `https://host` as the same routing identity.
 - Reproduce reports with the exact stored schemes before stating that duplicate detection works.
+
+## Verify reported fixes against the running development app
+- When a user asks for before-and-after verification, test the unchanged and fixed production code against the same Jean Run environment.
+- Cover each requested interface, such as UI and API, and record the exact URL, response, persisted state, and relevant logs.
