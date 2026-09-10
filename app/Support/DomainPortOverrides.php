@@ -34,6 +34,7 @@ class DomainPortOverrides
         $normalizedDomains = collect(explode(',', $fqdn))
             ->map(fn (string $domain): string => trim($domain))
             ->filter()
+            ->filter(fn (string $domain): bool => isValidDomainUrl($domain))
             ->map(function (string $domain) use ($existingOverrides): array {
                 $portlessDomain = self::withoutPort($domain);
                 $parts = DomainUrlParts::split($domain);

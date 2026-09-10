@@ -9,3 +9,6 @@
 ## Displayed defaults must not become stored overrides
 - When an edit form shows an inherited or computed default, trace an unchanged save and a related-field edit through persistence.
 - Preserve the inherited state when the displayed value still equals the computed default; store an override only when the user selects a different value.
+
+## Prove regressions against the unchanged baseline
+- For a bug fix, run the same regression test before and after the production change. Use a stash when requested so the failure and success come from the exact same test.
