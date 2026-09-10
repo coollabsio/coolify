@@ -43,3 +43,51 @@ test('opening the assistant ensures an active thread', function () {
 
     expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(1);
 });
+
+test('opening resumes a recent conversation instead of creating a new one', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $recent = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'updated_at' => now()->subMinutes(30),
+    ]);
+
+    Livewire::test(Assistant::class)
+        ->call('openThread')
+        ->assertSet('activeConversationId', $recent->id);
+
+    expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(1);
+});
+
+test('opening starts a fresh conversation when the last one is over an hour idle', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $stale = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'updated_at' => now()->subHours(2),
+    ]);
+
+    Livewire::test(Assistant::class)
+        ->call('openThread')
+        ->assertSet('activeConversationId', fn ($id) => $id !== null && $id !== $stale->id);
+
+    expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(2);
+});
+
+test('new chat always starts a fresh conversation', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $recent = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'updated_at' => now()->subMinutes(5),
+    ]);
+
+    Livewire::test(Assistant::class)
+        ->call('newThread')
+        ->assertSet('activeConversationId', fn ($id) => $id !== null && $id !== $recent->id);
+
+    expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(2);
+});

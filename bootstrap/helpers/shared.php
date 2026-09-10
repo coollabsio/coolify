@@ -4165,6 +4165,12 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function isAiAssistantEnabled(): bool
+{
+    return (bool) (instanceSettings()->is_ai_assistant_enabled ?? false)
+        && (bool) (currentTeam()->is_ai_assistant_enabled ?? false);
+}
+
 function wireNavigate(): string
 {
     try {

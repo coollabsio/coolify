@@ -49,6 +49,18 @@ test('sending a message starts a turn and clears the composer', function () {
     expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_RESPONDING);
 });
 
+test('a suggestion prompt starts a turn with the chosen text', function () {
+    Bus::fake();
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->call('sendPrompt', 'List my servers and their status')
+        ->assertSet('composerMessage', '')
+        ->assertHasNoErrors();
+
+    Bus::assertDispatched(RunAssistantTurn::class);
+    expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_RESPONDING);
+});
+
 test('an empty message does not start a turn', function () {
     Bus::fake();
 

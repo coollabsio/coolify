@@ -7,7 +7,6 @@ use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Ai\ConversationPage;
-use App\Livewire\Ai\Settings;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
@@ -81,6 +80,7 @@ use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
+use App\Livewire\Settings\Ai as SettingsAi;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
@@ -170,6 +170,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
     Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
+    Route::get('/settings/ai', SettingsAi::class)->name('settings.ai');
     Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
 
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
@@ -409,7 +410,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
-    Route::get('/ai/settings', Settings::class)->name('ai.settings');
     Route::get('/assistant', ConversationPage::class)->name('ai.assistant');
 });
 

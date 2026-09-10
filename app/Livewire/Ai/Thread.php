@@ -7,6 +7,7 @@ use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\Exceptions\NoAiCredentialException;
 use App\Ai\StartAssistantTurn;
 use App\Ai\Support\AssistantTurn;
+use App\Ai\Support\PageContext;
 use App\Jobs\Ai\ResumeAssistantTurn;
 use App\Models\AiConversation;
 use App\Models\User;
@@ -22,6 +23,9 @@ class Thread extends Component
     public int $conversationId;
 
     public string $composerMessage = '';
+
+    /** The UI path the user is viewing, sent with each message for page-aware context. */
+    public ?string $pagePath = null;
 
     public function mount(int $conversationId): void
     {
@@ -65,7 +69,7 @@ class Thread extends Component
             ->map(fn ($row) => [
                 'id' => $row->id,
                 'role' => $row->role,
-                'content' => $row->content,
+                'content' => $row->role === 'user' ? PageContext::strip($row->content) : $row->content,
                 'author' => $row->author_user_id ? ($authors[$row->author_user_id] ?? null) : null,
             ])
             ->values()
@@ -124,14 +128,24 @@ class Thread extends Component
         }
 
         try {
-            app(StartAssistantTurn::class)->handle($this->conversation(), auth()->user(), $message);
+            $pageContext = PageContext::resolve($this->pagePath);
+            app(StartAssistantTurn::class)->handle($this->conversation(), auth()->user(), $message, $pageContext);
             $this->composerMessage = '';
             unset($this->conversation, $this->busy);
         } catch (AssistantBusyException|AssistantRateLimitedException|NoAiCredentialException $e) {
             $this->dispatch('error', $e->getMessage());
+            $this->dispatch('assistant-idle');
         } catch (\Throwable $e) {
+            $this->dispatch('assistant-idle');
             handleError($e, $this);
         }
+    }
+
+    public function sendPrompt(string $message, ?string $pagePath = null): void
+    {
+        $this->composerMessage = $message;
+        $this->pagePath = $pagePath;
+        $this->send();
     }
 
     public function stop(): void

@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Settings\Advanced;
+use App\Livewire\Settings\Ai;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
@@ -22,7 +22,7 @@ test('instance admin can enable the ai assistant', function () {
     $this->actingAs($user);
     session(['currentTeam' => ['id' => $rootTeam->id]]);
 
-    Livewire::test(Advanced::class)
+    Livewire::test(Ai::class)
         ->assertSet('is_ai_assistant_enabled', false)
         ->set('is_ai_assistant_enabled', true)
         ->call('instantSave')

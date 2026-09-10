@@ -9,6 +9,7 @@ use App\Events\Ai\AssistantApprovalRequested;
 use App\Events\Ai\AssistantStreamDelta;
 use App\Events\Ai\AssistantTurnCompleted;
 use App\Events\Ai\AssistantTurnFailed;
+use App\Jobs\Ai\Concerns\ActsAsTeamMember;
 use App\Models\AiConversation;
 use App\Models\AiProviderCredential;
 use Illuminate\Bus\Queueable;
@@ -26,7 +27,7 @@ use Throwable;
 
 class ResumeAssistantTurn implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use ActsAsTeamMember, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
@@ -57,6 +58,7 @@ class ResumeAssistantTurn implements ShouldQueue
             }
 
             Context::add('ai.author_user_id', $this->approverUserId);
+            $this->actAsTeamMember($this->approverUserId, $conversation->team_id);
             $provider = RuntimeProvider::register($credential);
 
             $agent = (new CoolifyAssistant)->continue($conversation->sdk_conversation_id, as: $conversation->team);
@@ -104,6 +106,7 @@ class ResumeAssistantTurn implements ShouldQueue
         } finally {
             AssistantTurn::clear($conversation->uuid);
             $conversation->release();
+            $this->clearTeamMemberContext();
         }
     }
 }

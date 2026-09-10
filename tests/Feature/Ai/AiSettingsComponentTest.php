@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\AiProvider;
-use App\Livewire\Ai\Settings;
+use App\Livewire\Settings\Ai;
 use App\Models\AiProviderCredential;
 use App\Models\InstanceSettings;
 use App\Models\Team;
@@ -13,7 +13,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_ai_assistant_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
     $this->team = Team::factory()->create();
     $this->admin = User::factory()->create();
     $this->admin->teams()->attach($this->team, ['role' => 'admin']);
@@ -25,7 +25,7 @@ test('admin can add a credential and it becomes default when first', function ()
     $this->actingAs($this->admin);
     session(['currentTeam' => ['id' => $this->team->id]]);
 
-    Livewire::test(Settings::class)
+    Livewire::test(Ai::class)
         ->set('newProvider', AiProvider::OPENAI->value)
         ->set('newModel', 'gpt-5')
         ->set('newApiKey', 'sk-abc')
@@ -38,18 +38,11 @@ test('admin can add a credential and it becomes default when first', function ()
         ->and($cred->api_key)->toBe('sk-abc');
 });
 
-test('member is forbidden from adding a credential', function () {
+test('member cannot open the ai settings page', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => ['id' => $this->team->id]]);
 
-    Livewire::test(Settings::class)
-        ->set('newProvider', AiProvider::OPENAI->value)
-        ->set('newModel', 'gpt-5')
-        ->set('newApiKey', 'sk-abc')
-        ->call('addCredential')
-        ->assertDispatched('error');
-
-    expect(AiProviderCredential::where('team_id', $this->team->id)->count())->toBe(0);
+    Livewire::test(Ai::class)->assertRedirect(route('dashboard'));
 });
 
 test('testCredential surfaces a success message', function () {
@@ -65,7 +58,7 @@ test('testCredential surfaces a success message', function () {
         'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
     ])]);
 
-    Livewire::test(Settings::class)
+    Livewire::test(Ai::class)
         ->call('testCredential', $cred->id)
         ->assertDispatched('success');
 });
@@ -78,7 +71,7 @@ test('member of another team cannot delete this team credential', function () {
     $this->actingAs($otherAdmin);
     session(['currentTeam' => ['id' => $otherTeam->id]]);
 
-    Livewire::test(Settings::class)
+    Livewire::test(Ai::class)
         ->call('deleteCredential', $cred->id)
         ->assertDispatched('error');
 

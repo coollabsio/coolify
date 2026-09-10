@@ -1,16 +1,28 @@
 <?php
 
-namespace App\Livewire\Ai;
+namespace App\Livewire\Settings;
 
 use App\Ai\TestConnection;
 use App\Enums\AiProvider;
 use App\Models\AiProviderCredential;
+use App\Models\InstanceSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
-class Settings extends Component
+class Ai extends Component
 {
     use AuthorizesRequests;
+
+    public InstanceSettings $settings;
+
+    public bool $isInstanceAdmin = false;
+
+    #[Validate('boolean')]
+    public bool $is_ai_assistant_enabled = false;
+
+    #[Validate('boolean')]
+    public bool $is_mcp_server_enabled = false;
 
     public bool $isAiEnabled = true;
 
@@ -22,9 +34,33 @@ class Settings extends Component
 
     public ?string $newBaseUrl = null;
 
-    public function mount(): void
+    public function mount()
     {
+        if (! auth()->user()->isAdmin()) {
+            return redirect()->route('dashboard');
+        }
+        $this->settings = instanceSettings();
+        $this->isInstanceAdmin = isInstanceAdmin();
+        $this->is_ai_assistant_enabled = $this->settings->is_ai_assistant_enabled ?? false;
+        $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
         $this->isAiEnabled = currentTeam()->is_ai_assistant_enabled;
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->validate([
+                'is_ai_assistant_enabled' => 'boolean',
+                'is_mcp_server_enabled' => 'boolean',
+            ]);
+            $this->settings->is_ai_assistant_enabled = $this->is_ai_assistant_enabled;
+            $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
+            $this->settings->save();
+            $this->dispatch('success', 'Settings updated!');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function saveTeamToggle()
@@ -121,7 +157,7 @@ class Settings extends Component
 
     public function render()
     {
-        return view('livewire.ai.settings', [
+        return view('livewire.settings.ai', [
             'credentials' => AiProviderCredential::ownedByCurrentTeam()->get(),
             'providers' => AiProvider::cases(),
         ]);

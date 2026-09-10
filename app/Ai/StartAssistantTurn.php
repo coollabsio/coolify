@@ -16,7 +16,10 @@ class StartAssistantTurn
 {
     private const MAX_PER_MINUTE = 30;
 
-    public function handle(AiConversation $conversation, User $user, string $message): void
+    /**
+     * @param  array{key: string, block: string}|null  $pageContext
+     */
+    public function handle(AiConversation $conversation, User $user, string $message, ?array $pageContext = null): void
     {
         Gate::forUser($user)->authorize('view', $conversation);
 
@@ -35,6 +38,12 @@ class StartAssistantTurn
 
         RateLimiter::hit($key, 60);
 
-        RunAssistantTurn::dispatch($conversation->id, $message, $user->id);
+        RunAssistantTurn::dispatch(
+            $conversation->id,
+            $message,
+            $user->id,
+            $pageContext['block'] ?? null,
+            $pageContext['key'] ?? null,
+        );
     }
 }
