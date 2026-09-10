@@ -411,6 +411,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
     Route::get('/assistant', ConversationPage::class)->name('ai.assistant');
+    Route::get('/assistant/{uuid}', ConversationPage::class)->name('ai.assistant.show');
 });
 
 Route::middleware(['auth'])->group(function () {

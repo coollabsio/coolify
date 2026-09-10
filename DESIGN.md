@@ -777,6 +777,9 @@ Use these as implementation references:
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |
+| AI assistant identity glyph | `resources/views/components/ai/avatar.blade.php` |
+| AI conversation top bar (page + widget) | `resources/views/components/ai/conversation-header.blade.php` |
+| AI assistant page / floating widget | `resources/views/livewire/ai/conversation-page.blade.php`, `resources/views/livewire/ai/assistant.blade.php` |
 | Outline icons | `resources/views/components/reicon.blade.php` |
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
 | HTTP error pages | `resources/views/components/error-page.blade.php`, `resources/views/errors/*` |

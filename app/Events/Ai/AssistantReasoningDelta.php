@@ -8,16 +8,19 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class AssistantApprovalRequested implements ShouldBroadcastNow
+/**
+ * Streams the model's reasoning/thinking. Carries the cumulative reasoning text
+ * so any single frame is self-contained (reordering or a missed frame cannot
+ * blank the accordion — a later frame always supersedes an earlier one).
+ */
+class AssistantReasoningDelta implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * @param  array<int, array<string, mixed>>  $approvals
-     */
     public function __construct(
         public string $conversationUuid,
-        public array $approvals,
+        public int $sequence,
+        public string $reasoning,
     ) {}
 
     /**
@@ -30,6 +33,6 @@ class AssistantApprovalRequested implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'assistant.approval';
+        return 'assistant.reasoning';
     }
 }

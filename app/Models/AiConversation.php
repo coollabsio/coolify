@@ -22,6 +22,8 @@ class AiConversation extends BaseModel
         'created_by_user_id',
         'title',
         'visibility',
+        'pinned_at',
+        'archived_at',
         'sdk_conversation_id',
         'default_provider',
         'default_model',
@@ -33,6 +35,14 @@ class AiConversation extends BaseModel
         'visibility' => self::VISIBILITY_PRIVATE,
         'status' => self::STATUS_IDLE,
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'pinned_at' => 'datetime',
+            'archived_at' => 'datetime',
+        ];
+    }
 
     public function team(): BelongsTo
     {

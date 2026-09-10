@@ -26,6 +26,31 @@ test('the assistant is enabled only when both flags are on', function () {
     expect(Livewire::test(Assistant::class)->instance()->enabled())->toBeTrue();
 });
 
+test('the launcher morphs the icon and the header shows an online status', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $html = Livewire::test(Assistant::class)->html();
+
+    expect($html)
+        ->toContain(':aria-expanded="open"')                 // launcher toggles state
+        ->toContain('m6 9 6 6 6-6')                           // minimize chevron path
+        ->toContain('rotate-90 scale-75')                     // morph transform
+        ->toContain('bg-success')                             // online status dot
+        ->toContain('>Online<');                             // status label
+});
+
+test('the floating widget hides itself on the full-page assistant', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $html = Livewire::test(Assistant::class)->html();
+
+    expect($html)
+        ->toContain('x-show="!onAssistantPage"')
+        ->toContain("window.location.pathname.startsWith('/assistant')");
+});
+
 test('the assistant is disabled when the instance flag is off', function () {
     InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => false]);
     Once::flush();

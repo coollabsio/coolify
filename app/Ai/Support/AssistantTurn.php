@@ -31,6 +31,26 @@ class AssistantTurn
         return (string) Cache::get("ai:turn:{$uuid}:partial", '');
     }
 
+    public static function putReasoning(string $uuid, string $text): void
+    {
+        Cache::put("ai:turn:{$uuid}:reasoning", $text, self::TTL);
+    }
+
+    public static function getReasoning(string $uuid): string
+    {
+        return (string) Cache::get("ai:turn:{$uuid}:reasoning", '');
+    }
+
+    public static function putActivity(string $uuid, string $label): void
+    {
+        Cache::put("ai:turn:{$uuid}:activity", $label, self::TTL);
+    }
+
+    public static function getActivity(string $uuid): string
+    {
+        return (string) Cache::get("ai:turn:{$uuid}:activity", '');
+    }
+
     public static function requestStop(string $uuid): void
     {
         Cache::put("ai:turn:{$uuid}:stop", true, self::TTL);
@@ -50,6 +70,8 @@ class AssistantTurn
     {
         Cache::forget("ai:turn:{$uuid}:seq");
         Cache::forget("ai:turn:{$uuid}:partial");
+        Cache::forget("ai:turn:{$uuid}:reasoning");
+        Cache::forget("ai:turn:{$uuid}:activity");
         Cache::forget("ai:turn:{$uuid}:stop");
     }
 }

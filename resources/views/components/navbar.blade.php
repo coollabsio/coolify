@@ -105,6 +105,16 @@
                     </a>
                 </li>
             @endcan
+            @if (isAiAssistantEnabled())
+                <li>
+                    <a title="Assistant" {{ wireNavigate() }}
+                        class="{{ request()->is('assistant*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('ai.assistant') }}">
+                        <x-reicon name="feedback" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Assistant</span>
+                    </a>
+                </li>
+            @endif
             {{-- Infrastructure --}}
             <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
             <li>

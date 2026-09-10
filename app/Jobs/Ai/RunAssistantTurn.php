@@ -6,7 +6,10 @@ use App\Ai\Agents\CoolifyAssistant;
 use App\Ai\Support\AssistantTurn;
 use App\Ai\Support\PageContext;
 use App\Ai\Support\RuntimeProvider;
+use App\Ai\Support\ToolActivity;
+use App\Events\Ai\AssistantActivity;
 use App\Events\Ai\AssistantApprovalRequested;
+use App\Events\Ai\AssistantReasoningDelta;
 use App\Events\Ai\AssistantStreamDelta;
 use App\Events\Ai\AssistantTurnCompleted;
 use App\Events\Ai\AssistantTurnFailed;
@@ -21,7 +24,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Responses\StreamedAgentResponse;
+use Laravel\Ai\Streaming\Events\ReasoningDelta;
 use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\Streaming\Events\ToolCall;
 use RuntimeException;
 use Throwable;
 
@@ -45,6 +50,8 @@ class RunAssistantTurn implements ShouldQueue
         if (! $conversation) {
             return;
         }
+
+        $isFirstTurn = ! $conversation->sdk_conversation_id;
 
         try {
             $credential = AiProviderCredential::defaultForTeam($conversation->team_id);
@@ -70,6 +77,7 @@ class RunAssistantTurn implements ShouldQueue
             });
 
             $partial = '';
+            $reasoning = '';
             foreach ($stream as $event) {
                 if ($event instanceof TextDelta) {
                     $partial .= $event->delta;
@@ -79,6 +87,24 @@ class RunAssistantTurn implements ShouldQueue
                         AssistantTurn::nextSequence($conversation->uuid),
                         $event->delta,
                     ));
+                }
+
+                if ($event instanceof ReasoningDelta) {
+                    $reasoning .= $event->delta;
+                    AssistantTurn::putReasoning($conversation->uuid, $reasoning);
+                    broadcast(new AssistantReasoningDelta(
+                        $conversation->uuid,
+                        AssistantTurn::nextSequence($conversation->uuid),
+                        $reasoning,
+                    ));
+                }
+
+                // Surface tool activity so a long tool-running pause reads as
+                // "Reading servers…" instead of a silent spinner.
+                if ($event instanceof ToolCall) {
+                    $label = ToolActivity::label($event->toolCall->name);
+                    AssistantTurn::putActivity($conversation->uuid, $label);
+                    broadcast(new AssistantActivity($conversation->uuid, $label));
                 }
 
                 if (AssistantTurn::shouldStop($conversation->uuid)) {
@@ -102,6 +128,12 @@ class RunAssistantTurn implements ShouldQueue
                 ));
             } else {
                 broadcast(new AssistantTurnCompleted($conversation->uuid, $final?->text ?? $partial));
+            }
+
+            // Name the conversation from the first exchange (AI title, else a
+            // truncated prompt). Runs in its own job so it never delays the reply.
+            if ($isFirstTurn && blank($conversation->title)) {
+                GenerateConversationTitle::dispatch($conversation->id, $this->message, $this->userId);
             }
         } catch (Throwable $e) {
             broadcast(new AssistantTurnFailed($conversation->uuid, $e->getMessage()));

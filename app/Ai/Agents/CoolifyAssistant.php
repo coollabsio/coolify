@@ -6,17 +6,22 @@ use App\Ai\Docs\DocsIndexStore;
 use App\Ai\Tools\ControlResource;
 use App\Ai\Tools\DeleteResource;
 use App\Ai\Tools\DeleteServer;
+use App\Ai\Tools\ListServiceTemplates;
 use App\Ai\Tools\ReadDocPage;
 use App\Ai\Tools\RunServerCommand;
 use App\Ai\Tools\SearchDocs;
 use App\Ai\Tools\UpsertEnvironmentVariable;
 use App\Mcp\Servers\CoolifyServer;
+use Laravel\Ai\Attributes\CacheInstructions;
+use Laravel\Ai\Attributes\CacheToolDefinitions;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\RemembersConversations as RemembersConversationsContract;
 use Laravel\Ai\Promptable;
 
+#[CacheInstructions]
+#[CacheToolDefinitions]
 class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContract
 {
     use Promptable;
@@ -68,6 +73,10 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
             CoolifyServer::readToolClasses(),
         );
 
+        $catalogTools = [
+            app(ListServiceTemplates::class),
+        ];
+
         $writeTools = [
             app(ControlResource::class),
             app(DeleteServer::class),
@@ -81,6 +90,6 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
             $writeTools[] = app(ReadDocPage::class);
         }
 
-        return [...$readTools, ...$writeTools];
+        return [...$readTools, ...$catalogTools, ...$writeTools];
     }
 }

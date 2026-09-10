@@ -8,16 +8,14 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class AssistantApprovalRequested implements ShouldBroadcastNow
+class AssistantConversationRenamed implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * @param  array<int, array<string, mixed>>  $approvals
-     */
     public function __construct(
-        public string $conversationUuid,
-        public array $approvals,
+        public int $teamId,
+        public int $conversationId,
+        public string $title,
     ) {}
 
     /**
@@ -25,11 +23,11 @@ class AssistantApprovalRequested implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("ai-conversation.{$this->conversationUuid}")];
+        return [new PrivateChannel("team.{$this->teamId}")];
     }
 
     public function broadcastAs(): string
     {
-        return 'assistant.approval';
+        return 'assistant.conversation.renamed';
     }
 }
