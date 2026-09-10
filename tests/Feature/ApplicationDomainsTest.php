@@ -1894,6 +1894,16 @@ it('uses the compact service domains layout for compose applications', function 
         ->not->toContain('title="No domains for this service"');
 });
 
+it('uses a compact two row domain card at medium widths', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('@container service-domains (max-width: 980px)')
+        ->toContain('grid-template-columns: minmax(0, 1fr) auto auto;')
+        ->toContain('grid-template-areas: "domain dns actions" "summary summary summary";')
+        ->toContain('grid-area: summary;');
+});
+
 it('uses concise search indexing headers in application and service domain tables', function () {
     $applicationView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
     $serviceView = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
