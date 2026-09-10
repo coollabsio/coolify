@@ -1,0 +1,65 @@
+# documentation: https://snipe-it.readme.io/docs/introduction
+# slogan: Snipe-IT is an open-source asset management platform built for IT departments.
+# category: productivity
+# tags: inventory, open-source
+# logo: svgs/snipe-it.webp
+# port: 80
+
+services:
+  app:
+    image: snipe/snipe-it:v8.7.1
+    environment:
+      - SERVICE_URL_SNIPEIT_80
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=base64:${SERVICE_REALBASE64_32_APPKEY}
+      - APP_URL=${SERVICE_URL_SNIPEIT}
+      - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
+      - APP_LOCALE=${APP_LOCALE:-en-US}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=${MYSQL_DATABASE:-snipeit}
+      - DB_USERNAME=${SERVICE_USER_MARIADB}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MAIL_MAILER=${MAIL_MAILER:-smtp}
+      - MAIL_HOST=${MAIL_HOST:-null}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USERNAME=${MAIL_USERNAME:-null}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-null}
+      - MAIL_FROM_ADDR=${MAIL_FROM_ADDR:-you@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Snipe-IT}
+    volumes:
+      - storage:/var/lib/snipeit
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost/health
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:11.8
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-snipeit}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      interval: 5s
+      timeout: 1s
+      retries: 5
