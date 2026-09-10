@@ -334,8 +334,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             } else {
                 $uuid = $labels->get('com.docker.compose.service');
                 $type = $labels->get('coolify.type');
-                if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
-                    $this->foundProxy = true;
+                if ($name === 'coolify-proxy') {
+                    if ($this->isRunning($containerStatus)) {
+                        $this->foundProxy = true;
+                    }
+                    $this->persistProxyStatus(data_get($container, 'state', 'exited'));
                 } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
                 } else {
                     if ($this->allDatabaseUuids->contains($uuid) && $this->isActiveOrTransient($containerStatus)) {
@@ -782,6 +785,24 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($previewIdsToUpdate->isNotEmpty()) {
             ApplicationPreview::whereIn('id', $previewIdsToUpdate)->update(['status' => 'exited']);
         }
+    }
+
+    private function persistProxyStatus(string $status): void
+    {
+        // While Sentinel is in sync, ServerCheckJob (the only other automatic
+        // writer of the proxy status) never runs, so the stored status can
+        // stay "exited"/"starting" forever even though the proxy is healthy.
+        // Persist the state observed in the Sentinel push here. The UI
+        // compares against the plain container state, so store it without
+        // the ":health" suffix $containerStatus carries.
+        if (! $this->server->proxy) {
+            return;
+        }
+        if ($this->server->proxy->get('status') === $status) {
+            return;
+        }
+        $this->server->proxy->set('status', $status);
+        $this->server->save();
     }
 
     private function updateProxyStatus()
