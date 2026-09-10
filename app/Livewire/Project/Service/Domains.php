@@ -1180,11 +1180,9 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingDomainParts = DomainUrlParts::split($this->editingDomain);
-        $app = $this->findServiceApp((int) $this->domainRows[$index]['service_application_id']);
-        $canonical = DomainPortOverrides::withoutPort($this->editingDomain);
-        $savedPort = ($app?->domain_port_overrides ?? [])[$canonical] ?? null;
-        if (filled($savedPort)) {
-            $this->editingDomainParts['port'] = (string) $savedPort;
+        $internalPort = $this->domainRows[$index]['internal_port'] ?? null;
+        if (filled($internalPort)) {
+            $this->editingDomainParts['port'] = (string) $internalPort;
         }
         $this->editingDomainPartsChanged = false;
         $this->editingServiceApplicationId = (int) $this->domainRows[$index]['service_application_id'];
@@ -1219,8 +1217,16 @@ class Domains extends Component
                 return;
             }
 
-            if ($this->editingDomainPartsChanged || filled($this->editingDomainParts['host'] ?? null)) {
-                $this->editingDomain = DomainUrlParts::compose(...$this->editingDomainParts);
+            $editingDomainParts = $this->editingDomainParts;
+            $editingRow = $this->domainRows[$this->editingIndex];
+            if (
+                ! ($editingRow['has_port_override'] ?? false)
+                && (string) ($editingDomainParts['port'] ?? '') === (string) ($editingRow['internal_port'] ?? '')
+            ) {
+                $editingDomainParts['port'] = '';
+            }
+            if ($this->editingDomainPartsChanged || filled($editingDomainParts['host'] ?? null)) {
+                $this->editingDomain = DomainUrlParts::compose(...$editingDomainParts);
             }
             $this->validateOnly('editingDomain');
 

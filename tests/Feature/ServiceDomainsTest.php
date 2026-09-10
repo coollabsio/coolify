@@ -907,9 +907,18 @@ it('shows an inherited internal port badge from the coolify service env port', f
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet('domainRows.0.internal_port', 3000)
         ->assertSet('domainRows.0.has_port_override', false)
+        ->set('dnsValidationEnabled', false)
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '3000')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
         ->assertSee('Internal port 3000')
         ->assertSee('Inherited from the Coolify service port', false)
         ->assertDontSee('No internal port');
+
+    expect($this->apiApp->fresh())
+        ->fqdn->toBe('https://api.example.com')
+        ->domain_port_overrides->toBeNull();
 });
 
 it('shows a custom internal port badge for a service domain override', function () {
