@@ -9,6 +9,7 @@
     @auth
         <div x-data="{
             open: false,
+            hasSidebarPreference: localStorage.getItem('sidebarCollapsed') !== null,
             userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
             autoCollapse: localStorage.getItem('sidebarAutoCollapse') !== 'false',
             hasSecondBar: false,
@@ -25,7 +26,7 @@
             },
             targetCollapsed() {
                 this.hasSecondBar = !!document.querySelector('.application-settings-navigation');
-                return this.userCollapsed || (this.autoCollapse && this.hasSecondBar);
+                return this.hasSidebarPreference ? this.userCollapsed : (this.autoCollapse && this.hasSecondBar);
             },
             applyCollapsed(animate) {
                 const target = this.targetCollapsed();
@@ -41,6 +42,7 @@
             },
             toggleSidebar() {
                 this.collapsed = !this.collapsed;
+                this.hasSidebarPreference = true;
                 this.userCollapsed = this.collapsed;
                 localStorage.setItem('sidebarCollapsed', this.userCollapsed);
             },

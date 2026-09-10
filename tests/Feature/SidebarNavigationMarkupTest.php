@@ -27,8 +27,10 @@ it('initializes persisted sidebar state before enabling layout transitions', fun
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
     expect($layout)
+        ->toContain("hasSidebarPreference: localStorage.getItem('sidebarCollapsed') !== null")
         ->toContain("userCollapsed: localStorage.getItem('sidebarCollapsed') === 'true'")
-        ->toContain('return this.userCollapsed || (this.autoCollapse && this.hasSecondBar);')
+        ->toContain('return this.hasSidebarPreference ? this.userCollapsed : (this.autoCollapse && this.hasSecondBar);')
+        ->toContain('this.hasSidebarPreference = true;')
         ->toContain('this.userCollapsed = this.collapsed;')
         ->toContain("localStorage.setItem('sidebarCollapsed', this.userCollapsed);")
         ->toContain('sidebarReady: false')
