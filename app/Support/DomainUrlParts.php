@@ -46,6 +46,15 @@ class DomainUrlParts
         ];
     }
 
+    public static function hasDnsRelevantChange(string $oldUrl, string $newUrl): bool
+    {
+        $old = self::split($oldUrl);
+        $new = self::split($newUrl);
+
+        return $old['scheme'] !== $new['scheme']
+            || strtolower($old['host']) !== strtolower($new['host']);
+    }
+
     /**
      * @return array{scheme: string, host: string, port: string, path: string}
      */
