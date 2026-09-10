@@ -69,9 +69,9 @@
     @endcannot
 
     {{-- Toolbar --}}
-    <div class="mt-2 flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
         <div class="min-w-0 flex-1">
-            <h3>Domains</h3>
+            <h2 id="domains-section">Domains</h2>
             <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
                 {{ $configuredCount }} domain{{ $configuredCount === 1 ? '' : 's' }} across {{ $domainGroups->count() }} service{{ $domainGroups->count() === 1 ? '' : 's' }}
                 @if ($suggestedCount > 0)

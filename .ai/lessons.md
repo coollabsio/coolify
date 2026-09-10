@@ -41,3 +41,10 @@
 - All DNS check entry points must set the domain badge to the same `checking` state.
 - Do not use separate loading feedback on Check all or per-domain action buttons when the badge is the progress indicator.
 - Verify the rendered badge uses the spinner slot instead of the default status dot.
+
+## Confirm whether old reports still apply before changing code
+- For an old issue, first test the current branch and inspect later fixes. Do not assume that the historical reproduction still needs a new code change.
+
+## Compare routing identity, not complete domain URLs
+- Domain-conflict checks must treat `http://host` and `https://host` as the same routing identity.
+- Reproduce reports with the exact stored schemes before stating that duplicate detection works.

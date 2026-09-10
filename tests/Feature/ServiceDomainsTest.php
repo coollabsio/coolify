@@ -225,6 +225,16 @@ it('uses segmented fields when adding and editing service domains', function () 
         ->not->toContain('placeholder="https://app.example.com"');
 });
 
+it('matches the application domains toolbar heading and top spacing', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)
+        ->toContain('<div class="flex flex-wrap items-center gap-2">')
+        ->toContain('<h2 id="domains-section">Domains</h2>')
+        ->not->toContain('<div class="mt-2 flex flex-wrap items-center gap-2">')
+        ->not->toContain('<h3>Domains</h3>');
+});
+
 it('resets the add domain dns gate when segmented domain fields change', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('addDomainDnsFailed', true)

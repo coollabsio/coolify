@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -1785,6 +1786,123 @@ it('saves after confirming a domain conflict on add', function () {
         'https://shared.example.com',
         'https://www.shared.example.com',
     ]);
+});
+
+it('warns when adding a domain used by a docker compose application', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Compose Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose-taken.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://compose-taken.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('domainConflicts.0.service_name', 'web')
+        ->assertSet('pendingAction', 'add');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('warns when a compose domain uses a different scheme', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'HTTP Compose Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'http://scheme-conflict.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://scheme-conflict.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('domainConflicts.0.service_name', 'web');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('shows the compose service name in the domain conflict modal', function () {
+    $html = Blade::render(
+        '<x-domain-conflict-modal :conflicts="$conflicts" :show-modal="true" />',
+        ['conflicts' => [[
+            'domain' => 'https://compose-taken.example.com',
+            'resource_name' => 'Compose Conflict App',
+            'resource_link' => '#',
+            'resource_type' => 'application',
+            'service_name' => 'web',
+        ]]],
+    );
+
+    expect($html)->toContain('(application: web)');
+});
+
+it('checks each domain configured for one docker compose service', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Conflicting App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://second-compose.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => [
+                'domain' => 'https://first-compose.example.com,https://second-compose.example.com',
+                'redirect' => 'both',
+            ],
+        ]),
+    ]);
+
+    $result = checkDomainUsage(resource: $this->application->fresh());
+
+    expect($result['hasConflicts'])->toBeTrue()
+        ->and($result['conflicts'])->toHaveCount(1)
+        ->and($result['conflicts'][0]['domain'])->toBe('https://second-compose.example.com');
+});
+
+it('uses docker compose domains in API conflict checks', function () {
+    $composeApplication = Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Compose API Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://compose-api.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $result = checkIfDomainIsAlreadyUsedViaAPI(
+        ['https://compose-api.example.com'],
+        (string) $this->team->id,
+        $this->application->uuid,
+    );
+
+    expect($result['hasConflicts'])->toBeTrue()
+        ->and($result['conflicts'])->toHaveCount(1)
+        ->and($result['conflicts'][0]['resource_uuid'])->toBe($composeApplication->uuid)
+        ->and($result['conflicts'][0]['service_name'])->toBe('api');
 });
 
 it('saves after confirming a domain conflict on edit', function () {
