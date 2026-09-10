@@ -188,17 +188,24 @@ class CheckProxy
                     echo 'port_free';
                     exit 0;
                 fi;
-                count=\$(echo \"\$ss_output\" | grep -c ':$port ');
+                # Filter: only wildcard-bound listeners (0.0.0.0, *, [::], ::) conflict with Docker's 0.0.0.0 binding
+                # Specific IP bindings (e.g., Tailscale 100.x.x.x) coexist via SO_REUSEADDR
+                wildcard_output=\$(echo \"\$ss_output\" | grep -E '(0\\.0\\.0\\.0|\\*|\\[::\\]):{$port}[[:space:]]|:::{$port}[[:space:]]');
+                if [ -z \"\$wildcard_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$wildcard_output\" | grep -c ':$port ');
                 if [ \$count -eq 0 ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
                 # Check for dual-stack or docker processes
-                if [ \$count -le 2 ] && (echo \"\$ss_output\" | grep -q 'docker\\|coolify'); then
+                if [ \$count -le 2 ] && (echo \"\$wildcard_output\" | grep -q 'docker\\|coolify'); then
                     echo 'port_free';
                     exit 0;
                 fi;
-                echo \"port_conflict|\$ss_output\";
+                echo \"port_conflict|\$wildcard_output\";
                 exit 0;
             fi;
             
@@ -209,16 +216,22 @@ class CheckProxy
                     echo 'port_free';
                     exit 0;
                 fi;
-                count=\$(echo \"\$netstat_output\" | grep -c 'LISTEN');
+                # Filter: only wildcard-bound listeners conflict with Docker's 0.0.0.0 binding
+                wildcard_output=\$(echo \"\$netstat_output\" | grep -E '(0\\.0\\.0\\.0|\\*|\\[::\\]):{$port}[[:space:]]|:::{$port}[[:space:]]');
+                if [ -z \"\$wildcard_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$wildcard_output\" | grep -c 'LISTEN');
                 if [ \$count -eq 0 ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
-                if [ \$count -le 2 ] && (echo \"\$netstat_output\" | grep -q 'docker\\|coolify'); then
+                if [ \$count -le 2 ] && (echo \"\$wildcard_output\" | grep -q 'docker\\|coolify'); then
                     echo 'port_free';
                     exit 0;
                 fi;
-                echo \"port_conflict|\$netstat_output\";
+                echo \"port_conflict|\$wildcard_output\";
                 exit 0;
             fi;
             
@@ -355,6 +368,19 @@ class CheckProxy
                 if ($count == 0 || empty($details)) {
                     return false;
                 }
+
+                // Filter: only wildcard-bound listeners (0.0.0.0, *, [::], ::) conflict with Docker's 0.0.0.0 binding
+                // Specific IP bindings (e.g., Tailscale 100.x.x.x) coexist via SO_REUSEADDR
+                $detailLines = explode("\n", $details);
+                $wildcardPattern = '/(0\.0\.0\.0|\*|\[::\]):'.preg_quote($port, '/').'(\s|$)|:::'.preg_quote($port, '/').'(\s|$)/';
+                $wildcardLines = array_filter($detailLines, function ($line) use ($wildcardPattern) {
+                    return preg_match($wildcardPattern, $line);
+                });
+                if (empty($wildcardLines)) {
+                    return false;
+                }
+                $details = trim(implode("\n", $wildcardLines));
+                $count = count($wildcardLines);
 
                 // Try to detect if this is our coolify-proxy
                 if (strpos($details, 'docker') !== false || strpos($details, $proxyContainerName) !== false) {
