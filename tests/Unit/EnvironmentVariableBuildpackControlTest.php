@@ -72,3 +72,13 @@ it('rejects shared environment variable keys Docker cannot represent on the mode
         $env->key = 'BAD=KEY';
     })->toThrow(InvalidArgumentException::class, 'Docker-compatible');
 });
+
+it('only allows the Nixpacks PHP template variables at runtime', function (string $key, bool $allowed) {
+    expect(EnvironmentVariable::isRuntimeBuildpackKey($key))->toBe($allowed);
+})->with([
+    'root directory' => ['NIXPACKS_PHP_ROOT_DIR', true],
+    'fallback path' => ['NIXPACKS_PHP_FALLBACK_PATH', true],
+    'build-only Nixpacks control' => ['NIXPACKS_NODE_VERSION', false],
+    'build-only Railpack control' => ['RAILPACK_NODE_VERSION', false],
+    'ordinary variable' => ['APP_ENV', false],
+]);

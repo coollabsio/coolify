@@ -36,6 +36,11 @@ class EnvironmentVariable extends BaseModel
 {
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
+    public const RUNTIME_BUILDPACK_VARIABLE_KEYS = [
+        'NIXPACKS_PHP_FALLBACK_PATH',
+        'NIXPACKS_PHP_ROOT_DIR',
+    ];
+
     protected $attributes = [
         'is_runtime' => true,
         'is_buildtime' => true,
@@ -133,13 +138,23 @@ class EnvironmentVariable extends BaseModel
         return $this->belongsTo(Service::class);
     }
 
-    public function scopeWithoutBuildpackControlVariables(Builder $query): Builder
+    public function scopeWithoutBuildpackControlVariables(Builder $query, array $allowedKeys = []): Builder
     {
         foreach (self::BUILDPACK_CONTROL_VARIABLE_PREFIXES as $prefix) {
-            $query->where('key', 'not like', "{$prefix}%");
+            $query->where(function (Builder $query) use ($prefix, $allowedKeys) {
+                $query->where('key', 'not like', "{$prefix}%");
+                if ($allowedKeys !== []) {
+                    $query->orWhereIn('key', $allowedKeys);
+                }
+            });
         }
 
         return $query;
+    }
+
+    public static function isRuntimeBuildpackKey(?string $key): bool
+    {
+        return in_array($key, self::RUNTIME_BUILDPACK_VARIABLE_KEYS, true);
     }
 
     public static function isBuildpackControlKey(?string $key): bool
