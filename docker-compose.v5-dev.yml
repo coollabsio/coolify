@@ -10,6 +10,7 @@ services:
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
       FLUX_INTERNAL_URL: "http://coolify-flux:7080"
+      FLUX_RUNTIME_UID: "1000"
       FLUX_TLS_VERIFY_HOST: "coolify-flux"
     volumes:
       - dev_flux_data:/data/coolify/flux
@@ -27,11 +28,11 @@ services:
       BASE_CONFIG_PATH: /data/coolify
       SENTINEL_HOST_ENABLED: "true"
       DB_HOST: postgres
+      FLUX_RUNTIME_UID: "1000"
     command:
-      - php
-      - artisan
-      - flux:initialize-tls
-      - --identities=flux,coolify-flux,localhost,127.0.0.1,::1
+      - sh
+      - -lc
+      - chown -R 1000:1000 /data/coolify/flux && exec /command/s6-setuidgid www-data php artisan flux:initialize-tls --identities=flux,coolify-flux,localhost,127.0.0.1,::1
     volumes:
       - .:/var/www/html/:cached
       - dev_flux_data:/data/coolify/flux
@@ -41,6 +42,7 @@ services:
   flux:
     image: ghcr.io/coollabsio/flux:main
     container_name: coolify-flux
+    user: "1000:1000"
     restart: unless-stopped
     environment:
       FLUX_LISTEN_ADDR: "0.0.0.0:7443"

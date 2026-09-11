@@ -96,6 +96,9 @@ it('runs the v5 development control channel with generated TLS files', function 
         ->toContain('FLUX_PUBLIC_URL: "https://coolify-flux:7443"')
         ->toContain('FLUX_TLS_CERT_PATH: "/tls/pki/server.pem"')
         ->toContain('FLUX_TLS_KEY_PATH: "/tls/pki/server-key.pem"')
+        ->toContain('FLUX_RUNTIME_UID: "1000"')
+        ->toContain('chown -R 1000:1000 /data/coolify/flux')
+        ->toContain('user: "1000:1000"')
         ->toContain('dev_flux_data:/data/coolify/flux')
         ->not->toContain('FLUX_DEVELOPMENT_ALLOW_PLAINTEXT: "true"')
         ->not->toContain('BEGIN PRIVATE KEY');

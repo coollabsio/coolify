@@ -1,21 +1,16 @@
-# Flux TLS support
+# Fix Flux certificate renewal lock permissions
 
-- [x] Define and commit the TLS architecture and implementation plan.
-- [x] Pin Sentinel TLS to the installed private CA and verify DNS, IPv4, and IPv6 identities.
-- [x] Make Flux fail closed when production TLS is absent or invalid.
-- [x] Add the 100-year Coolify installation CA and 90-day Flux leaf lifecycle.
-- [x] Add atomic materialization, scheduled renewal, rollback, and runtime ownership.
-- [x] Install and repair Sentinel trust over SSH with complete rollback.
-- [x] Add assignment trust metadata and connection TLS reporting.
-- [x] Make the development stack generate and use TLS by default.
-- [x] Add development-only TLS state, renewal, and repair controls.
-- [ ] Add staged dual-CA rotation and per-server acknowledgements.
-- [ ] Run the final full-suite and rotation verification pass.
+- [x] Reproduce and prove the ownership conflict with a failing test.
+- [x] Keep the shared Flux PKI readable by Flux without removing Coolify write access.
+- [x] Run focused tests and formatter.
+- [x] Verify certificate renewal in the development environment.
+- [x] Search related GitHub issues and discussions.
+- [x] Record the result and test steps.
 
 ## Review
 
-- Published Sentinel and Flux `main` images start with pinned private-CA TLS.
-- The local systemd testing host connected with `transport=Tls`.
-- The ping passed through TLS in 12 ms before and after forced leaf renewal.
-- Automated tests cover CA/key encryption, DNS/IPv4/IPv6 SANs, invalid trust, plaintext rejection, atomic files, renewal rollback, and SSH repair rollback.
-- Remaining scope is staged dual-CA rotation. SSH is already available as the emergency repair path.
+- Root cause: the root-run PKI initializer created the lock and PKI as UID 0/65532, while the UI runs PHP as UID 1000.
+- Fix: the development initializer repairs the existing volume and then runs as `www-data`; Flux also runs as UID/GID 1000, so the key can remain mode `0600`.
+- Regression: the v5 Compose contract test now requires the shared UID and ownership repair.
+- Verification: 46 focused tests passed; a forced renewal executed as `www-data` returned `true`; Flux restarted with TLS and UID/GID 1000.
+- GitHub: no exact Flux renewal permission report was found. The open v5 tracking issue #5685 is related. Other certificate-permission reports concern database TLS and are only similar.
