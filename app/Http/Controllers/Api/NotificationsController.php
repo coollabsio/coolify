@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
+use App\Models\GotifyNotificationSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
@@ -164,6 +165,29 @@ class NotificationsController extends Controller
                     'server_unreachable_pushover_notifications' => 'sometimes|boolean',
                     'server_patch_pushover_notifications' => 'sometimes|boolean',
                     'traefik_outdated_pushover_notifications' => 'sometimes|boolean',
+                ],
+            ],
+            'gotify' => [
+                'model' => GotifyNotificationSettings::class,
+                'rules' => [
+                    'gotify_enabled' => 'sometimes|boolean',
+                    'gotify_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'gotify_token' => 'sometimes|nullable|string|max:255',
+                    'deployment_success_gotify_notifications' => 'sometimes|boolean',
+                    'deployment_failure_gotify_notifications' => 'sometimes|boolean',
+                    'status_change_gotify_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_gotify_notifications' => 'sometimes|boolean',
+                    'backup_success_gotify_notifications' => 'sometimes|boolean',
+                    'backup_failure_gotify_notifications' => 'sometimes|boolean',
+                    'scheduled_task_success_gotify_notifications' => 'sometimes|boolean',
+                    'scheduled_task_failure_gotify_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_success_gotify_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_failure_gotify_notifications' => 'sometimes|boolean',
+                    'server_disk_usage_gotify_notifications' => 'sometimes|boolean',
+                    'server_reachable_gotify_notifications' => 'sometimes|boolean',
+                    'server_unreachable_gotify_notifications' => 'sometimes|boolean',
+                    'server_patch_gotify_notifications' => 'sometimes|boolean',
+                    'traefik_outdated_gotify_notifications' => 'sometimes|boolean',
                 ],
             ],
             'webhook' => [
@@ -479,6 +503,44 @@ class NotificationsController extends Controller
     public function update_pushover(Request $request): JsonResponse
     {
         return $this->updateChannel($request, 'pushover');
+    }
+
+    #[OA\Get(
+        summary: 'Get Gotify notification settings',
+        description: 'Get the current team Gotify notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
+        path: '/notifications/gotify',
+        operationId: 'get-current-team-gotify-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Gotify notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+        ]
+    )]
+    public function gotify(Request $request): JsonResponse
+    {
+        return $this->showChannel('gotify');
+    }
+
+    #[OA\Patch(
+        summary: 'Update Gotify notification settings',
+        description: 'Update the current team Gotify notification settings.',
+        path: '/notifications/gotify',
+        operationId: 'update-current-team-gotify-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Updated Gotify notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function update_gotify(Request $request): JsonResponse
+    {
+        return $this->updateChannel($request, 'gotify');
     }
 
     #[OA\Get(
