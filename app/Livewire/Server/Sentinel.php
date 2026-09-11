@@ -3,7 +3,9 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Sentinel\PingFluxConnection;
+use App\Actions\Sentinel\RenewFluxCertificate;
 use App\Actions\Server\InstallSentinelHost;
+use App\Actions\Server\RepairSentinelFluxTrust;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
@@ -155,6 +157,32 @@ class Sentinel extends Component
             $this->fluxPingResult = PingFluxConnection::run($this->server);
         } catch (\Throwable $e) {
             $this->fluxPingResult = null;
+            handleError($e, $this);
+        }
+    }
+
+    public function repairFluxTrust(): void
+    {
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            RepairSentinelFluxTrust::run($this->server);
+            $this->dispatch('success', 'Sentinel Flux trust repaired.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function renewFluxCertificate(): void
+    {
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            RenewFluxCertificate::run(null, true);
+            $this->dispatch('success', 'Flux TLS certificate renewed.');
+        } catch (\Throwable $e) {
             handleError($e, $this);
         }
     }

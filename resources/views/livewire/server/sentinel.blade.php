@@ -114,6 +114,16 @@
                                 <span wire:loading.remove wire:target="refreshFluxConnection">Refresh state</span>
                                 <span wire:loading wire:target="refreshFluxConnection">Refreshing...</span>
                             </x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" wire:click="renewFluxCertificate"
+                                wire:loading.attr="disabled" wire:target="renewFluxCertificate">
+                                <span wire:loading.remove wire:target="renewFluxCertificate">Renew certificate</span>
+                                <span wire:loading wire:target="renewFluxCertificate">Renewing...</span>
+                            </x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" wire:click="repairFluxTrust"
+                                wire:loading.attr="disabled" wire:target="repairFluxTrust">
+                                <span wire:loading.remove wire:target="repairFluxTrust">Repair trust</span>
+                                <span wire:loading wire:target="repairFluxTrust">Repairing...</span>
+                            </x-forms.button>
                         </div>
                     </x-slot:actions>
                     @if ($fluxConnection)
@@ -122,6 +132,7 @@
                             <div><span class="text-neutral-500 dark:text-fg-dim">Transport</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'transport') === 'tls' ? 'TLS' : 'Plaintext' }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Endpoint</span><p class="break-all font-mono text-xs text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'endpoint') }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Protocol</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'protocol_version') }}</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Trust bundle</span><p class="font-medium text-neutral-950 dark:text-fg">Version {{ data_get($fluxConnection, 'trust_bundle_version', 'Unknown') }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Connected at</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'connected_at') }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Last heartbeat</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'last_heartbeat_at', 'Waiting for heartbeat') }}</p></div>
                         </div>

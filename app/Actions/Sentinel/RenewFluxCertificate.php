@@ -16,7 +16,7 @@ class RenewFluxCertificate
     /**
      * @param  Closure(FluxCertificate): void|null  $restartAndValidate
      */
-    public function handle(?Closure $restartAndValidate = null): bool
+    public function handle(?Closure $restartAndValidate = null, bool $force = false): bool
     {
         $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux';
         if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
@@ -38,7 +38,7 @@ class RenewFluxCertificate
                 return false;
             }
             $previous = $active->sole();
-            if ($previous->valid_until->isAfter(now()->addDays(config('constants.flux.renew_before_days')))) {
+            if (! $force && $previous->valid_until->isAfter(now()->addDays(config('constants.flux.renew_before_days')))) {
                 return false;
             }
             if ($previous->certificateAuthority->state !== 'active') {

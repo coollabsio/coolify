@@ -1,7 +1,9 @@
 <?php
 
 use App\Actions\Sentinel\PingFluxConnection;
+use App\Actions\Sentinel\RenewFluxCertificate;
 use App\Actions\Server\InstallSentinelHost;
+use App\Actions\Server\RepairSentinelFluxTrust;
 use App\Livewire\Server\Sentinel;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -136,6 +138,36 @@ it('tests the Flux connection through Sentinel', function () {
         ->assertSee('Ping succeeded')
         ->assertSee('12 ms')
         ->assertSee('main');
+});
+
+it('shows TLS trust state and runs the repair action', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    Cache::put("flux:connection:{$this->server->uuid}", [
+        'transport' => 'tls',
+        'endpoint' => 'https://flux.example.com:7443',
+        'protocol_version' => 1,
+        'trust_bundle_version' => 3,
+    ]);
+    RepairSentinelFluxTrust::partialMock()->shouldReceive('handle')->once()->with(Mockery::type(Server::class))->andReturn('');
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Trust bundle')
+        ->assertSee('Version 3')
+        ->assertSee('Repair trust')
+        ->call('repairFluxTrust')
+        ->assertDispatched('success', 'Sentinel Flux trust repaired.');
+});
+
+it('authorizes and runs forced Flux certificate renewal', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    RenewFluxCertificate::partialMock()->shouldReceive('handle')->once()->with(null, true)->andReturn(true);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Renew certificate')
+        ->call('renewFluxCertificate')
+        ->assertDispatched('success', 'Flux TLS certificate renewed.');
 });
 
 it('blocks Flux connection data for a server from another team', function () {
