@@ -52,11 +52,10 @@
     }">
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
-        <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
+        <div class="px-1 pb-3" :class="collapsed && 'lg:px-0'">
             <button @click="$dispatch('open-global-search')" type="button"
                 :title="'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
-                :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
+                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
                 <span class="flex items-center gap-2.5 min-w-0">
                     <x-reicon name="search" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
@@ -239,7 +238,7 @@
         :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
         <x-top-user-menu sidebar />
         <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
-            class="menu-item w-8 shrink-0 justify-center px-0">
+            class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
             <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
                 <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
