@@ -39,46 +39,9 @@ class ApplicationsController extends Controller
 {
     use Concerns\HandlesTagsApi;
 
-    private const APPLICATION_SETTING_FIELDS = [
-        'is_git_submodules_enabled',
-        'is_git_lfs_enabled',
-        'is_git_shallow_clone_enabled',
-        'disable_build_cache',
-        'inject_build_args_to_dockerfile',
-        'include_source_commit_in_build',
-        'is_env_sorting_enabled',
-        'is_pr_deployments_public_enabled',
-        'stop_grace_period',
-        'docker_images_to_keep',
-        'is_gzip_enabled',
-        'is_stripprefix_enabled',
-        'is_raw_compose_deployment_enabled',
-        'is_log_drain_enabled',
-        'is_gpu_enabled',
-        'gpu_driver',
-        'gpu_count',
-        'gpu_device_ids',
-        'gpu_options',
-        'is_consistent_container_name_enabled',
-        'custom_internal_name',
-    ];
+    private const APPLICATION_SETTING_FIELDS = Application::API_SETTING_FIELDS;
 
-    private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
-        'is_git_submodules_enabled',
-        'is_git_lfs_enabled',
-        'is_git_shallow_clone_enabled',
-        'disable_build_cache',
-        'inject_build_args_to_dockerfile',
-        'include_source_commit_in_build',
-        'is_env_sorting_enabled',
-        'is_pr_deployments_public_enabled',
-        'is_gzip_enabled',
-        'is_stripprefix_enabled',
-        'is_raw_compose_deployment_enabled',
-        'is_log_drain_enabled',
-        'is_gpu_enabled',
-        'is_consistent_container_name_enabled',
-    ];
+    private const BOOLEAN_APPLICATION_SETTING_FIELDS = Application::BOOLEAN_API_SETTING_FIELDS;
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
     {
@@ -158,20 +121,7 @@ class ApplicationsController extends Controller
 
     private function applyApplicationSettings(Application $application, array $settings): void
     {
-        if ($settings === []) {
-            return;
-        }
-
-        $regenerateLabels = ! $application->wasRecentlyCreated
-            && $application->settings->is_container_label_readonly_enabled
-            && (array_key_exists('is_gzip_enabled', $settings) || array_key_exists('is_stripprefix_enabled', $settings));
-
-        $application->settings->fill($settings)->save();
-
-        if ($regenerateLabels) {
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
-        }
+        $application->applyApiSettings($settings);
     }
 
     /**

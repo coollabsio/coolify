@@ -11,7 +11,6 @@ use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\Auditable;
-
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -129,6 +128,46 @@ class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+
+    public const API_SETTING_FIELDS = [
+        'is_git_submodules_enabled', 'is_git_lfs_enabled', 'is_git_shallow_clone_enabled', 'disable_build_cache',
+        'inject_build_args_to_dockerfile', 'include_source_commit_in_build', 'is_env_sorting_enabled',
+        'is_pr_deployments_public_enabled', 'stop_grace_period', 'docker_images_to_keep', 'is_gzip_enabled',
+        'is_stripprefix_enabled', 'is_raw_compose_deployment_enabled', 'is_log_drain_enabled', 'is_gpu_enabled',
+        'gpu_driver', 'gpu_count', 'gpu_device_ids', 'gpu_options', 'is_consistent_container_name_enabled',
+        'custom_internal_name',
+    ];
+
+    public const BOOLEAN_API_SETTING_FIELDS = [
+        'is_git_submodules_enabled', 'is_git_lfs_enabled', 'is_git_shallow_clone_enabled', 'disable_build_cache',
+        'inject_build_args_to_dockerfile', 'include_source_commit_in_build', 'is_env_sorting_enabled',
+        'is_pr_deployments_public_enabled', 'is_gzip_enabled', 'is_stripprefix_enabled',
+        'is_raw_compose_deployment_enabled', 'is_log_drain_enabled', 'is_gpu_enabled',
+        'is_consistent_container_name_enabled',
+    ];
+
+    /**
+     * Apply API-exposed ApplicationSetting fields; regenerates readonly labels on gzip/stripprefix changes.
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    public function applyApiSettings(array $settings): void
+    {
+        if ($settings === []) {
+            return;
+        }
+
+        $regenerateLabels = ! $this->wasRecentlyCreated
+            && $this->settings->is_container_label_readonly_enabled
+            && (array_key_exists('is_gzip_enabled', $settings) || array_key_exists('is_stripprefix_enabled', $settings));
+
+        $this->settings->fill($settings)->save();
+
+        if ($regenerateLabels) {
+            $this->custom_labels = str(implode('|coolify|', generateLabelsApplication($this)))->replace('|coolify|', "\n");
+            $this->save();
+        }
+    }
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
