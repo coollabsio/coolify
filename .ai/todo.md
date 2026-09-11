@@ -1,23 +1,22 @@
-# Flux server information vertical slice
+# Review and document the current v5 control architecture
 
-- [x] Define the existing command and event contracts across Coolify, Flux, and Sentinel.
-- [x] Add a failing Sentinel test for the server-information command.
-- [x] Implement server information collection in Sentinel.
-- [x] Add failing Coolify tests for request, persistence, authorization, and UI.
-- [x] Implement the Coolify request and result flow.
-- [x] Show durable server information and a refresh action in the UI.
-- [x] Run focused tests, formatting, and an end-to-end development check.
+- [x] Reconcile the active architecture documents with the implemented Sentinel and Flux slice.
+- [x] Add a brief current-state architecture document.
+- [x] Remove stale coold naming from active architecture references.
+- [x] Check links, terminology, and repository state.
 - [x] Search related GitHub issues and discussions.
 - [x] Record review results.
 
 ## Review
 
-- Sentinel implements the existing `system.info.v1` capability and collects host, OS, kernel, CPU, memory, root storage, uptime, boot, and container-runtime data.
-- Flux exposes the authenticated internal `POST /v1/commands/system.info` command endpoint.
-- Coolify validates the response and saves it in `server_metadata` without removing unrelated metadata such as transfer state.
-- The server overview refresh action uses Flux while the development host-agent gate is enabled. The normal SSH path remains unchanged outside that gate.
-- The server overview now shows hostname, storage, container runtime, and Sentinel version with the existing server details.
-- Sentinel protocol, control, and Flux tests passed (49 tests). Clippy passed with warnings denied.
-- Coolify focused tests passed (26 tests, 118 assertions), Pint passed, and the frontend build completed.
-- End-to-end development verification used the published `main` images: host Sentinel connected with TLS, `system.info.v1` returned real data, and Coolify persisted it.
-- GitHub: #5685 (open) is related to v5. #11256 (closed) is a similar server-detail refresh report. No exact open issue or discussion matched this Flux slice.
+- `docs/v5/architecture/current-state.md` is the canonical snapshot of the
+  implemented Coolify, Flux, and Sentinel control path.
+- The snapshot separates implemented diagnostics from planned runtime and
+  scaling capabilities.
+- Active architecture references now use the Sentinel name and the implemented
+  internal HTTP and outbound TLS gRPC transports. Historical ADRs keep the old
+  coold name for context.
+- All relative links in the active architecture documents resolve, and
+  `git diff --check` passes.
+- GitHub issue #5685 is an open related v5 tracking issue. No matching GitHub
+  discussion was found.

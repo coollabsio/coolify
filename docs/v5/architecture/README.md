@@ -1,35 +1,36 @@
 # Coolify v5 Architecture
 
-This directory is the canonical architecture reference for Coolify v5 from the
-Laravel control-plane point of view.
+This directory contains the active high-level architecture references for the
+new v5 implementation.
 
-v5 has three major building blocks:
+The current control path is:
 
 ```text
-User / API / Git webhook
-        ↓
+User / API
+    ↓
 Coolify Laravel control plane
-        ↓ HTTP over /run/coolify/flux.sock
+    ↓ authenticated internal HTTP
 Flux
-        ↓ outbound gRPC Agent.Stream
-coold on each host
-        ↓
-Podman / networks / firewall / DNS / Corrosion / builder
+    ⇅ outbound TLS gRPC stream
+Host-native Sentinel managed by systemd
+    ↓
+Current diagnostics; planned runtime, network, firewall, DNS, and Corrosion capabilities
 ```
+
+Coolify owns product intent, authorization, and durable product state. Flux
+routes typed requests to connected hosts. Sentinel validates and performs
+explicit host-local operations. SSH remains the bootstrap and recovery path.
 
 ## Documents
 
 | Document | Purpose |
 | --- | --- |
-| [Overview](overview.md) | High-level mental model and data flow. |
-| [Responsibility split](responsibility-split.md) | What belongs in Coolify, Flux, and coold. |
-| [Primitives](primitives.md) | Canonical host primitive surface Coolify may dispatch. |
-| [Deploy flows](deploy-flows.md) | User-functionality flows, starting with `nginx:alpine`. |
-| [ADRs](adr/README.md) | Architecture decision records for Coolify, Flux, coold, and their contracts. |
-| [ADR 0001](adr/0001-control-plane-flux-coold-split.md) | Decision record for the v5 split. |
+| [Current state](current-state.md) | What is implemented now, how it works, and what remains. |
+| [Responsibility split](responsibility-split.md) | Ownership boundaries between Coolify, Flux, and Sentinel. |
+| [Primitives](primitives.md) | Target typed host-operation surface. Implementations can lag behind this catalog. |
+| [Active decisions](../decisions/README.md) | Accepted architecture and migration decisions. |
+| [Flux TLS design](../../superpowers/specs/2026-09-11-flux-tls-design.md) | Private-CA trust, renewal, recovery, and planned rotation. |
 
-## Core rule
-
-Coolify owns user intent and application state. Flux routes requests. coold
-executes explicit host primitives. coold must not grow app, team, RBAC,
-deployment, billing, or audit concepts.
+Files under `docs/v5/archive/`, `docs/v5/migrations/`, `docs/v5/ui/`, and
+`docs/v5/architecture/adr/` are historical references. They do not define the
+current architecture.

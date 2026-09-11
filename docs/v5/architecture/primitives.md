@@ -1,6 +1,6 @@
 # v5 Host Primitives
 
-Coolify deploy logic must send explicit primitives to coold through Flux. There
+Coolify deploy logic must send explicit primitives to Sentinel through Flux. There
 must be no raw Podman passthrough.
 
 This file is the target primitive catalog. Implementations may lag behind this
@@ -61,7 +61,7 @@ flow. Per-resource or compose networks are runtime primitives.
 | `firewall.list` | List active/persisted allow rules. |
 | `firewall.reconcile` | Flush and restore firewall state from snapshots. |
 
-coold is the sole writer for both firewall planes: iptables for cross-host
+Sentinel is the sole writer for both firewall planes: iptables for cross-host
 traffic and nft bridge rules for same-bridge traffic.
 
 ## Service discovery and DNS
@@ -84,13 +84,13 @@ traffic and nft bridge rules for same-bridge traffic.
 
 ## Builder (deferred)
 
-Builder is intentionally not part of the active v5 Flux/coold primitive
+Builder is intentionally not part of the active v5 Flux/Sentinel primitive
 surface. Before reintroducing it, add an ADR/API covering scheduling, capacity,
 logs, artifacts, cancellation, restart adoption, and registry flow.
 
 ## Not primitives
 
-These belong in Coolify, not coold:
+These belong in Coolify, not Sentinel:
 
 - `deploy.application`
 - `rollback.deployment`
