@@ -19,12 +19,7 @@ class InstallSentinelHost
         $token = $server->settings->ensureValidSentinelToken();
         $endpoint = $server->settings->ensureSentinelUrl();
         $image ??= config('constants.sentinel.host_image');
-        $script = self::installationScript(
-            $token,
-            $endpoint,
-            $image,
-            skipImagePull: (bool) config('constants.sentinel.host_skip_image_pull', false),
-        );
+        $script = self::installationScript($token, $endpoint, $image);
 
         return instant_remote_process(
             ['printf %s '.escapeshellarg(base64_encode($script)).' | base64 -d | bash'],
@@ -34,7 +29,7 @@ class InstallSentinelHost
         );
     }
 
-    public static function installationScript(string $token, string $endpoint, string $image, bool $skipImagePull = false): string
+    public static function installationScript(string $token, string $endpoint, string $image): string
     {
         self::validateInputs($token, $endpoint, $image);
 
@@ -43,7 +38,6 @@ class InstallSentinelHost
         $encodedEnvironment = base64_encode($environment);
         $encodedUnit = base64_encode($unit);
         $escapedImage = escapeshellarg($image);
-        $pullImage = $skipImagePull ? '' : "docker pull {$escapedImage}";
 
         return <<<SCRIPT
 set -eu
@@ -60,7 +54,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-{$pullImage}
+docker pull {$escapedImage}
 container_id="\$(docker create "\$image" /sentinel)"
 docker cp "\$container_id:/sentinel" "\$temporary_binary"
 test -s "\$temporary_binary"
