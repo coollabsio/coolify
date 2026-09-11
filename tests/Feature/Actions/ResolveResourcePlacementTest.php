@@ -2,6 +2,8 @@
 
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Exceptions\AmbiguousDestinationException;
+use App\Exceptions\DestinationNotOnServerException;
+use App\Exceptions\NoDestinationsException;
 use App\Exceptions\ProjectNotFoundException;
 use App\Models\Project;
 use App\Models\Server;
@@ -43,3 +45,31 @@ it('requires destination_uuid when the server has multiple destinations', functi
 
     ResolveResourcePlacement::run($team->id, $project->uuid, 'production', null, $server->uuid, null);
 })->throws(AmbiguousDestinationException::class);
+
+it('throws NoDestinationsException when the server has no destinations', function () {
+    $team = Team::factory()->create();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->standaloneDockers()->delete();
+
+    ResolveResourcePlacement::run($team->id, $project->uuid, 'production', null, $server->uuid, null);
+})->throws(NoDestinationsException::class);
+
+it('throws DestinationNotOnServerException when destination_uuid is not on the server', function () {
+    $team = Team::factory()->create();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'coolify-2']);
+
+    ResolveResourcePlacement::run($team->id, $project->uuid, 'production', null, $server->uuid, 'not-a-destination');
+})->throws(DestinationNotOnServerException::class);
+
+it('ignores destination_uuid when the server has exactly one destination', function () {
+    $team = Team::factory()->create();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $placement = ResolveResourcePlacement::run($team->id, $project->uuid, 'production', null, $server->uuid, 'bogus');
+
+    expect($placement->destination->id)->toBe($server->destinations()->first()->id);
+});

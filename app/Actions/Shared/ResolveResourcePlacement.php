@@ -4,7 +4,9 @@ namespace App\Actions\Shared;
 
 use App\Data\ResourcePlacement;
 use App\Exceptions\AmbiguousDestinationException;
+use App\Exceptions\DestinationNotOnServerException;
 use App\Exceptions\EnvironmentNotFoundException;
+use App\Exceptions\NoDestinationsException;
 use App\Exceptions\ProjectNotFoundException;
 use App\Exceptions\ServerCannotHostResourcesException;
 use App\Exceptions\ServerNotFoundException;
@@ -49,13 +51,16 @@ class ResolveResourcePlacement
         }
 
         $destinations = $server->destinations();
-        if ($destinationUuid) {
+        if ($destinations->count() === 0) {
+            throw new NoDestinationsException;
+        }
+        if ($destinations->count() === 1) {
+            $destination = $destinations->first();
+        } elseif ($destinationUuid) {
             $destination = $destinations->firstWhere('uuid', $destinationUuid);
             if (! $destination) {
-                throw new AmbiguousDestinationException;
+                throw new DestinationNotOnServerException;
             }
-        } elseif ($destinations->count() === 1) {
-            $destination = $destinations->first();
         } else {
             throw new AmbiguousDestinationException;
         }
