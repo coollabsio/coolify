@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Ai;
 
+use App\Ai\Contracts\HasApprovalForm;
 use App\Ai\Exceptions\AssistantBusyException;
 use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\Exceptions\NoAiCredentialException;
@@ -9,11 +10,20 @@ use App\Ai\StartAssistantTurn;
 use App\Ai\Support\AssistantTurn;
 use App\Ai\Support\PageContext;
 use App\Ai\Support\ToolActivity;
+use App\Ai\Tools\CreateDatabase;
+use App\Ai\Tools\CreateEnvironment;
+use App\Ai\Tools\CreateProject;
+use App\Ai\Tools\CreateService;
+use App\Ai\Tools\DeleteResource;
+use App\Ai\Tools\DeleteServer;
+use App\Ai\Tools\RunServerCommand;
+use App\Ai\Tools\UpsertEnvironmentVariable;
 use App\Jobs\Ai\ResumeAssistantTurn;
 use App\Models\AiConversation;
 use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Laravel\Ai\Tools\ToolNameResolver;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -33,6 +43,30 @@ class Thread extends Component
 
     /** First message shown optimistically when a conversation is opened right after being started. */
     public ?string $initialPending = null;
+
+    /**
+     * User-edited approval form values, keyed [callId][fieldKey]. Survives
+     * Livewire re-renders so edits persist until the user approves.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    public array $approvalInputs = [];
+
+    /**
+     * Approvable AI tools that expose a generative approval form.
+     *
+     * @var array<int, class-string>
+     */
+    private const APPROVAL_FORM_TOOL_CLASSES = [
+        CreateDatabase::class,
+        CreateService::class,
+        CreateProject::class,
+        CreateEnvironment::class,
+        UpsertEnvironmentVariable::class,
+        RunServerCommand::class,
+        DeleteResource::class,
+        DeleteServer::class,
+    ];
 
     public function mount(int $conversationId, bool $wide = false, ?string $initialPending = null): void
     {
@@ -188,21 +222,52 @@ class Thread extends Component
         }
 
         $calls = collect(json_decode($row->tool_calls ?? '[]', true))->keyBy('id');
+        $formTools = $this->approvalFormToolMap();
 
-        return collect($pending)->map(function ($reason, $id) use ($calls) {
+        return collect($pending)->map(function ($reason, $id) use ($calls, $formTools) {
             $tool = $calls[$id]['name'] ?? 'action';
+            $arguments = (array) ($calls[$id]['arguments'] ?? []);
+
+            $form = null;
+            if (isset($formTools[$tool])) {
+                $formSpec = $formTools[$tool]->approvalForm($arguments)->toArray();
+                foreach ($formSpec['fields'] as $field) {
+                    if (! in_array($field['type'], ['note', 'locked'], true)) {
+                        $this->approvalInputs[$id][$field['key']] ??= $field['value'];
+                    }
+                }
+                $form = $formSpec;
+            }
 
             return [
                 'id' => $id,
                 'tool' => $tool,
                 'title' => ToolActivity::label($tool),
-                'destructive' => (bool) preg_match('/^(delete|remove|run|execute|deploy|restart|stop)/', (string) $tool),
+                'destructive' => $form['destructive'] ?? (bool) preg_match('/^(delete|remove|run|execute|deploy|restart|stop)/i', (string) $tool),
                 // The tool's approval reason already names the resolved resource and its
                 // real UUID, so we render that authoritative sentence rather than the
                 // model's raw arguments (which may be a slug the model used to resolve).
                 'reason' => $reason,
+                'form' => $form,
             ];
         })->values()->all();
+    }
+
+    /**
+     * Map of tool name (as recorded by the SDK) => tool instance, for the
+     * approvable tools that expose a generative approval form.
+     *
+     * @return array<string, HasApprovalForm>
+     */
+    private function approvalFormToolMap(): array
+    {
+        $map = [];
+        foreach (self::APPROVAL_FORM_TOOL_CLASSES as $class) {
+            $tool = app($class);
+            $map[ToolNameResolver::resolve($tool)] = $tool;
+        }
+
+        return $map;
     }
 
     public function partial(): string
