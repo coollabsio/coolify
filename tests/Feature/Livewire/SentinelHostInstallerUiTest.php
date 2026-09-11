@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Sentinel\PingFluxConnection;
 use App\Actions\Server\InstallSentinelHost;
 use App\Livewire\Server\Sentinel;
 use App\Models\InstanceSettings;
@@ -99,6 +100,42 @@ it('refreshes the Flux connection state from the cache', function () {
         ->assertSee('TLS')
         ->assertSee('https://flux.example.com:7443')
         ->assertDontSee('Unencrypted control channel');
+});
+
+it('clears an old ping result when connection state is refreshed', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->set('fluxPingResult', ['sentinel_version' => 'main', 'latency_ms' => 12, 'boot_id' => 'boot-1'])
+        ->call('refreshFluxConnection')
+        ->assertSet('fluxPingResult', null)
+        ->assertDontSee('Ping succeeded');
+});
+
+it('tests the Flux connection through Sentinel', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    Cache::put("flux:connection:{$this->server->uuid}", [
+        'transport' => 'tls',
+        'endpoint' => 'https://flux.example.com:7443',
+        'protocol_version' => 1,
+    ]);
+    PingFluxConnection::partialMock()->shouldReceive('handle')->once()->andReturn([
+        'command_id' => 'command-1',
+        'nonce' => 'nonce-1',
+        'sentinel_time_unix_ms' => 1_789_140_000_000,
+        'sentinel_version' => 'main',
+        'boot_id' => 'boot-1',
+        'latency_ms' => 12,
+    ]);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Test connection')
+        ->call('testFluxConnection')
+        ->assertSee('Ping succeeded')
+        ->assertSee('12 ms')
+        ->assertSee('main');
 });
 
 it('blocks Flux connection data for a server from another team', function () {

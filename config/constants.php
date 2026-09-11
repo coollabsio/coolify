@@ -118,6 +118,7 @@ return [
         'signing_private_key' => env('FLUX_SIGNING_PRIVATE_KEY'),
         'signing_public_key' => env('FLUX_SIGNING_PUBLIC_KEY'),
         'internal_token' => env('FLUX_INTERNAL_TOKEN'),
+        'internal_url' => env('FLUX_INTERNAL_URL'),
     ],
 
     'proxy' => [

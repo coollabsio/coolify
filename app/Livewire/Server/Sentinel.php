@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Sentinel\PingFluxConnection;
 use App\Actions\Server\InstallSentinelHost;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -31,6 +32,9 @@ class Sentinel extends Component
 
     /** @var array<string, mixed>|null */
     public ?array $fluxConnection = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $fluxPingResult = null;
 
     public function getListeners()
     {
@@ -138,7 +142,21 @@ class Sentinel extends Component
     {
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->authorize('view', $this->server);
+        $this->fluxPingResult = null;
         $this->loadFluxConnection();
+    }
+
+    public function testFluxConnection(): void
+    {
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            $this->fluxPingResult = PingFluxConnection::run($this->server);
+        } catch (\Throwable $e) {
+            $this->fluxPingResult = null;
+            handleError($e, $this);
+        }
     }
 
     public function render()
@@ -153,5 +171,8 @@ class Sentinel extends Component
         $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false)
             ? Cache::get("flux:connection:{$this->server->uuid}")
             : null;
+        if ($this->fluxConnection === null) {
+            $this->fluxPingResult = null;
+        }
     }
 }

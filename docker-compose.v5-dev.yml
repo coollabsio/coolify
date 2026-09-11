@@ -9,6 +9,7 @@ services:
       FLUX_SIGNING_PRIVATE_KEY: "Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0Mi/Cl3kvC2/8C/z9t+2wwKoU4CWjZewONC6G44Kct0tg=="
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
+      FLUX_INTERNAL_URL: "http://coolify-flux:7080"
 
   flux:
     image: ghcr.io/coollabsio/flux:main

@@ -103,11 +103,18 @@
                     title="Flux control channel"
                     helper="Experimental direct connection from the host Sentinel to Flux.">
                     <x-slot:actions>
-                        <x-forms.button wire:click="refreshFluxConnection" wire:loading.attr="disabled"
-                            wire:target="refreshFluxConnection">
-                            <span wire:loading.remove wire:target="refreshFluxConnection">Refresh state</span>
-                            <span wire:loading wire:target="refreshFluxConnection">Refreshing...</span>
-                        </x-forms.button>
+                        <div class="flex items-center gap-2">
+                            <x-forms.button wire:click="testFluxConnection" wire:loading.attr="disabled"
+                                wire:target="testFluxConnection" canGate="update" :canResource="$server">
+                                <span wire:loading.remove wire:target="testFluxConnection">Test connection</span>
+                                <span wire:loading wire:target="testFluxConnection">Testing...</span>
+                            </x-forms.button>
+                            <x-forms.button wire:click="refreshFluxConnection" wire:loading.attr="disabled"
+                                wire:target="refreshFluxConnection">
+                                <span wire:loading.remove wire:target="refreshFluxConnection">Refresh state</span>
+                                <span wire:loading wire:target="refreshFluxConnection">Refreshing...</span>
+                            </x-forms.button>
+                        </div>
                     </x-slot:actions>
                     @if ($fluxConnection)
                         <div class="grid gap-4 text-sm lg:grid-cols-2">
@@ -125,6 +132,13 @@
                         @endif
                     @else
                         <x-status-badge status="Disconnected" type="warning" />
+                    @endif
+                    @if ($fluxPingResult)
+                        <x-callout type="success" title="Ping succeeded">
+                            Sentinel {{ data_get($fluxPingResult, 'sentinel_version') }} responded in
+                            {{ data_get($fluxPingResult, 'latency_ms') }} ms. Boot ID:
+                            <span class="font-mono">{{ data_get($fluxPingResult, 'boot_id') }}</span>
+                        </x-callout>
                     @endif
                 </x-application.settings-section>
 
