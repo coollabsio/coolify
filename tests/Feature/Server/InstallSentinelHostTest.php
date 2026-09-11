@@ -59,19 +59,28 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('curl --fail --silent http://127.0.0.1:8888/api/health');
 
     expect(strpos($script, 'openssl x509 -in /etc/coolify/sentinel-flux-ca.pem.new -noout'))
-        ->toBeLessThan(strpos($script, 'systemctl enable sentinel.service'));
+        ->toBeLessThan(strrpos($script, 'systemctl enable sentinel.service'));
     expect(strrpos($script, 'changed=true'))
         ->toBeGreaterThan(strpos($script, 'had_ca_version=true'));
 });
 
 it('rejects unsafe installer inputs', function (string $token, string $endpoint, string $image) {
-    expect(fn () => InstallSentinelHost::installationScript($token, $endpoint, $image, '', 0))
+    $authority = EnsureFluxCertificateAuthority::run();
+
+    expect(fn () => InstallSentinelHost::installationScript($token, $endpoint, $image, $authority->certificate_pem, $authority->version))
         ->toThrow(InvalidArgumentException::class);
 })->with([
     'token with a newline' => ["token\nvalue", 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main'],
     'invalid endpoint' => ['token', 'not-a-url', 'ghcr.io/coollabsio/sentinel-host:main'],
     'unsafe image' => ['token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main; reboot'],
 ]);
+
+it('rejects an invalid trust bundle and version independently', function () {
+    expect(fn () => InstallSentinelHost::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', 'not-a-certificate', 1))
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => InstallSentinelHost::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', EnsureFluxCertificateAuthority::run()->certificate_pem, 0))
+        ->toThrow(InvalidArgumentException::class);
+});
 
 it('does not use ssh while the host agent feature is disabled', function () {
     config()->set('constants.sentinel.host_enabled', false);

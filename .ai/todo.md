@@ -1,13 +1,13 @@
-# Task 5 — Sentinel Flux trust bootstrap and repair
+# Task 5 — Fix round 1
 
-- [x] Read task contract, existing CA models/actions, and Sentinel remote-process conventions.
-- [x] Add focused failing Pest tests for installer and repair trust guarantees; run and confirm red.
-- [x] Implement atomic CA trust install and repair, including safe command construction and rollback.
-- [x] Run focused tests, authorization regression suite, and Pint; inspect the diff.
-- [x] Search GitHub issues/discussions; write task report and commit.
+- [x] Add executable failure-path tests for fresh install, update, and repair rollback; confirm red.
+- [x] Restore Sentinel active and enabled state exactly after failure.
+- [x] Correct unsafe input coverage with valid independent inputs.
+- [x] Run focused and combined tests, shell syntax checks, Pint, and review the diff.
+- [x] Append the Task 5 report and commit the fix.
 
 ## Review
 
-- The installer stages and validates the public CA and positive version before it atomically replaces either live trust file or enables/restarts Sentinel.
-- The repair action uses the same staged trust flow, keeps the existing token and endpoint lines, never downloads or replaces the Sentinel binary, and restores prior files plus the service after a validation failure.
-- Focused feature, PKI lifecycle, and assignment authorization regressions pass. Generated shell scripts pass `bash -n`.
+- Executed shell-harness tests prove rollback stops the failed replacement before it restores files.
+- Rollback now restores prior active and enabled state for fresh installs, updates, and repairs.
+- Unsafe token, endpoint, image, CA, and version validation each have independent coverage.

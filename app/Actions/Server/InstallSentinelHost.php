@@ -53,11 +53,16 @@ backup_directory="\$(mktemp -d /etc/coolify/.sentinel-install.XXXXXX)"
 container_id=''
 completed=false
 changed=false
+was_active=false
+was_enabled=false
 had_binary=false
 had_environment=false
 had_unit=false
 had_ca=false
 had_ca_version=false
+
+if systemctl is-active --quiet sentinel.service >/dev/null 2>&1; then was_active=true; fi
+if systemctl is-enabled --quiet sentinel.service >/dev/null 2>&1; then was_enabled=true; fi
 
 cleanup() {
     if [ -n "\$container_id" ]; then
@@ -81,16 +86,21 @@ rollback() {
     exit_code=\$?
     trap - EXIT
     if [ "\$changed" = true ] && [ "\$completed" != true ]; then
+        systemctl stop sentinel.service || true
+        if [ "\$was_enabled" != true ]; then
+            systemctl disable sentinel.service || true
+        fi
         restore_file /usr/local/bin/sentinel "\$had_binary" "\$backup_directory/sentinel"
         restore_file /etc/coolify/sentinel.env "\$had_environment" "\$backup_directory/sentinel.env"
         restore_file /etc/systemd/system/sentinel.service "\$had_unit" "\$backup_directory/sentinel.service"
         restore_file /etc/coolify/sentinel-flux-ca.pem "\$had_ca" "\$backup_directory/sentinel-flux-ca.pem"
         restore_file /etc/coolify/sentinel-flux-ca.version "\$had_ca_version" "\$backup_directory/sentinel-flux-ca.version"
         systemctl daemon-reload || true
-        if [ "\$had_unit" = true ]; then
-            systemctl restart sentinel.service || true
-        else
-            systemctl disable sentinel.service || true
+        if [ "\$was_enabled" = true ]; then
+            systemctl enable sentinel.service || true
+        fi
+        if [ "\$was_active" = true ]; then
+            systemctl start sentinel.service || true
         fi
     fi
     cleanup

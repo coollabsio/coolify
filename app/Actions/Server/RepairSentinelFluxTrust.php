@@ -40,9 +40,14 @@ install -d -m 0700 /etc/coolify
 backup_directory="\$(mktemp -d /etc/coolify/.sentinel-repair.XXXXXX)"
 completed=false
 changed=false
+was_active=false
+was_enabled=false
 had_environment=false
 had_ca=false
 had_ca_version=false
+
+if systemctl is-active --quiet sentinel.service >/dev/null 2>&1; then was_active=true; fi
+if systemctl is-enabled --quiet sentinel.service >/dev/null 2>&1; then was_enabled=true; fi
 
 cleanup() {
     rm -f /etc/coolify/sentinel.env.new /etc/coolify/sentinel-flux-ca.pem.new /etc/coolify/sentinel-flux-ca.version.new
@@ -61,10 +66,19 @@ rollback() {
     exit_code=\$?
     trap - EXIT
     if [ "\$changed" = true ] && [ "\$completed" != true ]; then
+        systemctl stop sentinel.service || true
+        if [ "\$was_enabled" != true ]; then
+            systemctl disable sentinel.service || true
+        fi
         restore_file /etc/coolify/sentinel.env "\$had_environment" "\$backup_directory/sentinel.env"
         restore_file /etc/coolify/sentinel-flux-ca.pem "\$had_ca" "\$backup_directory/sentinel-flux-ca.pem"
         restore_file /etc/coolify/sentinel-flux-ca.version "\$had_ca_version" "\$backup_directory/sentinel-flux-ca.version"
-        systemctl restart sentinel.service || true
+        if [ "\$was_enabled" = true ]; then
+            systemctl enable sentinel.service || true
+        fi
+        if [ "\$was_active" = true ]; then
+            systemctl start sentinel.service || true
+        fi
     fi
     cleanup
     exit "\$exit_code"

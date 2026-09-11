@@ -8,3 +8,4 @@
 - Keep the development Host Sentinel action button text-only. Do not add an icon unless the design explicitly requires one.
 - Do not describe a Sentinel client as active from its crate implementation alone. Verify that `main` starts its runtime loop before claiming that the Sentinel process calls an endpoint.
 - Use a 100-year validity period for each Coolify-managed Flux installation CA; do not use a shorter default.
+- SSH deployment rollback must preserve the complete prior systemd state. Record active and enabled state before activation, stop a failed replacement before restoring files, then restore both states exactly. Test fresh install, update, and repair paths by executing the generated shell script with controlled command substitutes; static script assertions alone are insufficient.
