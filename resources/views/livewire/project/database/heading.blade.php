@@ -66,6 +66,9 @@
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
                     <x-status-summary :status="$database->status" title="Database status" />
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator label="Working" />
+                    @endif
                 </div>
                 <div class="flex w-full flex-wrap gap-1">
                     <x-application.restart-limit-warning :application="$database" />
@@ -107,6 +110,9 @@
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator label="Working" class="mr-1" />
+                    @endif
                     @if ($database->destination->server->isFunctional())
                         @can('manage', $database)
                             <x-split-action id="database-desktop-actions">
@@ -170,6 +176,12 @@
     @script
         <script>
             $wire.$on('startEvent', async () => {
+                if (await $wire.$call('checkDeployments')) {
+                    // An operation is already running: reopen its live log.
+                    $wire.$call('reopenDeployment');
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                    return;
+                }
                 window.dispatchEvent(new CustomEvent('startdatabase'));
                 try {
                     await $wire.$call('start');
@@ -178,6 +190,11 @@
                 }
             });
             $wire.$on('restartEvent', async () => {
+                if (await $wire.$call('checkDeployments')) {
+                    // An operation is already running: reopen its live log.
+                    $wire.$call('reopenDeployment');
+                    return;
+                }
                 window.dispatchEvent(new CustomEvent('database-busy'));
                 $wire.$dispatch('info', 'Restarting database.');
                 window.dispatchEvent(new CustomEvent('startdatabase'));
