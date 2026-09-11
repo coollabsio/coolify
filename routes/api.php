@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
+use App\Http\Controllers\Api\FluxConnectionEventController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
@@ -440,6 +441,7 @@ Route::group([
 ], function () {
     Route::post('/sentinel/push', [SentinelController::class, 'push']);
     Route::post('/sentinel/control/assignment', [SentinelController::class, 'assignment']);
+    Route::post('/internal/sentinel/control/events', FluxConnectionEventController::class);
 });
 
 Route::any('/{any}', function () {

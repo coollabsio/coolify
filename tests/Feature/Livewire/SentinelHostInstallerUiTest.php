@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -55,4 +56,32 @@ it('shows the host installer button without an icon', function () {
     expect($matches['content'] ?? '')
         ->toContain('Install host Sentinel')
         ->not->toContain('<x-reicon');
+});
+
+it('shows the current Flux connection in development', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    Cache::put("flux:connection:{$this->server->uuid}", [
+        'transport' => 'plaintext',
+        'endpoint' => 'http://flux:7443',
+        'protocol_version' => 1,
+        'connected_at' => '2026-09-11T10:00:00Z',
+        'last_heartbeat_at' => '2026-09-11T10:00:30Z',
+    ]);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Flux control channel')
+        ->assertSee('Connected')
+        ->assertSee('Plaintext')
+        ->assertSee('http://flux:7443')
+        ->assertSee('2026-09-11T10:00:30Z')
+        ->assertSee('Unencrypted control channel');
+});
+
+it('blocks Flux connection data for a server from another team', function () {
+    $otherUser = User::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherUser->teams()->firstOrFail()->id]);
+
+    Livewire::test(Sentinel::class, ['server' => $otherServer])
+        ->assertForbidden();
 });

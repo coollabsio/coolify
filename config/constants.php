@@ -110,6 +110,16 @@ return [
 
     ],
 
+    'flux' => [
+        'port' => (int) env('FLUX_PORT', 7443),
+        'public_url' => env('FLUX_PUBLIC_URL'),
+        'issuer' => env('FLUX_ISSUER', env('APP_ID')),
+        'signing_key_id' => env('FLUX_SIGNING_KEY_ID'),
+        'signing_private_key' => env('FLUX_SIGNING_PRIVATE_KEY'),
+        'signing_public_key' => env('FLUX_SIGNING_PUBLIC_KEY'),
+        'internal_token' => env('FLUX_INTERNAL_TOKEN'),
+    ],
+
     'proxy' => [
         // How often (seconds) PushServerUpdateJob periodically re-connects the
         // proxy to Docker networks as a safety net. Real network-layout changes

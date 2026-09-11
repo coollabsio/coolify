@@ -1,17 +1,16 @@
-# Document Sentinel log transport
+# Flux connection-only vertical slice
 
-- [x] Review the active v5 decision format.
-- [x] Record the accepted on-demand Sentinel log design.
-- [x] Add the decision to the active decision index.
-- [x] Check the document for ambiguity and formatting problems.
-- [x] Search related GitHub issues and discussions.
-- [x] Record review results.
+- [x] Add Coolify tests for Flux configuration, EdDSA assignment credentials, enabled assignments, and connection events.
+- [x] Add `FLUX_PORT` with default 7443 and optional `FLUX_PUBLIC_URL`; keep the feature development-only.
+- [x] Issue 15-minute EdDSA credentials with the accepted claims and return enabled assignments.
+- [x] Add authenticated internal connection-event ingestion with bounded Redis state.
+- [x] Add the GHCR Flux image and direct port mapping to the v5 development stack.
+- [x] Show transport, endpoint, protocol, connection time, and last heartbeat in the development Sentinel UI.
+- [x] Run Pint, focused Pest tests, and a live end-to-end check after Jean reported no configured Run environment.
+- [x] Search GitHub issues and discussions, record results, and review the complete diff.
 
 ## Review
 
-- Decision 0003 makes the structured in-memory Sentinel buffer and on-demand Flux request the normal v5 path.
-- SSH plus bounded `journalctl` output remains the fallback when Sentinel or Flux is unavailable.
-- The decision rejects continuous central ingestion by default and requires redaction before buffering.
-- The exact protocol names, limits, UI, and optional external export remain open for the later implementation slice.
-- `git diff --check` passes for the decision files.
-- Open issue #5685 is related because it tracks Coolify v5. Closed issue #7420 is similar because it shows why startup failures need the journald fallback. This documentation change does not fix either issue.
+- Focused tests pass. Pint passes. The Compose configuration renders successfully.
+- Jean reported no configured Run environment. The repository Compose stack connected the published host Sentinel `main` binary to the published Flux `main` image and recorded a heartbeat in Coolify.
+- GitHub search found no fully fixed issue. Related: open issue #6050 and open discussion #11431. Similar: open issues #11111 and #11539.

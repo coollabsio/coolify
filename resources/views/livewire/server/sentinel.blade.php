@@ -99,6 +99,28 @@
             @endif
 
             @if (isDev() && config('constants.sentinel.host_enabled', false))
+                <x-application.settings-section id="server-sentinel-flux-development-section"
+                    title="Flux control channel"
+                    helper="Experimental direct connection from the host Sentinel to Flux.">
+                    @if ($fluxConnection)
+                        <div class="grid gap-4 text-sm lg:grid-cols-2">
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Status</span><p class="font-medium text-neutral-950 dark:text-fg">Connected</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Transport</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'transport') === 'tls' ? 'TLS' : 'Plaintext' }}</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Endpoint</span><p class="break-all font-mono text-xs text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'endpoint') }}</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Protocol</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'protocol_version') }}</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Connected at</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'connected_at') }}</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Last heartbeat</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'last_heartbeat_at', 'Waiting for heartbeat') }}</p></div>
+                        </div>
+                        @if (data_get($fluxConnection, 'transport') !== 'tls')
+                            <x-callout type="warning" title="Unencrypted control channel">
+                                This development Flux connection does not use TLS.
+                            </x-callout>
+                        @endif
+                    @else
+                        <x-status-badge status="Disconnected" type="warning" />
+                    @endif
+                </x-application.settings-section>
+
                 <x-application.settings-section id="server-sentinel-host-development-section"
                     title="Host Sentinel"
                     helper="Install the experimental host-native Sentinel service for local v5 development.">

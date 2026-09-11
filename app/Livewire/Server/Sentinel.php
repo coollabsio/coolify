@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\InstallSentinelHost;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -28,6 +29,9 @@ class Sentinel extends Component
 
     public ?string $sentinelCustomDockerImage = null;
 
+    /** @var array<string, mixed>|null */
+    public ?array $fluxConnection = null;
+
     public function getListeners()
     {
         $teamId = $this->server->team_id ?? auth()->user()->currentTeam()->id;
@@ -39,6 +43,7 @@ class Sentinel extends Component
 
     public function mount()
     {
+        $this->authorize('view', $this->server);
         $this->syncData();
     }
 
@@ -131,6 +136,10 @@ class Sentinel extends Component
 
     public function render()
     {
+        $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false)
+            ? Cache::get("flux:connection:{$this->server->uuid}")
+            : null;
+
         return view('livewire.server.sentinel');
     }
 }
