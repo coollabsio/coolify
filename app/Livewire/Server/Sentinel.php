@@ -134,12 +134,24 @@ class Sentinel extends Component
         }
     }
 
+    public function refreshFluxConnection(): void
+    {
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+        $this->authorize('view', $this->server);
+        $this->loadFluxConnection();
+    }
+
     public function render()
+    {
+        $this->loadFluxConnection();
+
+        return view('livewire.server.sentinel');
+    }
+
+    private function loadFluxConnection(): void
     {
         $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false)
             ? Cache::get("flux:connection:{$this->server->uuid}")
             : null;
-
-        return view('livewire.server.sentinel');
     }
 }

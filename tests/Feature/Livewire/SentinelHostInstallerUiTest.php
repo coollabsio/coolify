@@ -78,6 +78,29 @@ it('shows the current Flux connection in development', function () {
         ->assertSee('Unencrypted control channel');
 });
 
+it('refreshes the Flux connection state from the cache', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+
+    $component = Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Disconnected');
+
+    Cache::put("flux:connection:{$this->server->uuid}", [
+        'transport' => 'tls',
+        'endpoint' => 'https://flux.example.com:7443',
+        'protocol_version' => 1,
+        'connected_at' => '2026-09-11T10:00:00Z',
+        'last_heartbeat_at' => '2026-09-11T10:00:30Z',
+    ]);
+
+    $component
+        ->call('refreshFluxConnection')
+        ->assertSee('Connected')
+        ->assertSee('TLS')
+        ->assertSee('https://flux.example.com:7443')
+        ->assertDontSee('Unencrypted control channel');
+});
+
 it('blocks Flux connection data for a server from another team', function () {
     $otherUser = User::factory()->create();
     $otherServer = Server::factory()->create(['team_id' => $otherUser->teams()->firstOrFail()->id]);

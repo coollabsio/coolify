@@ -102,6 +102,13 @@
                 <x-application.settings-section id="server-sentinel-flux-development-section"
                     title="Flux control channel"
                     helper="Experimental direct connection from the host Sentinel to Flux.">
+                    <x-slot:actions>
+                        <x-forms.button wire:click="refreshFluxConnection" wire:loading.attr="disabled"
+                            wire:target="refreshFluxConnection">
+                            <span wire:loading.remove wire:target="refreshFluxConnection">Refresh state</span>
+                            <span wire:loading wire:target="refreshFluxConnection">Refreshing...</span>
+                        </x-forms.button>
+                    </x-slot:actions>
                     @if ($fluxConnection)
                         <div class="grid gap-4 text-sm lg:grid-cols-2">
                             <div><span class="text-neutral-500 dark:text-fg-dim">Status</span><p class="font-medium text-neutral-950 dark:text-fg">Connected</p></div>
