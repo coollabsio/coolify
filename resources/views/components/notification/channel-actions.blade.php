@@ -13,12 +13,17 @@
         toggleMethod: @js($toggleMethod),
         testMethod: @js($testMethod),
     }">
-    <x-forms.button type="button" :disabled="!$canUpdate" :isHighlighted="!$enabled"
+    <x-forms.button type="button" :disabled="!$canUpdate"
+        x-bind:class="{ 'button-highlighted': !enabled }"
         x-on:click="
             if (!enabled && !$el.closest('form').reportValidity()) return;
-            $wire.$set(enabledProperty, !enabled).then(() => $wire.$call(toggleMethod));
+            const next = !enabled;
+            enabled = next;
+            $wire.$set(enabledProperty, next)
+                .then(() => $wire.$call(toggleMethod))
+                .catch(() => { enabled = !next; });
         ">
-        {{ $enabled ? 'Disable' : 'Enable' }}
+        <span x-text="enabled ? 'Disable' : 'Enable'">{{ $enabled ? 'Disable' : 'Enable' }}</span>
     </x-forms.button>
     <x-forms.button type="button" :disabled="!$enabled"
         x-on:click="if ($el.closest('form').reportValidity()) $wire.$call(testMethod)">

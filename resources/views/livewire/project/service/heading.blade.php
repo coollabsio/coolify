@@ -65,7 +65,8 @@
         </x-slot:content>
     </x-process-dialog>
 
-    <div x-data="{ deploying: false }" @service-deploy-finished.window="deploying = false">
+    <div x-data="{ deploying: false }" @service-restarting.window="deploying = true"
+        @service-deploy-finished.window="deploying = false">
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-col items-start gap-2">
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
@@ -95,8 +96,9 @@
                         @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                             <x-slot:main x-bind:disabled="deploying"
                                 @click="document.getElementById('service-restart-trigger')?.click()">
-                                <x-reicon name="restart" class="size-3.5" />
-                                Restart
+                                <x-loading-on-button x-show="deploying" x-cloak />
+                                <x-reicon name="restart" class="size-3.5" x-show="!deploying" />
+                                <span x-text="deploying ? 'Restarting…' : 'Restart'">Restart</span>
                             </x-slot:main>
                             @if ($serviceStatus->contains('running'))
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -185,8 +187,9 @@
                         @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                                     <x-slot:main x-bind:disabled="deploying"
                                         @click="document.getElementById('service-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5" />
-                                        Restart
+                                        <x-loading-on-button x-show="deploying" x-cloak />
+                                        <x-reicon name="restart" class="size-3.5" x-show="!deploying" />
+                                        <span x-text="deploying ? 'Restarting…' : 'Restart'">Restart</span>
                                     </x-slot:main>
                                     @if ($serviceStatus->contains('running'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -319,9 +322,14 @@
                     return;
                 }
 
+                window.dispatchEvent(new CustomEvent('service-restarting'));
                 $wire.$dispatch('info',
                     'Gracefully stopping service.<br/><br/>It could take a while depending on the service.');
-                $wire.$call('restart');
+                try {
+                    await $wire.$call('restart');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('service-deploy-finished'));
+                }
             });
             $wire.$on('forceDeployEvent', () => $wire.$call('forceDeploy'));
             $wire.$on('pullAndRestartEvent', () => {

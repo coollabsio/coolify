@@ -57,7 +57,8 @@
         </x-slot:content>
     </x-process-dialog>
 
-    <div x-data>
+    <div x-data="{ busy: false }" @database-busy.window="busy = true"
+        @database-action-finished.window="busy = false">
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-col items-start gap-2">
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
@@ -77,9 +78,11 @@
                 @can('manage', $database)
                     <x-split-action id="database-mobile-actions" class="mb-3 flex w-full">
                         @if (! $databaseStatus->startsWith('exited'))
-                            <x-slot:main @click="document.getElementById('database-restart-trigger')?.click()">
-                                <x-reicon name="restart" class="size-3.5" />
-                                Restart
+                            <x-slot:main x-bind:disabled="busy"
+                                @click="document.getElementById('database-restart-trigger')?.click()">
+                                <x-loading-on-button x-show="busy" x-cloak />
+                                <x-reicon name="restart" class="size-3.5" x-show="!busy" />
+                                <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
                             </x-slot:main>
                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                 @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
@@ -87,9 +90,10 @@
                                 Stop
                             </button>
                         @else
-                            <x-slot:main @click="$wire.dispatch('startEvent')">
-                                <x-reicon name="play-circle" class="size-3.5" />
-                                Start
+                            <x-slot:main x-bind:disabled="busy" @click="busy = true; $wire.dispatch('startEvent')">
+                                <x-loading-on-button x-show="busy" x-cloak />
+                                <x-reicon name="play-circle" class="size-3.5" x-show="!busy" />
+                                <span x-text="busy ? 'Starting…' : 'Start'">Start</span>
                             </x-slot:main>
                         @endif
                     </x-split-action>
@@ -107,9 +111,11 @@
                         @can('manage', $database)
                             <x-split-action id="database-desktop-actions">
                                 @if (! $databaseStatus->startsWith('exited'))
-                                    <x-slot:main @click="document.getElementById('database-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5" />
-                                        Restart
+                                    <x-slot:main x-bind:disabled="busy"
+                                        @click="document.getElementById('database-restart-trigger')?.click()">
+                                        <x-loading-on-button x-show="busy" x-cloak />
+                                        <x-reicon name="restart" class="size-3.5" x-show="!busy" />
+                                        <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
                                     </x-slot:main>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
@@ -117,9 +123,10 @@
                                         Stop
                                     </button>
                                 @else
-                                    <x-slot:main @click="$wire.dispatch('startEvent')">
-                                        <x-reicon name="play-circle" class="size-3.5" />
-                                        Start
+                                    <x-slot:main x-bind:disabled="busy" @click="busy = true; $wire.dispatch('startEvent')">
+                                        <x-loading-on-button x-show="busy" x-cloak />
+                                        <x-reicon name="play-circle" class="size-3.5" x-show="!busy" />
+                                        <span x-text="busy ? 'Starting…' : 'Start'">Start</span>
                                     </x-slot:main>
                                 @endif
                             </x-split-action>
@@ -162,14 +169,23 @@
 
     @script
         <script>
-            $wire.$on('startEvent', () => {
+            $wire.$on('startEvent', async () => {
                 window.dispatchEvent(new CustomEvent('startdatabase'));
-                $wire.$call('start');
+                try {
+                    await $wire.$call('start');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                }
             });
-            $wire.$on('restartEvent', () => {
+            $wire.$on('restartEvent', async () => {
+                window.dispatchEvent(new CustomEvent('database-busy'));
                 $wire.$dispatch('info', 'Restarting database.');
                 window.dispatchEvent(new CustomEvent('startdatabase'));
-                $wire.$call('restart');
+                try {
+                    await $wire.$call('restart');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('database-action-finished'));
+                }
             });
         </script>
     @endscript
