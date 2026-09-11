@@ -34,6 +34,20 @@ it('builds an idempotent host installation script', function () {
         ->toContain('curl --fail --silent http://127.0.0.1:8888/api/health');
 });
 
+it('can use an existing local host image without pulling it', function () {
+    $script = InstallSentinelHost::installationScript(
+        token: 'sentinel-token',
+        endpoint: 'http://coolify:8000/api/v1/sentinel',
+        image: 'coolify-sentinel-host:dev',
+        skipImagePull: true,
+    );
+
+    expect($script)
+        ->not->toContain('docker pull')
+        ->toContain("image='coolify-sentinel-host:dev'")
+        ->toContain('docker create "$image" /sentinel');
+});
+
 it('rejects unsafe installer inputs', function (string $token, string $endpoint, string $image) {
     expect(fn () => InstallSentinelHost::installationScript($token, $endpoint, $image))
         ->toThrow(InvalidArgumentException::class);

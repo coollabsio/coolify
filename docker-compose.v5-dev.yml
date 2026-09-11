@@ -2,6 +2,8 @@ services:
   coolify:
     environment:
       SENTINEL_HOST_ENABLED: "true"
+      SENTINEL_HOST_IMAGE: "coolify-sentinel-host:dev"
+      SENTINEL_HOST_SKIP_IMAGE_PULL: "true"
       FLUX_PORT: "${FLUX_PORT:-7443}"
       FLUX_PUBLIC_URL: "http://coolify-flux:7443"
       FLUX_ISSUER: "coolify-dev"
@@ -11,7 +13,10 @@ services:
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
 
   flux:
-    image: ghcr.io/coollabsio/flux:main
+    image: coolify-flux:dev
+    build:
+      context: "${SENTINEL_SOURCE_PATH:-/root/devel/sentinel}"
+      dockerfile: Dockerfile.flux
     container_name: coolify-flux
     restart: unless-stopped
     environment:
@@ -25,6 +30,15 @@ services:
       - "${FLUX_PORT:-7443}:7443"
     networks:
       - coolify
+
+  sentinel-host-image:
+    profiles: ["build"]
+    image: coolify-sentinel-host:dev
+    build:
+      context: "${SENTINEL_SOURCE_PATH:-/root/devel/sentinel}"
+      dockerfile: Dockerfile.host
+      args:
+        VERSION: dev
 
   testing-host:
     image: coolify-testing-host-systemd:dev

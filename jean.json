@@ -2,7 +2,7 @@
   "scripts": {
     "setup": "cp $JEAN_ROOT_PATH/.env .",
     "teardown": null,
-    "run": "docker rm -f coolify coolify-minio-init coolify-realtime coolify-minio coolify-testing-host coolify-testing-host-systemd coolify-redis coolify-db coolify-mail coolify-vite 2>/dev/null || true; docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.v5-dev.yml up; docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.v5-dev.yml down"
+    "run": "docker rm -f coolify coolify-minio-init coolify-realtime coolify-minio coolify-testing-host coolify-testing-host-systemd coolify-redis coolify-db coolify-mail coolify-vite coolify-flux 2>/dev/null || true; docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.v5-dev.yml --profile build build flux sentinel-host-image && docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.v5-dev.yml up; docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.v5-dev.yml down"
   },
   "ports": [
     {
