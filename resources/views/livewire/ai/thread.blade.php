@@ -162,6 +162,11 @@
                         </div>
                         <p class="mt-1 text-[13px] leading-relaxed text-neutral-600 dark:text-fg-dim">
                             {{ $approval['reason'] }}</p>
+                        @if (! empty($approval['form']))
+                            <div class="mt-3">
+                                @include('livewire.ai.approval-form', ['callId' => $approval['id'], 'form' => $approval['form']])
+                            </div>
+                        @endif
                     </div>
                     <div
                         class="flex items-center justify-end gap-2 border-t border-black/5 bg-neutral-50/70 px-3 py-2 dark:border-white/5 dark:bg-white/[0.02]">

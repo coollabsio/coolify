@@ -74,4 +74,10 @@ test('pending create approval carries a pre-filled editable form and seeds input
     $inputs = $component->instance()->approvalInputs;
     expect($inputs['call_1']['name'])->toBe('seed-pg')
         ->and($inputs['call_1'])->not->toHaveKey('project_uuid');
+
+    // the generic renderer compiles and renders the editable fields + locked target
+    $html = $component->html();
+    expect($html)->toContain('approvalInputs.call_1.name')
+        ->and($html)->toContain('Deploy immediately')
+        ->and($html)->toContain('Engine');
 });
