@@ -5,6 +5,10 @@ namespace App\Ai\Tools;
 use App\Actions\Service\CreateService as CreateServiceAction;
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Exceptions\ResourcePlacementException;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
@@ -13,7 +17,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class CreateService implements Approvable, Tool
+class CreateService implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -38,6 +42,18 @@ class CreateService implements Approvable, Tool
             'name' => $schema->string()->description('Optional name.'),
             'instant_deploy' => $schema->boolean()->description('Deploy the service immediately after creation.'),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Create service', false, [
+            new Field(FieldType::Text, 'name', 'Name', $arguments['name'] ?? '', help: 'Leave blank for an auto-generated name.'),
+            new Field(FieldType::Toggle, 'instant_deploy', 'Deploy immediately', filter_var($arguments['instant_deploy'] ?? false, FILTER_VALIDATE_BOOLEAN)),
+            new Field(FieldType::Locked, 'type', 'Template', $arguments['type'] ?? 'compose'),
+            new Field(FieldType::Locked, 'project_uuid', 'Project', $arguments['project_uuid'] ?? ''),
+            new Field(FieldType::Locked, 'environment', 'Environment', $arguments['environment_name'] ?? ($arguments['environment_uuid'] ?? '')),
+            new Field(FieldType::Locked, 'server_uuid', 'Server', $arguments['server_uuid'] ?? ''),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool

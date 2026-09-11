@@ -3,6 +3,10 @@
 namespace App\Ai\Tools;
 
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Mcp\Concerns\ResolvesResource;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
@@ -11,7 +15,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class UpsertEnvironmentVariable implements Approvable, Tool
+class UpsertEnvironmentVariable implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -31,6 +35,16 @@ class UpsertEnvironmentVariable implements Approvable, Tool
             'key' => $schema->string()->description('Environment variable key.')->required(),
             'value' => $schema->string()->description('Environment variable value.')->required(),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Set environment variable', false, [
+            new Field(FieldType::Text, 'key', 'Key', $arguments['key'] ?? '', required: true),
+            new Field(FieldType::Textarea, 'value', 'Value', $arguments['value'] ?? '', required: true),
+            new Field(FieldType::Locked, 'resource', 'Resource type', $arguments['resource'] ?? ''),
+            new Field(FieldType::Locked, 'uuid', 'Resource', $arguments['uuid'] ?? ''),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool

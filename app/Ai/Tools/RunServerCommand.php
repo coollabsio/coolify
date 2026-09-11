@@ -4,6 +4,10 @@ namespace App\Ai\Tools;
 
 use App\Actions\Server\RunCommand;
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
@@ -12,7 +16,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class RunServerCommand implements Approvable, Tool
+class RunServerCommand implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -29,6 +33,15 @@ class RunServerCommand implements Approvable, Tool
             'server_uuid' => $schema->string()->description('Server UUID.')->required(),
             'command' => $schema->string()->description('The shell command to run.')->required(),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Run server command', true, [
+            new Field(FieldType::Textarea, 'command', 'Command', $arguments['command'] ?? '', required: true),
+            new Field(FieldType::Locked, 'server_uuid', 'Server', $arguments['server_uuid'] ?? ''),
+            new Field(FieldType::Note, 'warning', '', 'This runs a shell command on the server over SSH.'),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool

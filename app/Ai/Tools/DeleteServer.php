@@ -4,6 +4,10 @@ namespace App\Ai\Tools;
 
 use App\Actions\Server\DeleteServer as DeleteServerAction;
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
@@ -12,7 +16,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class DeleteServer implements Approvable, Tool
+class DeleteServer implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -28,6 +32,14 @@ class DeleteServer implements Approvable, Tool
         return [
             'server_uuid' => $schema->string()->description('Server UUID.')->required(),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Delete server', true, [
+            new Field(FieldType::Locked, 'server_uuid', 'Server', $arguments['server_uuid'] ?? ''),
+            new Field(FieldType::Note, 'warning', '', 'This permanently deletes the server and cannot be undone.'),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool

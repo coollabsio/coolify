@@ -5,6 +5,10 @@ namespace App\Ai\Tools;
 use App\Actions\Database\CreateDatabase as CreateDatabaseAction;
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Enums\NewDatabaseTypes;
 use App\Exceptions\ResourcePlacementException;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -14,7 +18,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class CreateDatabase implements Approvable, Tool
+class CreateDatabase implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -39,6 +43,22 @@ class CreateDatabase implements Approvable, Tool
             'image' => $schema->string()->description('Optional docker image override.'),
             'instant_deploy' => $schema->boolean()->description('Start the database immediately after creation.'),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Create database', false, [
+            new Field(FieldType::Text, 'name', 'Name', $arguments['name'] ?? '', help: 'Leave blank for an auto-generated name.'),
+            new Field(FieldType::Select, 'type', 'Engine', $arguments['type'] ?? 'postgresql', options: array_map(
+                fn (NewDatabaseTypes $t) => $t->value,
+                NewDatabaseTypes::cases(),
+            ), required: true),
+            new Field(FieldType::Text, 'image', 'Image', $arguments['image'] ?? '', help: 'Optional docker image override.'),
+            new Field(FieldType::Toggle, 'instant_deploy', 'Deploy immediately', filter_var($arguments['instant_deploy'] ?? false, FILTER_VALIDATE_BOOLEAN)),
+            new Field(FieldType::Locked, 'project_uuid', 'Project', $arguments['project_uuid'] ?? ''),
+            new Field(FieldType::Locked, 'environment', 'Environment', $arguments['environment_name'] ?? ($arguments['environment_uuid'] ?? '')),
+            new Field(FieldType::Locked, 'server_uuid', 'Server', $arguments['server_uuid'] ?? ''),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool

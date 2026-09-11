@@ -3,6 +3,10 @@
 namespace App\Ai\Tools;
 
 use App\Ai\Concerns\AuthorizesToolAction;
+use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Ui\ApprovalForm;
+use App\Ai\Ui\Field;
+use App\Ai\Ui\FieldType;
 use App\Jobs\DeleteResourceJob;
 use App\Mcp\Concerns\ResolvesResource;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,7 +16,7 @@ use Laravel\Ai\Contracts\Approvable;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class DeleteResource implements Approvable, Tool
+class DeleteResource implements Approvable, HasApprovalForm, Tool
 {
     use AuthorizesToolAction;
     use InteractsWithApprovals;
@@ -30,6 +34,15 @@ class DeleteResource implements Approvable, Tool
             'resource' => $schema->string()->description('application | database | service')->required(),
             'uuid' => $schema->string()->description('Resource UUID.')->required(),
         ];
+    }
+
+    public function approvalForm(array $arguments): ApprovalForm
+    {
+        return new ApprovalForm('Delete resource', true, [
+            new Field(FieldType::Locked, 'resource', 'Resource type', $arguments['resource'] ?? ''),
+            new Field(FieldType::Locked, 'uuid', 'Resource', $arguments['uuid'] ?? ''),
+            new Field(FieldType::Note, 'warning', '', 'This permanently deletes the resource and cannot be undone.'),
+        ]);
     }
 
     protected function needsApproval(Request $request): Approval|bool
