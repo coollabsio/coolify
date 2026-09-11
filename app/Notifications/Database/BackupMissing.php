@@ -5,6 +5,7 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -50,6 +51,11 @@ class BackupMissing extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(title: 'Scheduled database backup missing', level: 'error', message: $this->description());
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(title: 'Scheduled database backup missing', level: 'error', message: $this->description());
     }
 
     public function toSlack(): SlackMessage
