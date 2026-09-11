@@ -9,6 +9,10 @@ use App\Mcp\Resources\InfrastructureOverviewResource;
 use App\Mcp\Tools\CancelDeployment;
 use App\Mcp\Tools\Control;
 use App\Mcp\Tools\CoolifyHelp;
+use App\Mcp\Tools\CreateDatabase;
+use App\Mcp\Tools\CreateEnvironment;
+use App\Mcp\Tools\CreateProject;
+use App\Mcp\Tools\CreateService;
 use App\Mcp\Tools\Deploy;
 use App\Mcp\Tools\GetApplication;
 use App\Mcp\Tools\GetCurrentTeam;
@@ -136,6 +140,10 @@ MD;
         Control::class,
         Deploy::class,
         CancelDeployment::class,
+        CreateDatabase::class,
+        CreateService::class,
+        CreateProject::class,
+        CreateEnvironment::class,
     ];
 
     protected array $resources = [
@@ -156,6 +164,10 @@ MD;
         Control::class,
         Deploy::class,
         CancelDeployment::class,
+        CreateDatabase::class,
+        CreateService::class,
+        CreateProject::class,
+        CreateEnvironment::class,
     ];
 
     /**
