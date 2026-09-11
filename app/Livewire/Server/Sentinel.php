@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\InstallSentinelHost;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
@@ -112,6 +113,19 @@ class Sentinel extends Component
             $this->restartSentinel();
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function installHostSentinel(): void
+    {
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            InstallSentinelHost::run($this->server);
+            $this->dispatch('success', 'Host Sentinel installed and started.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

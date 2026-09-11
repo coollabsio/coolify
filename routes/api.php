@@ -439,6 +439,7 @@ Route::group([
     'prefix' => 'v1',
 ], function () {
     Route::post('/sentinel/push', [SentinelController::class, 'push']);
+    Route::post('/sentinel/control/assignment', [SentinelController::class, 'assignment']);
 });
 
 Route::any('/{any}', function () {

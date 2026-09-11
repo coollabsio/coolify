@@ -1,0 +1,23 @@
+services:
+  coolify:
+    environment:
+      SENTINEL_HOST_ENABLED: "true"
+
+  testing-host:
+    image: coolify-testing-host-systemd:dev
+    build:
+      target: systemd
+    init: false
+    privileged: true
+    cgroup: host
+    stop_signal: SIGRTMIN+3
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    healthcheck:
+      test: ["CMD-SHELL", "systemctl is-active --quiet ssh.service"]
+      interval: 5s
+      retries: 10
+      timeout: 2s

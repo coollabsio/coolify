@@ -97,6 +97,24 @@
                     </div>
                 </x-application.settings-section>
             @endif
+
+            @if (isDev() && config('constants.sentinel.host_enabled', false))
+                <x-application.settings-section id="server-sentinel-host-development-section"
+                    title="Host Sentinel"
+                    helper="Install the experimental host-native Sentinel service for local v5 development.">
+                    <x-slot:actions>
+                        <x-forms.button canGate="update" :canResource="$server"
+                            wire:click="installHostSentinel" wire:loading.attr="disabled"
+                            wire:target="installHostSentinel">
+                            Install host Sentinel
+                        </x-forms.button>
+                    </x-slot:actions>
+                    <x-callout type="warning" title="Development feature">
+                        This installs Sentinel as a systemd service on the selected development server. The existing
+                        Sentinel container continues to own metrics and traffic collection.
+                    </x-callout>
+                </x-application.settings-section>
+            @endif
         @endif
     </form>
 </div>

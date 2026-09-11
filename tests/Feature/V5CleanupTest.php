@@ -35,3 +35,54 @@ it('documents removed v5 packages and the v4 animation dependency', function () 
         ->toContain('`tw-animate-css`')
         ->toContain('must not be removed');
 });
+
+it('records active v5 decisions separately from the archived prototype', function () {
+    $index = file_get_contents(base_path('docs/v5/decisions/README.md'));
+    $sentinelDecision = file_get_contents(base_path('docs/v5/decisions/0001-combine-coold-with-sentinel.md'));
+    $installationDecision = file_get_contents(base_path('docs/v5/decisions/0002-separate-legacy-upgrades-from-v5-installs.md'));
+
+    expect($index)
+        ->toContain('Active Coolify v5 Decisions')
+        ->toContain('0001-combine-coold-with-sentinel.md')
+        ->toContain('historical references')
+        ->and($sentinelDecision)
+        ->toContain('Status: Accepted')
+        ->toContain('V4 continues to run Sentinel as a Docker container')
+        ->toContain('V5 runs Sentinel as a mandatory host-native binary')
+        ->toContain('coold functionality will move into the Sentinel project')
+        ->toContain('typed commands and local safety checks')
+        ->toContain('same Sentinel product and executable')
+        ->toContain('both can run during a controlled transition')
+        ->toContain('host-native Sentinel first owns the v5 control connection')
+        ->toContain('retire the container after capability parity')
+        ->and($index)
+        ->toContain('0002-separate-legacy-upgrades-from-v5-installs.md')
+        ->and($installationDecision)
+        ->toContain('Status: Accepted')
+        ->toContain('legacy-control-plane')
+        ->toContain('prevent the v5 scheduler from placing new v5 workloads on localhost')
+        ->toContain('v5-combined')
+        ->toContain('v5-control-plane')
+        ->toContain('v5-worker')
+        ->toContain('in-place conversion');
+});
+
+it('replaces the normal testing host with systemd for v5 development', function () {
+    $compose = file_get_contents(base_path('docker-compose.v5-dev.yml'));
+    $defaultCompose = file_get_contents(base_path('docker-compose.dev.yml'));
+    $dockerfile = file_get_contents(base_path('docker/testing-host/Dockerfile'));
+
+    expect($compose)
+        ->toContain('testing-host:')
+        ->toContain('target: systemd')
+        ->toContain('init: false')
+        ->toContain('cgroup: host')
+        ->toContain('/sys/fs/cgroup:/sys/fs/cgroup:rw')
+        ->and($defaultCompose)
+        ->not->toContain("\n  testing-host-systemd:\n")
+        ->and($dockerfile)
+        ->toContain('AS systemd')
+        ->toContain('systemd-sysv')
+        ->toContain('systemctl enable ssh.service')
+        ->toContain('CMD ["/sbin/init"]');
+});

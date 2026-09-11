@@ -100,6 +100,8 @@ return [
 
     'sentinel' => [
         'dev_url' => env('DEV_SENTINEL_URL'),
+        'host_enabled' => env('SENTINEL_HOST_ENABLED', false),
+        'host_image' => env('SENTINEL_HOST_IMAGE', 'ghcr.io/coollabsio/sentinel-host:main'),
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
         // the container state hash is unchanged. Keeps exited-detection and
         // storage checks from going stale without writing every resource row on

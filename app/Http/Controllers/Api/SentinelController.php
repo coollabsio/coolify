@@ -7,12 +7,54 @@ use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
 use Exception;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class SentinelController extends Controller
 {
+    private const CONTROL_PROTOCOL_MIN = 1;
+
+    private const CONTROL_PROTOCOL_MAX = 1;
+
+    public function assignment(Request $request): JsonResponse
+    {
+        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
+
+        $server = $this->authenticatedServer($request);
+        if ($server === null) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'sentinel_version' => ['required', 'string', 'max:100'],
+            'protocol_min' => ['required', 'integer', 'min:1'],
+            'protocol_max' => ['required', 'integer', 'min:1', 'gte:protocol_min'],
+            'capabilities' => ['required', 'array', 'max:64'],
+            'capabilities.*' => ['required', 'string', 'max:100', 'distinct'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        if ($validated['protocol_max'] < self::CONTROL_PROTOCOL_MIN || $validated['protocol_min'] > self::CONTROL_PROTOCOL_MAX) {
+            return response()->json(['message' => 'Incompatible Sentinel control protocol.'], 409);
+        }
+
+        return response()->json([
+            'enabled' => false,
+            'retry_after_seconds' => 10,
+        ]);
+    }
+
     /**
      * Handle a Sentinel agent metrics push.
      *
@@ -168,5 +210,40 @@ class SentinelController extends Controller
     private function isCompleteSnapshot(array $data): bool
     {
         return data_get($data, 'snapshot.complete', true) !== false;
+    }
+
+    private function authenticatedServer(Request $request): ?Server
+    {
+        $authorization = $request->header('Authorization');
+        if (! is_string($authorization) || ! str_starts_with($authorization, 'Bearer ')) {
+            return null;
+        }
+
+        $token = substr($authorization, 7);
+        try {
+            $payload = json_decode(decrypt($token), true);
+        } catch (Exception) {
+            return null;
+        }
+
+        $serverUuid = data_get($payload, 'server_uuid');
+        if (! is_string($serverUuid) || $serverUuid === '') {
+            return null;
+        }
+
+        $server = Server::query()->where('uuid', $serverUuid)->first();
+        if ($server === null || $server->settings->sentinel_token !== $token) {
+            return null;
+        }
+
+        if ($server->isFunctional() === false) {
+            return null;
+        }
+
+        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team_id !== 0) {
+            return null;
+        }
+
+        return $server;
     }
 }

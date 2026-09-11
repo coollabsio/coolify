@@ -7,7 +7,7 @@ ARG DOCKER_COMPOSE_VERSION=2.38.2
 ARG DOCKER_BUILDX_VERSION=0.25.0
 
 
-FROM debian:12-slim
+FROM debian:12-slim AS testing-host-base
 
 ARG TARGETPLATFORM
 ARG DOCKER_VERSION
@@ -46,4 +46,17 @@ RUN mkdir -p ~/.ssh
 RUN echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 coolify@coolify-instance" >> ~/.ssh/authorized_keys
 
 EXPOSE 22
+
+FROM testing-host-base AS systemd
+
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt -y install systemd systemd-sysv dbus && \
+    systemctl enable ssh.service && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
+
+FROM testing-host-base AS default
+
 CMD ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0", "-o", "Port=22"]
