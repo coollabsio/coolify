@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Contracts\HasApprovalForm;
+use App\Ai\Tools\CreateApplication;
 use App\Ai\Tools\CreateDatabase;
 use App\Ai\Tools\CreateEnvironment;
 use App\Ai\Tools\CreateProject;
@@ -49,8 +50,23 @@ it('DeleteResource and DeleteServer are confirm-only and destructive', function 
 });
 
 it('every approvable create/write tool implements HasApprovalForm', function () {
-    foreach ([CreateDatabase::class, CreateService::class, CreateProject::class, CreateEnvironment::class,
+    foreach ([CreateApplication::class, CreateDatabase::class, CreateService::class, CreateProject::class, CreateEnvironment::class,
         UpsertEnvironmentVariable::class, RunServerCommand::class, DeleteResource::class, DeleteServer::class] as $tool) {
         expect(app($tool))->toBeInstanceOf(HasApprovalForm::class);
     }
 });
+
+it('CreateApplication builds a per-type form with the type locked', function (string $type, array $extra, array $editable) {
+    $form = app(CreateApplication::class)->approvalForm(array_merge([
+        'type' => $type, 'name' => 'x', 'project_uuid' => 'p1', 'environment_name' => 'production', 'server_uuid' => 's1',
+    ], $extra));
+
+    expect($form->editableKeys())->toBe($editable)
+        ->and(collect($form->toArray()['fields'])->firstWhere('key', 'type')['type'])->toBe('locked');
+})->with([
+    'public' => ['public', ['git_repository' => 'https://github.com/a/b', 'git_branch' => 'main', 'build_pack' => 'nixpacks'], ['name', 'domains', 'instant_deploy', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes']],
+    'private-gh-app' => ['private-gh-app', ['github_app_uuid' => 'gh1', 'git_repository' => 'a/b', 'git_branch' => 'main', 'build_pack' => 'nixpacks'], ['name', 'domains', 'instant_deploy', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes']],
+    'private-deploy-key' => ['private-deploy-key', ['private_key_uuid' => 'k1', 'git_repository' => 'git@x:a/b.git', 'git_branch' => 'main', 'build_pack' => 'nixpacks'], ['name', 'domains', 'instant_deploy', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes']],
+    'dockerfile' => ['dockerfile', ['dockerfile' => 'FROM nginx'], ['name', 'domains', 'instant_deploy', 'dockerfile']],
+    'dockerimage' => ['dockerimage', ['docker_registry_image_name' => 'nginx'], ['name', 'domains', 'instant_deploy', 'docker_registry_image_name', 'docker_registry_image_tag', 'ports_exposes']],
+]);

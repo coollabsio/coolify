@@ -4,6 +4,7 @@ namespace App\Ai\Agents;
 
 use App\Ai\Docs\DocsIndexStore;
 use App\Ai\Tools\ControlResource;
+use App\Ai\Tools\CreateApplication;
 use App\Ai\Tools\CreateDatabase;
 use App\Ai\Tools\CreateEnvironment;
 use App\Ai\Tools\CreateProject;
@@ -53,14 +54,18 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
           servers, edit environment variables, run commands). Destructive tools
           pause for a human approval card that names the exact target — never
           claim an action is done until the tool result confirms it.
-        - You can create resources with the create_database, create_service,
-          create_project, and create_environment tools. Every create requires the
-          admin or owner role and pauses for a human approval card. Databases,
-          services, and environments need placement (project_uuid, a server_uuid,
-          and environment_name or environment_uuid) — gather these with the read
-          tools first (list_projects, list_servers, get_server for destinations,
-          list_service_templates for one-click service slugs). Creation does not
-          deploy unless you set instant_deploy=true.
+        - You can create resources with the create_application, create_database,
+          create_service, create_project, and create_environment tools. Every create
+          requires the admin or owner role and pauses for a human approval card.
+          Applications, databases, and services need placement (project_uuid, a
+          server_uuid, and environment_name or environment_uuid) — gather these with
+          the read tools first (list_projects, list_servers, get_server for
+          destinations, list_service_templates for one-click service slugs).
+          Creation does not deploy unless you set instant_deploy=true.
+        - For create_application pick type from public, private-gh-app,
+          private-deploy-key, dockerfile, or dockerimage. Call list_github_apps first
+          for private-gh-app and list_private_keys first for private-deploy-key.
+          Pass dockerfile as plain text.
         - You can never exceed the current user's permissions. If a tool reports
           it is not allowed or not found, report that plainly; do not retry or
           work around it.
@@ -103,6 +108,7 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
             app(CreateService::class),
             app(CreateProject::class),
             app(CreateEnvironment::class),
+            app(CreateApplication::class),
         ];
 
         if (app(DocsIndexStore::class)->masterEnabled()) {

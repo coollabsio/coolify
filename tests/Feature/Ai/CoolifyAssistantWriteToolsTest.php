@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\CoolifyAssistant;
 use App\Ai\Tools\ControlResource;
+use App\Ai\Tools\CreateApplication;
 use App\Ai\Tools\DeleteResource;
 use App\Ai\Tools\DeleteServer;
 use App\Ai\Tools\RunServerCommand;
@@ -17,6 +18,7 @@ test('the assistant exposes native write tools and still excludes MCP mutating t
     expect($classes)
         ->toContain(ListServers::class)
         ->toContain(ControlResource::class)
+        ->toContain(CreateApplication::class)
         ->toContain(DeleteServer::class)
         ->toContain(RunServerCommand::class)
         ->toContain(DeleteResource::class)
