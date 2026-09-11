@@ -28,6 +28,8 @@ class FluxConnectionEventController extends Controller
             'connection_id' => ['required', 'uuid'],
             'sentinel_version' => ['required_if:event,connected', 'nullable', 'string', 'max:100'],
             'protocol_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
+            'trust_bundle_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
+            'transport' => ['required_if:event,connected', 'nullable', 'in:tls,plaintext'],
             'observed_at_unix_ms' => ['nullable', 'integer', 'min:0'],
         ]);
         if ($validator->fails()) {
@@ -58,7 +60,8 @@ class FluxConnectionEventController extends Controller
             'protocol_version' => $data['protocol_version'] ?? data_get($current, 'protocol_version'),
             'connected_at' => $data['event'] === 'connected' ? now()->toIso8601String() : data_get($current, 'connected_at'),
             'last_heartbeat_at' => $data['event'] === 'heartbeat' ? now()->toIso8601String() : data_get($current, 'last_heartbeat_at'),
-            'transport' => str_starts_with($fluxUrl, 'https://') ? 'tls' : 'plaintext',
+            'trust_bundle_version' => $data['trust_bundle_version'] ?? data_get($current, 'trust_bundle_version'),
+            'transport' => $data['transport'] ?? data_get($current, 'transport'),
             'endpoint' => $fluxUrl,
         ], fn ($value) => $value !== null), now()->addMinutes(5));
 

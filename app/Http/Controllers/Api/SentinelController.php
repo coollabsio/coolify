@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
 use App\Actions\Sentinel\IssueFluxCredential;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Http\Controllers\Controller;
@@ -20,7 +21,7 @@ class SentinelController extends Controller
 
     private const CONTROL_PROTOCOL_MAX = 1;
 
-    public function assignment(Request $request, IssueFluxCredential $issueFluxCredential, ResolveFluxPublicUrl $resolveFluxPublicUrl): JsonResponse
+    public function assignment(Request $request, IssueFluxCredential $issueFluxCredential, ResolveFluxPublicUrl $resolveFluxPublicUrl, EnsureFluxCertificateAuthority $ensureFluxCertificateAuthority): JsonResponse
     {
         if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
             return response()->json(['message' => 'Not found.'], 404);
@@ -57,6 +58,7 @@ class SentinelController extends Controller
             max($validated['protocol_min'], self::CONTROL_PROTOCOL_MIN),
             min($validated['protocol_max'], self::CONTROL_PROTOCOL_MAX),
         );
+        $authority = $ensureFluxCertificateAuthority->handle();
 
         return response()->json([
             'enabled' => true,
@@ -67,6 +69,7 @@ class SentinelController extends Controller
             'protocol_min' => self::CONTROL_PROTOCOL_MIN,
             'protocol_max' => self::CONTROL_PROTOCOL_MAX,
             'heartbeat_interval_seconds' => 30,
+            'trust_bundle_version' => $authority->version,
         ]);
     }
 

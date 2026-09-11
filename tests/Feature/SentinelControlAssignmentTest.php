@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\User;
 use Firebase\JWT\JWT;
@@ -10,10 +11,12 @@ use Illuminate\Testing\TestResponse;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
     $keyPair = sodium_crypto_sign_seed_keypair(str_repeat('C', 32));
     config()->set('constants.flux.public_url', 'http://flux:7443');
+    config()->set('constants.flux.development_allow_plaintext', true);
     config()->set('constants.flux.signing_key_id', 'dev-key');
     config()->set('constants.flux.signing_private_key', base64_encode(sodium_crypto_sign_secretkey($keyPair)));
     config()->set('constants.flux.signing_public_key', base64_encode(sodium_crypto_sign_publickey($keyPair)));
@@ -48,6 +51,7 @@ it('returns an enabled development assignment with a bound short-lived credentia
         ->assertJsonPath('enabled', true)
         ->assertJsonPath('server_id', $this->server->uuid)
         ->assertJsonPath('flux_url', 'http://flux:7443')
+        ->assertJsonPath('trust_bundle_version', 1)
         ->json();
 
     $claims = (array) JWT::decode($assignment['credential'], new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
@@ -62,6 +66,12 @@ it('returns an enabled development assignment with a bound short-lived credentia
         ])
         ->and($claims['exp'] - $claims['iat'])->toBe(900)
         ->and($claims['caps'])->toBe(['system.ping.v1', 'system.info.v1']);
+});
+
+it('rejects a plaintext Flux endpoint without the development override', function () {
+    config()->set('constants.flux.development_allow_plaintext', false);
+
+    requestSentinelAssignment($this->token)->assertStatus(500);
 });
 
 it('requires the existing Sentinel token', function () {

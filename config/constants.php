@@ -120,6 +120,7 @@ return [
         'signing_public_key' => env('FLUX_SIGNING_PUBLIC_KEY'),
         'internal_token' => env('FLUX_INTERNAL_TOKEN'),
         'internal_url' => env('FLUX_INTERNAL_URL'),
+        'development_allow_plaintext' => env('FLUX_DEVELOPMENT_ALLOW_PLAINTEXT', false),
     ],
 
     'proxy' => [

@@ -10,7 +10,9 @@ class ResolveFluxPublicUrl
     {
         $configuredUrl = config('constants.flux.public_url');
         if (is_string($configuredUrl) && $configuredUrl !== '') {
-            return rtrim($configuredUrl, '/');
+            $url = rtrim($configuredUrl, '/');
+
+            return $this->validateScheme($url);
         }
 
         $appUrl = parse_url((string) config('app.url'));
@@ -25,6 +27,15 @@ class ResolveFluxPublicUrl
             $host = "[$host]";
         }
 
-        return "{$scheme}://{$host}:{$port}";
+        return $this->validateScheme("{$scheme}://{$host}:{$port}");
+    }
+
+    private function validateScheme(string $url): string
+    {
+        if (str_starts_with($url, 'http://') && ! (isDev() && config('constants.flux.development_allow_plaintext', false))) {
+            throw new RuntimeException('Flux requires TLS.');
+        }
+
+        return $url;
     }
 }
