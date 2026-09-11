@@ -59,6 +59,26 @@ trait AuthorizesToolAction
     }
 
     /**
+     * Authorize the acting user against a gate ability that takes no target
+     * model (e.g. createAnyResource), or throw. Audits denials like
+     * authorizeToolAction.
+     */
+    protected function authorizeToolGate(string $ability, string $tool): User
+    {
+        $user = $this->actingUser();
+
+        try {
+            Gate::forUser($user)->authorize($ability);
+        } catch (AuthorizationException $e) {
+            $this->auditToolCall($tool, 'denied', ['ability' => $ability]);
+
+            throw $e;
+        }
+
+        return $user;
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      */
     protected function auditToolCall(string $tool, string $outcome, array $context = []): void

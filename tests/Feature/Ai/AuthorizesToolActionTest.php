@@ -24,6 +24,11 @@ function makeAuthTraitHarness(): object
         {
             return $this->actingTeamId();
         }
+
+        public function callGate(string $ability): User
+        {
+            return $this->authorizeToolGate($ability, 'harness');
+        }
     };
 }
 
@@ -53,6 +58,21 @@ test('a member is denied a destructive ability before anything runs', function (
     $harness = makeAuthTraitHarness();
 
     expect(fn () => $harness->callAuthorize('delete', $this->server))
+        ->toThrow(AuthorizationException::class);
+});
+
+test('authorizeToolGate allows an admin through createAnyResource', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    expect(makeAuthTraitHarness()->callGate('createAnyResource')->id)->toBe($this->admin->id);
+});
+
+test('authorizeToolGate denies a member on createAnyResource', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    expect(fn () => makeAuthTraitHarness()->callGate('createAnyResource'))
         ->toThrow(AuthorizationException::class);
 });
 
