@@ -82,7 +82,13 @@ class ConversationPage extends Component
         }
 
         session()->flash('assistant_pending', ['uuid' => $conversation->uuid, 'message' => $message]);
-        $this->redirect(route('ai.assistant.show', ['uuid' => $conversation->uuid]), navigate: true);
+        $this->redirect(route('ai.assistant.show', ['uuid' => $conversation->uuid]), navigate: $this->spaNavigate());
+    }
+
+    /** Whether SPA navigation is enabled for this instance (mirrors wireNavigate()). */
+    private function spaNavigate(): bool
+    {
+        return filled(wireNavigate());
     }
 
     /**
@@ -113,6 +119,10 @@ class ConversationPage extends Component
             'mine' => $c->created_by_user_id === auth()->id(),
             'pinned' => $c->pinned_at !== null,
             'archived' => $c->archived_at !== null,
+            // Compact "last active" like ChatGPT's list (e.g. "2h", "3d", "now").
+            'last_active' => $c->updated_at
+                ? trim(str_replace(' ago', '', $c->updated_at->diffForHumans(short: true)))
+                : null,
         ];
     }
 
@@ -129,7 +139,7 @@ class ConversationPage extends Component
             ->orderByRaw('pinned_at IS NULL') // pinned first
             ->orderByDesc('pinned_at')
             ->orderByDesc('updated_at')
-            ->get(['id', 'uuid', 'title', 'visibility', 'created_by_user_id', 'pinned_at', 'archived_at'])
+            ->get(['id', 'uuid', 'title', 'visibility', 'created_by_user_id', 'pinned_at', 'archived_at', 'updated_at'])
             ->map(fn ($c) => $this->toRow($c))
             ->all();
     }
@@ -145,7 +155,7 @@ class ConversationPage extends Component
         return $this->visibleConversations()
             ->whereNotNull('archived_at')
             ->orderByDesc('archived_at')
-            ->get(['id', 'uuid', 'title', 'visibility', 'created_by_user_id', 'pinned_at', 'archived_at'])
+            ->get(['id', 'uuid', 'title', 'visibility', 'created_by_user_id', 'pinned_at', 'archived_at', 'updated_at'])
             ->map(fn ($c) => $this->toRow($c))
             ->all();
     }
@@ -168,20 +178,16 @@ class ConversationPage extends Component
 
     public function newThread(): void
     {
-        $conversation = AiConversation::create([
-            'team_id' => currentTeam()->id,
-            'created_by_user_id' => auth()->id(),
-            'visibility' => AiConversation::VISIBILITY_PRIVATE,
-        ]);
-
-        $this->redirect(route('ai.assistant.show', ['uuid' => $conversation->uuid]), navigate: true);
+        // Don't persist an empty conversation; the default page's composer starts
+        // one only when the first message is sent.
+        $this->redirect(route('ai.assistant'), navigate: $this->spaNavigate());
     }
 
     public function open(int $id): void
     {
         $conversation = AiConversation::findOrFail($id);
         $this->authorize('view', $conversation);
-        $this->redirect(route('ai.assistant.show', ['uuid' => $conversation->uuid]), navigate: true);
+        $this->redirect(route('ai.assistant.show', ['uuid' => $conversation->uuid]), navigate: $this->spaNavigate());
     }
 
     public function share(int $id): void
@@ -251,7 +257,7 @@ class ConversationPage extends Component
         $conversation->forceFill(['archived_at' => now(), 'pinned_at' => null])->save();
 
         if ($this->activeConversationId === $id) {
-            $this->redirect(route('ai.assistant'), navigate: true);
+            $this->redirect(route('ai.assistant'), navigate: $this->spaNavigate());
 
             return;
         }
@@ -295,7 +301,7 @@ class ConversationPage extends Component
         $conversation->delete();
 
         if ($this->activeConversationId === $id) {
-            $this->redirect(route('ai.assistant'), navigate: true);
+            $this->redirect(route('ai.assistant'), navigate: $this->spaNavigate());
 
             return;
         }

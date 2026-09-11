@@ -38,7 +38,8 @@
                     <div class="nav-section">Conversations</div>
                 @endif
 
-                <div wire:key="thread-{{ $thread['id'] }}" class="group relative" x-data="{ menuOpen: false }"
+                <div wire:key="thread-{{ $thread['id'] }}" x-show="!gone" x-collapse class="group relative"
+                    x-data="{ menuOpen: false, gone: false, pinned: {{ $thread['pinned'] ? 'true' : 'false' }} }"
                     :class="menuOpen && 'z-20'" x-on:click.outside="menuOpen = false"
                     x-on:keydown.escape.window="menuOpen = false">
                     @if ($editingId === $thread['id'])
@@ -48,27 +49,28 @@
                                 class="h-8 w-full rounded-md border border-coollabs bg-white px-2.5 text-[13px] font-medium text-black focus:outline-none focus:ring-0 dark:border-warning dark:bg-white/[0.06] dark:text-fg" />
                         </form>
                     @else
-                        <a href="{{ route('ai.assistant.show', ['uuid' => $thread['uuid']]) }}" wire:navigate @class([
+                        <a href="{{ route('ai.assistant.show', ['uuid' => $thread['uuid']]) }}" {{ wireNavigate() }} @class([
                             'menu-item pr-8',
                             'menu-item-active' => $activeConversationId === $thread['id'],
                         ])>
-                            @if ($thread['pinned'])
-                                <x-reicon name="pin" class="menu-item-icon" />
-                            @else
-                                <x-reicon name="feedback" class="menu-item-icon" />
-                            @endif
+                            <span x-show="pinned" x-cloak><x-reicon name="pin" class="menu-item-icon" /></span>
+                            <span x-show="!pinned" x-cloak><x-reicon name="feedback" class="menu-item-icon" /></span>
                             <span class="menu-item-label text-left">{{ $thread['title'] }}</span>
                             @if ($thread['visibility'] === 'team')
                                 <span class="shrink-0 text-[11px] font-medium text-nav-muted">Team</span>
+                            @endif
+                            @if (filled($thread['last_active']))
+                                {{-- Last active reveals on hover, alongside the ⋯ menu (ChatGPT-style). --}}
+                                <span
+                                    class="shrink-0 pl-1 text-[11px] font-medium tabular-nums text-nav-muted opacity-0 transition-opacity group-hover:opacity-100">{{ $thread['last_active'] }}</span>
                             @endif
                         </a>
 
                         @if ($thread['mine'])
                             <button type="button" x-on:click.stop="menuOpen = ! menuOpen" :aria-expanded="menuOpen"
-                                title="Conversation options" @class([
-                                    'absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-nav-muted transition-[opacity,background-color,color] hover:bg-black/[0.06] hover:text-nav-active dark:hover:bg-white/[0.08]',
-                                    'opacity-0 focus-visible:opacity-100 group-hover:opacity-100' => $activeConversationId !== $thread['id'],
-                                ])>
+                                title="Conversation options"
+                                class="absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-nav-muted opacity-0 transition-[opacity,background-color,color] pointer-events-none hover:bg-black/[0.06] hover:text-nav-active focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 dark:hover:bg-white/[0.08]"
+                                :class="menuOpen && '!opacity-100 !pointer-events-auto'">
                                 <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <circle cx="12" cy="5" r="1.6" />
                                     <circle cx="12" cy="12" r="1.6" />
@@ -84,13 +86,13 @@
                                     Rename
                                 </button>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="togglePin({{ $thread['id'] }})" x-on:click="menuOpen = false"
-                                    role="menuitem">
+                                    wire:click="togglePin({{ $thread['id'] }})"
+                                    x-on:click="pinned = ! pinned; menuOpen = false" role="menuitem">
                                     <x-reicon name="pin" class="size-4 shrink-0 opacity-70" />
-                                    {{ $thread['pinned'] ? 'Unpin' : 'Pin' }}
+                                    <span x-text="pinned ? 'Unpin' : 'Pin'"></span>
                                 </button>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="archive({{ $thread['id'] }})" x-on:click="menuOpen = false"
+                                    wire:click="archive({{ $thread['id'] }})" x-on:click="gone = true; menuOpen = false"
                                     role="menuitem">
                                     <x-reicon name="archive" class="size-4 shrink-0 opacity-70" />
                                     Archive
@@ -129,10 +131,10 @@
                 @if ($showArchived)
                     <div class="mt-0.5 flex max-h-[30vh] flex-col gap-0.5 overflow-y-auto">
                         @foreach ($this->archivedThreads as $thread)
-                            <div wire:key="arch-{{ $thread['id'] }}" class="group relative" x-data="{ menuOpen: false }"
-                                :class="menuOpen && 'z-20'" x-on:click.outside="menuOpen = false"
-                                x-on:keydown.escape.window="menuOpen = false">
-                                <a href="{{ route('ai.assistant.show', ['uuid' => $thread['uuid']]) }}" wire:navigate
+                            <div wire:key="arch-{{ $thread['id'] }}" x-show="!gone" x-collapse class="group relative"
+                                x-data="{ menuOpen: false, gone: false }" :class="menuOpen && 'z-20'"
+                                x-on:click.outside="menuOpen = false" x-on:keydown.escape.window="menuOpen = false">
+                                <a href="{{ route('ai.assistant.show', ['uuid' => $thread['uuid']]) }}" {{ wireNavigate() }}
                                     @class([
                                         'menu-item pr-8',
                                         'menu-item-active' => $activeConversationId === $thread['id'],
@@ -159,8 +161,8 @@
                                     <div x-show="menuOpen" x-cloak x-transition.origin.top.right
                                         class="listbox-panel bottom-full! right-0! left-auto! mb-1! w-44!" role="menu">
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                            wire:click="unarchive({{ $thread['id'] }})" x-on:click="menuOpen = false"
-                                            role="menuitem">
+                                            wire:click="unarchive({{ $thread['id'] }})"
+                                            x-on:click="gone = true; menuOpen = false" role="menuitem">
                                             <x-reicon name="archive" class="size-4 shrink-0 opacity-70" />
                                             Unarchive
                                         </button>
@@ -229,11 +231,6 @@
                             </div>
                         </div>
                     @endif
-                    <button type="button" wire:click="deleteThread({{ $activeConversationId }})"
-                        wire:confirm="Delete this conversation?" title="Delete conversation"
-                        class="flex size-8 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-error/10 hover:text-error dark:text-fg-faint">
-                        <x-reicon name="trash" class="size-4" />
-                    </button>
                 </x-slot:actions>
             </x-ai.conversation-header>
 

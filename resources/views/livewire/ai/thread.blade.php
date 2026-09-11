@@ -143,7 +143,7 @@
         {{-- Confirmation cards: the assistant asking to authorize an action. Rendered
              inline in the conversation column (assistant-aligned), not full width. --}}
         @foreach ($this->pendingApprovals as $approval)
-            <div wire:key="approval-{{ $approval['id'] }}" x-show="!busy" class="flex items-start gap-2">
+            <div wire:key="approval-{{ $approval['id'] }}" class="flex items-start gap-2">
                 <x-ai.avatar size="sm" variant="tint" class="mt-1" />
                 <div
                     class="min-w-0 max-w-[85%] overflow-hidden rounded-2xl rounded-bl-md bg-white ring-1 ring-black/5 dark:bg-white/[0.04] dark:ring-white/10">
@@ -205,10 +205,8 @@
                     </button>
                 </template>
             </div>
-            @if ($wide)
-                <p class="mt-2 text-center text-[11px] text-neutral-500 dark:text-fg-faint">The assistant can make
-                    mistakes. It always asks before making changes.</p>
-            @endif
+            <p class="mt-2 text-center text-[11px] text-neutral-500 dark:text-fg-faint">The assistant can make
+                mistakes. It always asks before making changes.</p>
         </div>
     </form>
 

@@ -102,12 +102,12 @@ test('a member cannot unshare another users shared conversation', function () {
     expect($shared->fresh()->visibility)->toBe(AiConversation::VISIBILITY_TEAM);
 });
 
-test('new thread creates a private conversation owned by the current user', function () {
-    Livewire::test(ConversationPage::class)->call('newThread');
+test('new thread goes to the default composer without creating a conversation', function () {
+    Livewire::test(ConversationPage::class)
+        ->call('newThread')
+        ->assertRedirect(route('ai.assistant'));
 
-    $conversation = AiConversation::where('team_id', $this->team->id)->latest('id')->first();
-    expect($conversation->created_by_user_id)->toBe($this->user->id)
-        ->and($conversation->visibility)->toBe(AiConversation::VISIBILITY_PRIVATE);
+    expect(AiConversation::where('team_id', $this->team->id)->count())->toBe(0);
 });
 
 test('share flips visibility to team for the creator only', function () {
@@ -254,13 +254,6 @@ test('opening a conversation navigates to its per-session url', function () {
     Livewire::test(ConversationPage::class)
         ->call('open', $c->id)
         ->assertRedirect(route('ai.assistant.show', ['uuid' => $c->uuid]));
-});
-
-test('newThread creates and redirects to the new session url', function () {
-    Livewire::test(ConversationPage::class)->call('newThread');
-
-    $conversation = AiConversation::where('team_id', $this->team->id)->latest('id')->first();
-    expect($conversation)->not->toBeNull();
 });
 
 test('a member cannot archive another users thread', function () {
