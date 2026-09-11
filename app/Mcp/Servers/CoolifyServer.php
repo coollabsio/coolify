@@ -9,6 +9,7 @@ use App\Mcp\Resources\InfrastructureOverviewResource;
 use App\Mcp\Tools\CancelDeployment;
 use App\Mcp\Tools\Control;
 use App\Mcp\Tools\CoolifyHelp;
+use App\Mcp\Tools\CreateApplication;
 use App\Mcp\Tools\CreateDatabase;
 use App\Mcp\Tools\CreateEnvironment;
 use App\Mcp\Tools\CreateProject;
@@ -146,6 +147,7 @@ MD;
         CreateService::class,
         CreateProject::class,
         CreateEnvironment::class,
+        CreateApplication::class,
     ];
 
     protected array $resources = [
@@ -170,6 +172,7 @@ MD;
         CreateService::class,
         CreateProject::class,
         CreateEnvironment::class,
+        CreateApplication::class,
     ];
 
     /**
