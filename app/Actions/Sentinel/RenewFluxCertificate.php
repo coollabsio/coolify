@@ -5,7 +5,6 @@ namespace App\Actions\Sentinel;
 use App\Models\FluxCertificate;
 use App\Models\Server;
 use Closure;
-use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 use Throwable;
@@ -19,8 +18,17 @@ class RenewFluxCertificate
      */
     public function handle(?Closure $restartAndValidate = null): bool
     {
-        $lock = Cache::lock('flux-certificate-renewal', 1800);
-        if (! $lock->get()) {
+        $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux';
+        if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('Cannot create the Flux directory.');
+        }
+        $lock = fopen($directory.'/.certificate-renewal.lock', 'c');
+        if ($lock === false) {
+            throw new RuntimeException('Cannot open the Flux certificate renewal lock.');
+        }
+        if (! flock($lock, LOCK_EX | LOCK_NB)) {
+            fclose($lock);
+
             return false;
         }
 
@@ -47,8 +55,11 @@ class RenewFluxCertificate
                 return $candidate;
             });
             $restartAndValidate ??= $this->restartAndValidate(...);
+            $materializer = MaterializeFluxCertificate::make();
+            $previousFiles = [];
             try {
-                MaterializeFluxCertificate::run($candidate);
+                $previousFiles = $materializer->retain();
+                $materializer->handle($candidate);
                 $restartAndValidate($candidate);
                 $previous->getConnection()->transaction(function () use ($previous, $candidate): void {
                     $previous->update(['state' => 'previous']);
@@ -56,8 +67,10 @@ class RenewFluxCertificate
                 });
             } catch (Throwable $exception) {
                 try {
-                    MaterializeFluxCertificate::run($previous);
-                    $restartAndValidate($previous);
+                    if ($previousFiles !== []) {
+                        $materializer->restore($previousFiles);
+                        $restartAndValidate($previous);
+                    }
                 } catch (Throwable $rollbackException) {
                     throw new RuntimeException('Flux certificate renewal failed and rollback failed.', previous: $rollbackException);
                 }
@@ -65,9 +78,12 @@ class RenewFluxCertificate
                 throw $exception;
             }
 
+            $materializer->discard($previousFiles);
+
             return true;
         } finally {
-            $lock->release();
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 

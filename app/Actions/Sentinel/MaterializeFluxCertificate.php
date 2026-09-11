@@ -5,6 +5,7 @@ namespace App\Actions\Sentinel;
 use App\Models\FluxCertificate;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
+use Throwable;
 
 class MaterializeFluxCertificate
 {
@@ -64,6 +65,60 @@ class MaterializeFluxCertificate
                 if (is_file($temporary)) {
                     unlink($temporary);
                 }
+            }
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function retain(): array
+    {
+        $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux/pki';
+        $previousFiles = [];
+        try {
+            foreach (['ca.pem', 'server.pem', 'server-key.pem'] as $name) {
+                $path = $directory.'/'.$name;
+                if (! is_file($path)) {
+                    throw new RuntimeException('The current Flux certificate files must exist before renewal.');
+                }
+                $backup = $directory.'/.previous-'.bin2hex(random_bytes(16)).'-'.$name;
+                if (! link($path, $backup)) {
+                    throw new RuntimeException('Cannot retain the current Flux certificate file.');
+                }
+                $previousFiles[$path] = $backup;
+            }
+
+            return $previousFiles;
+        } catch (Throwable $exception) {
+            $this->discard($previousFiles);
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $previousFiles
+     */
+    public function restore(array $previousFiles): void
+    {
+        foreach ($previousFiles as $path => $backup) {
+            if (! rename($backup, $path)) {
+                throw new RuntimeException('Cannot restore the previous Flux certificate file.');
+            }
+            if (is_file($backup) && ! unlink($backup)) {
+                throw new RuntimeException('Cannot remove the restored Flux certificate backup.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $previousFiles
+     */
+    public function discard(array $previousFiles): void
+    {
+        foreach ($previousFiles as $backup) {
+            if (! unlink($backup)) {
+                throw new RuntimeException('Cannot remove the previous Flux certificate file.');
             }
         }
     }
