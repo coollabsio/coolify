@@ -3,6 +3,7 @@
 use App\Actions\Service\CreateService;
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Data\ResourcePlacement;
+use App\Exceptions\ServiceTemplateNotFoundException;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -33,3 +34,10 @@ it('creates a service from raw docker compose in the resolved placement', functi
         ->and($service->destination_id)->toBe($placement->destination->id)
         ->and($service->name)->toBe('my-svc');
 });
+
+it('throws ServiceTemplateNotFoundException for an unknown slug', function () {
+    Queue::fake();
+    $placement = servicePlacement();
+
+    CreateService::run($placement, 'definitely-not-a-template', null);
+})->throws(ServiceTemplateNotFoundException::class);

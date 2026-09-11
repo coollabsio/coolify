@@ -2,6 +2,8 @@
 
 use App\Actions\Project\CreateEnvironment;
 use App\Actions\Project\CreateProject;
+use App\Exceptions\EnvironmentAlreadyExistsException;
+use App\Models\Project;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -24,4 +26,11 @@ it('creates an additional environment and rejects duplicates', function () {
     expect($env->name)->toBe('staging');
 
     CreateEnvironment::run($project, 'staging');
-})->throws(RuntimeException::class);
+})->throws(EnvironmentAlreadyExistsException::class);
+
+it('throws EnvironmentAlreadyExistsException for a duplicate environment name', function () {
+    $team = Team::factory()->create();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+
+    CreateEnvironment::run($project, 'production');
+})->throws(EnvironmentAlreadyExistsException::class);

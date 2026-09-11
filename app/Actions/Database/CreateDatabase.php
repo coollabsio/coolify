@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Data\ResourcePlacement;
 use App\Enums\NewDatabaseTypes;
+use App\Exceptions\PublicPortAlreadyUsedException;
 use Illuminate\Database\Eloquent\Model;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -24,8 +25,16 @@ class CreateDatabase
         $environmentId = $placement->environment->id;
         $destination = $placement->destination;
 
+        if (($data['is_public'] ?? false) && ! empty($data['public_port'])
+            && isPublicPortAlreadyUsed($placement->server, (int) $data['public_port'])) {
+            throw new PublicPortAlreadyUsedException;
+        }
+        if ($image !== null) {
+            $data['image'] = $image;
+        }
+
         $database = match ($type) {
-            NewDatabaseTypes::POSTGRESQL => create_standalone_postgresql($environmentId, $destination, $data, $image ?? 'postgres:16-alpine'),
+            NewDatabaseTypes::POSTGRESQL => create_standalone_postgresql($environmentId, $destination, $data, $data['image'] ?? 'postgres:16-alpine'),
             NewDatabaseTypes::MYSQL => create_standalone_mysql($environmentId, $destination, $data),
             NewDatabaseTypes::MARIADB => create_standalone_mariadb($environmentId, $destination, $data),
             NewDatabaseTypes::MONGODB => create_standalone_mongodb($environmentId, $destination, $data),

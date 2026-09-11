@@ -2,6 +2,7 @@
 
 namespace App\Actions\Project;
 
+use App\Exceptions\EnvironmentAlreadyExistsException;
 use App\Models\Environment;
 use App\Models\Project;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -13,7 +14,7 @@ class CreateEnvironment
     public function handle(Project $project, string $name): Environment
     {
         if ($project->environments()->where('name', $name)->exists()) {
-            throw new \RuntimeException("Environment '{$name}' already exists in this project.");
+            throw new EnvironmentAlreadyExistsException;
         }
 
         return $project->environments()->create(['name' => $name]);

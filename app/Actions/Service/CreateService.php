@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Data\ResourcePlacement;
+use App\Exceptions\ServiceTemplateNotFoundException;
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -45,7 +46,7 @@ class CreateService
         $services = get_service_templates();
         $compose = data_get($services, "$slug.compose");
         if (! $compose) {
-            throw new \RuntimeException("Service template [{$slug}] not found.");
+            throw new ServiceTemplateNotFoundException($services->keys()->all());
         }
 
         $dotEnvs = data_get($services, "$slug.envs", null);

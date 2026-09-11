@@ -4,8 +4,10 @@ use App\Actions\Database\CreateDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Shared\ResolveResourcePlacement;
 use App\Enums\NewDatabaseTypes;
+use App\Exceptions\PublicPortAlreadyUsedException;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,3 +46,20 @@ it('dispatches StartDatabase when instant_deploy is true', function () {
 
     StartDatabase::assertPushed();
 });
+
+it('applies the image argument to non-postgres engines', function () {
+    Queue::fake();
+    [$placement] = dbPlacement();
+
+    $db = CreateDatabase::run($placement, NewDatabaseTypes::MYSQL, [], 'mysql:8.4', false);
+
+    expect($db)->toBeInstanceOf(StandaloneMysql::class)->and($db->image)->toBe('mysql:8.4');
+});
+
+it('throws PublicPortAlreadyUsedException when the public port is taken on the server', function () {
+    Queue::fake();
+    [$placement] = dbPlacement();
+    CreateDatabase::run($placement, NewDatabaseTypes::POSTGRESQL, ['is_public' => true, 'public_port' => 5433], null, false);
+
+    CreateDatabase::run($placement, NewDatabaseTypes::MYSQL, ['is_public' => true, 'public_port' => 5433], null, false);
+})->throws(PublicPortAlreadyUsedException::class);
