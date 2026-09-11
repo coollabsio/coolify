@@ -35,9 +35,6 @@ class Sentinel extends Component
     /** @var array<string, mixed>|null */
     public ?array $fluxConnection = null;
 
-    /** @var array<string, mixed>|null */
-    public ?array $fluxPingResult = null;
-
     public function getListeners()
     {
         $teamId = $this->server->team_id ?? auth()->user()->currentTeam()->id;
@@ -144,8 +141,9 @@ class Sentinel extends Component
     {
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->authorize('view', $this->server);
-        $this->fluxPingResult = null;
         $this->loadFluxConnection();
+        $state = $this->fluxConnection === null ? 'disconnected' : 'connected';
+        $this->dispatch('info', "Flux connection state refreshed. Sentinel is {$state}.");
     }
 
     public function testFluxConnection(): void
@@ -154,9 +152,11 @@ class Sentinel extends Component
 
         try {
             $this->authorize('manageSentinel', $this->server);
-            $this->fluxPingResult = PingFluxConnection::run($this->server);
+            $result = PingFluxConnection::run($this->server);
+            $version = data_get($result, 'sentinel_version', 'unknown');
+            $latency = data_get($result, 'latency_ms', 'unknown');
+            $this->dispatch('success', "Flux connection test succeeded. Sentinel {$version} responded in {$latency} ms.");
         } catch (\Throwable $e) {
-            $this->fluxPingResult = null;
             handleError($e, $this);
         }
     }
@@ -199,8 +199,5 @@ class Sentinel extends Component
         $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false)
             ? Cache::get("flux:connection:{$this->server->uuid}")
             : null;
-        if ($this->fluxConnection === null) {
-            $this->fluxPingResult = null;
-        }
     }
 }

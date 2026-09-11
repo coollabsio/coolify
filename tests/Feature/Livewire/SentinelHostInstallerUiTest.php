@@ -104,15 +104,13 @@ it('refreshes the Flux connection state from the cache', function () {
         ->assertDontSee('Unencrypted control channel');
 });
 
-it('clears an old ping result when connection state is refreshed', function () {
+it('shows a notification when connection state is refreshed', function () {
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->set('fluxPingResult', ['sentinel_version' => 'main', 'latency_ms' => 12, 'boot_id' => 'boot-1'])
         ->call('refreshFluxConnection')
-        ->assertSet('fluxPingResult', null)
-        ->assertDontSee('Ping succeeded');
+        ->assertDispatched('info', 'Flux connection state refreshed. Sentinel is disconnected.');
 });
 
 it('tests the Flux connection through Sentinel', function () {
@@ -135,9 +133,14 @@ it('tests the Flux connection through Sentinel', function () {
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->assertSee('Test connection')
         ->call('testFluxConnection')
-        ->assertSee('Ping succeeded')
-        ->assertSee('12 ms')
-        ->assertSee('main');
+        ->assertDispatched('success', 'Flux connection test succeeded. Sentinel main responded in 12 ms.')
+        ->assertDontSee('Ping succeeded');
+});
+
+it('wraps Flux actions on narrow screens', function () {
+    $view = file_get_contents(resource_path('views/livewire/server/sentinel.blade.php'));
+
+    expect($view)->toContain('class="flex flex-wrap items-center gap-2"');
 });
 
 it('shows TLS trust state and runs the repair action', function () {

@@ -103,7 +103,7 @@
                     title="Flux control channel"
                     helper="Experimental direct connection from the host Sentinel to Flux.">
                     <x-slot:actions>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <x-forms.button wire:click="testFluxConnection" wire:loading.attr="disabled"
                                 wire:target="testFluxConnection" canGate="update" :canResource="$server">
                                 <span wire:loading.remove wire:target="testFluxConnection">Test connection</span>
@@ -143,13 +143,6 @@
                         @endif
                     @else
                         <x-status-badge status="Disconnected" type="warning" />
-                    @endif
-                    @if ($fluxPingResult)
-                        <x-callout type="success" title="Ping succeeded">
-                            Sentinel {{ data_get($fluxPingResult, 'sentinel_version') }} responded in
-                            {{ data_get($fluxPingResult, 'latency_ms') }} ms. Boot ID:
-                            <span class="font-mono">{{ data_get($fluxPingResult, 'boot_id') }}</span>
-                        </x-callout>
                     @endif
                 </x-application.settings-section>
 
