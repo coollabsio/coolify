@@ -75,6 +75,9 @@
                 <div class="relative flex w-full min-w-0 items-center gap-2">
                     <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
                     <x-services.links :service="$service" compact />
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator />
+                    @endif
                 </div>
                 <div class="flex w-full flex-wrap gap-1">
                     @if ($selectedResource)
@@ -173,6 +176,9 @@
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($isDeploymentProgress)
+                        <x-deploying-indicator class="mr-1" />
+                    @endif
                     @if ($service->isDeployable)
                         <div class="resource-heading-menus shrink-0">
                             <x-services.links :service="$service" />
@@ -303,8 +309,8 @@
                     const isDeploymentProgress = await $wire.$call('checkDeployments');
 
                     if (isDeploymentProgress) {
-                        $wire.$dispatch('error',
-                            'There is a deployment in progress.<br><br>You can force deploy from the Actions menu.');
+                        // A deploy is already running: reopen its live log instead of erroring.
+                        $wire.$call('reopenDeployment');
                         return;
                     }
 
@@ -317,8 +323,8 @@
                 const isDeploymentProgress = await $wire.$call('checkDeployments');
 
                 if (isDeploymentProgress) {
-                    $wire.$dispatch('error',
-                        'There is a deployment in progress.<br><br>You can force deploy from the Actions menu.');
+                    // A deploy is already running: reopen its live log instead of erroring.
+                    $wire.$call('reopenDeployment');
                     return;
                 }
 
