@@ -3,13 +3,38 @@ services:
     environment:
       SENTINEL_HOST_ENABLED: "true"
       FLUX_PORT: "${FLUX_PORT:-7443}"
-      FLUX_PUBLIC_URL: "http://coolify-flux:7443"
+      FLUX_PUBLIC_URL: "https://coolify-flux:7443"
       FLUX_ISSUER: "coolify-dev"
       FLUX_SIGNING_KEY_ID: "dev-key"
       FLUX_SIGNING_PRIVATE_KEY: "Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0Mi/Cl3kvC2/8C/z9t+2wwKoU4CWjZewONC6G44Kct0tg=="
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
       FLUX_INTERNAL_URL: "http://coolify-flux:7080"
+    volumes:
+      - dev_flux_data:/data/coolify/flux
+
+  flux-pki-init:
+    image: coolify:dev
+    pull_policy: never
+    restart: "no"
+    depends_on:
+      coolify:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BASE_CONFIG_PATH: /data/coolify
+      SENTINEL_HOST_ENABLED: "true"
+    command:
+      - php
+      - artisan
+      - flux:initialize-tls
+      - --identities=flux,coolify-flux,localhost,127.0.0.1,::1
+    volumes:
+      - .:/var/www/html/:cached
+      - dev_flux_data:/data/coolify/flux
+    networks:
+      - coolify
 
   flux:
     image: ghcr.io/coollabsio/flux:main
@@ -22,6 +47,13 @@ services:
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_EVENTS_URL: "http://coolify:8080/api/v1/internal/sentinel/control/events"
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
+      FLUX_TLS_CERT_PATH: "/tls/pki/server.pem"
+      FLUX_TLS_KEY_PATH: "/tls/pki/server-key.pem"
+    depends_on:
+      flux-pki-init:
+        condition: service_completed_successfully
+    volumes:
+      - dev_flux_data:/tls:ro
     ports:
       - "${FLUX_PORT:-7443}:7443"
     networks:
@@ -45,3 +77,6 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
+
+volumes:
+  dev_flux_data:

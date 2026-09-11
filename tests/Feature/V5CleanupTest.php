@@ -86,3 +86,17 @@ it('replaces the normal testing host with systemd for v5 development', function 
         ->toContain('systemctl enable ssh.service')
         ->toContain('CMD ["/sbin/init"]');
 });
+
+it('runs the v5 development control channel with generated TLS files', function () {
+    $compose = file_get_contents(base_path('docker-compose.v5-dev.yml'));
+
+    expect($compose)
+        ->toContain('flux-pki-init:')
+        ->toContain('flux:initialize-tls')
+        ->toContain('FLUX_PUBLIC_URL: "https://coolify-flux:7443"')
+        ->toContain('FLUX_TLS_CERT_PATH: "/tls/pki/server.pem"')
+        ->toContain('FLUX_TLS_KEY_PATH: "/tls/pki/server-key.pem"')
+        ->toContain('dev_flux_data:/data/coolify/flux')
+        ->not->toContain('FLUX_DEVELOPMENT_ALLOW_PLAINTEXT: "true"')
+        ->not->toContain('BEGIN PRIVATE KEY');
+});
