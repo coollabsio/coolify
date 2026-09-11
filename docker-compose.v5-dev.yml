@@ -10,6 +10,7 @@ services:
       FLUX_SIGNING_PUBLIC_KEY: "Ivwpd5Lwtv/Av8/bftsMCqFOAlo2XsDjQuhuOCnLdLY="
       FLUX_INTERNAL_TOKEN: "coolify-flux-development-token"
       FLUX_INTERNAL_URL: "http://coolify-flux:7080"
+      FLUX_TLS_VERIFY_HOST: "coolify-flux"
     volumes:
       - dev_flux_data:/data/coolify/flux
 
@@ -25,6 +26,7 @@ services:
     environment:
       BASE_CONFIG_PATH: /data/coolify
       SENTINEL_HOST_ENABLED: "true"
+      DB_HOST: postgres
     command:
       - php
       - artisan
@@ -72,6 +74,7 @@ services:
       - /run/lock
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - dev_flux_data:/data/coolify/flux
     healthcheck:
       test: ["CMD-SHELL", "systemctl is-active --quiet ssh.service"]
       interval: 5s

@@ -95,7 +95,9 @@ class RenewFluxCertificate
         $identity = $certificate->identities[0];
         $verification = filter_var($identity, FILTER_VALIDATE_IP) !== false ? '-verify_ip' : '-verify_hostname';
         $port = (int) config('constants.flux.port');
-        $command = 'timeout 15 openssl s_client -connect '.escapeshellarg('127.0.0.1:'.$port)
+        $host = (string) config('constants.flux.tls_verify_host', '127.0.0.1');
+        $connect = str_contains($host, ':') ? '['.$host.']:'.$port : $host.':'.$port;
+        $command = 'timeout 15 openssl s_client -showcerts -connect '.escapeshellarg($connect)
             .' -CAfile '.escapeshellarg($directory.'/ca.pem')
             .' -verify_return_error '.$verification.' '.escapeshellarg($identity)
             .' -servername '.escapeshellarg($identity).' </dev/null';

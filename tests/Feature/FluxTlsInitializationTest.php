@@ -11,6 +11,7 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $this->directory = sys_get_temp_dir().'/coolify-flux-init-'.bin2hex(random_bytes(6));
     config()->set('constants.coolify.base_config_path', $this->directory);
+    config()->set('constants.flux.runtime_uid', 65532);
 });
 
 afterEach(function () {
@@ -26,6 +27,9 @@ it('issues and materializes the first Flux TLS certificate', function () {
         ->and($certificate->identities)->toBe(['flux', '127.0.0.1', '::1'])
         ->and(file_get_contents($this->directory.'/flux/pki/server.pem'))->toBe($certificate->certificate_pem)
         ->and(file_get_contents($this->directory.'/flux/pki/ca.pem'))->toBe($certificate->certificateAuthority->certificate_pem)
+        ->and(fileowner($this->directory.'/flux/pki'))
+        ->toBe(65532)
+        ->and(fileowner($this->directory.'/flux/pki/server-key.pem'))->toBe(65532)
         ->and(FluxCertificate::query()->where('state', 'active')->count())->toBe(1);
 });
 

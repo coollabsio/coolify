@@ -214,7 +214,7 @@ it('validates the served leaf after restart for root and non-root SSH users', fu
     expect(RenewFluxCertificate::run())->toBeTrue()
         ->and($commands)->toHaveCount(2)
         ->and($commands[0])->toContain(($user === 'root' ? '' : 'sudo ').'docker restart coolify-flux')
-        ->and($commands[1])->toContain("-connect '127.0.0.1:7443'", '-verify_return_error', $verification." '".$identity."'");
+        ->and($commands[1])->toContain("-connect '127.0.0.1:7443'", '-showcerts', '-verify_return_error', $verification." '".$identity."'");
 })->with([
     ['root', 'flux.example.test', '-verify_hostname'],
     ['deploy', '192.0.2.1', '-verify_ip'],

@@ -23,6 +23,10 @@ class MaterializeFluxCertificate
         if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
             throw new RuntimeException('Cannot create the Flux certificate directory.');
         }
+        $runtimeUid = (int) config('constants.flux.runtime_uid', 65532);
+        if (! chmod($directory, 0700) || ! chown($directory, $runtimeUid)) {
+            throw new RuntimeException('Cannot secure the Flux certificate directory.');
+        }
 
         $files = [
             'ca.pem' => [$authority->certificate_pem, 0644],
@@ -53,6 +57,9 @@ class MaterializeFluxCertificate
                 }
                 if (! chmod($temporary, $mode)) {
                     throw new RuntimeException('Cannot set the Flux certificate file permissions.');
+                }
+                if (! chown($temporary, $runtimeUid)) {
+                    throw new RuntimeException('Cannot set the Flux certificate file owner.');
                 }
             }
             foreach ($temporaryFiles as $name => $temporary) {

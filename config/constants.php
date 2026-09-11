@@ -112,6 +112,8 @@ return [
 
     'flux' => [
         'renew_before_days' => 30,
+        'runtime_uid' => (int) env('FLUX_RUNTIME_UID', 65532),
+        'tls_verify_host' => env('FLUX_TLS_VERIFY_HOST', '127.0.0.1'),
         'port' => (int) env('FLUX_PORT', 7443),
         'public_url' => env('FLUX_PUBLIC_URL'),
         'issuer' => env('FLUX_ISSUER', env('APP_ID')),
