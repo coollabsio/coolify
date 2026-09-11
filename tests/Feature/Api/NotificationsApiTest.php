@@ -2,6 +2,7 @@
 
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
+use App\Models\GotifyNotificationSettings;
 use App\Models\InstanceSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
@@ -77,6 +78,7 @@ describe('GET /api/v1/notifications/*', function () {
         'slack',
         'telegram',
         'pushover',
+        'gotify',
         'webhook',
     ]);
 
@@ -236,7 +238,7 @@ describe('PATCH /api/v1/notifications/*', function () {
             ->and($settings->deployment_success_discord_notifications)->toBeTrue();
     });
 
-    test('updates slack, telegram, pushover, and webhook channels', function (string $channel, array $payload, string $modelClass, string $enabledField) {
+    test('updates slack, telegram, pushover, gotify, and webhook channels', function (string $channel, array $payload, string $modelClass, string $enabledField) {
         $response = $this->withHeaders(authHeaders($this->bearerToken))
             ->patchJson("/api/v1/notifications/{$channel}", $payload);
 
@@ -277,6 +279,17 @@ describe('PATCH /api/v1/notifications/*', function () {
             ],
             PushoverNotificationSettings::class,
             'pushover_enabled',
+        ],
+        'gotify' => [
+            'gotify',
+            [
+                'gotify_enabled' => true,
+                'gotify_url' => 'https://example.com',
+                'gotify_token' => 'app-token',
+                'deployment_failure_gotify_notifications' => true,
+            ],
+            GotifyNotificationSettings::class,
+            'gotify_enabled',
         ],
         'webhook' => [
             'webhook',
