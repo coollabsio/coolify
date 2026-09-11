@@ -11,7 +11,7 @@ services:
     image: "infisical/infisical:v0.154.6"
     environment:
       - SERVICE_URL_BACKEND_8080
-      - SITE_URL=${SERVICE_URL_BACKEND_8080}
+      - SITE_URL=${SERVICE_URL_BACKEND}
       - NODE_ENV=${NODE_ENV:-production}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
       - AUTH_SECRET=${SERVICE_REALBASE64_64_AUTHSECRET}
