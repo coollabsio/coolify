@@ -40,6 +40,7 @@ use App\Mcp\Tools\ListEnvKeys;
 use App\Mcp\Tools\ListGithubApps;
 use App\Mcp\Tools\ListGithubBranches;
 use App\Mcp\Tools\ListGithubRepositories;
+use App\Mcp\Tools\ListPrivateKeys;
 use App\Mcp\Tools\ListProjects;
 use App\Mcp\Tools\ListResources;
 use App\Mcp\Tools\ListResourceTags;
@@ -137,6 +138,7 @@ MD;
         ListGithubApps::class,
         ListGithubRepositories::class,
         ListGithubBranches::class,
+        ListPrivateKeys::class,
         Control::class,
         Deploy::class,
         CancelDeployment::class,

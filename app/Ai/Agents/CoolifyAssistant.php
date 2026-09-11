@@ -10,6 +10,8 @@ use App\Ai\Tools\CreateProject;
 use App\Ai\Tools\CreateService;
 use App\Ai\Tools\DeleteResource;
 use App\Ai\Tools\DeleteServer;
+use App\Ai\Tools\ListGithubApps;
+use App\Ai\Tools\ListPrivateKeys;
 use App\Ai\Tools\ListServiceTemplates;
 use App\Ai\Tools\ReadDocPage;
 use App\Ai\Tools\RunServerCommand;
@@ -87,6 +89,8 @@ class CoolifyAssistant implements Agent, HasTools, RemembersConversationsContrac
 
         $catalogTools = [
             app(ListServiceTemplates::class),
+            app(ListGithubApps::class),
+            app(ListPrivateKeys::class),
         ];
 
         $writeTools = [
