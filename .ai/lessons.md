@@ -7,3 +7,4 @@
 - Never convert an existing Coolify localhost installation from Docker to Podman, WireGuard, or the native v5 worker stack automatically. Keep it as an explicit legacy control plane, and reserve native combined or control-plane-only modes for fresh v5 installations.
 - Keep the development Host Sentinel action button text-only. Do not add an icon unless the design explicitly requires one.
 - Do not describe a Sentinel client as active from its crate implementation alone. Verify that `main` starts its runtime loop before claiming that the Sentinel process calls an endpoint.
+- Use a 100-year validity period for each Coolify-managed Flux installation CA; do not use a shorter default.
