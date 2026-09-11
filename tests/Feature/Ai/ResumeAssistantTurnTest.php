@@ -38,7 +38,7 @@ test('resume streams a continuation and releases the thread', function () {
     Event::fake([AssistantTurnCompleted::class]);
     Ai::fakeAgent(CoolifyAssistant::class, ['Done, deleted the resource.']);
 
-    (new ResumeAssistantTurn($this->conversation->id, ['call_1' => true], $this->user->id))->handle();
+    (new ResumeAssistantTurn($this->conversation->id, ['call_1' => ['action' => 'approve']], $this->user->id))->handle();
 
     Event::assertDispatched(AssistantTurnCompleted::class);
     expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE);

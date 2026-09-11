@@ -18,6 +18,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Context;
+use Laravel\Ai\Approvals\Decision;
 use Laravel\Ai\Approvals\Decisions;
 use Laravel\Ai\Exceptions\ApprovalMismatchException;
 use Laravel\Ai\Responses\StreamedAgentResponse;
@@ -32,7 +33,12 @@ class ResumeAssistantTurn implements ShouldQueue
     public int $timeout = 300;
 
     /**
-     * @param  array<string, bool>  $decisions
+     * Serializable per-call decisions, keyed by tool-call id. Each is
+     * ['action' => 'approve'|'reject'|'edit', 'arguments' => array] where
+     * arguments is present only for edit. Reconstructed into Decision
+     * instances in handle() so the payload stays queue-serializable.
+     *
+     * @param  array<string, array{action: string, arguments?: array<string, mixed>}>  $decisions
      */
     public function __construct(
         public int $conversationId,
@@ -63,8 +69,17 @@ class ResumeAssistantTurn implements ShouldQueue
 
             $agent = (new CoolifyAssistant)->continue($conversation->sdk_conversation_id, as: $conversation->team);
 
+            $decisions = [];
+            foreach ($this->decisions as $callId => $decision) {
+                $decisions[$callId] = match ($decision['action'] ?? 'approve') {
+                    'edit' => Decision::edit($decision['arguments'] ?? []),
+                    'reject' => Decision::reject(),
+                    default => Decision::approve(),
+                };
+            }
+
             $final = null;
-            $stream = $agent->stream(Decisions::from($this->decisions), provider: $provider, model: $credential->model);
+            $stream = $agent->stream(Decisions::from($decisions), provider: $provider, model: $credential->model);
             $stream->then(function (StreamedAgentResponse $response) use (&$final) {
                 $final = $response;
             });

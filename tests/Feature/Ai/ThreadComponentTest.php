@@ -86,7 +86,7 @@ test('approving a pending call dispatches a resume job', function () {
     Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
         ->call('approve', 'call_1');
 
-    Bus::assertDispatched(ResumeAssistantTurn::class, fn ($job) => $job->decisions === ['call_1' => true]
+    Bus::assertDispatched(ResumeAssistantTurn::class, fn ($job) => $job->decisions === ['call_1' => ['action' => 'approve']]
         && $job->approverUserId === $this->user->id);
 });
 

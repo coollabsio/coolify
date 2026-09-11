@@ -346,8 +346,61 @@ class Thread extends Component
             return;
         }
 
-        ResumeAssistantTurn::dispatch($conversation->id, [$callId => $approved], auth()->id());
+        ResumeAssistantTurn::dispatch($conversation->id, [$callId => $this->decisionFor($callId, $approved)], auth()->id());
         unset($this->conversation, $this->busy);
+    }
+
+    /**
+     * Build the serializable decision for a pending call: reject, plain approve,
+     * or approve-with-edits (edited form values merged over the model's original
+     * arguments). The tool re-validates and re-authorizes the edited arguments.
+     *
+     * @return array{action: string, arguments?: array<string, mixed>}
+     */
+    private function decisionFor(string $callId, bool $approved): array
+    {
+        if (! $approved) {
+            return ['action' => 'reject'];
+        }
+
+        $edits = $this->approvalInputs[$callId] ?? [];
+        if ($edits === []) {
+            return ['action' => 'approve'];
+        }
+
+        return [
+            'action' => 'edit',
+            'arguments' => array_merge($this->pendingCallArguments($callId), $edits),
+        ];
+    }
+
+    /**
+     * The model's original arguments for a pending tool call, from the latest
+     * paused assistant row.
+     *
+     * @return array<string, mixed>
+     */
+    private function pendingCallArguments(string $callId): array
+    {
+        $sdkId = $this->conversation()->sdk_conversation_id;
+        if (! $sdkId) {
+            return [];
+        }
+
+        $row = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $sdkId)
+            ->where('role', 'assistant')
+            ->whereNotNull('approval_state')
+            ->orderByDesc('id')
+            ->first(['tool_calls']);
+
+        if (! $row) {
+            return [];
+        }
+
+        $call = collect(json_decode($row->tool_calls ?? '[]', true))->firstWhere('id', $callId);
+
+        return (array) ($call['arguments'] ?? []);
     }
 
     public function render()
