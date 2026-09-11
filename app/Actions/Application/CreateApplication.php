@@ -278,7 +278,7 @@ class CreateApplication
     /** @return array{0: Collection, 1: mixed} */
     private function normalizeComposeDomainPorts(Collection $domains): array
     {
-        $normalized = DomainPortOverrides::normalize($domains->pluck('domain')->filter()->implode(','));
+        $normalized = DomainPortOverrides::normalize($domains->pluck('domain')->filter()->implode(','), null);
         $domains = $domains->map(function (array $entry): array {
             $entry['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain'] ?? null))
                 ->map(fn (string $d): string => DomainPortOverrides::withoutPort($d))
