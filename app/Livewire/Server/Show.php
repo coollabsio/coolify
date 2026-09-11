@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Sentinel\FetchFluxServerInformation;
 use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
@@ -643,6 +644,13 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if (isDev() && config('constants.sentinel.host_enabled', false)) {
+                FetchFluxServerInformation::run($this->server);
+                $this->server->refresh()->load('settings');
+                $this->dispatch('success', 'Server details refreshed through Flux.');
+
+                return;
+            }
             if (! $this->server->isFunctional()) {
                 $this->dispatch('error', 'Validate the server connection before fetching details.');
 

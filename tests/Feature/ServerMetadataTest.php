@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Sentinel\FetchFluxServerInformation;
 use App\Livewire\Server\Show;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\PrivateKey;
@@ -13,9 +14,10 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('constants.sentinel.host_enabled', false);
     $user = User::factory()->create();
     $this->team = Team::factory()->create();
-    $user->teams()->attach($this->team);
+    $user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($user);
     session(['currentTeam' => $this->team]);
 
@@ -127,11 +129,17 @@ it('stores a parsed docker version when gathering server metadata', function () 
 it('shows the stored docker version in remote server details', function () {
     $this->server->update([
         'server_metadata' => [
+            'hostname' => 'worker-1',
             'os' => 'Debian GNU/Linux 12 (bookworm)',
             'arch' => 'aarch64',
             'kernel' => '6.1.0-17-arm64',
             'cpus' => 8,
             'memory_bytes' => 17179869184,
+            'disk_total_bytes' => 536870912000,
+            'disk_available_bytes' => 322122547200,
+            'sentinel_version' => '1.0.1',
+            'container_runtime' => 'docker',
+            'container_runtime_version' => '27.5.1',
             'uptime_since' => '2024-03-01 08:00:00',
             'collected_at' => now()->toIso8601String(),
         ],
@@ -140,6 +148,14 @@ it('shows the stored docker version in remote server details', function () {
     $this->server->rememberComposeVersion('2.29.7');
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Hostname')
+        ->assertSee('worker-1')
+        ->assertSee('Storage')
+        ->assertSee('300 GB available of 500 GB')
+        ->assertSee('Sentinel version')
+        ->assertSee('1.0.1')
+        ->assertSee('Container runtime')
+        ->assertSee('Docker 27.5.1')
         ->assertSee('Docker version')
         ->assertSee('27.5.1')
         ->assertSee('Compose version')
@@ -159,15 +175,31 @@ it('can overwrite server_metadata with new values', function () {
         ->and($this->server->server_metadata['cpus'])->toBe(4);
 });
 
+it('refreshes server information through Flux when the host control channel is enabled', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    FetchFluxServerInformation::partialMock()
+        ->shouldReceive('handle')
+        ->once()
+        ->with(Mockery::type(Server::class))
+        ->andReturn(['hostname' => 'worker-1']);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('refreshServerMetadata')
+        ->assertDispatched('success', 'Server details refreshed through Flux.');
+});
+
 it('calls gatherServerMetadata during ValidateAndInstall when docker version is valid', function () {
     $serverMock = Mockery::mock($this->server)->makePartial();
     $serverMock->shouldReceive('isSwarm')->andReturn(false);
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn('24.0.0');
     $serverMock->shouldReceive('gatherServerMetadata')->once();
     $serverMock->shouldReceive('isBuildServer')->andReturn(false);
+    $serverMock->shouldReceive('isSentinelEnabled')->andReturn(false);
 
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+    $component = app(ValidateAndInstall::class);
+    $component->server = $serverMock;
+    $component->validateDockerVersion();
 });
 
 it('does not call gatherServerMetadata when docker version validation fails', function () {
@@ -176,6 +208,7 @@ it('does not call gatherServerMetadata when docker version validation fails', fu
     $serverMock->shouldReceive('validateDockerEngineVersion')->once()->andReturn(false);
     $serverMock->shouldNotReceive('gatherServerMetadata');
 
-    Livewire::test(ValidateAndInstall::class, ['server' => $serverMock])
-        ->call('validateDockerVersion');
+    $component = app(ValidateAndInstall::class);
+    $component->server = $serverMock;
+    $component->validateDockerVersion();
 });
