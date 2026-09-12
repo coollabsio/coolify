@@ -6,6 +6,8 @@ use App\Enums\NodeRole;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use RuntimeException;
 
 class Node extends BaseModel
@@ -35,6 +37,16 @@ class Node extends BaseModel
     public function privateKey(): BelongsTo
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function workloads(): BelongsToMany
+    {
+        return $this->belongsToMany(NodeWorkload::class, 'node_workload_nodes')->withTimestamps();
+    }
+
+    public function containers(): HasMany
+    {
+        return $this->hasMany(NodeContainer::class);
     }
 
     public function isNonRoot(): bool

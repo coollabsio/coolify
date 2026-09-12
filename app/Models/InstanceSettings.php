@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Spatie\Url\Url;
 
 class InstanceSettings extends Model
@@ -59,6 +60,7 @@ class InstanceSettings extends Model
         'avatar_s3_storage_id',
         'image_cdn_url',
         'is_dashboard_force_https_enabled',
+        'instance_uuid',
     ];
 
     protected $hidden = [
@@ -173,6 +175,15 @@ class InstanceSettings extends Model
     public static function get()
     {
         return once(fn () => InstanceSettings::findOrFail(0));
+    }
+
+    public function ensureInstanceUuid(): string
+    {
+        if (blank($this->instance_uuid)) {
+            $this->forceFill(['instance_uuid' => (string) Str::uuid()])->saveQuietly();
+        }
+
+        return $this->instance_uuid;
     }
 
     // public function getRecipients($notification)

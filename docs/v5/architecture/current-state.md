@@ -156,9 +156,12 @@ cross-instance command routing are not implemented yet.
 - private CA issuance, Flux leaf issuance, automatic leaf renewal, rollback,
   and SSH trust repair;
 - `system.ping.v1` and `system.info.v1` typed commands;
-- development-only UI controls and connection state.
-
-The separate `Node` model from Decision 0004 is accepted but not implemented.
+- development-only UI controls and connection state;
+- separate `Node`, `NodeWorkload`, immutable workload revision, assignment, and
+  observed `NodeContainer` models;
+- stable Coolify installation identity and standard container identity labels;
+- transactional container observation reconciliation with managed, external,
+  and unrecognized ownership states.
 
 ### Not implemented
 
@@ -173,6 +176,7 @@ The separate `Node` model from Decision 0004 is accepted but not implemented.
 
 ## Next safe step
 
-Implement `node_containers` with a read-only `container.list` command. Do
+Implement the read-only `container.list` command and feed its validated result
+into the existing `node_containers` reconciliation action. Do
 not start mutating workload operations until command reconciliation,
 idempotency, audit, and restart behavior are specified.
