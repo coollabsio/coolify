@@ -11,7 +11,7 @@ services:
     environment:
       - SERVICE_URL_VIKUNJA
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_URL_VIKUNJA
-      - VIKUNJA_SERVICE_JWTSECRET=$SERVICE_PASSWORD_JWTSECRET
+      - VIKUNJA_SERVICE_SECRET=$SERVICE_PASSWORD_JWTSECRET
       - VIKUNJA_SERVICE_ENABLEREGISTRATION=true
       - VIKUNJA_DATABASE_TYPE=postgres
       - VIKUNJA_DATABASE_HOST=postgresql
@@ -20,9 +20,16 @@ services:
       - VIKUNJA_DATABASE_DATABASE=${POSTGRESQL_DATABASE}
     volumes:
       - vikunja-data:/app/vikunja/
+    healthcheck:
+      test: [ "CMD", "/app/vikunja/vikunja", "healthcheck" ]
+      interval: 30s
+      timeout: 5s  
+      retries: 3
+      start_period: 15s
     depends_on:
       postgresql:
         condition: service_healthy
+
   postgresql:
     image: postgres:16-alpine
     volumes:

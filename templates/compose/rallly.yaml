@@ -7,9 +7,9 @@
 
 services:
   rallly_db:
-    image: postgres:14.2
+    image: postgres:18
     volumes:
-      - rallly_db_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -25,23 +25,28 @@ services:
   rallly:
     image: lukevella/rallly:latest
     platform: linux/amd64
-    depends_on:
-      rallly_db:
-        condition: service_healthy
     environment:
       - SERVICE_URL_RALLLY_3000
+      - PROXY_MODE=external
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@rallly_db:5432/${POSTGRES_DB:-rallly}
       - SECRET_PASSWORD=${SERVICE_PASSWORD_64_RALLLY}
       - NEXT_PUBLIC_BASE_URL=${SERVICE_URL_RALLLY}
+      - REGISTRATION_ENABLED=${REGISTRATION_ENABLED:-true}
+      - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:?}
       - ALLOWED_EMAILS=${ALLOWED_EMAILS}
-      - SUPPORT_EMAIL=${SUPPORT_EMAIL:-support@example.com}
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL:?}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_SECURE=${SMTP_SECURE:-false}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PWD=${SMTP_PWD}
+      - SMTP_TLS_ENABLED=${SMTP_TLS_ENABLED:-false}
+      - BETTER_AUTH_TRUSTED_ORIGINS=${SERVICE_URL_RALLLY}
     healthcheck:
       test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"]
       interval: 5s
       timeout: 20s
       retries: 10
+    depends_on:
+      rallly_db:
+        condition: service_healthy

@@ -1,0 +1,73 @@
+# documentation: https://openlitespeed.org/kb/
+# slogan: WordPress served by OpenLiteSpeed, a high-performance web server with built-in LSPHP and HTTP/3.
+# category: cms
+# tags: cms, blog, wordpress, openlitespeed, litespeed, php, mariadb
+# logo: svgs/wordpress.svg
+# port: 80
+
+services:
+  openlitespeed:
+    image: litespeedtech/openlitespeed:1.9.2-lsphp83
+    environment:
+      - SERVICE_URL_OPENLITESPEED_80
+      - TZ=${TZ:-UTC}
+    volumes:
+      - wordpress-files:/var/www/vhosts/localhost/html
+    depends_on:
+      wordpress-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:80/wp-login.php"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  wordpress-init:
+    image: wordpress:6.8-php8.3-fpm
+    user: "0:0"
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - wordpress-files:/var/www/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        if [ ! -f /var/www/html/wp-settings.php ]; then
+          cp -a /usr/src/wordpress/. /var/www/html/
+        fi
+        if [ ! -f /var/www/html/wp-config.php ]; then
+          cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+          sed -i "s/database_name_here/$$WORDPRESS_DB_NAME/;s/username_here/$$WORDPRESS_DB_USER/;s/password_here/$$WORDPRESS_DB_PASSWORD/;s/localhost/$$WORDPRESS_DB_HOST/" /var/www/html/wp-config.php
+          for KEY in AUTH_KEY SECURE_AUTH_KEY LOGGED_IN_KEY NONCE_KEY AUTH_SALT SECURE_AUTH_SALT LOGGED_IN_SALT NONCE_SALT; do
+            SALT=$$(head -c 64 /dev/urandom | base64 | tr -d '\n/')
+            sed -i "s|define( '$$KEY',.*|define( '$$KEY', '$$SALT' );|" /var/www/html/wp-config.php
+          done
+        fi
+        chown -R 1000:1000 /var/www/html
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MARIADB_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MARIADB_USER=$SERVICE_USER_WORDPRESS
+      - MARIADB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 15
+
+volumes:
+  wordpress-files:
+  mariadb-data:

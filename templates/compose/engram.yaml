@@ -1,0 +1,41 @@
+# documentation: https://github.com/Gentleman-Programming/engram
+# slogan: Persistent memory sync server for AI coding agents (MCP).
+# category: ai
+# tags: ai, memory, mcp, agents, self-hosted, postgres
+# logo: svgs/engram.png
+# port: 8080
+
+services:
+  engram:
+    image: ghcr.io/gentleman-programming/engram:1.20.0
+    command:
+      - cloud
+      - serve
+    environment:
+      - SERVICE_FQDN_ENGRAM_8080
+      - ENGRAM_CLOUD_HOST=0.0.0.0
+      - ENGRAM_PORT=8080
+      - ENGRAM_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB}?sslmode=disable
+      - ENGRAM_JWT_SECRET=${SERVICE_BASE64_64_JWTSECRET}
+      - ENGRAM_CLOUD_TOKEN=${SERVICE_PASSWORD_64_CLOUDTOKEN}
+      - ENGRAM_CLOUD_ADMIN=${SERVICE_PASSWORD_64_ADMIN}
+      - ENGRAM_CLOUD_ALLOWED_PROJECTS=${ENGRAM_CLOUD_ALLOWED_PROJECTS:-*}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-engram-db}
+    volumes:
+      - engram-postgresql-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 20s
+      retries: 10
