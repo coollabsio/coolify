@@ -46,7 +46,7 @@
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col">
                     <x-unsaved-bar action="submit" />
                     <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
-                        helper="Configure these endpoints when the repository is not connected through an official Git App." flush>
+                        helper="Configure these endpoints when the repository is not connected through an official Git App. GitLab App sources always need this - Coolify does not create GitLab webhooks automatically." flush>
                         <x-slot:actions>
                             @if (filled($resource?->gitWebhook))
                                 <a class="button" href="{{ $resource->gitWebhook }}" target="_blank"
