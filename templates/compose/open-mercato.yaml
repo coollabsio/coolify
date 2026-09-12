@@ -127,7 +127,8 @@ services:
          && chmod 0440 /etc/sudoers.d/omuser
         RUN mkdir -p /var/lib/open-mercato /app/apps/mercato/.mercato/queue /app/node_modules/.cache \
          && chown -R omuser:omuser /var/lib/open-mercato /app/apps/mercato/.mercato/queue \
-            /app/apps/mercato/.mercato/generated /app/node_modules/.cache /app/packages /app/apps/mercato/src
+            /app/apps/mercato/.mercato/generated /app/node_modules/.cache /app/packages /app/apps/mercato/src \
+         && chown omuser:omuser /app/apps/mercato/.mercato
         USER omuser
         EXPOSE $${CONTAINER_PORT}
         WORKDIR /app/apps/mercato
