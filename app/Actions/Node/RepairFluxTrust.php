@@ -1,19 +1,19 @@
 <?php
 
-namespace App\Actions\Server;
+namespace App\Actions\Node;
 
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
-use App\Models\Server;
+use App\Models\Node;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class RepairSentinelFluxTrust
+class RepairFluxTrust
 {
     use AsAction;
 
-    public function handle(Server $server): ?string
+    public function handle(Node $node): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || ! $server->isNode()) {
+        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
             return null;
         }
 
@@ -21,7 +21,7 @@ class RepairSentinelFluxTrust
 
         return instant_remote_process(
             [self::remoteCommand(self::repairScript($authority->certificate_pem, $authority->version))],
-            $server,
+            $node,
             timeout: 600,
             disableMultiplexing: true,
         );

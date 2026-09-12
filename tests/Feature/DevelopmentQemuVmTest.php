@@ -6,6 +6,7 @@ use App\Actions\Development\SeedDevelopmentQemuServer;
 use App\Actions\Development\StartDevelopmentQemuVm;
 use App\Console\Commands\ManageDevelopmentQemuVmCommand;
 use App\Console\Commands\SeedDevelopmentQemuServerCommand;
+use App\Models\Node;
 use App\Models\Server;
 use Database\Seeders\PrivateKeySeeder;
 use Database\Seeders\TeamSeeder;
@@ -170,15 +171,17 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect($compose)->toContain("postgres:\n        condition: service_healthy");
 });
 
-it('seeds the node worker with the host gateway sentinel endpoint', function () {
-    $server = SeedDevelopmentQemuServer::run('node-worker');
+it('seeds the node worker as a separate node with the host gateway endpoint', function () {
+    $node = SeedDevelopmentQemuServer::run('node-worker');
 
-    expect($server->uuid)->toBe('development-qemu-node-worker')
-        ->and($server->mode->value)->toBe('node-worker')
-        ->and($server->ip)->toBe('192.168.122.50')
-        ->and($server->user)->toBe('root')
-        ->and($server->settings->sentinel_custom_url)->toBe('http://192.168.122.1:8000')
-        ->and($server->settings->is_usable)->toBeFalse();
+    expect($node)->toBeInstanceOf(Node::class)
+        ->and($node->uuid)->toBe('development-qemu-node-worker')
+        ->and($node->role->value)->toBe('worker')
+        ->and($node->ip)->toBe('192.168.122.50')
+        ->and($node->user)->toBe('root')
+        ->and($node->sentinel_url)->toBe('http://192.168.122.1:8000')
+        ->and($node->is_usable)->toBeFalse()
+        ->and(Server::query()->where('uuid', $node->uuid)->exists())->toBeFalse();
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {

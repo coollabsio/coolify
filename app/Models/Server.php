@@ -8,7 +8,6 @@ use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
-use App\Enums\ServerMode;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
@@ -123,8 +122,6 @@ class Server extends BaseModel
     public const PLACEHOLDER_IP = '1.2.3.4';
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
-
-    public const PODMAN_VALIDATION_COMMAND = 'command -v podman >/dev/null && command -v systemctl >/dev/null && systemctl is-active --quiet podman.socket && test -S /run/podman/podman.sock && podman info --format json';
 
     public static $batch_counter = 0;
 
@@ -258,7 +255,6 @@ class Server extends BaseModel
     }
 
     protected $casts = [
-        'mode' => ServerMode::class,
         'proxy' => SchemalessAttributes::class,
         'traefik_outdated_info' => 'array',
         'server_metadata' => 'array',
@@ -269,10 +265,6 @@ class Server extends BaseModel
         'unreachable_notification_sent' => 'boolean',
         'is_build_server' => 'boolean',
         'force_disabled' => 'boolean',
-    ];
-
-    protected $attributes = [
-        'mode' => ServerMode::LEGACY->value,
     ];
 
     /**
@@ -310,7 +302,6 @@ class Server extends BaseModel
         'traefik_outdated_info',
         'server_metadata',
         'ip_previous',
-        'mode',
     ];
 
     use HasSafeStringAttribute;
@@ -331,16 +322,6 @@ class Server extends BaseModel
     {
         // Cast: the saving hook stores the ip as a Stringable in memory.
         return self::isPlaceholderIp((string) $this->ip);
-    }
-
-    public function usesPodman(): bool
-    {
-        return $this->mode?->usesPodman() ?? false;
-    }
-
-    public function isNode(): bool
-    {
-        return $this->mode instanceof ServerMode && $this->mode !== ServerMode::LEGACY;
     }
 
     public static function isPlaceholderIp(?string $ip): bool
@@ -1663,27 +1644,6 @@ $siteAddress {
         return true;
     }
 
-    public function validatePodman($throwError = false): bool
-    {
-        $output = instant_remote_process([self::PODMAN_VALIDATION_COMMAND], $this, false, no_sudo: true);
-
-        if (is_null($output) || json_decode(trim($output), true) === null) {
-            $this->settings->is_usable = false;
-            $this->settings->save();
-            if ($throwError) {
-                throw new \Exception('Server is not usable. Podman or its API socket is not available.');
-            }
-
-            return false;
-        }
-
-        $this->settings->is_reachable = true;
-        $this->settings->is_usable = true;
-        $this->settings->save();
-
-        return true;
-    }
-
     public function validateDockerCompose($throwError = false)
     {
         $dockerCompose = instant_remote_process(['docker compose version'], $this, false);
@@ -1830,9 +1790,6 @@ $siteAddress {
     public function restartSentinel(?string $customImage = null, bool $async = true)
     {
         try {
-            if ($this->isNode()) {
-                return instant_remote_process(['systemctl restart sentinel.service'], $this);
-            }
             if ($async) {
                 StartSentinel::dispatch($this, true, null, $customImage);
             } else {

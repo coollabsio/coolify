@@ -1,8 +1,8 @@
 <?php
 
+use App\Actions\Node\InstallSentinel;
+use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
-use App\Actions\Server\InstallSentinelHost;
-use App\Actions\Server\RepairSentinelFluxTrust;
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -21,7 +21,7 @@ afterEach(function () {
 });
 
 it('restores a failed fresh install to inactive and disabled without Sentinel files', function () {
-    $script = InstallSentinelHost::installationScript(
+    $script = InstallSentinel::installationScript(
         'sentinel-token',
         'https://coolify.example/api/v1/sentinel',
         'ghcr.io/coollabsio/sentinel-host:main',
@@ -46,7 +46,7 @@ it('restores a failed fresh install to inactive and disabled without Sentinel fi
 });
 
 it('restores files modes and an enabled-state-disabled active Sentinel after a failed update', function () {
-    $script = InstallSentinelHost::installationScript(
+    $script = InstallSentinel::installationScript(
         'sentinel-token',
         'https://coolify.example/api/v1/sentinel',
         'ghcr.io/coollabsio/sentinel-host:main',
@@ -69,7 +69,7 @@ it('restores files modes and an enabled-state-disabled active Sentinel after a f
 });
 
 it('restores an inactive enabled Sentinel and preserves its token and endpoint after a failed repair', function () {
-    $script = RepairSentinelFluxTrust::repairScript($this->authority->certificate_pem, $this->authority->version);
+    $script = RepairFluxTrust::repairScript($this->authority->certificate_pem, $this->authority->version);
     $sandbox = sentinelTrustRollbackSandbox($this->directory, $script, active: false, enabled: true);
     $previous = writeSentinelTrustFiles($sandbox['root']);
 

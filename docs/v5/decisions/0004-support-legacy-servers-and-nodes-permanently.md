@@ -39,10 +39,8 @@ conversion tool can create a node only after explicit operator action and
 compatibility checks. A legacy server remains fully supported when the
 operator does not convert it.
 
-The current unreleased `servers.mode` implementation is transitional. Before
-the node model is released, Coolify will remove that mode column and move the
-QEMU node, Flux assignment, node metadata, and node-only UI to the `Node`
-model.
+Coolify removed the unreleased `servers.mode` implementation. The QEMU node,
+Flux assignment, node metadata, and node-only UI use the `Node` model.
 
 ## Consequences
 

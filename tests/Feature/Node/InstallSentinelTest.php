@@ -1,8 +1,9 @@
 <?php
 
+use App\Actions\Node\InstallSentinel;
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
-use App\Actions\Server\InstallSentinelHost;
 use App\Models\InstanceSettings;
+use App\Models\Node;
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
@@ -15,15 +16,15 @@ beforeEach(function () {
 
 it('installs a public CA bundle and version atomically before Sentinel starts', function () {
     $authority = EnsureFluxCertificateAuthority::run();
-    $script = InstallSentinelHost::installationScript(
+    $script = InstallSentinel::installationScript(
         token: 'sentinel-token',
         endpoint: 'http://coolify:8000/api/v1/sentinel',
         image: 'ghcr.io/coollabsio/sentinel-host:main',
         certificate: $authority->certificate_pem,
         trustBundleVersion: $authority->version,
     );
-    $environment = InstallSentinelHost::environmentFile('sentinel-token', 'http://coolify:8000/api/v1/sentinel', $authority->version);
-    $unit = InstallSentinelHost::serviceUnit();
+    $environment = InstallSentinel::environmentFile('sentinel-token', 'http://coolify:8000/api/v1/sentinel', $authority->version);
+    $unit = InstallSentinel::serviceUnit();
 
     expect($script)
         ->toContain('runtime="$(command -v docker || command -v podman || true)"')
@@ -70,7 +71,7 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
 it('rejects unsafe installer inputs', function (string $token, string $endpoint, string $image) {
     $authority = EnsureFluxCertificateAuthority::run();
 
-    expect(fn () => InstallSentinelHost::installationScript($token, $endpoint, $image, $authority->certificate_pem, $authority->version))
+    expect(fn () => InstallSentinel::installationScript($token, $endpoint, $image, $authority->certificate_pem, $authority->version))
         ->toThrow(InvalidArgumentException::class);
 })->with([
     'token with a newline' => ["token\nvalue", 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main'],
@@ -79,9 +80,9 @@ it('rejects unsafe installer inputs', function (string $token, string $endpoint,
 ]);
 
 it('rejects an invalid trust bundle and version independently', function () {
-    expect(fn () => InstallSentinelHost::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', 'not-a-certificate', 1))
+    expect(fn () => InstallSentinel::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', 'not-a-certificate', 1))
         ->toThrow(InvalidArgumentException::class)
-        ->and(fn () => InstallSentinelHost::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', EnsureFluxCertificateAuthority::run()->certificate_pem, 0))
+        ->and(fn () => InstallSentinel::installationScript('token', 'https://coolify.example/api/v1/sentinel', 'ghcr.io/coollabsio/sentinel-host:main', EnsureFluxCertificateAuthority::run()->certificate_pem, 0))
         ->toThrow(InvalidArgumentException::class);
 });
 
@@ -89,7 +90,7 @@ it('does not use ssh while the host agent feature is disabled', function () {
     config()->set('constants.sentinel.host_enabled', false);
     Process::fake();
 
-    expect(InstallSentinelHost::run(new Server))->toBeNull();
+    expect(InstallSentinel::run(new Node))->toBeNull();
 
     Process::assertNothingRan();
 });
@@ -99,7 +100,7 @@ it('does not use ssh outside development', function () {
     config()->set('constants.sentinel.host_enabled', true);
     Process::fake();
 
-    expect(InstallSentinelHost::run(new Server))->toBeNull();
+    expect(InstallSentinel::run(new Node))->toBeNull();
 
     Process::assertNothingRan();
 });
@@ -109,14 +110,14 @@ it('does not install host-native Sentinel on legacy servers', function () {
     config()->set('constants.sentinel.host_enabled', true);
     Process::fake();
 
-    expect(InstallSentinelHost::run(new Server))->toBeNull();
+    expect(fn () => InstallSentinel::run(new Server))->toThrow(TypeError::class);
 
     Process::assertNothingRan();
 });
 
 it('elevates the encoded installer for a non-root server user', function () {
-    $server = new Server(['user' => 'coolify']);
-    $command = InstallSentinelHost::remoteCommand('set -eu');
+    $server = new Node(['user' => 'coolify']);
+    $command = InstallSentinel::remoteCommand('set -eu');
 
     expect(parseCommandsByLineForSudo(collect([$command]), $server)[0])
         ->toStartWith("sudo bash -c '")

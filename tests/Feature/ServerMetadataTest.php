@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Sentinel\FetchFluxServerInformation;
 use App\Livewire\Server\Show;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\PrivateKey;
@@ -173,21 +172,6 @@ it('can overwrite server_metadata with new values', function () {
 
     expect($this->server->server_metadata['os'])->toBe('Ubuntu 22.04')
         ->and($this->server->server_metadata['cpus'])->toBe(4);
-});
-
-it('refreshes server information through Flux when the host control channel is enabled', function () {
-    config()->set('app.env', 'local');
-    config()->set('constants.sentinel.host_enabled', true);
-    $this->server->update(['mode' => 'node-worker']);
-    FetchFluxServerInformation::partialMock()
-        ->shouldReceive('handle')
-        ->once()
-        ->with(Mockery::type(Server::class))
-        ->andReturn(['hostname' => 'worker-1']);
-
-    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->call('refreshServerMetadata')
-        ->assertDispatched('success', 'Server details refreshed through Flux.');
 });
 
 it('calls gatherServerMetadata during ValidateAndInstall when docker version is valid', function () {

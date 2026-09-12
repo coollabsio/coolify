@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Node;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -20,7 +21,7 @@ function shouldChangeOwnership(string $path): bool
 
     return $isCoolifyPath;
 }
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
+function parseCommandsByLineForSudo(Collection $commands, Server|Node $server): array
 {
     $commands = $commands->map(function ($line) {
         $trimmedLine = trim($line);
@@ -133,7 +134,7 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
     return $commands->toArray();
 }
-function parseLineForSudo(string $command, Server $server): string
+function parseLineForSudo(string $command, Server|Node $server): string
 {
     if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
         $command = "sudo $command";

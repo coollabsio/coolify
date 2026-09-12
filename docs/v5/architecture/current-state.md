@@ -117,13 +117,10 @@ Developers with KVM access can also start the optional `node-worker` QEMU profil
 It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
 on a normal virtual machine. The VM connects to the same development Coolify and
 Flux services and is the target for runtime and host-network integration tests.
-The current development slice stores an explicit mode on `servers`. This is a
-transitional implementation. Decision 0004 requires the released architecture
-to keep legacy hosts in `servers` and store nodes in a separate `nodes` table.
-Legacy servers validate Docker and Docker Compose. `node-worker` and
-`node-controller-worker` nodes validate Podman, systemd, and the rootful Podman
-API socket. Development seeding does not mark a worker usable before that
-validation succeeds.
+Legacy hosts are stored in `servers`, and nodes are stored in the separate
+`nodes` table. Legacy servers validate Docker and Docker Compose. Nodes validate
+Podman, systemd, and the rootful Podman API socket. Development seeding does not
+mark a worker usable before that validation succeeds.
 
 ### Existing self-hosted installations
 
@@ -173,11 +170,9 @@ The separate `Node` model from Decision 0004 is accepted but not implemented.
   will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
 - retirement of the existing Sentinel container.
-- migration of the transitional node records from `servers` to `nodes`.
 
 ## Next safe step
 
-Add the separate `nodes` model and move the current development node flow to it.
-Then implement `node_containers` with a read-only `container.list` command. Do
+Implement `node_containers` with a read-only `container.list` command. Do
 not start mutating workload operations until command reconciliation,
 idempotency, audit, and restart behavior are specified.

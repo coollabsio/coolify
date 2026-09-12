@@ -1,21 +1,23 @@
-# Record permanent dual architecture
+# Implement permanent Node model
 
-- [x] Record that legacy servers and nodes remain permanently supported.
-- [x] Define the boundary between the two models.
-- [x] Update existing Sentinel and installation decisions for consistency.
-- [x] Update the current-state architecture and local lessons.
-- [x] Add architecture regression assertions.
-- [x] Verify documentation consistency.
+- [x] Add the node schema, model, role enum, factory, relationships, and policy.
+- [x] Move QEMU node seeding and validation from Server to Node.
+- [x] Move Flux assignment, events, ping, information, and metadata to Node.
+- [x] Support Node SSH bootstrap, install, update, trust repair, and restart.
+- [x] Add a development Node Sentinel page and keep legacy Server UI unchanged.
+- [x] Remove ServerMode, servers.mode, and all Server node branches.
+- [x] Reinitialize the development database record and host Sentinel.
+- [x] Run focused and regression tests, then verify the live TLS flow.
 - [x] Search related GitHub issues and discussions.
 
 ## Review
 
-- Decision 0004 establishes permanent parallel `Server` and `Node` models.
-- Legacy Docker servers keep SSH and container Sentinel support.
-- Podman nodes use host-native Sentinel and Flux, with SSH for bootstrap and recovery.
-- Both types can exist in the same team, project, environment, and Coolify installation.
-- Conversion is never required or automatic.
-- The current `servers.mode` code is explicitly transitional and will be replaced before release.
-- The first implementation step is the `nodes` table; `node_containers` follows with `container.list`.
-- Decision and architecture tests passed: 7 tests and 67 assertions.
-- No related GitHub issues, pull requests, or discussions were found.
+- Added a permanent `nodes` boundary. Legacy `servers` remain Docker and SSH managed.
+- The development QEMU worker is now a `Node`; it validates Podman and runs host Sentinel through systemd.
+- Flux assignment, connection state, ping, and system information resolve only `Node` records.
+- Added the development-only `/node/{node_uuid}` Sentinel and Flux control page.
+- Removed the unreleased `servers.mode`, `ServerMode`, and mixed Server/node code paths.
+- Verified 158 focused tests with 594 assertions. The repository-wide Pest command is blocked by the existing duplicate test-case declaration in `tests/Feature/S3StorageFormTest.php`.
+- Built frontend assets. The first build exposed a missing optional Rolldown package; `npm install --include=optional` restored it without tracked dependency changes.
+- Live QEMU verification passed: Podman validation, Sentinel systemd installation, TLS Flux connection, ping, and system information.
+- GitHub issue and discussion searches found no matching Sentinel, Flux, Node, or Podman reports.

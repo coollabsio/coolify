@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 
 class SshMultiplexingHelper
 {
-    public static function serverSshConfiguration(Server $server): array
+    public static function serverSshConfiguration(Server|Node $server): array
     {
         $privateKey = PrivateKey::findOrFail($server->private_key_id);
 
@@ -23,7 +24,7 @@ class SshMultiplexingHelper
         ];
     }
 
-    public static function ensureMultiplexedConnection(Server $server): bool
+    public static function ensureMultiplexedConnection(Server|Node $server): bool
     {
         if (! self::isMultiplexingEnabled()) {
             return false;
@@ -64,7 +65,7 @@ class SshMultiplexingHelper
         }
     }
 
-    public static function establishNewMultiplexedConnection(Server $server): bool
+    public static function establishNewMultiplexedConnection(Server|Node $server): bool
     {
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
@@ -90,7 +91,7 @@ class SshMultiplexingHelper
         return true;
     }
 
-    public static function removeMuxFile(Server $server): void
+    public static function removeMuxFile(Server|Node $server): void
     {
         $checkProcess = Process::run(self::muxControlCommand($server, 'check'));
         $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
@@ -131,7 +132,7 @@ class SshMultiplexingHelper
         Cache::forget(self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime));
     }
 
-    public static function generateScpCommand(Server $server, string $source, string $dest): string
+    public static function generateScpCommand(Server|Node $server, string $source, string $dest): string
     {
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
@@ -171,7 +172,7 @@ class SshMultiplexingHelper
     /**
      * Build an SCP command that downloads a remote file onto the Coolify host.
      */
-    public static function generateScpDownloadCommand(Server $server, string $remoteSource, string $localDest): string
+    public static function generateScpDownloadCommand(Server|Node $server, string $remoteSource, string $localDest): string
     {
         $sshConfig = self::serverSshConfiguration($server);
         $sshKeyLocation = $sshConfig['sshKeyLocation'];
@@ -208,9 +209,9 @@ class SshMultiplexingHelper
         return $scpCommand.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
     }
 
-    public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
+    public static function generateSshCommand(Server|Node $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
     {
-        if ($server->settings->force_disabled) {
+        if ($server instanceof Server && $server->settings->force_disabled) {
             throw new \RuntimeException('Server is disabled.');
         }
 
@@ -255,7 +256,7 @@ class SshMultiplexingHelper
         return 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi';
     }
 
-    public static function getConnectionTimeout(Server $server): int
+    public static function getConnectionTimeout(Server|Node $server): int
     {
         $timeout = data_get($server, 'settings.connection_timeout');
 
@@ -264,7 +265,7 @@ class SshMultiplexingHelper
             : (int) config('constants.ssh.connection_timeout');
     }
 
-    public static function isConnectionHealthy(Server $server): bool
+    public static function isConnectionHealthy(Server|Node $server): bool
     {
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
@@ -281,14 +282,14 @@ class SshMultiplexingHelper
         return $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
     }
 
-    public static function refreshMultiplexedConnection(Server $server): bool
+    public static function refreshMultiplexedConnection(Server|Node $server): bool
     {
         self::removeMuxFile($server);
 
         return self::establishNewMultiplexedConnection($server);
     }
 
-    private static function connectionLockKey(Server $server): string
+    private static function connectionLockKey(Server|Node $server): string
     {
         return 'ssh_mux_lock_'.(gethostname() ?: 'unknown').'_'.$server->uuid;
     }
@@ -315,12 +316,12 @@ class SshMultiplexingHelper
         return $fields[19] ?? null;
     }
 
-    private static function masterConnectionExists(Server $server): bool
+    private static function masterConnectionExists(Server|Node $server): bool
     {
         return Process::run(self::muxControlCommand($server, 'check'))->exitCode() === 0;
     }
 
-    private static function connectionIsReusable(Server $server): bool
+    private static function connectionIsReusable(Server|Node $server): bool
     {
         if (! self::masterConnectionExists($server)) {
             return false;
@@ -333,7 +334,7 @@ class SshMultiplexingHelper
         return true;
     }
 
-    private static function muxControlCommand(Server $server, string $operation): string
+    private static function muxControlCommand(Server|Node $server, string $operation): string
     {
         $command = "ssh -O {$operation} -o ControlPath=".self::muxSocket($server).' ';
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -343,19 +344,19 @@ class SshMultiplexingHelper
         return $command.self::escapedUserAtHost($server);
     }
 
-    private static function multiplexingOptions(Server $server): string
+    private static function multiplexingOptions(Server|Node $server): string
     {
         return '-o ControlMaster=auto '
             .'-o ControlPath='.self::muxSocket($server).' '
             .'-o ControlPersist='.config('constants.ssh.mux_persist_time').' ';
     }
 
-    private static function muxSocket(Server $server): string
+    private static function muxSocket(Server|Node $server): string
     {
         return '/var/www/html/storage/app/ssh/mux/mux_'.$server->uuid;
     }
 
-    private static function escapedUserAtHost(Server $server): string
+    private static function escapedUserAtHost(Server|Node $server): string
     {
         return escapeshellarg($server->user).'@'.escapeshellarg($server->ip);
     }
@@ -400,7 +401,7 @@ class SshMultiplexingHelper
         }
     }
 
-    private static function getCommonSshOptions(Server $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
+    private static function getCommonSshOptions(Server|Node $server, string $sshKeyLocation, int $connectionTimeout, int $serverInterval, bool $isScp = false): string
     {
         $options = "-i {$sshKeyLocation} "
             .'-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '

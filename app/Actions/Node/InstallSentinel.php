@@ -1,31 +1,31 @@
 <?php
 
-namespace App\Actions\Server;
+namespace App\Actions\Node;
 
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
-use App\Models\Server;
+use App\Models\Node;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class InstallSentinelHost
+class InstallSentinel
 {
     use AsAction;
 
-    public function handle(Server $server, ?string $image = null): ?string
+    public function handle(Node $node, ?string $image = null): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || ! $server->isNode()) {
+        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
             return null;
         }
 
-        $token = $server->settings->ensureValidSentinelToken();
-        $endpoint = $server->settings->ensureSentinelUrl();
+        $token = $node->ensureValidSentinelToken();
+        $endpoint = $node->ensureSentinelUrl();
         $image ??= config('constants.sentinel.host_image');
         $authority = EnsureFluxCertificateAuthority::run();
         $script = self::installationScript($token, $endpoint, $image, $authority->certificate_pem, $authority->version);
 
         return instant_remote_process(
             [self::remoteCommand($script)],
-            $server,
+            $node,
             timeout: 600,
             disableMultiplexing: true,
         );
@@ -40,7 +40,7 @@ class InstallSentinelHost
         $encodedEnvironment = base64_encode($environment);
         $encodedUnit = base64_encode($unit);
         $escapedImage = escapeshellarg($image);
-        $trustFiles = RepairSentinelFluxTrust::trustFileStagingScript($certificate, $trustBundleVersion);
+        $trustFiles = RepairFluxTrust::trustFileStagingScript($certificate, $trustBundleVersion);
 
         return <<<SCRIPT
 set -eu

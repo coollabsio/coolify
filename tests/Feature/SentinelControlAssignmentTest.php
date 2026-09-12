@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\InstanceSettings;
+use App\Models\Node;
 use App\Models\Server;
 use App\Models\User;
 use Firebase\JWT\JWT;
@@ -23,15 +24,10 @@ beforeEach(function () {
     config()->set('constants.flux.issuer', 'coolify-dev');
 
     $user = User::factory()->create();
-    $this->server = Server::factory()->create([
+    $this->node = Node::factory()->create([
         'team_id' => $user->teams()->firstOrFail()->id,
-        'mode' => 'node-worker',
     ]);
-    $this->server->settings->update([
-        'is_reachable' => true,
-        'is_usable' => true,
-    ]);
-    $this->token = $this->server->settings->sentinel_token;
+    $this->token = $this->node->ensureValidSentinelToken();
 });
 
 function requestSentinelAssignment(?string $token = null, array $payload = []): TestResponse
@@ -50,7 +46,7 @@ it('returns an enabled development assignment with a bound short-lived credentia
     $assignment = requestSentinelAssignment($this->token)
         ->assertOk()
         ->assertJsonPath('enabled', true)
-        ->assertJsonPath('server_id', $this->server->uuid)
+        ->assertJsonPath('server_id', $this->node->uuid)
         ->assertJsonPath('flux_url', 'http://flux:7443')
         ->assertJsonPath('trust_bundle_version', 1)
         ->json();
@@ -61,7 +57,7 @@ it('returns an enabled development assignment with a bound short-lived credentia
             'iss' => 'coolify-dev',
             'aud' => 'flux',
             'purpose' => 'node-control-channel',
-            'sub' => $this->server->uuid,
+            'sub' => $this->node->uuid,
             'pmin' => 1,
             'pmax' => 1,
         ])
@@ -80,15 +76,15 @@ it('requires the existing Sentinel token', function () {
     requestSentinelAssignment('invalid-token')->assertUnauthorized();
 });
 
-it('allows a valid sentinel to reconnect while the server is marked unreachable', function () {
-    $this->server->settings->update([
+it('allows a valid sentinel to reconnect while the node is marked unreachable', function () {
+    $this->node->update([
         'is_reachable' => false,
         'is_usable' => false,
     ]);
 
     requestSentinelAssignment($this->token)
         ->assertOk()
-        ->assertJsonPath('server_id', $this->server->uuid);
+        ->assertJsonPath('server_id', $this->node->uuid);
 });
 
 it('derives the direct Flux URL from the Coolify URL and configured port', function () {
@@ -107,10 +103,10 @@ it('is unavailable when the development gate is disabled', function () {
     requestSentinelAssignment($this->token)->assertNotFound();
 });
 
-it('is unavailable to legacy servers', function () {
-    $this->server->update(['mode' => 'legacy']);
+it('does not accept a legacy server token for node assignment', function () {
+    $server = Server::factory()->create(['team_id' => $this->node->team_id]);
 
-    requestSentinelAssignment($this->token)->assertNotFound();
+    requestSentinelAssignment($server->settings->sentinel_token)->assertUnauthorized();
 });
 
 it('is unavailable outside development even when the gate is enabled', function () {

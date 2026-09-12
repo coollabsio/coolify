@@ -2,26 +2,22 @@
 
 namespace App\Actions\Sentinel;
 
-use App\Models\Server;
+use App\Models\Node;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-class FetchFluxServerInformation
+class FetchFluxNodeInformation
 {
     use AsAction;
 
     /**
      * @return array<string, mixed>
      */
-    public function handle(Server $server): array
+    public function handle(Node $node): array
     {
-        if (! $server->isNode()) {
-            throw new RuntimeException('Flux is available only for nodes.');
-        }
-
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
         if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
@@ -32,7 +28,7 @@ class FetchFluxServerInformation
             ->acceptJson()
             ->timeout(12)
             ->post(rtrim($url, '/').'/v1/commands/system.info', [
-                'server_id' => $server->uuid,
+                'server_id' => $node->uuid,
             ]);
         $response->throw();
         $validator = Validator::make($response->json(), [
@@ -62,7 +58,7 @@ class FetchFluxServerInformation
             $information['operating_system_version'] ?? null,
         ])));
         $observedAt = Carbon::createFromTimestampMs($information['observed_at_unix_ms']);
-        $metadata = is_array($server->server_metadata) ? $server->server_metadata : [];
+        $metadata = is_array($node->metadata) ? $node->metadata : [];
         $metadata = [
             ...$metadata,
             'hostname' => $information['hostname'] ?? null,
@@ -84,10 +80,7 @@ class FetchFluxServerInformation
             'source' => 'flux',
         ];
 
-        $server->update(['server_metadata' => $metadata]);
-        if (($information['container_runtime'] ?? null) === 'docker') {
-            $server->rememberDockerVersion($information['container_runtime_version'] ?? null);
-        }
+        $node->update(['metadata' => $metadata]);
 
         return $information;
     }

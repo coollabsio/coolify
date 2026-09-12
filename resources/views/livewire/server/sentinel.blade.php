@@ -60,7 +60,7 @@
                 </div>
             </x-application.settings-section>
 
-            @if (isDev() && !$server->isNode())
+            @if (isDev())
                 <x-application.settings-section id="server-sentinel-development-section"
                     title="Development overrides"
                     helper="Local testing controls that are unavailable in production.">
@@ -98,70 +98,6 @@
                 </x-application.settings-section>
             @endif
 
-            @if (isDev() && config('constants.sentinel.host_enabled', false) && $server->isNode())
-                <x-application.settings-section id="server-sentinel-flux-development-section"
-                    title="Flux control channel"
-                    helper="Experimental direct connection from the host Sentinel to Flux.">
-                    <x-slot:actions>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <x-forms.button wire:click="testFluxConnection" wire:loading.attr="disabled"
-                                wire:target="testFluxConnection" canGate="update" :canResource="$server">
-                                <span wire:loading.remove wire:target="testFluxConnection">Test connection</span>
-                                <span wire:loading wire:target="testFluxConnection">Testing...</span>
-                            </x-forms.button>
-                            <x-forms.button wire:click="refreshFluxConnection" wire:loading.attr="disabled"
-                                wire:target="refreshFluxConnection">
-                                <span wire:loading.remove wire:target="refreshFluxConnection">Refresh state</span>
-                                <span wire:loading wire:target="refreshFluxConnection">Refreshing...</span>
-                            </x-forms.button>
-                            <x-forms.button canGate="update" :canResource="$server" wire:click="renewFluxCertificate"
-                                wire:loading.attr="disabled" wire:target="renewFluxCertificate">
-                                <span wire:loading.remove wire:target="renewFluxCertificate">Renew certificate</span>
-                                <span wire:loading wire:target="renewFluxCertificate">Renewing...</span>
-                            </x-forms.button>
-                            <x-forms.button canGate="update" :canResource="$server" wire:click="repairFluxTrust"
-                                wire:loading.attr="disabled" wire:target="repairFluxTrust">
-                                <span wire:loading.remove wire:target="repairFluxTrust">Repair trust</span>
-                                <span wire:loading wire:target="repairFluxTrust">Repairing...</span>
-                            </x-forms.button>
-                        </div>
-                    </x-slot:actions>
-                    @if ($fluxConnection)
-                        <div class="grid gap-4 text-sm lg:grid-cols-2">
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Status</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'status') === 'reconnecting' ? 'Reconnecting' : 'Connected' }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Transport</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'transport') === 'tls' ? 'TLS' : 'Plaintext' }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Endpoint</span><p class="break-all font-mono text-xs text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'endpoint') }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Protocol</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'protocol_version') }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Trust bundle</span><p class="font-medium text-neutral-950 dark:text-fg">Version {{ data_get($fluxConnection, 'trust_bundle_version', 'Unknown') }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Connected at</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'connected_at') }}</p></div>
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Last heartbeat</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'last_heartbeat_at', 'Waiting for heartbeat') }}</p></div>
-                        </div>
-                        @if (data_get($fluxConnection, 'transport') !== 'tls')
-                            <x-callout type="warning" title="Unencrypted control channel">
-                                This development Flux connection does not use TLS.
-                            </x-callout>
-                        @endif
-                    @else
-                        <x-status-badge status="Disconnected" type="warning" />
-                    @endif
-                </x-application.settings-section>
-
-                <x-application.settings-section id="server-sentinel-host-development-section"
-                    title="Host Sentinel"
-                    helper="Install the experimental host-native Sentinel service for local node development.">
-                    <x-slot:actions>
-                        <x-forms.button canGate="update" :canResource="$server"
-                            wire:click="installHostSentinel" wire:loading.attr="disabled"
-                            wire:target="installHostSentinel">
-                            Install host Sentinel
-                        </x-forms.button>
-                    </x-slot:actions>
-                    <x-callout type="warning" title="Development feature">
-                        This installs Sentinel as a systemd service on the selected development server. The existing
-                        Sentinel container continues to own metrics and traffic collection.
-                    </x-callout>
-                </x-application.settings-section>
-            @endif
         @endif
     </form>
 </div>

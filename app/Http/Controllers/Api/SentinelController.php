@@ -7,6 +7,7 @@ use App\Actions\Sentinel\IssueFluxCredential;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Http\Controllers\Controller;
 use App\Jobs\PushServerUpdateJob;
+use App\Models\Node;
 use App\Models\Server;
 use Exception;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -27,12 +28,9 @@ class SentinelController extends Controller
             return response()->json(['message' => 'Not found.'], 404);
         }
 
-        $server = $this->authenticatedServer($request);
-        if ($server === null) {
+        $node = $this->authenticatedNode($request);
+        if ($node === null) {
             return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        if (! $server->isNode()) {
-            return response()->json(['message' => 'Not found.'], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -56,7 +54,7 @@ class SentinelController extends Controller
         }
 
         $issued = $issueFluxCredential->issue(
-            $server,
+            $node,
             $validated['capabilities'],
             max($validated['protocol_min'], self::CONTROL_PROTOCOL_MIN),
             min($validated['protocol_max'], self::CONTROL_PROTOCOL_MAX),
@@ -65,7 +63,7 @@ class SentinelController extends Controller
 
         return response()->json([
             'enabled' => true,
-            'server_id' => $server->uuid,
+            'server_id' => $node->uuid,
             'flux_url' => $resolveFluxPublicUrl->resolve(),
             'credential' => $issued['credential'],
             'credential_expires_at' => $issued['expires_at']->toIso8601ZuluString(),
@@ -233,7 +231,7 @@ class SentinelController extends Controller
         return data_get($data, 'snapshot.complete', true) !== false;
     }
 
-    private function authenticatedServer(Request $request): ?Server
+    private function authenticatedNode(Request $request): ?Node
     {
         $authorization = $request->header('Authorization');
         if (! is_string($authorization) || ! str_starts_with($authorization, 'Bearer ')) {
@@ -247,20 +245,20 @@ class SentinelController extends Controller
             return null;
         }
 
-        $serverUuid = data_get($payload, 'server_uuid');
-        if (! is_string($serverUuid) || $serverUuid === '') {
+        $nodeUuid = data_get($payload, 'node_uuid');
+        if (! is_string($nodeUuid) || $nodeUuid === '') {
             return null;
         }
 
-        $server = Server::query()->where('uuid', $serverUuid)->first();
-        if ($server === null || $server->settings->sentinel_token !== $token) {
+        $node = Node::query()->where('uuid', $nodeUuid)->first();
+        if ($node === null || $node->sentinel_token !== $token) {
             return null;
         }
 
-        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team_id !== 0) {
+        if (isCloud() && data_get($node->team->subscription, 'stripe_invoice_paid', false) === false && $node->team_id !== 0) {
             return null;
         }
 
-        return $server;
+        return $node;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
+use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
-use App\Actions\Server\RepairSentinelFluxTrust;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +14,7 @@ beforeEach(function () {
 
 it('repairs only the versioned public CA trust files and validates the restarted service', function () {
     $authority = EnsureFluxCertificateAuthority::run();
-    $script = RepairSentinelFluxTrust::repairScript($authority->certificate_pem, $authority->version);
+    $script = RepairFluxTrust::repairScript($authority->certificate_pem, $authority->version);
 
     expect($script)
         ->toContain('/etc/coolify/sentinel-flux-ca.pem.new')
@@ -50,7 +50,7 @@ it('repairs only the versioned public CA trust files and validates the restarted
 
 it('uses a sudo-safe encoded command for non-root server users', function () {
     $server = new Server(['user' => 'coolify']);
-    $command = RepairSentinelFluxTrust::remoteCommand('set -eu');
+    $command = RepairFluxTrust::remoteCommand('set -eu');
 
     expect(parseCommandsByLineForSudo(collect([$command]), $server)[0])
         ->toStartWith("sudo bash -c '")

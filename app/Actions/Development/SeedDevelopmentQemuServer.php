@@ -2,7 +2,8 @@
 
 namespace App\Actions\Development;
 
-use App\Enums\ServerMode;
+use App\Enums\NodeRole;
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use InvalidArgumentException;
@@ -13,7 +14,7 @@ class SeedDevelopmentQemuServer
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $removeOtherServers = true): Server
+    public function handle(string $profileName, bool $removeOtherServers = true): Server|Node
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -33,7 +34,38 @@ class SeedDevelopmentQemuServer
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
                 ->delete();
+            Node::query()
+                ->where('uuid', 'like', 'development-qemu-%')
+                ->where('uuid', '!=', $profile['uuid'])
+                ->delete();
         }
+
+        if (($profile['runtime'] ?? null) === 'podman') {
+            Server::query()->where('uuid', $profile['uuid'])->delete();
+
+            return Node::query()->updateOrCreate(
+                ['uuid' => $profile['uuid']],
+                [
+                    'name' => $profile['name'],
+                    'description' => 'Development-only QEMU virtual machine managed by dev:qemu.',
+                    'role' => NodeRole::WORKER,
+                    'ip' => $profile['ip'],
+                    'port' => 22,
+                    'user' => $profile['user'],
+                    'team_id' => 0,
+                    'private_key_id' => $privateKey->id,
+                    'sentinel_url' => sprintf(
+                        'http://%s:%d',
+                        config('development-qemu.gateway'),
+                        config('development-qemu.coolify_host_port'),
+                    ),
+                    'is_reachable' => false,
+                    'is_usable' => false,
+                ],
+            );
+        }
+
+        Node::query()->where('uuid', $profile['uuid'])->delete();
 
         $server = Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server;
         $server->forceFill(['uuid' => $profile['uuid']]);
@@ -45,19 +77,9 @@ class SeedDevelopmentQemuServer
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
-            'mode' => ($profile['runtime'] ?? null) === 'podman' ? ServerMode::NODE_WORKER : ServerMode::LEGACY,
         ]);
         $server->deleted_at = null;
         $server->save();
-
-        if (($profile['runtime'] ?? null) === 'podman') {
-            $server->settings->sentinel_custom_url = sprintf(
-                'http://%s:%d',
-                config('development-qemu.gateway'),
-                config('development-qemu.coolify_host_port'),
-            );
-            $server->settings->saveQuietly();
-        }
 
         return $server->fresh();
     }

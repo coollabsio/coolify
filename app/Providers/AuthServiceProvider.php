@@ -16,6 +16,7 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
@@ -54,6 +55,7 @@ use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\IntegrationTokenPolicy;
+use App\Policies\NodePolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
@@ -82,6 +84,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Server::class => ServerPolicy::class,
+        Node::class => NodePolicy::class,
         PrivateKey::class => PrivateKeyPolicy::class,
         StandaloneDocker::class => StandaloneDockerPolicy::class,
         SwarmDocker::class => SwarmDockerPolicy::class,

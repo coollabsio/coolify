@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Sentinel\PingFluxConnection;
+use App\Models\Node;
 use App\Models\Server;
 use Illuminate\Support\Facades\Http;
 
@@ -16,11 +17,10 @@ it('sends an authenticated ping to the internal Flux API', function () {
             'boot_id' => 'boot-1',
         ]),
     ]);
-    $server = new Server;
-    $server->uuid = 'server-1';
-    $server->mode = 'node-worker';
+    $node = new Node;
+    $node->uuid = 'server-1';
 
-    $result = PingFluxConnection::run($server);
+    $result = PingFluxConnection::run($node);
 
     expect($result)->toMatchArray([
         'command_id' => 'command-1',
@@ -36,7 +36,7 @@ it('does not send Flux commands to legacy servers', function () {
     Http::fake();
 
     expect(fn () => PingFluxConnection::run(new Server))
-        ->toThrow(RuntimeException::class, 'Flux is available only for nodes.');
+        ->toThrow(TypeError::class);
 
     Http::assertNothingSent();
 });

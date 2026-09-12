@@ -2,7 +2,7 @@
 
 namespace App\Actions\Sentinel;
 
-use App\Models\Server;
+use App\Models\Node;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -15,12 +15,8 @@ class PingFluxConnection
     /**
      * @return array{command_id: string, nonce: string, sentinel_time_unix_ms: int, sentinel_version: string, boot_id: string, latency_ms: int}
      */
-    public function handle(Server $server): array
+    public function handle(Node $node): array
     {
-        if (! $server->isNode()) {
-            throw new RuntimeException('Flux is available only for nodes.');
-        }
-
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
         if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
@@ -32,7 +28,7 @@ class PingFluxConnection
             ->acceptJson()
             ->timeout(12)
             ->post(rtrim($url, '/').'/v1/commands/system.ping', [
-                'server_id' => $server->uuid,
+                'server_id' => $node->uuid,
             ]);
         $response->throw();
         $validator = Validator::make($response->json(), [

@@ -221,31 +221,6 @@ class ValidateAndInstall extends Component
     {
         $this->authorize('update', $this->server);
 
-        if ($this->server->usesPodman()) {
-            $this->docker_installed = $this->server->validatePodman();
-            $this->docker_compose_installed = $this->docker_installed;
-            $this->docker_version = $this->docker_installed;
-
-            if (! $this->docker_installed) {
-                $this->error = 'Podman or its API socket is not available. Install Podman and enable podman.socket before continuing.';
-                $this->server->update(['validation_logs' => $this->error]);
-
-                return;
-            }
-
-            $this->server->update(['is_validating' => false]);
-            $this->server->gatherServerMetadata();
-            $this->dispatch('refreshServerShow');
-            $this->dispatch('refreshBoardingIndex');
-            ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
-            if ($this->server->isSentinelEnabled()) {
-                CheckAndStartSentinelJob::dispatch($this->server);
-            }
-            $this->dispatch('success', 'Podman server validated.');
-
-            return;
-        }
-
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {

@@ -1,10 +1,9 @@
 <?php
 
-use App\Actions\Server\StartSentinel;
-use App\Enums\ServerMode;
-use App\Jobs\CheckAndStartSentinelJob;
+use App\Actions\Node\ValidateNode;
+use App\Enums\NodeRole;
 use App\Jobs\ServerConnectionCheckJob;
-use App\Livewire\Server\ValidateAndInstall;
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -12,7 +11,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -20,68 +18,40 @@ beforeEach(function () {
     Storage::fake('ssh-keys');
 });
 
-function createServerForModeValidation(array $attributes = []): Server
-{
+it('keeps legacy servers and nodes as separate permanent types', function () {
     $team = Team::factory()->create();
     $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
-
-    return Server::factory()->create(array_merge([
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
+    $node = Node::factory()->create([
         'team_id' => $team->id,
-        'private_key_id' => $privateKey->id,
-        'ip' => '203.0.113.10',
-    ], $attributes));
-}
-
-it('stores an explicit legacy mode for existing servers', function () {
-    $server = createServerForModeValidation()->fresh();
-
-    expect(Schema::hasColumn('servers', 'mode'))->toBeTrue()
-        ->and($server->getRawOriginal('mode'))->toBe('legacy')
-        ->and($server->mode->value)->toBe('legacy');
-});
-
-it('uses node names for every server mode', function () {
-    expect(array_column(ServerMode::cases(), 'value'))->toBe([
-        'legacy',
-        'node-worker',
-        'node-controller-worker',
-        'node-controller',
+        'private_key_id' => $server->private_key_id,
+        'role' => NodeRole::WORKER,
     ]);
+
+    expect(Schema::hasColumn('servers', 'mode'))->toBeFalse()
+        ->and($server)->toBeInstanceOf(Server::class)
+        ->and($node)->toBeInstanceOf(Node::class)
+        ->and($node->role)->toBe(NodeRole::WORKER);
 });
 
-it('uses podman instead of docker for node worker connection checks', function () {
-    $server = createServerForModeValidation(['mode' => 'node-worker'])->fresh();
-
-    Process::fake(['*' => Process::result(output: '{"host":{"arch":"amd64"}}')]);
+it('uses Docker for legacy server connection checks', function () {
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
+    Process::fake(['*' => Process::result(output: '{"Server":{"Version":"27.0.0"}}')]);
 
     (new ServerConnectionCheckJob($server, disableMux: false))->handle();
 
-    expect($server->mode->value)->toBe('node-worker')
-        ->and($server->usesPodman())->toBeTrue()
-        ->and($server->settings->fresh()->is_usable)->toBeTrue();
+    expect($server->settings->fresh()->is_usable)->toBeTrue();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker version --format json'));
 });
 
-it('shows podman validation checkpoints for node workers', function () {
-    $server = createServerForModeValidation(['mode' => 'node-worker'])->fresh();
+it('validates Podman only through the node action', function () {
+    $node = Node::factory()->create();
+    Process::fake(['*' => Process::result(output: '{"host":{"arch":"amd64"}}')]);
 
-    Livewire::test(ValidateAndInstall::class, ['server' => $server])
-        ->set('uptime', 100)
-        ->set('supported_os_type', true)
-        ->set('prerequisites_installed', true)
-        ->set('docker_installed', true)
-        ->set('docker_compose_installed', true)
-        ->set('docker_version', true)
-        ->assertSee('Podman is installed')
-        ->assertSee('Podman API is available')
-        ->assertDontSee('Docker Compose is installed');
-});
-
-it('never starts the legacy container Sentinel on nodes', function () {
-    $server = createServerForModeValidation(['mode' => 'node-worker'])->fresh();
-    Process::fake();
-
-    (new CheckAndStartSentinelJob($server))->handle();
-    StartSentinel::run($server);
-
-    Process::assertNothingRan();
+    expect(ValidateNode::run($node))->toBeTrue()
+        ->and($node->fresh()->is_reachable)->toBeTrue()
+        ->and($node->fresh()->is_usable)->toBeTrue();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'podman info --format json'));
 });

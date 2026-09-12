@@ -91,9 +91,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $isUsable = $this->server->usesPodman()
-                ? $this->checkPodmanAvailability()
-                : $this->checkDockerAvailability();
+            $isUsable = $this->checkDockerAvailability();
 
             $this->server->settings->update([
                 'is_reachable' => true,
@@ -219,26 +217,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             return false;
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Docker check failed', [
-                'server_id' => $this->server->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
-    private function checkPodmanAvailability(): bool
-    {
-        try {
-            $output = instant_remote_process_with_timeout(
-                [Server::PODMAN_VALIDATION_COMMAND],
-                $this->server,
-                false,
-            );
-
-            return is_string($output) && json_decode(trim($output), true) !== null;
-        } catch (\Throwable $e) {
-            Log::debug('ServerConnectionCheck: Podman check failed', [
                 'server_id' => $this->server->id,
                 'error' => $e->getMessage(),
             ]);

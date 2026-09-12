@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\Sentinel\FetchFluxServerInformation;
-use App\Models\Server;
+use App\Actions\Sentinel\FetchFluxNodeInformation;
+use App\Models\Node;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -31,14 +31,13 @@ it('fetches and stores server information through Flux', function () {
             'container_runtime_version' => '5.4.2',
         ]),
     ]);
-    $server = Server::factory()->create([
+    $node = Node::factory()->create([
         'team_id' => Team::factory(),
-        'mode' => 'node-worker',
-        'server_metadata' => ['transfer' => ['status' => 'pending']],
+        'metadata' => ['transfer' => ['status' => 'pending']],
     ]);
 
-    $result = FetchFluxServerInformation::run($server);
-    $metadata = $server->fresh()->server_metadata;
+    $result = FetchFluxNodeInformation::run($node);
+    $metadata = $node->fresh()->metadata;
 
     expect($result['hostname'])->toBe('worker-1')
         ->and($metadata)->toMatchArray([
@@ -60,7 +59,7 @@ it('fetches and stores server information through Flux', function () {
 
     Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/system.info'
         && $request->hasHeader('Authorization', 'Bearer internal-secret')
-        && $request['server_id'] === $server->uuid);
+        && $request['server_id'] === $node->uuid);
 });
 
 it('rejects an invalid Flux server information response', function () {
@@ -68,11 +67,10 @@ it('rejects an invalid Flux server information response', function () {
     config()->set('constants.flux.internal_token', 'internal-secret');
     Http::fake(['*' => Http::response(['hostname' => ['invalid']])]);
 
-    $server = Server::factory()->create([
+    $node = Node::factory()->create([
         'team_id' => Team::factory(),
-        'mode' => 'node-worker',
     ]);
 
-    expect(fn () => FetchFluxServerInformation::run($server))
+    expect(fn () => FetchFluxNodeInformation::run($node))
         ->toThrow(RuntimeException::class, 'Flux returned an invalid server information response.');
 });

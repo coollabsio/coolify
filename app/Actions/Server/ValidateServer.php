@@ -91,18 +91,6 @@ class ValidateServer
             throw new \Exception($this->error);
         }
 
-        if ($server->usesPodman()) {
-            if ($server->validatePodman()) {
-                return 'OK';
-            }
-
-            $this->error = 'Podman or its API socket is not available. Install Podman and enable podman.socket before continuing.';
-            $server->update([
-                'validation_logs' => $this->error,
-            ]);
-            throw new \Exception($this->error);
-        }
-
         $this->docker_installed = $server->validateDockerEngine();
         $this->docker_compose_installed = $server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {

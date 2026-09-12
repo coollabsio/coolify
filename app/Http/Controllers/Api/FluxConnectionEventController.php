@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Http\Controllers\Controller;
-use App\Models\Server;
+use App\Models\Node;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -36,9 +36,8 @@ class FluxConnectionEventController extends Controller
             abort(422, $validator->errors()->first());
         }
         $data = $validator->validated();
-        $server = Server::query()->where('uuid', $data['server_id'])->firstOrFail();
-        abort_unless($server->isNode(), 404);
-        $key = "flux:connection:{$server->uuid}";
+        $node = Node::query()->where('uuid', $data['server_id'])->firstOrFail();
+        $key = $node->cacheKey();
         $current = Cache::get($key, []);
 
         if ($data['event'] === 'disconnected') {

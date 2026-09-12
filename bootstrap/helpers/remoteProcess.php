@@ -7,6 +7,7 @@ use App\Helpers\SshRetryHandler;
 use App\Jobs\CoolifyTask;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Carbon\Carbon;
@@ -19,7 +20,7 @@ use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
     Collection|array $command,
-    Server $server,
+    Server|Node $server,
     ?string $type = null,
     ?string $type_uuid = null,
     ?Model $model = null,
@@ -76,7 +77,7 @@ function remote_process(
     return $activity;
 }
 
-function instant_scp(string $source, string $dest, Server $server, $throwError = true)
+function instant_scp(string $source, string $dest, Server|Node $server, $throwError = true)
 {
     return SshRetryHandler::retry(
         function () use ($source, $dest, $server) {
@@ -105,7 +106,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 /**
  * Download a remote file from a managed server onto the Coolify host via SCP.
  */
-function instant_scp_from_server(string $remoteSource, string $localDest, Server $server, $throwError = true)
+function instant_scp_from_server(string $remoteSource, string $localDest, Server|Node $server, $throwError = true)
 {
     return SshRetryHandler::retry(
         function () use ($remoteSource, $localDest, $server) {
@@ -131,7 +132,7 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
     );
 }
 
-function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
+function instant_remote_process_with_timeout(Collection|array $command, Server|Node $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
     if ($server->isNonRoot() && ! $no_sudo) {
@@ -165,7 +166,7 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     );
 }
 
-function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
+function instant_remote_process(Collection|array $command, Server|Node $server, bool $throwError = true, bool $no_sudo = false, ?int $timeout = null, bool $disableMultiplexing = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
@@ -403,7 +404,7 @@ function refresh_server_connection(?PrivateKey $private_key = null)
     }
 }
 
-function checkRequiredCommands(Server $server)
+function checkRequiredCommands(Server|Node $server)
 {
     $commands = collect(['jq', 'jc']);
     foreach ($commands as $command) {

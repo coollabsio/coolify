@@ -2,7 +2,7 @@
 
 namespace App\Actions\Sentinel;
 
-use App\Models\Server;
+use App\Models\Node;
 use Carbon\CarbonImmutable;
 use Firebase\JWT\JWT;
 use Illuminate\Support\Str;
@@ -14,12 +14,8 @@ class IssueFluxCredential
      * @param  list<string>  $capabilities
      * @return array{credential: string, expires_at: CarbonImmutable, capabilities: list<string>}
      */
-    public function issue(Server $server, array $capabilities, int $protocolMin, int $protocolMax): array
+    public function issue(Node $node, array $capabilities, int $protocolMin, int $protocolMax): array
     {
-        if (! $server->isNode()) {
-            throw new RuntimeException('Flux is available only for nodes.');
-        }
-
         $privateKey = config('constants.flux.signing_private_key');
         $keyId = config('constants.flux.signing_key_id');
         $issuer = config('constants.flux.issuer');
@@ -38,7 +34,7 @@ class IssueFluxCredential
             'iss' => $issuer,
             'aud' => 'flux',
             'purpose' => 'node-control-channel',
-            'sub' => $server->uuid,
+            'sub' => $node->uuid,
             'jti' => (string) Str::uuid(),
             'iat' => $now->timestamp,
             'nbf' => $now->subSeconds(5)->timestamp,
