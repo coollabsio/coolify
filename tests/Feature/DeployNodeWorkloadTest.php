@@ -148,6 +148,7 @@ it('queues an assigned revision from the Node page without storing environment v
 
     Livewire::test(Show::class, ['node_uuid' => $node->uuid])
         ->assertSee('Workloads')
+        ->assertSee('Unknown')
         ->assertSee('Deploy')
         ->call('deployRevision', $revision->uuid)
         ->assertDispatched('success');

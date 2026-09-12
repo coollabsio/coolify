@@ -3,6 +3,7 @@
 namespace App\Livewire\Node;
 
 use App\Actions\Node\CreateOperation;
+use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RepairFluxTrust;
@@ -28,6 +29,9 @@ class Show extends Component
 
     /** @var array<string, mixed>|null */
     public ?array $fluxConnection = null;
+
+    /** @var array<string, array{status: string, type: string}> */
+    public array $workloadStates = [];
 
     public function mount(string $node_uuid): void
     {
@@ -181,6 +185,16 @@ class Show extends Component
             'workloads' => fn ($query) => $query->with(['revisions' => fn ($revisions) => $revisions->latest('id')->limit(1)]),
             'operations' => fn ($query) => $query->with('workload')->latest('id')->limit(20),
         ]);
+        $this->workloadStates = $this->node->workloads
+            ->mapWithKeys(function ($workload): array {
+                $state = DetermineWorkloadState::run($this->node, $workload);
+
+                return [$workload->uuid => [
+                    'status' => str($state->value)->title()->toString(),
+                    'type' => $state->badgeType(),
+                ]];
+            })
+            ->all();
     }
 
     private function runAction(callable $action, string $message): void

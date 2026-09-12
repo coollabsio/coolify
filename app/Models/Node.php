@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 class Node extends BaseModel
@@ -87,6 +89,21 @@ class Node extends BaseModel
     public function cacheKey(): string
     {
         return "flux:connection:{$this->uuid}";
+    }
+
+    public function hasRecentFluxHeartbeat(): bool
+    {
+        $connection = Cache::get($this->cacheKey());
+        $heartbeat = data_get($connection, 'last_heartbeat_at');
+        if (data_get($connection, 'status') !== 'connected' || ! is_string($heartbeat)) {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($heartbeat)->isAfter(now()->subMinutes(2));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function restartSentinel(): ?string

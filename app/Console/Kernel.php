@@ -13,6 +13,7 @@ use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\RefreshConnectedNodesJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
@@ -54,6 +55,9 @@ class Kernel extends ConsoleKernel
             ->daily()
             ->onOneServer()
             ->withoutOverlapping(30);
+        $this->scheduleInstance->job(new RefreshConnectedNodesJob)
+            ->everyMinute()
+            ->onOneServer();
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('cleanup:stucked-resources')
             ->dailyAt('03:17')

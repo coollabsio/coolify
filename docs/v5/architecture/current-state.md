@@ -87,6 +87,16 @@ host-local operation.
   immutable revision. Containers are shown as managed, external, or
   unrecognized.
 - The Node page shows the stored inventory and has a manual refresh action.
+- Coolify schedules `RefreshConnectedNodesJob` every minute on one scheduler.
+  The job selects usable Nodes with a Flux heartbeat from the last two minutes
+  and queues one unique inventory job per Node with a delay of 0 to 59 seconds.
+  The schedule uses Node and connection state directly. It does not use the
+  `SENTINEL_HOST_ENABLED` development variable.
+- Each complete inventory stores its observation time. The Node page compares
+  the newest workload revision with managed containers from that snapshot and
+  shows `Running`, `Stopped`, `Outdated`, or `Missing`. It shows `Unknown`
+  before the first snapshot and `Stale` when the last snapshot is more than
+  three minutes old.
 
 ### Durable Node operations
 
@@ -227,6 +237,8 @@ cross-instance command routing are not implemented yet.
 - stable Coolify installation identity and standard container identity labels;
 - transactional container observation reconciliation with managed, external,
   and unrecognized ownership states.
+- scheduled, staggered container inventory for connected Nodes and calculated
+  workload state from complete inventory snapshots;
 - durable Coolify Node operation state, guarded transitions, idempotent
   creation, and scheduled retention cleanup;
 - durable Sentinel command result replay and interrupted-command protection.

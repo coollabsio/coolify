@@ -45,7 +45,8 @@ it('fetches, validates, and reconciles a complete container snapshot through Flu
         ->and($container->management_state)->toBe(NodeContainerManagementState::EXTERNAL)
         ->and($container->observed_at->timestamp)->toBe(1_789_237_260)
         ->and($container->runtime_created_at->timestamp)->toBe(1_789_237_060)
-        ->and($container->ports[0]['host_port'])->toBe(8080);
+        ->and($container->ports[0]['host_port'])->toBe(8080)
+        ->and(data_get($node->fresh()->metadata, 'container_inventory_observed_at'))->toBe('2026-09-12T18:21:00+00:00');
     Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/container.list'
         && $request->hasHeader('Authorization', 'Bearer internal-secret')
         && $request['server_id'] === $node->uuid);

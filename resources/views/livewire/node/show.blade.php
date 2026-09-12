@@ -70,7 +70,10 @@
                     @php($revision = $workload->revisions->first())
                     <div wire:key="node-workload-{{ $workload->uuid }}" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
                         <div class="min-w-0">
-                            <p class="font-medium text-black dark:text-fg">{{ $workload->name }}</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-medium text-black dark:text-fg">{{ $workload->name }}</p>
+                                <x-status-badge :status="data_get($workloadStates, $workload->uuid.'.status', 'Unknown')" :type="data_get($workloadStates, $workload->uuid.'.type', 'neutral')" />
+                            </div>
                             @if ($revision)
                                 <p class="truncate font-mono text-xs text-neutral-500 dark:text-fg-faint">{{ $revision->image }} · {{ $revision->uuid }}</p>
                             @else
