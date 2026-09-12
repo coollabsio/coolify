@@ -3,6 +3,7 @@
 namespace App\Livewire\Node;
 
 use App\Actions\Node\CreateDeploymentOperation;
+use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
@@ -12,7 +13,9 @@ use App\Actions\Sentinel\FetchFluxNodeInformation;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Actions\Sentinel\RenewFluxCertificate;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
+use App\Jobs\ManageNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkloadRevision;
@@ -97,7 +100,7 @@ class Show extends Component
                 DeployNodeWorkloadJob::dispatch($operation->id);
                 $this->dispatch('success', 'Workload deployment queued.');
             } else {
-                $this->dispatch('info', 'This workload revision already has an active deployment.');
+                $this->dispatch('info', 'This workload already has an active operation.');
             }
             $this->loadNodeData();
         } catch (\Throwable $e) {
@@ -112,11 +115,35 @@ class Show extends Component
             $operation = NodeOperation::query()
                 ->where('node_id', $this->node->id)
                 ->where('uuid', $operationUuid)
-                ->where('command_type', 'workload.deploy.v1')
+                ->whereIn('command_type', ['workload.deploy.v1', 'workload.lifecycle.v1'])
                 ->where('status', NodeOperationStatus::UNCERTAIN)
                 ->firstOrFail();
-            DeployNodeWorkloadJob::dispatch($operation->id);
-            $this->dispatch('success', 'Deployment recovery queued.');
+            match ($operation->command_type) {
+                'workload.deploy.v1' => DeployNodeWorkloadJob::dispatch($operation->id),
+                'workload.lifecycle.v1' => ManageNodeWorkloadJob::dispatch($operation->id),
+            };
+            $this->dispatch('success', 'Operation recovery queued.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function manageWorkload(string $actionValue, string $revisionUuid): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $action = NodeWorkloadAction::from($actionValue);
+            $revision = NodeWorkloadRevision::query()
+                ->with('workload')
+                ->where('uuid', $revisionUuid)
+                ->whereHas('workload', fn ($query) => $query
+                    ->where('team_id', $this->node->team_id)
+                    ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
+                ->firstOrFail();
+            $operation = CreateLifecycleOperation::run($this->node, $revision, $action, auth()->user());
+            ManageNodeWorkloadJob::dispatch($operation->id);
+            $this->dispatch('success', str($action->value)->title().' command queued.');
+            $this->loadNodeData();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

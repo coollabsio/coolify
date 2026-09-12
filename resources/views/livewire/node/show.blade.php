@@ -68,11 +68,12 @@
             <div class="flex flex-col gap-3">
                 @foreach ($node->workloads->sortBy('name') as $workload)
                     @php($revision = $workload->revisions->first())
+                    @php($workloadState = data_get($workloadStates, $workload->uuid.'.status', 'Unknown'))
                     <div wire:key="node-workload-{{ $workload->uuid }}" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="font-medium text-black dark:text-fg">{{ $workload->name }}</p>
-                                <x-status-badge :status="data_get($workloadStates, $workload->uuid.'.status', 'Unknown')" :type="data_get($workloadStates, $workload->uuid.'.type', 'neutral')" />
+                                <x-status-badge :status="$workloadState" :type="data_get($workloadStates, $workload->uuid.'.type', 'neutral')" />
                             </div>
                             @if ($revision)
                                 <p class="truncate font-mono text-xs text-neutral-500 dark:text-fg-faint">{{ $revision->image }} · {{ $revision->uuid }}</p>
@@ -81,9 +82,20 @@
                             @endif
                         </div>
                         @if ($revision)
-                            <x-forms.button wire:click="deployRevision('{{ $revision->uuid }}')" wire:loading.attr="disabled" wire:target="deployRevision('{{ $revision->uuid }}')">
-                                {{ data_get($workloadStates, $workload->uuid.'.status') === 'Running' ? 'Redeploy' : 'Deploy' }}
-                            </x-forms.button>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-forms.button wire:click="deployRevision('{{ $revision->uuid }}')" wire:loading.attr="disabled" wire:target="deployRevision('{{ $revision->uuid }}')">
+                                    {{ $workloadState === 'Running' ? 'Redeploy' : 'Deploy' }}
+                                </x-forms.button>
+                                @if ($workloadState === 'Running')
+                                    <x-forms.button wire:click="manageWorkload('stop', '{{ $revision->uuid }}')" wire:loading.attr="disabled">Stop</x-forms.button>
+                                    <x-forms.button wire:click="manageWorkload('restart', '{{ $revision->uuid }}')" wire:loading.attr="disabled">Restart</x-forms.button>
+                                @elseif ($workloadState === 'Stopped')
+                                    <x-forms.button wire:click="manageWorkload('start', '{{ $revision->uuid }}')" wire:loading.attr="disabled">Start</x-forms.button>
+                                @endif
+                                @if (in_array($workloadState, ['Running', 'Stopped', 'Outdated'], true))
+                                    <x-forms.button isError wire:confirm="Remove this workload container from the node?" wire:click="manageWorkload('remove', '{{ $revision->uuid }}')" wire:loading.attr="disabled">Remove</x-forms.button>
+                                @endif
+                            </div>
                         @endif
                     </div>
                 @endforeach
@@ -95,7 +107,13 @@
                 <h3 class="text-sm font-medium">Recent operations</h3>
                 @foreach ($node->operations as $operation)
                     <div wire:key="node-operation-{{ $operation->uuid }}" class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <span>{{ $operation->workload?->name ?? $operation->command_type }}</span>
+                        <span>
+                            @if ($operation->command_type === 'workload.lifecycle.v1')
+                                {{ str(data_get($operation->request, 'action'))->title() }} {{ $operation->workload?->name }}
+                            @else
+                                {{ $operation->workload?->name ?? $operation->command_type }}
+                            @endif
+                        </span>
                         <div class="flex items-center gap-2">
                             <span class="text-neutral-500 dark:text-fg-faint">{{ $operation->created_at->diffForHumans() }}</span>
                             <x-status-badge :status="match ($operation->status->value) {

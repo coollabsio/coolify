@@ -50,6 +50,7 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('PUSH_ENDPOINT=http://coolify:8000/api/v1/sentinel')
         ->and($unit)->toContain('ExecStart=/usr/local/bin/sentinel')
         ->toContain('EnvironmentFile=/etc/coolify/sentinel.env')
+        ->toContain('KillMode=process')
         ->not->toContain('docker.service')
         ->and($script)
         ->toContain('rollback()')

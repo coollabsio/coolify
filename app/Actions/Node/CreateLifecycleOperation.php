@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadAction;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -11,21 +12,24 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
 
-class CreateDeploymentOperation
+class CreateLifecycleOperation
 {
     use AsAction;
 
-    /** @return array{operation: NodeOperation, created: bool} */
-    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null): array
+    public function handle(Node $node, NodeWorkloadRevision $revision, NodeWorkloadAction $action, ?User $requestedBy = null): NodeOperation
     {
-        return DB::transaction(function () use ($node, $revision, $requestedBy): array {
+        return DB::transaction(function () use ($node, $revision, $action, $requestedBy): NodeOperation {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
                 ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($node->id))
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first();
+            if ($workload === null) {
+                throw new RuntimeException('The workload is not assigned to this Node.');
+            }
             $revision = NodeWorkloadRevision::query()
                 ->whereKey($revision->id)
                 ->where('node_workload_id', $workload->id)
@@ -40,23 +44,20 @@ class CreateDeploymentOperation
                     NodeOperationStatus::VERIFYING,
                     NodeOperationStatus::UNCERTAIN,
                 ])
-                ->latest('id')
-                ->first();
-            if ($active !== null) {
-                return ['operation' => $active, 'created' => false];
+                ->exists();
+            if ($active) {
+                throw new RuntimeException('This workload already has an active operation.');
             }
 
-            $operation = CreateOperation::run(
+            return CreateOperation::run(
                 $node,
-                'workload.deploy.v1',
-                "deploy:{$node->uuid}:{$revision->uuid}:".Str::uuid(),
+                'workload.lifecycle.v1',
+                "lifecycle:{$node->uuid}:{$workload->uuid}:".Str::uuid(),
                 $workload,
                 $revision,
-                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash],
+                ['revision_uuid' => $revision->uuid, 'action' => $action->value],
                 $requestedBy,
             );
-
-            return ['operation' => $operation, 'created' => true];
         });
     }
 }

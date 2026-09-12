@@ -162,6 +162,26 @@ shows that operations often remain `queued`, `dispatched`, `running`, or
 must reuse the existing operation UUID. It must not create a new deployment
 command for the same attempt.
 
+### Workload lifecycle
+
+- `workload.lifecycle.v1` starts, stops, restarts, or removes the stable Podman
+  container for a workload.
+- Coolify creates a durable operation before each action. Flux routes the typed
+  action, and Sentinel invokes Podman without a shell.
+- Start and restart converge when the requested revision and image are running.
+  Stop converges when the managed container exists but is not running. Remove
+  converges when no managed container for the workload remains.
+- An uncertain recovery refreshes inventory before it sends a command. If the
+  requested state already exists, Coolify completes the operation without a
+  replay. Otherwise, it reuses the original operation UUID.
+- Coolify serializes deployment and lifecycle operations for each workload so
+  two mutating commands cannot run against the same container at once.
+- Coolify polls fresh inventory for up to 15 seconds so transitional Podman
+  states such as `stopping` do not produce a false result.
+- The Sentinel systemd unit uses `KillMode=process`. Restarting or upgrading
+  Sentinel must not kill the Podman `conmon` processes that supervise running
+  workloads.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -256,6 +276,8 @@ cross-instance command routing are not implemented yet.
 - durable Sentinel command result replay and interrupted-command protection.
 - development Node UI deployment, operation state, state refresh, and uncertain
   operation recovery.
+- durable start, stop, restart, and remove commands with observed-state
+  convergence and manual recovery.
 
 ### Not implemented
 
@@ -272,6 +294,6 @@ cross-instance command routing are not implemented yet.
 
 ## Next safe step
 
-Add workload lifecycle commands for stop, start, restart, and remove. Each
-mutating command must use the same durable operation and convergence rules as
-deployment.
+Add persistent volume support to immutable workload revisions and Podman
+deployment. Volume creation and attachment must remain Node-local operations,
+while Coolify owns the desired volume configuration and identity.

@@ -190,6 +190,7 @@ Type=simple
 EnvironmentFile=/etc/coolify/sentinel.env
 ExecStart=/usr/local/bin/sentinel
 WorkingDirectory=/app
+KillMode=process
 Restart=always
 RestartSec=5
 
