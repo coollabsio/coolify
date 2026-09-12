@@ -254,10 +254,6 @@ class SentinelController extends Controller
             return null;
         }
 
-        if ($server->isFunctional() === false) {
-            return null;
-        }
-
         if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team_id !== 0) {
             return null;
         }

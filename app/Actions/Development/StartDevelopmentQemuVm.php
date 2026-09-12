@@ -37,6 +37,7 @@ class StartDevelopmentQemuVm
 
         ConfigureDevelopmentQemuHost::run();
         $this->waitForSsh($profile['ip']);
+        $this->waitForCloudInit($profile);
     }
 
     /** @param array{domain: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
@@ -120,19 +121,26 @@ class StartDevelopmentQemuVm
         ]);
     }
 
-    /** @param array{user: string, provisioner: string} $profile */
+    /** @param array{user: string, provisioner: string, runtime?: string} $profile */
     private function userData(array $profile): string
     {
         $publicKey = config('development-qemu.public_key');
+        $gateway = config('development-qemu.gateway');
         $adminGroup = $profile['provisioner'] === 'apt' ? 'sudo' : 'wheel';
         $sudo = $profile['user'] === 'root' ? '' : "    groups: [{$adminGroup}]\n    sudo: ALL=(ALL) NOPASSWD:ALL\n";
 
-        [$packages, $startDocker] = match ($profile['provisioner']) {
-            'apk' => ["  - docker\n  - sudo", 'rc-update add docker default && service docker start'],
-            'rpm' => ["  - curl\n  - sudo", 'curl -fsSL https://get.docker.com | sh && systemctl enable --now docker'],
-            default => ["  - docker.io\n  - sudo", 'systemctl enable --now docker'],
-        };
-        $addUserToDockerGroup = $profile['user'] === 'root' ? '' : "\n  - usermod -aG docker {$profile['user']}";
+        if (($profile['runtime'] ?? 'docker') === 'podman') {
+            $packages = "  - podman\n  - podman-docker\n  - sudo";
+            $runtimeSetup = "systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '{$gateway} coolify-flux\\n' >> /etc/hosts";
+        } else {
+            [$packages, $startDocker] = match ($profile['provisioner']) {
+                'apk' => ["  - docker\n  - sudo", 'rc-update add docker default && service docker start'],
+                'rpm' => ["  - curl\n  - sudo", 'curl -fsSL https://get.docker.com | sh && systemctl enable --now docker'],
+                default => ["  - docker.io\n  - sudo", 'systemctl enable --now docker'],
+            };
+            $addUserToDockerGroup = $profile['user'] === 'root' ? '' : "\n  - usermod -aG docker {$profile['user']}";
+            $runtimeSetup = $startDocker.$addUserToDockerGroup;
+        }
 
         return <<<YAML
 #cloud-config
@@ -147,7 +155,7 @@ package_update: true
 packages:
 {$packages}
 runcmd:
-  - {$startDocker}{$addUserToDockerGroup}
+  - {$runtimeSetup}
 YAML;
     }
 
@@ -198,6 +206,17 @@ do {
 exit(1);
 PHP;
         $this->runOrFail("docker exec {$container} php -r ".escapeshellarg($probe).' '.escapeshellarg($ip));
+    }
+
+    /** @param array{ip: string, user: string} $profile */
+    private function waitForCloudInit(array $profile): void
+    {
+        $container = escapeshellarg(config('development-qemu.coolify_container'));
+        $key = escapeshellarg(config('development-qemu.private_key_path'));
+        $target = escapeshellarg($profile['user'].'@'.$profile['ip']);
+        $options = '-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
+
+        $this->runOrFail("docker exec {$container} ssh {$options} -i {$key} {$target} cloud-init status --wait");
     }
 
     private function runOrFail(string $command): void

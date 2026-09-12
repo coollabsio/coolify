@@ -26,9 +26,11 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
     $unit = InstallSentinelHost::serviceUnit();
 
     expect($script)
-        ->toContain("docker pull 'ghcr.io/coollabsio/sentinel-host:main'")
-        ->toContain('docker create "$image" /sentinel')
-        ->toContain('docker cp "$container_id:/sentinel" "$temporary_binary"')
+        ->toContain('runtime="$(command -v docker || command -v podman || true)"')
+        ->toContain('test -n "$runtime"')
+        ->toContain('"$runtime" pull')
+        ->toContain('"$runtime" create "$image" /sentinel')
+        ->toContain('"$runtime" cp "$container_id:/sentinel" "$temporary_binary"')
         ->toContain('install -m 0755 "$temporary_binary" /usr/local/bin/sentinel.new')
         ->toContain('mv -f /usr/local/bin/sentinel.new /usr/local/bin/sentinel')
         ->toContain('/etc/coolify/sentinel-flux-ca.pem.new')
@@ -47,6 +49,7 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('PUSH_ENDPOINT=http://coolify:8000/api/v1/sentinel')
         ->and($unit)->toContain('ExecStart=/usr/local/bin/sentinel')
         ->toContain('EnvironmentFile=/etc/coolify/sentinel.env')
+        ->not->toContain('docker.service')
         ->and($script)
         ->toContain('rollback()')
         ->toContain('if [ "$changed" = true ] && [ "$completed" != true ]; then')

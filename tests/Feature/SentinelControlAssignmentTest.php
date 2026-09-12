@@ -79,6 +79,17 @@ it('requires the existing Sentinel token', function () {
     requestSentinelAssignment('invalid-token')->assertUnauthorized();
 });
 
+it('allows a valid sentinel to reconnect while the server is marked unreachable', function () {
+    $this->server->settings->update([
+        'is_reachable' => false,
+        'is_usable' => false,
+    ]);
+
+    requestSentinelAssignment($this->token)
+        ->assertOk()
+        ->assertJsonPath('server_id', $this->server->uuid);
+});
+
 it('derives the direct Flux URL from the Coolify URL and configured port', function () {
     config()->set('constants.flux.public_url', null);
     config()->set('constants.flux.port', 8443);

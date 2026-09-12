@@ -1,6 +1,6 @@
 # Optional KVM v5 worker design
 
-**Status:** Proposed  
+**Status:** Implemented
 **Date:** 2026-09-12
 
 ## Goal
@@ -14,25 +14,26 @@ Sentinel, and Podman.
 
 ## Chosen approach
 
-Run an Ubuntu cloud image directly with QEMU and KVM acceleration. Use QEMU user
-networking and fixed host port forwarding instead of a host bridge or a libvirt
-network.
+Extend Coolify's existing libvirt-based development VM manager with a dedicated
+Ubuntu v5 worker profile. The existing manager already creates cloud-image VMs,
+configures a NAT network that the Coolify container can reach, assigns fixed IP
+addresses, and seeds normal remote-server records.
 
 ```text
 Docker development stack
-  Coolify  ───── SSH through host.docker.internal:<ssh-port> ────┐
+  Coolify  ───── SSH through libvirt network ────────────────────┐
   Flux     ◄──── TLS gRPC through host port 7443 ────────────────┤
                                                                  │
-Host machine                                                     │
+Host machine and libvirt NAT network                             │
   QEMU/KVM v5 worker VM ◄────────────────────────────────────────┘
     systemd
     Sentinel
     Podman
 ```
 
-The guest reaches the host through QEMU's user-network gateway. Coolify reaches
-the guest through an SSH port forwarded on the host. The existing Compose setup
-already maps `host.docker.internal` to the Docker host gateway.
+The worker uses the existing fixed-address libvirt network. Coolify reaches the
+guest directly on that network. The guest reaches the published Coolify and Flux
+ports through the libvirt gateway.
 
 ### Why not nested Podman
 
@@ -40,41 +41,23 @@ Podman inside the Docker testing host changes cgroups, storage, network
 namespaces, and firewall access. It is useful for narrow tests but cannot prove
 that v5 works on a normal Linux server.
 
-### Why not libvirt first
+### Why reuse libvirt
 
-Libvirt is useful for larger VM fleets, but it adds a daemon, network setup, and
-host-specific permissions. Direct QEMU gives this single optional VM a smaller
-setup. We can move to libvirt later if one VM is no longer sufficient.
+Coolify already has tested libvirt host setup, VM creation, cloud-init, fixed IP
+allocation, and database seeding. Reusing it avoids a second VM manager and keeps
+the v5 worker compatible with the existing root and non-root test profiles.
 
 ## Developer interface
 
-Add one script with these commands:
+Use the existing Artisan interface:
 
 ```text
-./scripts/v5-worker doctor
-./scripts/v5-worker up
-./scripts/v5-worker status
-./scripts/v5-worker register
-./scripts/v5-worker reset
-./scripts/v5-worker down
-./scripts/v5-worker destroy
+php artisan dev:qemu v5-worker
 ```
 
-- `doctor` checks QEMU, KVM access, cloud-image tooling, disk space, and required
-  ports. It reports installation guidance but does not modify the host.
-- `up` downloads and verifies the pinned cloud image when absent, creates the
-  overlay disk and cloud-init seed, and starts the VM.
-- `status` reports the process, SSH readiness, forwarded address, and image
-  version.
-- `register` idempotently adds or updates the development server record in a
-  running Coolify container.
-- `reset` destroys VM state and creates a clean worker from the cached base
-  image.
-- `down` requests a clean shutdown and then stops the process after a timeout.
-- `destroy` removes generated VM state but keeps the cached base image.
-
-All generated files live under `.dev-v5-worker/` and remain untracked. The
-script uses a PID file and refuses to start a second VM for the same worktree.
+The command uses the existing `dev:qemu` reset behavior. It prepares libvirt,
+recreates the selected VM, waits for SSH, and seeds the server record. Running
+`php artisan dev:qemu` without an argument shows the profile selector.
 
 ## Guest configuration
 
@@ -95,15 +78,14 @@ key. The private key remains in Coolify's development data.
 
 ## Network contract
 
-Use configurable host ports with development defaults:
+Use the existing libvirt network with one new fixed address:
 
-| Setting | Default | Purpose |
+| Setting | Value | Purpose |
 | --- | ---: | --- |
-| `V5_WORKER_SSH_PORT` | `2223` | Host port forwarded to guest SSH port 22. |
-| `V5_WORKER_FLUX_PORT` | `7443` | Host Flux port that Sentinel uses. |
-| `V5_WORKER_MEMORY_MB` | `4096` | Guest memory. |
-| `V5_WORKER_CPUS` | `2` | Guest virtual CPUs. |
-| `V5_WORKER_DISK_GB` | `30` | Overlay disk size. |
+| Worker address | `192.168.122.50` | Coolify SSH target. |
+| Gateway address | `192.168.122.1` | Guest path to Coolify and Flux. |
+| SSH port | `22` | Direct SSH on the libvirt network. |
+| Flux port | `7443` | Published development Flux listener. |
 
 The VM does not bind a dashboard or workload port in the first slice. Later
 workload tests will add explicit port forwarding or a tap-based network as a
@@ -116,15 +98,14 @@ identity. The VM uses the gateway address and host port 8000 for its
 
 ## Coolify registration
 
-An idempotent development seeder creates one normal remote server record. It
-must not use ID `0`. The `register` command runs this seeder inside the Coolify
-container and passes the configured SSH port.
+The existing idempotent development QEMU seeder creates one normal remote server
+record. It must not use ID `0`.
 
 The record uses:
 
 - name `v5-kvm-worker`;
-- host `host.docker.internal`;
-- the configured forwarded SSH port;
+- host `192.168.122.50`;
+- SSH port `22`;
 - the existing development testing-host private key;
 - the root development team;
 - an explicit marker that identifies it as development-only.
@@ -135,8 +116,7 @@ record or user resources.
 
 ## Lifecycle integration
 
-The KVM worker stays outside Docker Compose. Compose must not own the QEMU
-process.
+The KVM worker stays outside Docker Compose. Libvirt owns the QEMU process.
 
 Jean and local developers can opt in through a separate command. The normal
 development command continues to start only the Docker stack. This keeps KVM
@@ -149,29 +129,26 @@ standalone workflow works.
 
 ## Failure behavior
 
-- If `/dev/kvm` is absent or inaccessible, `doctor` and `up` stop with a clear
-  message. They do not fall back to slow software emulation.
-- If a required host port is busy, `up` stops before it creates a QEMU process.
+- If KVM or a required libvirt tool is unavailable, the existing host setup
+  stops with a clear error.
 - If cloud-init or SSH does not become ready before the timeout, `up` stops the
   VM and preserves logs for inspection.
 - If the base image checksum does not match, the script deletes the bad download
   and stops.
-- `down` and `destroy` verify the recorded PID before they send a signal.
 
 ## Verification
 
 The first implementation is complete when these checks pass:
 
 1. The normal Docker development stack still starts without KVM.
-2. `doctor` gives a clear result on hosts with and without KVM access.
-3. `up` starts a fresh VM and SSH becomes ready.
+2. The profile appears in the existing `dev:qemu` selector.
+3. `php artisan dev:qemu v5-worker` starts a fresh VM and SSH becomes ready.
 4. The guest runs systemd and Podman.
 5. Coolify can reach the VM through the forwarded SSH port.
 6. Coolify installs host-native Sentinel on the VM.
 7. Sentinel connects to Flux with TLS and reports heartbeats.
 8. A VM reboot restores Sentinel and the Flux connection.
-9. `reset` creates a clean worker.
-10. `down` and `destroy` leave no QEMU process behind.
+9. Running the command again creates a clean worker.
 
 ## Deferred work
 

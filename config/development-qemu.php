@@ -13,7 +13,23 @@ return [
     'libvirt_network' => 'default',
     'docker_network' => 'coolify',
     'coolify_container' => 'coolify',
+    'private_key_path' => '/var/www/html/storage/app/ssh/keys/ssh_key@ssh',
+    'coolify_host_port' => (int) env('DEVELOPMENT_QEMU_COOLIFY_PORT', 8000),
     'profiles' => [
+        'v5-worker' => [
+            'label' => 'Coolify v5 worker (Ubuntu 24.04, Podman)',
+            'domain' => 'coolify-dev-v5-worker',
+            'uuid' => 'development-qemu-v5-worker',
+            'name' => 'QEMU v5 worker',
+            'ip' => '192.168.122.50',
+            'user' => 'root',
+            'mac' => '52:54:00:ca:00:09',
+            'image' => 'ubuntu-noble-amd64.qcow2',
+            'image_url' => 'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img',
+            'os_variant' => 'ubuntu24.04',
+            'provisioner' => 'apt',
+            'runtime' => 'podman',
+        ],
         'ubuntu-root' => [
             'label' => 'Ubuntu 24.04 (root)',
             'domain' => 'coolify-dev-ubuntu-root',

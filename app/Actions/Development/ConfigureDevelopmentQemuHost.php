@@ -20,6 +20,7 @@ class ConfigureDevelopmentQemuHost
         $this->configureIpForwarding();
         $this->configureStorage();
         $this->configureDockerForwarding();
+        $this->configureCoolifyPortForwarding();
     }
 
     private function installDependencies(): void
@@ -86,6 +87,21 @@ class ConfigureDevelopmentQemuHost
 
         Process::run("iptables -D LIBVIRT_FWI {$rule}");
         $this->runOrFail("iptables -I LIBVIRT_FWI 1 {$rule}");
+    }
+
+    private function configureCoolifyPortForwarding(): void
+    {
+        $port = (int) config('development-qemu.coolify_host_port');
+        if ($port < 1 || $port > 65535) {
+            throw new RuntimeException('The development QEMU Coolify port is invalid.');
+        }
+
+        $this->runOrFail("printf 'net.ipv4.conf.virbr0.route_localnet=1\\n' > /etc/sysctl.d/99-coolify-development-qemu-loopback.conf");
+        $this->runOrFail('sysctl -w net.ipv4.conf.virbr0.route_localnet=1');
+
+        $rule = "-i virbr0 -p tcp --dport {$port} -j DNAT --to-destination 127.0.0.1:{$port}";
+        Process::run("iptables -t nat -D PREROUTING {$rule}");
+        $this->runOrFail("iptables -t nat -I PREROUTING 1 {$rule}");
     }
 
     private function libvirtNetworkXml(string $network): string

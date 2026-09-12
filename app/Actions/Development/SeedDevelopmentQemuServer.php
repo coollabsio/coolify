@@ -48,6 +48,17 @@ class SeedDevelopmentQemuServer
         $server->deleted_at = null;
         $server->save();
 
+        if (($profile['runtime'] ?? null) === 'podman') {
+            $server->settings->sentinel_custom_url = sprintf(
+                'http://%s:%d',
+                config('development-qemu.gateway'),
+                config('development-qemu.coolify_host_port'),
+            );
+            $server->settings->is_reachable = true;
+            $server->settings->is_usable = true;
+            $server->settings->saveQuietly();
+        }
+
         return $server->fresh();
     }
 

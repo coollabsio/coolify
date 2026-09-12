@@ -51,6 +51,7 @@ temporary_binary="\$(mktemp /tmp/coolify-sentinel.XXXXXX)"
 install -d -m 0700 /etc/coolify /app/db
 backup_directory="\$(mktemp -d /etc/coolify/.sentinel-install.XXXXXX)"
 container_id=''
+runtime="\$(command -v docker || command -v podman || true)"
 completed=false
 changed=false
 was_active=false
@@ -66,7 +67,7 @@ if systemctl is-enabled --quiet sentinel.service >/dev/null 2>&1; then was_enabl
 
 cleanup() {
     if [ -n "\$container_id" ]; then
-        docker container rm -f "\$container_id" >/dev/null 2>&1 || true
+        "\$runtime" container rm -f "\$container_id" >/dev/null 2>&1 || true
     fi
     rm -f "\$temporary_binary"
     rm -f /usr/local/bin/sentinel.new /etc/coolify/sentinel.env.new /etc/systemd/system/sentinel.service.new
@@ -108,9 +109,10 @@ rollback() {
 }
 trap rollback EXIT
 
-docker pull {$escapedImage}
-container_id="\$(docker create "\$image" /sentinel)"
-docker cp "\$container_id:/sentinel" "\$temporary_binary"
+test -n "\$runtime"
+"\$runtime" pull "\$image"
+container_id="\$("\$runtime" create "\$image" /sentinel)"
+"\$runtime" cp "\$container_id:/sentinel" "\$temporary_binary"
 test -s "\$temporary_binary"
 
 install -m 0755 "\$temporary_binary" /usr/local/bin/sentinel.new
@@ -180,7 +182,7 @@ SCRIPT;
         return <<<'UNIT'
 [Unit]
 Description=Coolify Sentinel
-After=docker.service network-online.target
+After=network-online.target
 Wants=network-online.target
 
 [Service]

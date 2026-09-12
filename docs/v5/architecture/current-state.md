@@ -113,6 +113,11 @@ container, and host-native Sentinel runs as a systemd service inside it. The
 stack uses published `main` images from GHCR. This setup tests the production
 process model while keeping local development reproducible.
 
+Developers with KVM access can also start the optional `v5-worker` QEMU profile.
+It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
+on a normal virtual machine. The VM connects to the same development Coolify and
+Flux services and is the target for runtime and host-network integration tests.
+
 ### Existing self-hosted installations
 
 Existing Coolify installations remain on the Docker-based localhost path. They

@@ -48,6 +48,7 @@ it('provides root and non-root profiles for every supported distribution', funct
     $profiles = collect(config('development-qemu.profiles'));
 
     expect($profiles->keys()->all())->toBe([
+        'v5-worker',
         'ubuntu-root',
         'ubuntu-non-root',
         'debian-root',
@@ -56,10 +57,34 @@ it('provides root and non-root profiles for every supported distribution', funct
         'centos-non-root',
         'alpine-root',
         'alpine-non-root',
-    ])->and($profiles->pluck('ip')->unique()->count())->toBe(8)
-        ->and($profiles->pluck('mac')->unique()->count())->toBe(8)
-        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(4)
+    ])->and($profiles->pluck('ip')->unique()->count())->toBe(9)
+        ->and($profiles->pluck('mac')->unique()->count())->toBe(9)
+        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(5)
         ->and($profiles->filter(fn (array $profile) => $profile['user'] !== 'root')->count())->toBe(4);
+});
+
+it('provisions the v5 worker with podman and a reachable flux hostname', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-v5-worker-test-'.uniqid();
+    config(['development-qemu.storage_path' => $storagePath]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* iptables -C *' => Process::result(exitCode: 1),
+        '*' => Process::result(),
+    ]);
+
+    StartDevelopmentQemuVm::run('v5-worker');
+
+    $userData = File::get("{$storagePath}/coolify-dev-v5-worker-user-data.yaml");
+
+    expect($userData)
+        ->toContain('  - podman')
+        ->toContain('  - podman-docker')
+        ->toContain('systemctl enable --now podman.socket')
+        ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
+        ->toContain('192.168.122.1 coolify-flux')
+        ->not->toContain('docker.io')
+        ->not->toContain('get.docker.com');
 });
 
 it('stores vm disks in a libvirt-accessible directory', function () {
@@ -95,6 +120,8 @@ it('automatically configures the qemu host', function () {
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-autostart'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'sysctl -w net.ipv4.ip_forward=1'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'net.ipv4.conf.virbr0.route_localnet=1'));
+    Process::assertRan(fn ($process) => str_contains($process->command, '-t nat -I PREROUTING') && str_contains($process->command, '--dport 8000') && str_contains($process->command, '127.0.0.1:8000'));
 });
 
 it('does not restart an active libvirt network', function () {
@@ -125,6 +152,17 @@ it('seeds one predefined root qemu server', function () {
         ->and($server->user)->toBe('root')
         ->and($server->team_id)->toBe(0)
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
+});
+
+it('seeds the v5 worker with the host gateway sentinel endpoint', function () {
+    $server = SeedDevelopmentQemuServer::run('v5-worker');
+
+    expect($server->uuid)->toBe('development-qemu-v5-worker')
+        ->and($server->ip)->toBe('192.168.122.50')
+        ->and($server->user)->toBe('root')
+        ->and($server->settings->sentinel_custom_url)->toBe('http://192.168.122.1:8000')
+        ->and($server->settings->is_reachable)->toBeTrue()
+        ->and($server->settings->is_usable)->toBeTrue();
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {
@@ -159,6 +197,7 @@ it('deletes managed vm data and freshly creates only the selected vm', function 
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh undefine') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh start'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'cloud-init status --wait'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'net-update') && str_contains($process->command, 'ip-dhcp-host') && str_contains($process->command, '192.168.122.11'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -D LIBVIRT_FWI'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec') && str_contains($process->command, 'coolify'));
