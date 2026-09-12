@@ -117,10 +117,13 @@ Developers with KVM access can also start the optional `node-worker` QEMU profil
 It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
 on a normal virtual machine. The VM connects to the same development Coolify and
 Flux services and is the target for runtime and host-network integration tests.
-Coolify stores an explicit server mode. Legacy servers validate Docker and
-Docker Compose. `node-worker` and `node-controller-worker` nodes validate Podman,
-systemd, and the rootful Podman API socket. Development seeding does not mark a
-worker usable before that validation succeeds.
+The current development slice stores an explicit mode on `servers`. This is a
+transitional implementation. Decision 0004 requires the released architecture
+to keep legacy hosts in `servers` and store nodes in a separate `nodes` table.
+Legacy servers validate Docker and Docker Compose. `node-worker` and
+`node-controller-worker` nodes validate Podman, systemd, and the rootful Podman
+API socket. Development seeding does not mark a worker usable before that
+validation succeeds.
 
 ### Existing self-hosted installations
 
@@ -128,7 +131,8 @@ Existing Coolify installations remain on the Docker-based localhost path. They
 must not be converted automatically to Podman, WireGuard, or the node
 worker stack. Legacy servers keep container Sentinel and SSH. Coolify does not
 install host-native Sentinel, issue Flux assignments, or send Flux commands to
-legacy servers.
+legacy servers. Legacy servers remain a supported product path after nodes are
+released; they are not a temporary compatibility mode.
 
 ### Fresh v5 installations
 
@@ -157,6 +161,8 @@ cross-instance command routing are not implemented yet.
 - `system.ping.v1` and `system.info.v1` typed commands;
 - development-only UI controls and connection state.
 
+The separate `Node` model from Decision 0004 is accepted but not implemented.
+
 ### Not implemented
 
 - staged CA rotation;
@@ -167,9 +173,11 @@ cross-instance command routing are not implemented yet.
   will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
 - retirement of the existing Sentinel container.
+- migration of the transitional node records from `servers` to `nodes`.
 
 ## Next safe step
 
-Add one small, read-only diagnostic command at a time, or implement staged CA
-rotation before broad testing. Do not start mutating workload operations until
-command reconciliation, idempotency, audit, and restart behavior are specified.
+Add the separate `nodes` model and move the current development node flow to it.
+Then implement `node_containers` with a read-only `container.list` command. Do
+not start mutating workload operations until command reconciliation,
+idempotency, audit, and restart behavior are specified.

@@ -40,6 +40,7 @@ it('records active v5 decisions separately from the archived prototype', functio
     $index = file_get_contents(base_path('docs/v5/decisions/README.md'));
     $sentinelDecision = file_get_contents(base_path('docs/v5/decisions/0001-combine-coold-with-sentinel.md'));
     $installationDecision = file_get_contents(base_path('docs/v5/decisions/0002-separate-legacy-upgrades-from-v5-installs.md'));
+    $parallelModelsDecision = file_get_contents(base_path('docs/v5/decisions/0004-support-legacy-servers-and-nodes-permanently.md'));
 
     expect($index)
         ->toContain('Active Coolify v5 Decisions')
@@ -47,14 +48,15 @@ it('records active v5 decisions separately from the archived prototype', functio
         ->toContain('historical references')
         ->and($sentinelDecision)
         ->toContain('Status: Accepted')
-        ->toContain('V4 continues to run Sentinel as a Docker container')
-        ->toContain('V5 runs Sentinel as a mandatory host-native binary')
+        ->toContain('Legacy servers continue to run Sentinel as a Docker container')
+        ->toContain('Nodes run Sentinel as a mandatory host-native binary')
         ->toContain('coold functionality will move into the Sentinel project')
         ->toContain('typed commands and local safety checks')
         ->toContain('same Sentinel product and executable')
         ->toContain('both can run during a controlled transition')
         ->toContain('host-native Sentinel first owns the v5 control connection')
-        ->toContain('retire the container after capability parity')
+        ->toContain('Legacy servers')
+        ->toContain('keep their container Sentinel')
         ->and($index)
         ->toContain('0002-separate-legacy-upgrades-from-v5-installs.md')
         ->and($installationDecision)
@@ -64,7 +66,15 @@ it('records active v5 decisions separately from the archived prototype', functio
         ->toContain('node-controller-worker')
         ->toContain('node-controller')
         ->toContain('node-worker')
-        ->toContain('in-place conversion');
+        ->toContain('in-place conversion')
+        ->and($index)
+        ->toContain('0004-support-legacy-servers-and-nodes-permanently.md')
+        ->and($parallelModelsDecision)
+        ->toContain('Status: Accepted')
+        ->toContain('Legacy support is a product requirement')
+        ->toContain('`Server` and the `servers` table')
+        ->toContain('`Node` and the `nodes` table')
+        ->toContain('There will be no automatic conversion');
 });
 
 it('replaces the normal testing host with systemd for node development', function () {

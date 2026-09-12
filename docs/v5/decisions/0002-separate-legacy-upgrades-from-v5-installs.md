@@ -57,7 +57,8 @@ combined, or control-plane-only.
 
 An existing installation can become Podman-native only through an explicit
 future migration procedure or a fresh v5 installation. This decision does not
-promise an in-place conversion.
+promise an in-place conversion. Decision 0004 makes legacy servers and nodes
+permanent parallel models; legacy support does not end when node support ships.
 
 ## Consequences
 
@@ -82,5 +83,4 @@ This decision does not define:
 - the exact Podman network and storage layout;
 - the WireGuard address allocation and key-rotation protocol;
 - the firewall implementation and rollback mechanism;
-- the procedure for a future explicit Docker-to-Podman migration; or
-- the date when the legacy Docker execution path can be removed.
+- the procedure for a future explicit Docker-to-Podman migration.

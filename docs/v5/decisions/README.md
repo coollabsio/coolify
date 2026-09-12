@@ -12,9 +12,10 @@ current v5 architecture.
 
 | Decision | Status | Summary |
 | --- | --- | --- |
-| [0001: Combine coold with Sentinel](0001-combine-coold-with-sentinel.md) | Accepted | Keep one Sentinel product: retain the v4 container during a controlled transition, introduce the host-native node deployment, move capabilities to it, and then retire the container. |
+| [0001: Combine coold with Sentinel](0001-combine-coold-with-sentinel.md) | Accepted | Keep one Sentinel product with a container deployment for legacy servers and a host-native deployment for nodes; retire only a node's temporary container after capability handover. |
 | [0002: Separate legacy upgrades from native node installations](0002-separate-legacy-upgrades-from-v5-installs.md) | Accepted | Keep upgraded Docker localhost servers on the legacy path, while fresh v5 installs support combined, control-plane-only, and worker modes. |
 | [0003: Transport Sentinel logs on demand](0003-transport-sentinel-logs-on-demand.md) | Accepted | Keep a bounded structured log buffer in Sentinel, read it through Flux on demand, and retain SSH plus journald as the failure-path fallback. |
+| [0004: Support legacy servers and nodes permanently](0004-support-legacy-servers-and-nodes-permanently.md) | Accepted | Keep legacy Docker servers and Podman nodes as permanent parallel models, with shared product ownership but separate runtime state and control paths. |
 
 ## Adding a decision
 

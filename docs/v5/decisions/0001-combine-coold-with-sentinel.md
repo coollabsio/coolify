@@ -22,13 +22,13 @@ must not keep two different agent products.
 
 ## Decision
 
-V4 continues to run Sentinel as a Docker container.
+Legacy servers continue to run Sentinel as a Docker container.
 
-V5 runs Sentinel as a mandatory host-native binary managed by systemd.
+Nodes run Sentinel as a mandatory host-native binary managed by systemd.
 
 coold functionality will move into the Sentinel project. The host agent keeps
 the Sentinel name. Container and host deployments use the same Sentinel product and executable.
-The Sentinel project will produce the v4 container image and the v5 host-native
+The Sentinel project will produce the legacy container image and the node host-native
 Linux artifacts from the same source revision.
 
 The current container and host-native Sentinel both can run during a controlled transition.
@@ -41,10 +41,11 @@ They have separate capability ownership:
 - Coolify explicitly records which deployment owns each capability so that the
   two processes do not perform the same operation.
 
-Coolify will move observational capabilities to the host-native Sentinel in
-small steps. It will retire the container after capability parity, health
-validation, and rollback validation. The final v5 state has one host-native
-Sentinel process.
+Coolify will move observational capabilities to the host-native Sentinel on
+nodes in small steps. It will retire a node's temporary container process after
+capability parity, health validation, and rollback validation. Legacy servers
+keep their container Sentinel. Coolify continues to build and support both
+deployment forms of the same Sentinel product.
 
 The v4 container retains Sentinel's current monitoring responsibilities. The
 v5 binary adds the host-agent responsibilities previously implemented by coold,
@@ -69,7 +70,7 @@ It must not expose unrestricted shell, Docker, or Podman passthrough.
 
 - Coolify has one long-term agent product and one agent project to release and
   support.
-- V4 remains compatible with the existing Sentinel container deployment.
+- Legacy servers remain compatible with the existing Sentinel container deployment.
 - A transition can contain two Sentinel processes, but they must not own the
   same capability at the same time.
 - V5 gains a mandatory agent that can safely perform privileged host-local
@@ -91,8 +92,8 @@ This decision does not define:
 - the detailed installation, upgrade, rollback, or v4-to-v5 migration flow;
 - changes to the Flux protocol or deployment topology;
 - the final capability and authentication formats; or
-- the detailed capability migration schedule and the exact point when the v4
-  Sentinel container can be retired.
+- the detailed capability migration schedule and the exact point when a node's
+  transitional Sentinel container can be retired.
 
 Those subjects require separate decisions before implementation commits to
 them.
