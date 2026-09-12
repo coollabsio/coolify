@@ -36,6 +36,111 @@ it('preserves bounded cleanup when commands are adapted for non-root servers', f
         ->toContain('__COOLIFY_CONTAINER_REMOVE_TIMEOUT__');
 });
 
+it('preserves bounded helper startup retries for non-root servers', function () {
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $server->user = 'ubuntu';
+
+    $command = parseLineForSudo(
+        dockerRunWithNameConflictRetryCommand('docker run --name container-name image', 'container-name'),
+        $server
+    );
+
+    expect($command)
+        ->toStartWith("sudo bash -c '")
+        ->toContain('$SECONDS')
+        ->toContain('sudo docker run --name container-name image')
+        ->not->toContain('sudo exit');
+});
+
+it('retries helper startup until Docker releases the container name', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-run-'.bin2hex(random_bytes(4));
+    $countFile = $directory.'/count';
+    $captureFile = $directory.'/arguments';
+    $secret = "a'b \$c;d";
+    $runCommand = 'docker run --name container-name -e SECRET='.escapeshellarg($secret).' image';
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\ncount=0\nif [ -f \"\$COUNT_FILE\" ]; then count=\$(cat \"\$COUNT_FILE\"); fi\ncount=\$((count + 1))\nprintf '%s' \"\$count\" > \"\$COUNT_FILE\"\nprintf '%s\\n' \"\$@\" > \"\$CAPTURE_FILE\"\nif [ \"\$count\" -lt 3 ]; then echo 'Error response from daemon: Conflict. The container name is already in use by container' >&2; exit 125; fi\necho container-id\n");
+    chmod($directory.'/docker', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRunWithNameConflictRetryCommand($runCommand, 'container-name', 2)], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'COUNT_FILE' => $countFile,
+        'CAPTURE_FILE' => $captureFile,
+    ]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue()
+        ->and(file_get_contents($countFile))->toBe('3')
+        ->and(file_get_contents($captureFile))->toBe("run\n--name\ncontainer-name\n-e\nSECRET={$secret}\nimage\n");
+
+    unlink($countFile);
+    unlink($captureFile);
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('does not apply the conflict deadline to a successful start', function () {
+    $process = new Process(['/bin/sh', '-c', dockerRunWithNameConflictRetryCommand('sleep 2', 'container-name', 1)]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue();
+});
+
+it('times out while Docker keeps the container name reserved', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-run-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\necho 'Error response from daemon: Conflict. The container name is already in use by container' >&2\nexit 125\n");
+    chmod($directory.'/docker', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRunWithNameConflictRetryCommand('docker run --name container-name image', 'container-name', 1)], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(124)
+        ->and($process->getErrorOutput())->toContain('Timed out waiting to start container container-name after name conflicts.');
+
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('does not retry unrelated Docker errors', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-run-'.bin2hex(random_bytes(4));
+    $countFile = $directory.'/count';
+    mkdir($directory);
+    file_put_contents($directory.'/docker', "#!/bin/sh\nprintf x >> \"\$COUNT_FILE\"\necho 'Cannot connect to the Docker daemon' >&2\nexit 1\n");
+    chmod($directory.'/docker', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRunWithNameConflictRetryCommand('docker run --name container-name image', 'container-name', 2)], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+        'COUNT_FILE' => $countFile,
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(1)
+        ->and($process->getErrorOutput())->toContain('Cannot connect to the Docker daemon')
+        ->and(file_get_contents($countFile))->toBe('x');
+
+    unlink($countFile);
+    unlink($directory.'/docker');
+    rmdir($directory);
+});
+
+it('stops the helper before retrying startup with the same name', function () {
+    $source = file_get_contents(dirname(__DIR__, 2).'/app/Jobs/ApplicationDeploymentJob.php');
+    $start = strpos($source, 'private function prepare_builder_image');
+    $end = strpos($source, 'private function restart_builder_container_with_actual_commit');
+    $prepareBuilderImage = substr($source, $start, $end - $start);
+
+    $stop = strpos($prepareBuilderImage, '$this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);');
+    $run = strpos($prepareBuilderImage, 'dockerRunWithNameConflictRetryCommand($runCommand, $this->deployment_uuid)');
+
+    expect($stop)->toBeInt()
+        ->and($run)->toBeInt()->toBeGreaterThan($stop);
+});
+
 it('escapes container names in bounded removal commands', function () {
     $containerName = "container'; reboot; '";
     $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
