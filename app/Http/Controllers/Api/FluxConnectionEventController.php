@@ -42,7 +42,10 @@ class FluxConnectionEventController extends Controller
 
         if ($data['event'] === 'disconnected') {
             if (data_get($current, 'connection_id') === $data['connection_id']) {
-                Cache::forget($key);
+                Cache::put($key, [
+                    ...$current,
+                    'status' => 'reconnecting',
+                ], now()->addSeconds(15));
             }
 
             return response()->noContent();
@@ -58,7 +61,9 @@ class FluxConnectionEventController extends Controller
             'connection_id' => $data['connection_id'],
             'sentinel_version' => $data['sentinel_version'] ?? data_get($current, 'sentinel_version'),
             'protocol_version' => $data['protocol_version'] ?? data_get($current, 'protocol_version'),
-            'connected_at' => $data['event'] === 'connected' ? now()->toIso8601String() : data_get($current, 'connected_at'),
+            'connected_at' => $data['event'] === 'connected' && data_get($current, 'status') !== 'reconnecting'
+                ? now()->toIso8601String()
+                : data_get($current, 'connected_at'),
             'last_heartbeat_at' => $data['event'] === 'heartbeat' ? now()->toIso8601String() : data_get($current, 'last_heartbeat_at'),
             'trust_bundle_version' => $data['trust_bundle_version'] ?? data_get($current, 'trust_bundle_version'),
             'transport' => $data['transport'] ?? data_get($current, 'transport'),

@@ -142,7 +142,7 @@ class Sentinel extends Component
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->authorize('view', $this->server);
         $this->loadFluxConnection();
-        $state = $this->fluxConnection === null ? 'disconnected' : 'connected';
+        $state = data_get($this->fluxConnection, 'status', 'disconnected');
         $this->dispatch('info', "Flux connection state refreshed. Sentinel is {$state}.");
     }
 

@@ -1,17 +1,15 @@
-# Runtime-aware server validation
+# QEMU Sentinel reconnect investigation
 
-- [x] Review current Docker validation and the accepted v5 server modes.
-- [x] Approve the explicit server-mode design.
-- [x] Add the server-mode migration and enum.
-- [x] Route validation to Docker or Podman by server mode.
-- [x] Update v5 QEMU seeding and UI messages.
-- [x] Add regression tests and verify the real VM.
+- [x] Reproduce the Connected at timestamp change.
+- [x] Compare Flux, Coolify, and QEMU Sentinel logs.
+- [x] Find and test the root cause.
+- [x] Add a regression test and implement the smallest fix.
+- [x] Verify that the connection stays stable.
 
 ## Review
 
-- Existing servers default to `legacy` and keep Docker validation.
-- Native `v5-worker` and `v5-combined` servers validate Podman, systemd, and the rootful API socket.
-- The QEMU v5 worker is no longer marked usable by its seeder.
-- The validation UI shows Podman checkpoints for native workers and hides the Docker Compose checkpoint.
-- Focused tests passed: 54 tests and 197 assertions.
-- The running `coolify-dev-v5-worker` VM passed the real Podman validation through Coolify.
+- Sentinel intentionally replaces its stream every 14 minutes because its Flux credential lasts 15 minutes and refresh starts one minute early.
+- Coolify removed the connection cache entry during the short replacement, which caused the UI flicker and reset `connected_at`.
+- Coolify now keeps a 15-second `reconnecting` state and preserves the logical connection start when the new stream arrives.
+- A real QEMU Sentinel restart changed the Flux connection ID but preserved `connected_at`.
+- Focused tests passed: 33 tests and 169 assertions.

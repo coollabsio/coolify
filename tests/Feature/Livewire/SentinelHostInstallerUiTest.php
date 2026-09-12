@@ -104,6 +104,24 @@ it('refreshes the Flux connection state from the cache', function () {
         ->assertDontSee('Unencrypted control channel');
 });
 
+it('keeps connection details visible during a short reconnect', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    Cache::put("flux:connection:{$this->server->uuid}", [
+        'status' => 'reconnecting',
+        'transport' => 'tls',
+        'endpoint' => 'https://flux.example.com:7443',
+        'protocol_version' => 1,
+        'connected_at' => '2026-09-11T10:00:00Z',
+    ]);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server])
+        ->assertSee('Reconnecting')
+        ->assertSee('2026-09-11T10:00:00Z')
+        ->call('refreshFluxConnection')
+        ->assertDispatched('info', 'Flux connection state refreshed. Sentinel is reconnecting.');
+});
+
 it('shows a notification when connection state is refreshed', function () {
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);

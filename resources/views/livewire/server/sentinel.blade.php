@@ -128,7 +128,7 @@
                     </x-slot:actions>
                     @if ($fluxConnection)
                         <div class="grid gap-4 text-sm lg:grid-cols-2">
-                            <div><span class="text-neutral-500 dark:text-fg-dim">Status</span><p class="font-medium text-neutral-950 dark:text-fg">Connected</p></div>
+                            <div><span class="text-neutral-500 dark:text-fg-dim">Status</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'status') === 'reconnecting' ? 'Reconnecting' : 'Connected' }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Transport</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'transport') === 'tls' ? 'TLS' : 'Plaintext' }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Endpoint</span><p class="break-all font-mono text-xs text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'endpoint') }}</p></div>
                             <div><span class="text-neutral-500 dark:text-fg-dim">Protocol</span><p class="font-medium text-neutral-950 dark:text-fg">{{ data_get($fluxConnection, 'protocol_version') }}</p></div>
