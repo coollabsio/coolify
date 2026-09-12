@@ -49,6 +49,11 @@ class Node extends BaseModel
         return $this->hasMany(NodeContainer::class);
     }
 
+    public function operations(): HasMany
+    {
+        return $this->hasMany(NodeOperation::class);
+    }
+
     public function isNonRoot(): bool
     {
         return $this->user !== 'root';

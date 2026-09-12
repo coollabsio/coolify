@@ -54,4 +54,9 @@ class NodeWorkload extends BaseModel
     {
         return $this->hasMany(NodeContainer::class);
     }
+
+    public function operations(): HasMany
+    {
+        return $this->hasMany(NodeOperation::class);
+    }
 }

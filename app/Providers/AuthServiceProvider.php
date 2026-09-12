@@ -18,6 +18,7 @@ use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\Node;
 use App\Models\NodeContainer;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -58,6 +59,7 @@ use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\IntegrationTokenPolicy;
 use App\Policies\NodeContainerPolicy;
+use App\Policies\NodeOperationPolicy;
 use App\Policies\NodePolicy;
 use App\Policies\NodeWorkloadPolicy;
 use App\Policies\NotificationPolicy;
@@ -91,6 +93,7 @@ class AuthServiceProvider extends ServiceProvider
         Node::class => NodePolicy::class,
         NodeWorkload::class => NodeWorkloadPolicy::class,
         NodeContainer::class => NodeContainerPolicy::class,
+        NodeOperation::class => NodeOperationPolicy::class,
         PrivateKey::class => PrivateKeyPolicy::class,
         StandaloneDocker::class => StandaloneDockerPolicy::class,
         SwarmDocker::class => SwarmDockerPolicy::class,

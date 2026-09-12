@@ -125,6 +125,11 @@ return [
         'development_allow_plaintext' => env('FLUX_DEVELOPMENT_ALLOW_PLAINTEXT', false),
     ],
 
+    'node' => [
+        'operation_success_retention_days' => (int) env('NODE_OPERATION_SUCCESS_RETENTION_DAYS', 30),
+        'operation_failure_retention_days' => (int) env('NODE_OPERATION_FAILURE_RETENTION_DAYS', 90),
+    ],
+
     'proxy' => [
         // How often (seconds) PushServerUpdateJob periodically re-connects the
         // proxy to Docker networks as a safety net. Real network-layout changes

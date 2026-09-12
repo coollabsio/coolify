@@ -88,6 +88,26 @@ host-local operation.
   unrecognized.
 - The Node page shows the stored inventory and has a manual refresh action.
 
+### Durable Node operations
+
+- Coolify stores each future mutating Node command in `node_operations` before
+  dispatch. The record contains the Node, workload revision, command type,
+  request, requester, idempotency key, attempts, timestamps, result, and error.
+- Operation states are queued, dispatched, running, succeeded, failed,
+  timed out, uncertain, and cancelled. Invalid state changes are rejected.
+- An idempotency key is unique per Node. Reuse returns the existing operation
+  only when its complete request identity matches.
+- Successful operations are retained for 30 days. Failed, timed-out, and
+  cancelled operations are retained for 90 days. Active and uncertain
+  operations are not removed by retention cleanup.
+- Sentinel stores accepted command requests and final protobuf results in a
+  separate SQLite journal before and after execution. Matching completed
+  commands replay their original result after a restart. A command left running
+  by a restart is reported as interrupted and is not executed again.
+- Sentinel retains completed command results for seven days, with a limit of
+  100,000 completed records. Active records do not count toward this limit and
+  are not removed automatically.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -175,13 +195,16 @@ cross-instance command routing are not implemented yet.
 - stable Coolify installation identity and standard container identity labels;
 - transactional container observation reconciliation with managed, external,
   and unrecognized ownership states.
+- durable Coolify Node operation state, guarded transitions, idempotent
+  creation, and scheduled retention cleanup;
+- durable Sentinel command result replay and interrupted-command protection.
 
 ### Not implemented
 
 - staged CA rotation;
 - production rollout and upgrade policy for host-native Sentinel;
 - multi-Flux routing and horizontal scaling;
-- durable mutating-command reconciliation;
+- mutating workload commands and uncertain-operation reconciliation;
 - the Podman, firewall, DNS, Corrosion, ingress, and builder capabilities that
   will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
@@ -189,6 +212,7 @@ cross-instance command routing are not implemented yet.
 
 ## Next safe step
 
-Specify command reconciliation, idempotency, audit, and restart behavior for
-mutating workload operations. Do not add container create, update, or delete
-commands before these guarantees are defined.
+Implement the first minimal Podman workload deployment command. Use the durable
+Node operation UUID as its command identity, deterministic runtime names, and
+the existing Coolify ownership labels. Reconcile an uncertain result against
+the observed container inventory before retrying it.

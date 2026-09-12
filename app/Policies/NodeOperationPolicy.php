@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\NodeOperation;
+use App\Models\User;
+
+class NodeOperationPolicy
+{
+    /**
+     * Determine whether the user can view any models.
+     */
+    public function viewAny(User $user): bool
+    {
+        return true;
+    }
+
+    /**
+     * Determine whether the user can view the model.
+     */
+    public function view(User $user, NodeOperation $nodeOperation): bool
+    {
+        return $user->teams->contains('id', $nodeOperation->node->team_id);
+    }
+
+    /**
+     * Determine whether the user can create models.
+     */
+    public function create(User $user): bool
+    {
+        return false;
+    }
+
+    /**
+     * Determine whether the user can update the model.
+     */
+    public function update(User $user, NodeOperation $nodeOperation): bool
+    {
+        return $user->isAdminOfTeam($nodeOperation->node->team_id);
+    }
+
+    /**
+     * Determine whether the user can delete the model.
+     */
+    public function delete(User $user, NodeOperation $nodeOperation): bool
+    {
+        return false;
+    }
+
+    /**
+     * Determine whether the user can restore the model.
+     */
+    public function restore(User $user, NodeOperation $nodeOperation): bool
+    {
+        return false;
+    }
+
+    /**
+     * Determine whether the user can permanently delete the model.
+     */
+    public function forceDelete(User $user, NodeOperation $nodeOperation): bool
+    {
+        return false;
+    }
+}

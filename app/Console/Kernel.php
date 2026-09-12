@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Actions\Node\CleanupOperations;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -48,6 +49,11 @@ class Kernel extends ConsoleKernel
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('flux:renew-certificate')->daily()->onOneServer()->withoutOverlapping(30)
             ->when(fn () => config('constants.sentinel.host_enabled'));
+        $this->scheduleInstance->call(fn () => CleanupOperations::run())
+            ->name('cleanup:node-operations')
+            ->daily()
+            ->onOneServer()
+            ->withoutOverlapping(30);
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('cleanup:stucked-resources')
             ->dailyAt('03:17')
