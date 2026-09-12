@@ -20,7 +20,7 @@
             </div>
         </x-slot:actions>
         <div class="grid gap-4 text-sm sm:grid-cols-2">
-            <div><span class="text-neutral-500 dark:text-fg-dim">Address</span><p class="font-mono text-xs">{{ $node->user }}@{{ $node->ip }}:{{ $node->port }}</p></div>
+            <div><span class="text-neutral-500 dark:text-fg-dim">Address</span><p class="font-mono text-xs">{{ $node->user.'@'.$node->ip.':'.$node->port }}</p></div>
             <div><span class="text-neutral-500 dark:text-fg-dim">Coolify endpoint</span><p class="break-all font-mono text-xs">{{ $node->sentinel_url }}</p></div>
         </div>
         @if ($node->validation_logs)

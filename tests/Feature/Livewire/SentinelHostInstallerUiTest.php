@@ -34,6 +34,8 @@ it('shows and runs node Sentinel controls in development', function () {
     RepairFluxTrust::partialMock()->shouldReceive('handle')->once()->andReturn('');
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSee($this->node->user.'@'.$this->node->ip.':'.$this->node->port)
+        ->assertDontSee('{{ $node->ip }}', escape: false)
         ->assertSee('Install or update')
         ->assertSee('Flux control channel')
         ->assertSee('Validate Podman')
