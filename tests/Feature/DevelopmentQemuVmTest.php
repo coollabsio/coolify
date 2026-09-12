@@ -154,6 +154,21 @@ it('seeds one predefined root qemu server', function () {
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
 });
 
+it('keeps automatic qemu startup opt in for the development stack', function () {
+    $jean = json_decode(File::get(base_path('jean.json')), true, flags: JSON_THROW_ON_ERROR);
+    $script = File::get(base_path('scripts/dev-stack'));
+
+    expect(File::get(base_path('.env.development.example')))->toContain('DEVELOPMENT_QEMU_AUTO_START=false')
+        ->and($jean['scripts']['run'])->toBe('bash scripts/dev-stack')
+        ->and($script)->toContain('DEVELOPMENT_QEMU_AUTO_START')
+        ->and($script)->toContain('php artisan dev:qemu v5-worker')
+        ->and($script)->toContain('compose up --detach --pull missing')
+        ->and($script)->toContain('config --environment');
+
+    $compose = File::get(base_path('docker-compose.v5-dev.yml'));
+    expect($compose)->toContain("postgres:\n        condition: service_healthy");
+});
+
 it('seeds the v5 worker with the host gateway sentinel endpoint', function () {
     $server = SeedDevelopmentQemuServer::run('v5-worker');
 

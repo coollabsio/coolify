@@ -1,15 +1,16 @@
-# QEMU Sentinel reconnect investigation
+# Automatic development QEMU worker
 
-- [x] Reproduce the Connected at timestamp change.
-- [x] Compare Flux, Coolify, and QEMU Sentinel logs.
-- [x] Find and test the root cause.
-- [x] Add a regression test and implement the smallest fix.
-- [x] Verify that the connection stays stable.
+- [x] Find the normal development startup entry point and existing environment conventions.
+- [x] Add a failing test for the opt-in reset and seed behavior.
+- [x] Add one disabled-by-default environment variable.
+- [x] Run the QEMU reset only when the variable is enabled.
+- [x] Verify disabled and enabled startup behavior.
 
 ## Review
 
-- Sentinel intentionally replaces its stream every 14 minutes because its Flux credential lasts 15 minutes and refresh starts one minute early.
-- Coolify removed the connection cache entry during the short replacement, which caused the UI flicker and reset `connected_at`.
-- Coolify now keeps a 15-second `reconnecting` state and preserves the logical connection start when the new stream arrives.
-- A real QEMU Sentinel restart changed the Flux connection ID but preserved `connected_at`.
-- Focused tests passed: 33 tests and 169 assertions.
+- Added `DEVELOPMENT_QEMU_AUTO_START=false` to the development environment example.
+- Jean now runs `scripts/dev-stack`, which reads the Compose environment and only recreates `v5-worker` when the variable is enabled.
+- The startup waits for Coolify, recreates the VM, waits for cloud-init, and seeds the server before following Compose logs.
+- Flux PKI initialization now waits for Postgres health as well as Coolify health.
+- The full enabled startup completed and seeded `v5-worker` at `192.168.122.50`.
+- Focused tests passed: 16 tests and 75 assertions.

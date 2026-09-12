@@ -22,6 +22,8 @@ services:
     depends_on:
       coolify:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
     environment:

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+compose_files=(
+    -f docker-compose.yml
+    -f docker-compose.dev.yml
+    -f docker-compose.v5-dev.yml
+)
+
+compose() {
+    docker compose "${compose_files[@]}" "$@"
+}
+
+cleanup() {
+    compose down
+}
+
+automatic_qemu_start_enabled() {
+    local value
+    value="$(compose config --environment | awk -F= '$1 == "DEVELOPMENT_QEMU_AUTO_START" { print substr($0, index($0, "=") + 1) }')"
+
+    case "${value,,}" in
+        1|true|yes|on) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+wait_for_coolify() {
+    local deadline=$((SECONDS + 120))
+
+    until [ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' coolify 2>/dev/null || true)" = healthy ]; do
+        if (( SECONDS >= deadline )); then
+            echo 'Coolify did not become healthy within 120 seconds.' >&2
+            return 1
+        fi
+
+        sleep 2
+    done
+}
+
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+docker rm -f \
+    coolify coolify-flux coolify-minio-init coolify-realtime coolify-minio \
+    coolify-testing-host coolify-testing-host-systemd coolify-sentinel \
+    coolify-redis coolify-db coolify-mail coolify-vite 2>/dev/null || true
+
+compose up --detach --pull missing
+
+if automatic_qemu_start_enabled; then
+    wait_for_coolify
+    php artisan dev:qemu v5-worker
+fi
+
+compose logs --follow
