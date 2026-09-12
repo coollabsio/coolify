@@ -158,11 +158,11 @@ it('seeds the v5 worker with the host gateway sentinel endpoint', function () {
     $server = SeedDevelopmentQemuServer::run('v5-worker');
 
     expect($server->uuid)->toBe('development-qemu-v5-worker')
+        ->and($server->mode->value)->toBe('v5-worker')
         ->and($server->ip)->toBe('192.168.122.50')
         ->and($server->user)->toBe('root')
         ->and($server->settings->sentinel_custom_url)->toBe('http://192.168.122.1:8000')
-        ->and($server->settings->is_reachable)->toBeTrue()
-        ->and($server->settings->is_usable)->toBeTrue();
+        ->and($server->settings->is_usable)->toBeFalse();
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {

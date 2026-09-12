@@ -123,54 +123,69 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            // Check if Docker is installed
-            $dockerInstalled = $this->server->validateDockerEngine();
-            $dockerComposeInstalled = $this->server->validateDockerCompose();
-
-            if (! $dockerInstalled || ! $dockerComposeInstalled) {
-                // Try to install Docker
-                if ($this->numberOfTries >= $this->maxTries) {
-                    $errorMessage = 'Docker Engine could not be installed after '.$this->maxTries.' attempts. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            if ($this->server->usesPodman()) {
+                if (! $this->server->validatePodman()) {
+                    $errorMessage = 'Podman or its API socket is not available. Install Podman and enable podman.socket before continuing.';
                     $this->server->update([
                         'validation_logs' => $errorMessage,
                         'is_validating' => false,
                     ]);
-                    Log::error('ValidateAndInstallServer: Docker installation failed after max tries', [
+                    Log::error('ValidateAndInstallServer: Podman validation failed', [
                         'server_id' => $this->server->id,
-                        'attempts' => $this->numberOfTries,
                     ]);
 
                     return;
                 }
+            } else {
+                // Check if Docker is installed
+                $dockerInstalled = $this->server->validateDockerEngine();
+                $dockerComposeInstalled = $this->server->validateDockerCompose();
 
-                Log::info('ValidateAndInstallServer: Installing Docker', [
-                    'server_id' => $this->server->id,
-                    'attempt' => $this->numberOfTries + 1,
-                ]);
+                if (! $dockerInstalled || ! $dockerComposeInstalled) {
+                    // Try to install Docker
+                    if ($this->numberOfTries >= $this->maxTries) {
+                        $errorMessage = 'Docker Engine could not be installed after '.$this->maxTries.' attempts. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                        $this->server->update([
+                            'validation_logs' => $errorMessage,
+                            'is_validating' => false,
+                        ]);
+                        Log::error('ValidateAndInstallServer: Docker installation failed after max tries', [
+                            'server_id' => $this->server->id,
+                            'attempts' => $this->numberOfTries,
+                        ]);
 
-                // Install Docker
-                $this->server->installDocker();
+                        return;
+                    }
 
-                // Retry validation after installation
-                self::dispatch($this->server, $this->numberOfTries + 1)->delay(now()->addSeconds(30));
+                    Log::info('ValidateAndInstallServer: Installing Docker', [
+                        'server_id' => $this->server->id,
+                        'attempt' => $this->numberOfTries + 1,
+                    ]);
 
-                return;
-            }
+                    // Install Docker
+                    $this->server->installDocker();
 
-            // Validate Docker version
-            $dockerVersion = $this->server->validateDockerEngineVersion();
-            if (! $dockerVersion) {
-                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $errorMessage = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
-                $this->server->update([
-                    'validation_logs' => $errorMessage,
-                    'is_validating' => false,
-                ]);
-                Log::error('ValidateAndInstallServer: Docker version not sufficient', [
-                    'server_id' => $this->server->id,
-                ]);
+                    // Retry validation after installation
+                    self::dispatch($this->server, $this->numberOfTries + 1)->delay(now()->addSeconds(30));
 
-                return;
+                    return;
+                }
+
+                // Validate Docker version
+                $dockerVersion = $this->server->validateDockerEngineVersion();
+                if (! $dockerVersion) {
+                    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
+                    $errorMessage = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                    $this->server->update([
+                        'validation_logs' => $errorMessage,
+                        'is_validating' => false,
+                    ]);
+                    Log::error('ValidateAndInstallServer: Docker version not sufficient', [
+                        'server_id' => $this->server->id,
+                    ]);
+
+                    return;
+                }
             }
 
             // Validation successful!
@@ -180,7 +195,7 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             // Start proxy if needed
-            if (! $this->server->isBuildServer()) {
+            if (! $this->server->usesPodman() && ! $this->server->isBuildServer()) {
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if ($proxyShouldRun) {
                     // Ensure networks exist BEFORE dispatching async proxy startup

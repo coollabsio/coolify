@@ -2,6 +2,7 @@
 
 namespace App\Actions\Development;
 
+use App\Enums\ServerMode;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use InvalidArgumentException;
@@ -44,6 +45,7 @@ class SeedDevelopmentQemuServer
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
+            'mode' => ($profile['runtime'] ?? null) === 'podman' ? ServerMode::V5_WORKER : ServerMode::LEGACY,
         ]);
         $server->deleted_at = null;
         $server->save();
@@ -54,8 +56,6 @@ class SeedDevelopmentQemuServer
                 config('development-qemu.gateway'),
                 config('development-qemu.coolify_host_port'),
             );
-            $server->settings->is_reachable = true;
-            $server->settings->is_usable = true;
             $server->settings->saveQuietly();
         }
 

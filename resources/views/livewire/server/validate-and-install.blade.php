@@ -19,7 +19,9 @@
     $showOs = (bool) $uptime;
     $showPrerequisites = (bool) ($uptime && $supported_os_type);
     $showDocker = (bool) ($uptime && $supported_os_type && $prerequisites_installed);
-    $showCompose = $showDocker;
+    $usesPodman = $server->usesPodman();
+    $runtimeName = $usesPodman ? 'Podman' : 'Docker';
+    $showCompose = $showDocker && ! $usesPodman;
     $showVersion = (bool) ($showDocker && $docker_compose_installed);
     $validationComplete = (bool) ($uptime
         && $supported_os_type
@@ -48,8 +50,8 @@
             'visible' => $showPrerequisites,
         ],
         [
-            'title' => 'Docker is installed',
-            'description' => 'Install or detect Docker Engine',
+            'title' => $runtimeName.' is installed',
+            'description' => $usesPodman ? 'Detect Podman and its API socket' : 'Install or detect Docker Engine',
             'status' => $resolveStatus($docker_installed === null ? null : (bool) $docker_installed, $showDocker, (bool) $error && $showDocker && ! $docker_installed),
             'visible' => $showDocker,
         ],
@@ -60,8 +62,8 @@
             'visible' => $showCompose,
         ],
         [
-            'title' => 'Minimum Docker version',
-            'description' => 'Require Docker Engine '.str(config('constants.docker.minimum_required_version'))->before('.').' or newer',
+            'title' => $usesPodman ? 'Podman API is available' : 'Minimum Docker version',
+            'description' => $usesPodman ? 'Verify the rootful Podman API socket' : 'Require Docker Engine '.str(config('constants.docker.minimum_required_version'))->before('.').' or newer',
             'status' => $resolveStatus(
                 isset($docker_version) ? (bool) $docker_version : null,
                 $showVersion,
@@ -76,8 +78,12 @@
     @if ($ask)
         <div
             class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
-            This will revalidate the server, install or update Docker Engine, Docker Compose, and related
-            configuration. Docker Engine will restart, so running containers may be briefly unreachable.
+            @if ($usesPodman)
+                This will revalidate Podman, its API socket, systemd, and related configuration.
+            @else
+                This will revalidate the server, install or update Docker Engine, Docker Compose, and related
+                configuration. Docker Engine will restart, so running containers may be briefly unreachable.
+            @endif
         </div>
         <x-forms.button isHighlighted wire:click="startValidatingAfterAsking">
             Continue
@@ -99,6 +105,7 @@
                 <div class="flex min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar divide-x divide-neutral-200 dark:divide-white/[0.07]"
                     x-ref="track">
                     @foreach ($checkpoints as $checkpoint)
+                        @continue(! $checkpoint['visible'])
                         <x-checkpoint-item :title="$checkpoint['title']" :description="$checkpoint['description']"
                             :status="$checkpoint['status']" data-checkpoint-status="{{ $checkpoint['status'] }}"
                             class="basis-[88%] shrink-0 snap-start sm:basis-72 lg:basis-80" />

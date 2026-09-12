@@ -117,6 +117,10 @@ Developers with KVM access can also start the optional `v5-worker` QEMU profile.
 It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
 on a normal virtual machine. The VM connects to the same development Coolify and
 Flux services and is the target for runtime and host-network integration tests.
+Coolify stores an explicit server mode. Legacy servers validate Docker and
+Docker Compose. Native `v5-worker` and `v5-combined` servers validate Podman,
+systemd, and the rootful Podman API socket. Development seeding does not mark a
+worker usable before that validation succeeds.
 
 ### Existing self-hosted installations
 
