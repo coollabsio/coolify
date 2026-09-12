@@ -109,11 +109,7 @@ class StartMongodb
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD',
-                        'echo',
-                        'ok',
-                    ]),
+                    'healthcheck' => $this->database->healthCheckConfiguration($this->generate_health_check_command()),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -322,6 +318,43 @@ class StartMongodb
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
+    }
+
+    private function generate_health_check_command(): array
+    {
+        $usesLegacyShell = str($this->database->image)->startsWith('mongo:4');
+        $command = [
+            'CMD',
+            $usesLegacyShell ? 'mongo' : 'mongosh',
+            '--quiet',
+            '--host',
+            $this->database->uuid,
+        ];
+
+        if ($this->database->enable_ssl) {
+            $command = [
+                ...$command,
+                $usesLegacyShell ? '--ssl' : '--tls',
+                $usesLegacyShell ? '--sslCAFile' : '--tlsCAFile',
+                '/etc/mongo/certs/ca.pem',
+            ];
+
+            if ($this->database->ssl_mode === 'verify-full') {
+                $command = [
+                    ...$command,
+                    $usesLegacyShell ? '--sslPEMKeyFile' : '--tlsCertificateKeyFile',
+                    '/etc/mongo/certs/server.pem',
+                ];
+            }
+        }
+
+        return [
+            ...$command,
+            '--eval',
+            $usesLegacyShell
+                ? 'quit(db.isMaster().ismaster === true ? 0 : 1)'
+                : 'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+        ];
     }
 
     private function add_custom_mongo_conf()
