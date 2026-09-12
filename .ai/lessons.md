@@ -15,3 +15,5 @@
 - Do not bypass server validation by marking a Podman worker node usable during development seeding. Store the server mode explicitly, then validate Docker for legacy servers and Podman for worker nodes.
 - Keep host-native Sentinel and Flux exclusive to nodes. Legacy servers must continue to use container Sentinel and SSH, and must not receive Flux assignments or commands.
 - Use node terminology for runtime resources. Do not encode a Coolify release number in server modes, eligibility methods, QEMU profiles, domains, UUIDs, or user-facing names.
+
+- When an unreleased branch has several dependent migrations, consolidate them before merge so a new installation applies one final schema instead of branch-history patches.

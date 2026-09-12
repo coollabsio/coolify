@@ -49,31 +49,6 @@ it('uses node names for every server mode', function () {
     ]);
 });
 
-it('migrates old v5 mode names to node names', function () {
-    $team = Team::factory()->create();
-    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
-
-    $servers = collect(['v5-worker', 'v5-combined', 'v5-control-plane'])
-        ->map(function (string $mode) use ($team, $privateKey): Server {
-            $server = Server::factory()->create([
-                'team_id' => $team->id,
-                'private_key_id' => $privateKey->id,
-            ]);
-            Server::query()->whereKey($server)->update(['mode' => $mode]);
-
-            return $server;
-        });
-
-    $migration = require database_path('migrations/2026_09_12_121547_rename_server_modes_to_node_modes.php');
-    $migration->up();
-
-    expect($servers->map(fn (Server $server) => Server::query()->whereKey($server)->value('mode')->value)->all())->toBe([
-        'node-worker',
-        'node-controller-worker',
-        'node-controller',
-    ]);
-});
-
 it('uses podman instead of docker for node worker connection checks', function () {
     $server = createServerForModeValidation(['mode' => 'node-worker'])->fresh();
 
