@@ -1,19 +1,17 @@
-# Add scheduled Node inventory and workload state
+# Fix Node workload redeployment
 
-- [x] Define workload state from the desired revision and observed containers.
-- [x] Add a unique queued inventory refresh job per Node.
-- [x] Schedule connected Nodes in chunks with distributed delays.
-- [x] Show current workload state on the Node page.
-- [x] Keep scheduling independent from the development environment gate.
-- [x] Add tests for state rules, eligibility, scheduling, and queue behavior.
-- [x] Run formatting, tests, build, and live development verification.
-- [x] Update architecture notes and search GitHub issues and discussions.
+- [x] Reproduce the permanent revision lock in a Livewire test.
+- [x] Allow a new operation after the prior attempt reaches a final state.
+- [x] Reuse an existing active operation to prevent concurrent duplicate work.
+- [x] Update the Node UI notification and tests.
+- [x] Verify the live deployment flow and update documentation.
+- [x] Search GitHub issues and discussions.
 
 ## Review
 
-- Coolify passed 62 focused tests with 200 assertions and Pint.
-- The Vite production build completed. It reports the existing CSS optimizer warning.
-- The Laravel schedule lists `RefreshConnectedNodesJob` every minute.
-- The live QEMU Node refreshed through Flux and Sentinel. Coolify stored the snapshot time and calculated the workload as `running` from two observed containers.
-- The schedule does not check `SENTINEL_HOST_ENABLED`; usable Node records and recent Flux heartbeats select work.
-- GitHub search found no fully fixed item. Similar reports are open #11539, open #7287, and closed #8803; they concern the legacy Docker status path.
+- The fixed idempotency key was the root cause. It permanently mapped one Node revision to one operation.
+- Each deployment attempt now gets a new idempotency key after the prior operation reaches a final state.
+- Queued, dispatched, running, and uncertain operations still block a concurrent duplicate deployment.
+- The live QEMU Node redeployed the same revision as operation 7. Sentinel returned success, Podman returned a new runtime ID, and Coolify calculated the workload state as running.
+- Pint passed. The focused suite passed 56 tests with 216 assertions. The Vite build passed with the existing CSS optimizer warning.
+- GitHub search found no issue or discussion that this change fully fixes. Open discussion #9779 is related to redeploy UI behavior, but it concerns the legacy v4 banner.

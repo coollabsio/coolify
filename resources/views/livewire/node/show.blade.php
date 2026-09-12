@@ -82,7 +82,7 @@
                         </div>
                         @if ($revision)
                             <x-forms.button wire:click="deployRevision('{{ $revision->uuid }}')" wire:loading.attr="disabled" wire:target="deployRevision('{{ $revision->uuid }}')">
-                                Deploy
+                                {{ data_get($workloadStates, $workload->uuid.'.status') === 'Running' ? 'Redeploy' : 'Deploy' }}
                             </x-forms.button>
                         @endif
                     </div>

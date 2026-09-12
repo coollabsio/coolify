@@ -22,3 +22,4 @@
 - Treat legacy Docker servers and Podman nodes as permanent parallel products. Keep `Server` for SSH-managed legacy hosts and use a separate `Node` model for Flux-managed hosts; do not plan to remove legacy support or require conversion.
 - When the user asks to "add" a verified development host, interpret it as adding the host to the visible Coolify resource list unless the context clearly refers to starting or seeding it.
 - In Blade text, do not place `@` directly before a `{{ ... }}` expression. Blade treats `@{{` as an escaped client-side expression. Build SSH addresses in one expression or insert the separator safely.
+- Scope deployment idempotency to one attempt, not permanently to a Node and revision. Allow redeployment after a final operation, while reusing an active operation to prevent concurrent duplicate commands.

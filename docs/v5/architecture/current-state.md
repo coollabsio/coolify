@@ -133,6 +133,10 @@ host-local operation.
 - A successful deployment triggers a full container inventory refresh. The
   standard labels then connect the observed runtime container to its workload
   and revision.
+- Each deployment attempt has its own idempotency key and durable command UUID.
+  Coolify permits another deployment of the same revision after the prior
+  operation reaches a final state. While an operation is active, another click
+  reuses that operation and does not queue concurrent work.
 - A lost transport result changes the operation to `uncertain`. The Node UI can
   recover it by sending the same operation UUID again. Sentinel then replays
   its stored result instead of running the command twice.

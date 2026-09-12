@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Node;
 
-use App\Actions\Node\CreateOperation;
+use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
@@ -91,20 +91,13 @@ class Show extends Component
                     ->where('team_id', $this->node->team_id)
                     ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
                 ->firstOrFail();
-            $operation = CreateOperation::run(
-                $this->node,
-                'workload.deploy.v1',
-                "deploy:{$this->node->uuid}:{$revision->uuid}",
-                $revision->workload,
-                $revision,
-                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash],
-                auth()->user(),
-            );
-            if ($operation->wasRecentlyCreated) {
+            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user());
+            $operation = $deployment['operation'];
+            if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($operation->id);
                 $this->dispatch('success', 'Workload deployment queued.');
             } else {
-                $this->dispatch('info', 'This workload revision already has a deployment operation.');
+                $this->dispatch('info', 'This workload revision already has an active deployment.');
             }
             $this->loadNodeData();
         } catch (\Throwable $e) {

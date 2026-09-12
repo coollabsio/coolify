@@ -214,3 +214,51 @@ it('records a queue failure before dispatch', function () {
     expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
         ->and($this->operation->error)->toBe('The deployment worker stopped before dispatch.');
 });
+
+it('allows the same revision to be deployed again after a final operation', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $node->workloads()->attach($workload);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+    Queue::fake();
+
+    Livewire::test(Show::class, ['node_uuid' => $node->uuid])->call('deployRevision', $revision->uuid);
+    $node->operations()->firstOrFail()->update([
+        'status' => NodeOperationStatus::SUCCEEDED,
+        'completed_at' => now(),
+    ]);
+    Livewire::test(Show::class, ['node_uuid' => $node->uuid])
+        ->call('deployRevision', $revision->uuid)
+        ->assertDispatched('success');
+
+    expect($node->operations()->count())->toBe(2)
+        ->and($node->operations()->pluck('idempotency_key')->unique()->count())->toBe(2);
+    Queue::assertPushed(DeployNodeWorkloadJob::class, 2);
+});
+
+it('does not queue a second deployment while the same revision is active', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $node->workloads()->attach($workload);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+    Queue::fake();
+    $component = Livewire::test(Show::class, ['node_uuid' => $node->uuid]);
+
+    $component->call('deployRevision', $revision->uuid);
+    $component->call('deployRevision', $revision->uuid)->assertDispatched('info');
+
+    expect($node->operations()->count())->toBe(1);
+    Queue::assertPushed(DeployNodeWorkloadJob::class, 1);
+});
