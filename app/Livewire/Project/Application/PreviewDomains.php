@@ -142,7 +142,7 @@ class PreviewDomains extends Component
                 }
             }
         } else {
-            $this->preview->generate_preview_fqdn(generateWithoutApplicationDomain: true);
+            $this->preview->generate_preview_fqdn(generateWithoutApplicationDomain: true, force: true);
         }
         $this->refreshDomains();
         $this->dispatch('success', 'Domain generated.');
