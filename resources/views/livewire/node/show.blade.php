@@ -98,7 +98,10 @@
                         <span>{{ $operation->workload?->name ?? $operation->command_type }}</span>
                         <div class="flex items-center gap-2">
                             <span class="text-neutral-500 dark:text-fg-faint">{{ $operation->created_at->diffForHumans() }}</span>
-                            <x-status-badge :status="str($operation->status->value)->replace('_', ' ')->title()" :type="match ($operation->status->value) {
+                            <x-status-badge :status="match ($operation->status->value) {
+                                'running' => 'Running command',
+                                default => str($operation->status->value)->replace('_', ' ')->title(),
+                            }" :type="match ($operation->status->value) {
                                 'succeeded' => 'success',
                                 'failed', 'timed_out' => 'error',
                                 'uncertain' => 'warning',

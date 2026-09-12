@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\TransitionOperation;
+use App\Actions\Node\VerifyDeploymentConvergence;
 use App\Enums\NodeOperationStatus;
 use App\Models\NodeOperation;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,24 +33,54 @@ class DeployNodeWorkloadJob implements ShouldQueue
         }
 
         try {
+            if ($operation->status === NodeOperationStatus::UNCERTAIN) {
+                try {
+                    $verification = $this->verify($operation);
+                    if ($verification['converged']) {
+                        TransitionOperation::run(
+                            $operation,
+                            NodeOperationStatus::SUCCEEDED,
+                            result: [...($operation->result ?? []), 'verification' => $verification],
+                        );
+
+                        return;
+                    }
+                } catch (ConnectionException|RequestException) {
+                    // Replaying the same command UUID is safe when inventory cannot confirm the result.
+                }
+            }
+
             TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
             $result = DispatchWorkloadDeployment::run($operation);
-            TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);
+            $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
+            $verification = $this->verify($operation);
+            $result['verification'] = $verification;
+            if (! $verification['converged']) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, result: $result, error: 'The requested workload revision is not running.');
 
-            try {
-                FetchContainers::run($operation->node);
-            } catch (Throwable $exception) {
-                report($exception);
+                return;
             }
+
+            TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);
         } catch (ConnectionException) {
-            TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The deployment result is unknown.');
+            if ($operation->refresh()->status !== NodeOperationStatus::UNCERTAIN) {
+                TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The deployment result is unknown.');
+            }
         } catch (RequestException $exception) {
             $message = 'Flux rejected the deployment with HTTP '.$exception->response->status().'.';
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: $message);
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
         }
+    }
+
+    /** @return array{converged: bool, observed_at: mixed, runtime_id: ?string, state: string, image: ?string} */
+    private function verify(NodeOperation $operation): array
+    {
+        FetchContainers::run($operation->node);
+
+        return VerifyDeploymentConvergence::run($operation);
     }
 
     public function failed(?Throwable $exception): void

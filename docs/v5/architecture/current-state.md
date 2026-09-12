@@ -103,8 +103,9 @@ host-local operation.
 - Coolify stores each future mutating Node command in `node_operations` before
   dispatch. The record contains the Node, workload revision, command type,
   request, requester, idempotency key, attempts, timestamps, result, and error.
-- Operation states are queued, dispatched, running, succeeded, failed,
-  timed out, uncertain, and cancelled. Invalid state changes are rejected.
+- Operation states are queued, dispatched, running, verifying, succeeded,
+  failed, timed out, uncertain, and cancelled. Invalid state changes are
+  rejected.
 - An idempotency key is unique per Node. Reuse returns the existing operation
   only when its complete request identity matches.
 - Successful operations are retained for 30 days. Failed, timed-out, and
@@ -133,13 +134,20 @@ host-local operation.
 - A successful deployment triggers a full container inventory refresh. The
   standard labels then connect the observed runtime container to its workload
   and revision.
+- After Sentinel completes the command, the operation enters `verifying`.
+  Coolify refreshes the complete inventory and confirms that a managed
+  container for the requested revision and image is running. Only then does
+  the operation become `succeeded`. A missing, stopped, or mismatched container
+  makes the operation fail with its verification result stored in the journal.
 - Each deployment attempt has its own idempotency key and durable command UUID.
   Coolify permits another deployment of the same revision after the prior
   operation reaches a final state. While an operation is active, another click
   reuses that operation and does not queue concurrent work.
 - A lost transport result changes the operation to `uncertain`. The Node UI can
-  recover it by sending the same operation UUID again. Sentinel then replays
-  its stored result instead of running the command twice.
+  recover it. Coolify first refreshes inventory and marks the operation as
+  successful when the requested revision is already running. Otherwise, it
+  sends the same operation UUID again. Sentinel then replays its stored result
+  instead of running the command twice.
 
 ### Operation recovery policy
 
@@ -264,7 +272,6 @@ cross-instance command routing are not implemented yet.
 
 ## Next safe step
 
-Add deployment convergence. After a successful command or an uncertain result,
-compare the desired revision with the observed labeled container. Use that
-comparison to confirm completion, detect drift, and decide whether recovery
-needs a result replay or a new operation.
+Add workload lifecycle commands for stop, start, restart, and remove. Each
+mutating command must use the same durable operation and convergence rules as
+deployment.

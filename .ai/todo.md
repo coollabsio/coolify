@@ -1,17 +1,18 @@
-# Fix Node workload redeployment
+# Add Node deployment convergence
 
-- [x] Reproduce the permanent revision lock in a Livewire test.
-- [x] Allow a new operation after the prior attempt reaches a final state.
-- [x] Reuse an existing active operation to prevent concurrent duplicate work.
-- [x] Update the Node UI notification and tests.
-- [x] Verify the live deployment flow and update documentation.
+- [x] Define convergence outcomes from a deployment revision and observed inventory.
+- [x] Add failing tests for successful verification, verification failure, and uncertain recovery.
+- [x] Implement convergence after deployment and before uncertain replay.
+- [x] Show verification state and results in the Node UI where needed.
+- [x] Update the v5 architecture brief.
+- [x] Run focused tests, formatting, build, and live QEMU verification.
 - [x] Search GitHub issues and discussions.
 
 ## Review
 
-- The fixed idempotency key was the root cause. It permanently mapped one Node revision to one operation.
-- Each deployment attempt now gets a new idempotency key after the prior operation reaches a final state.
-- Queued, dispatched, running, and uncertain operations still block a concurrent duplicate deployment.
-- The live QEMU Node redeployed the same revision as operation 7. Sentinel returned success, Podman returned a new runtime ID, and Coolify calculated the workload state as running.
-- Pint passed. The focused suite passed 56 tests with 216 assertions. The Vite build passed with the existing CSS optimizer warning.
-- GitHub search found no issue or discussion that this change fully fixes. Open discussion #9779 is related to redeploy UI behavior, but it concerns the legacy v4 banner.
+- Deployment operations now enter `verifying` after Sentinel returns. Coolify refreshes inventory and requires the requested managed revision and image to be running before success.
+- A missing, stopped, or image-mismatched container fails the operation and stores the observed verification result.
+- Manual recovery checks current inventory first. If the requested revision is already running, Coolify marks the operation successful without replaying the command. Otherwise, it safely replays the same command UUID.
+- The live QEMU Node completed operation 9 with a converged running container. An uncertain recovery then returned to succeeded without increasing its attempt count.
+- Pint passed. The focused suite passed 59 tests with 227 assertions. The Vite build passed with the existing CSS optimizer warning.
+- GitHub search found no matching issue or discussion that this change fully fixes or directly relates to the Node convergence flow.

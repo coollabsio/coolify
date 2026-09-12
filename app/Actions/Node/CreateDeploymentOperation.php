@@ -30,6 +30,7 @@ class CreateDeploymentOperation
                     NodeOperationStatus::QUEUED,
                     NodeOperationStatus::DISPATCHED,
                     NodeOperationStatus::RUNNING,
+                    NodeOperationStatus::VERIFYING,
                     NodeOperationStatus::UNCERTAIN,
                 ])
                 ->latest('id')

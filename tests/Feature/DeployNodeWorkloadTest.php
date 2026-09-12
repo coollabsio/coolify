@@ -96,11 +96,92 @@ it('deploys a revision with the durable operation UUID and refreshes inventory',
     expect($operation->status)->toBe(NodeOperationStatus::SUCCEEDED)
         ->and($operation->attempt_count)->toBe(1)
         ->and($operation->result['runtime_id'])->toBe('runtime-123')
+        ->and($operation->result['verification']['converged'])->toBeTrue()
+        ->and($operation->result['verification']['runtime_id'])->toBe('runtime-123')
         ->and($this->node->containers()->first()->node_workload_id)->toBe($this->workload->id);
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/v1/commands/workload.deploy')
         && $request['command_id'] === $operation->uuid
         && $request['environment'] === ['APP_ENV' => 'production']
         && $request['labels']['coolify.revision'] === $this->revision->uuid);
+});
+
+it('fails when the deployed revision is not running after inventory refresh', function () {
+    Http::fake(function ($request) {
+        if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
+            return Http::response([
+                'command_id' => $this->operation->uuid,
+                'observed_at_unix_ms' => 1_700_000_000_000,
+                'runtime_id' => 'runtime-123',
+                'name' => 'coolify-'.$this->workload->uuid.'-main',
+                'image' => $this->revision->image,
+            ]);
+        }
+
+        return Http::response([
+            'command_id' => 'inventory-1',
+            'observed_at_unix_ms' => 1_700_000_000_100,
+            'containers' => [],
+        ]);
+    });
+
+    (new DeployNodeWorkloadJob($this->operation->id))->handle();
+
+    expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
+        ->and($this->operation->result['verification']['converged'])->toBeFalse()
+        ->and($this->operation->error)->toBe('The requested workload revision is not running.');
+});
+
+it('recovers an uncertain deployment from observed state without replaying the command', function () {
+    $this->operation->update([
+        'status' => NodeOperationStatus::UNCERTAIN,
+        'error' => 'The deployment result is unknown.',
+    ]);
+    Http::fake(function ($request) {
+        if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
+            return Http::response('Deployment must not be replayed.', 500);
+        }
+
+        return Http::response([
+            'command_id' => 'inventory-1',
+            'observed_at_unix_ms' => 1_700_000_000_100,
+            'containers' => [[
+                'runtime_id' => 'runtime-existing',
+                'name' => 'coolify-'.$this->workload->uuid.'-main',
+                'image' => $this->revision->image,
+                'state' => 'running',
+                'health_status' => null,
+                'restart_count' => 0,
+                'ports' => [],
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.instance' => 'instance-test',
+                    'coolify.workload' => $this->workload->uuid,
+                    'coolify.revision' => $this->revision->uuid,
+                    'coolify.component' => 'main',
+                ],
+            ]],
+        ]);
+    });
+
+    (new DeployNodeWorkloadJob($this->operation->id))->handle();
+
+    expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
+        ->and($this->operation->attempt_count)->toBe(0)
+        ->and($this->operation->result['verification']['runtime_id'])->toBe('runtime-existing');
+    Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/v1/commands/workload.deploy'));
+});
+
+it('keeps recovery uncertain when Flux remains unavailable', function () {
+    $this->operation->update([
+        'status' => NodeOperationStatus::UNCERTAIN,
+        'error' => 'The deployment result is unknown.',
+    ]);
+    Http::fake(fn () => throw new ConnectionException('connection lost'));
+
+    (new DeployNodeWorkloadJob($this->operation->id))->handle();
+
+    expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN)
+        ->and($this->operation->error)->toBe('The deployment result is unknown.');
 });
 
 it('marks an explicit Sentinel failure as failed', function () {
@@ -257,6 +338,7 @@ it('does not queue a second deployment while the same revision is active', funct
     $component = Livewire::test(Show::class, ['node_uuid' => $node->uuid]);
 
     $component->call('deployRevision', $revision->uuid);
+    $node->operations()->firstOrFail()->update(['status' => NodeOperationStatus::VERIFYING]);
     $component->call('deployRevision', $revision->uuid)->assertDispatched('info');
 
     expect($node->operations()->count())->toBe(1);

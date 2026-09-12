@@ -75,6 +75,7 @@ it('records valid operation transitions and attempts', function () {
 
     TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
     TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
+    TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: ['container' => 'web']);
     TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: ['container' => 'web']);
 
     $operation->refresh();
@@ -157,6 +158,7 @@ it('clears an uncertain error when recovery succeeds', function () {
 
     TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
     TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
+    TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: ['runtime_id' => 'container-1']);
     TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: ['runtime_id' => 'container-1']);
 
     expect($operation->refresh()->error)->toBeNull();
