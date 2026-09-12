@@ -54,7 +54,7 @@ class StandaloneDocker extends BaseModel
     {
         $safeNetwork = escapeshellarg($this->network);
 
-        return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --attachable {$safeNetwork} >/dev/null";
+        return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || ".dockerNetworkCreateCommand($this->network);
     }
 
     public function setNetworkAttribute(string $value): void
