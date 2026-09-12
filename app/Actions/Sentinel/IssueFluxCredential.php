@@ -29,6 +29,7 @@ class IssueFluxCredential
             'system.ping.v1',
             'system.info.v1',
             'container.list.v1',
+            'workload.deploy.v1',
         ], $capabilities));
 
         $credential = JWT::encode([

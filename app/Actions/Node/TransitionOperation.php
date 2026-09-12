@@ -29,6 +29,7 @@ class TransitionOperation
             if ($status === NodeOperationStatus::DISPATCHED) {
                 $attributes['attempt_count'] = $operation->attempt_count + 1;
                 $attributes['dispatched_at'] = now();
+                $attributes['error'] = null;
             }
             if ($status === NodeOperationStatus::RUNNING && $operation->started_at === null) {
                 $attributes['started_at'] = now();
@@ -38,6 +39,9 @@ class TransitionOperation
             }
             if ($result !== null) {
                 $attributes['result'] = $result;
+            }
+            if ($status === NodeOperationStatus::SUCCEEDED) {
+                $attributes['error'] = null;
             }
             if ($error !== null) {
                 $attributes['error'] = $error;

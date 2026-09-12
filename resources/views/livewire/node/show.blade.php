@@ -58,6 +58,59 @@
         </div>
     </x-application.settings-section>
 
+    <x-application.settings-section title="Workloads" helper="Deploy assigned workload revisions through Flux and host-native Sentinel.">
+        <x-slot:actions>
+            <x-forms.button wire:click="refreshWorkloads" wire:loading.attr="disabled" wire:target="refreshWorkloads">Refresh state</x-forms.button>
+        </x-slot:actions>
+        @if ($node->workloads->isEmpty())
+            <x-empty size="sm" title="No workloads assigned" description="Assign a workload to this node before deployment." icon-name="servers" />
+        @else
+            <div class="flex flex-col gap-3">
+                @foreach ($node->workloads->sortBy('name') as $workload)
+                    @php($revision = $workload->revisions->first())
+                    <div wire:key="node-workload-{{ $workload->uuid }}" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+                        <div class="min-w-0">
+                            <p class="font-medium text-black dark:text-fg">{{ $workload->name }}</p>
+                            @if ($revision)
+                                <p class="truncate font-mono text-xs text-neutral-500 dark:text-fg-faint">{{ $revision->image }} · {{ $revision->uuid }}</p>
+                            @else
+                                <p class="text-xs text-neutral-500 dark:text-fg-faint">No revision is available.</p>
+                            @endif
+                        </div>
+                        @if ($revision)
+                            <x-forms.button wire:click="deployRevision('{{ $revision->uuid }}')" wire:loading.attr="disabled" wire:target="deployRevision('{{ $revision->uuid }}')">
+                                Deploy
+                            </x-forms.button>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        @if ($node->operations->isNotEmpty())
+            <div class="mt-5 flex flex-col gap-2">
+                <h3 class="text-sm font-medium">Recent operations</h3>
+                @foreach ($node->operations as $operation)
+                    <div wire:key="node-operation-{{ $operation->uuid }}" class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span>{{ $operation->workload?->name ?? $operation->command_type }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-neutral-500 dark:text-fg-faint">{{ $operation->created_at->diffForHumans() }}</span>
+                            <x-status-badge :status="str($operation->status->value)->replace('_', ' ')->title()" :type="match ($operation->status->value) {
+                                'succeeded' => 'success',
+                                'failed', 'timed_out' => 'error',
+                                'uncertain' => 'warning',
+                                default => 'neutral',
+                            }" />
+                            @if ($operation->status->value === 'uncertain')
+                                <x-forms.button wire:click="retryOperation('{{ $operation->uuid }}')" wire:loading.attr="disabled" wire:target="retryOperation('{{ $operation->uuid }}')">Recover</x-forms.button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </x-application.settings-section>
+
     <x-application.settings-section title="Containers" helper="Read-only Podman inventory reported by Sentinel through Flux.">
         <x-slot:actions>
             <x-forms.button wire:click="refreshContainers" wire:loading.attr="disabled" wire:target="refreshContainers">

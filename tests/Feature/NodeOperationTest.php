@@ -147,3 +147,17 @@ it('limits operation access to the Node team', function () {
         ->and($outsider->can('view', $operation))->toBeFalse()
         ->and($outsider->can('update', $operation))->toBeFalse();
 });
+
+it('clears an uncertain error when recovery succeeds', function () {
+    $operation = NodeOperation::factory()->create([
+        'node_id' => $this->node->id,
+        'status' => NodeOperationStatus::UNCERTAIN,
+        'error' => 'The deployment result is unknown.',
+    ]);
+
+    TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
+    TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
+    TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: ['runtime_id' => 'container-1']);
+
+    expect($operation->refresh()->error)->toBeNull();
+});

@@ -38,7 +38,7 @@ function requestSentinelAssignment(?string $token = null, array $payload = []): 
         'sentinel_version' => 'main',
         'protocol_min' => 1,
         'protocol_max' => 1,
-        'capabilities' => ['system.ping.v1', 'system.info.v1', 'container.list.v1'],
+        'capabilities' => ['system.ping.v1', 'system.info.v1', 'container.list.v1', 'workload.deploy.v1'],
     ], $payload), $headers);
 }
 
@@ -62,7 +62,7 @@ it('returns an enabled development assignment with a bound short-lived credentia
             'pmax' => 1,
         ])
         ->and($claims['exp'] - $claims['iat'])->toBe(900)
-        ->and($claims['caps'])->toBe(['system.ping.v1', 'system.info.v1', 'container.list.v1']);
+        ->and($claims['caps'])->toBe(['system.ping.v1', 'system.info.v1', 'container.list.v1', 'workload.deploy.v1']);
 });
 
 it('rejects a plaintext Flux endpoint without the development override', function () {

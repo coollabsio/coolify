@@ -108,6 +108,25 @@ host-local operation.
   100,000 completed records. Active records do not count toward this limit and
   are not removed automatically.
 
+### Minimal workload deployment
+
+- `workload.deploy.v1` deploys one Podman container from an immutable workload
+  revision. The first contract supports an image, command arguments,
+  environment values, published ports, labels, and a restart policy.
+- Coolify creates the durable operation before it sends the command. It uses
+  the operation UUID as the command ID and stores only the revision identity
+  and configuration hash in the operation request. It does not copy environment
+  values into the operation journal.
+- Sentinel validates all fields and invokes Podman without a shell. The stable
+  container name and `--replace` make a newer revision replace the prior main
+  container for that workload.
+- A successful deployment triggers a full container inventory refresh. The
+  standard labels then connect the observed runtime container to its workload
+  and revision.
+- A lost transport result changes the operation to `uncertain`. The Node UI can
+  recover it by sending the same operation UUID again. Sentinel then replays
+  its stored result instead of running the command twice.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -119,8 +138,8 @@ host-local operation.
 - Coolify stores CA and leaf private keys encrypted in its database.
 - Flux fails closed when production TLS configuration is missing or invalid.
 - Production Sentinel rejects plaintext Flux endpoints.
-- Commands are typed, versioned, short-lived, capability-gated, and deduplicated
-  in memory. Sentinel rejects a command when its type and payload do not match.
+- Commands are typed, versioned, short-lived, capability-gated, and journaled.
+  Sentinel rejects a command when its type and payload do not match.
 - Flux's internal HTTP API uses a bearer token and is for Coolify-to-Flux
   traffic on the private control-plane network. It is not a public API.
 - SSH remains available to repair trust, configuration, installation, or a
@@ -187,8 +206,8 @@ cross-instance command routing are not implemented yet.
 - direct TLS gRPC connection, heartbeats, and connection reporting;
 - private CA issuance, Flux leaf issuance, automatic leaf renewal, rollback,
   and SSH trust repair;
-- `system.ping.v1`, `system.info.v1`, and read-only `container.list.v1` typed
-  commands;
+- `system.ping.v1`, `system.info.v1`, read-only `container.list.v1`, and minimal
+  `workload.deploy.v1` typed commands;
 - development-only UI controls and connection state;
 - separate `Node`, `NodeWorkload`, immutable workload revision, assignment, and
   observed `NodeContainer` models;
@@ -198,13 +217,16 @@ cross-instance command routing are not implemented yet.
 - durable Coolify Node operation state, guarded transitions, idempotent
   creation, and scheduled retention cleanup;
 - durable Sentinel command result replay and interrupted-command protection.
+- development Node UI deployment, operation state, state refresh, and uncertain
+  operation recovery.
 
 ### Not implemented
 
 - staged CA rotation;
 - production rollout and upgrade policy for host-native Sentinel;
 - multi-Flux routing and horizontal scaling;
-- mutating workload commands and uncertain-operation reconciliation;
+- complete application deployment orchestration, volumes, secrets, networks,
+  proxy configuration, health gates, rollback, and placement;
 - the Podman, firewall, DNS, Corrosion, ingress, and builder capabilities that
   will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
@@ -212,7 +234,7 @@ cross-instance command routing are not implemented yet.
 
 ## Next safe step
 
-Implement the first minimal Podman workload deployment command. Use the durable
-Node operation UUID as its command identity, deterministic runtime names, and
-the existing Coolify ownership labels. Reconcile an uncertain result against
-the observed container inventory before retrying it.
+Add deployment convergence. After a successful command or an uncertain result,
+compare the desired revision with the observed labeled container. Use that
+comparison to confirm completion, detect drift, and decide whether recovery
+needs a result replay or a new operation.
