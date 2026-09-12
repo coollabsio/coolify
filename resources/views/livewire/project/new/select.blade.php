@@ -469,7 +469,16 @@
                             if (!source) return null;
 
                             try {
-                                return new URL(source).origin;
+                                const url = new URL(source);
+                                const hostname = url.hostname.toLowerCase();
+                                if (hostname === 'github.com' || hostname === 'www.github.com' || hostname === 'gitlab.com' || hostname === 'www.gitlab.com') {
+                                    const pathSegments = url.pathname.split('/').filter(Boolean);
+                                    if (pathSegments.length >= 2) {
+                                        return `${url.protocol}//${url.hostname}/${pathSegments[0]}/${pathSegments[1]}`;
+                                    }
+                                    return url.href;
+                                }
+                                return url.origin;
                             } catch (error) {
                                 return null;
                             }
