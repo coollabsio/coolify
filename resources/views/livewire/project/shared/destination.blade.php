@@ -235,4 +235,6 @@
             </x-application.settings-section>
         </div>
     @endif
+
+    <livewire:project.shared.container-networks :resource="$resource" lazy />
 </div>

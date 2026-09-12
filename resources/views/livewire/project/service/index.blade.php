@@ -144,6 +144,9 @@
                         </section>
                     </form>
 
+                    <livewire:project.shared.container-networks :resource="$serviceApplication"
+                        :key="'container-networks-'.$serviceApplication->uuid" lazy />
+
                     <x-domain-conflict-modal
                         :conflicts="$domainConflicts"
                         :showModal="$showDomainConflictModal"
@@ -333,6 +336,9 @@
                             </div>
                         </section>
                     </form>
+
+                    <livewire:project.shared.container-networks :resource="$serviceDatabase"
+                        :key="'container-networks-'.$serviceDatabase->uuid" lazy />
                 @endif
             @endif
         </div>
