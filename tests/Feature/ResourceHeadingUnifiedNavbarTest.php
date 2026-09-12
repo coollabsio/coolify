@@ -371,6 +371,12 @@ it('renders configuration warnings as navbar popovers instead of floating notifi
         ->toContain("\$dispatch('open-configuration-diff')");
 });
 
+it('dispatches open-configuration-diff directly when clicking changes pending with unapplied diffs', function () {
+    $warning = file_get_contents(resource_path('views/components/configuration-warning.blade.php'));
+
+    expect($warning)->toContain("@click=\"{{ data_get(\$diff, 'count') ? \"\$dispatch('open-configuration-diff')\" : 'open = !open' }}\"");
+});
+
 it('renders only one configuration warning on database runtime logs', function () {
     $logs = file_get_contents(resource_path('views/livewire/project/shared/logs.blade.php'));
     $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));

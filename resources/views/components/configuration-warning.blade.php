@@ -2,7 +2,7 @@
 
 <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
     <button type="button" aria-label="Configuration changes not applied" aria-haspopup="dialog"
-        :aria-expanded="open" @click="open = !open"
+        :aria-expanded="open" @click="{{ data_get($diff, 'count') ? "$dispatch('open-configuration-diff')" : 'open = !open' }}"
         class="flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-amber-700 transition-colors hover:bg-amber-100 dark:text-warning dark:hover:bg-warning/10">
         <x-reicon name="alert-triangle" class="size-4" />
         <span class="hidden text-xs font-medium lg:inline">Changes pending</span>
