@@ -113,19 +113,19 @@ container, and host-native Sentinel runs as a systemd service inside it. The
 stack uses published `main` images from GHCR. This setup tests the production
 process model while keeping local development reproducible.
 
-Developers with KVM access can also start the optional `v5-worker` QEMU profile.
+Developers with KVM access can also start the optional `node-worker` QEMU profile.
 It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
 on a normal virtual machine. The VM connects to the same development Coolify and
 Flux services and is the target for runtime and host-network integration tests.
 Coolify stores an explicit server mode. Legacy servers validate Docker and
-Docker Compose. Native `v5-worker` and `v5-combined` servers validate Podman,
+Docker Compose. `node-worker` and `node-controller-worker` nodes validate Podman,
 systemd, and the rootful Podman API socket. Development seeding does not mark a
 worker usable before that validation succeeds.
 
 ### Existing self-hosted installations
 
 Existing Coolify installations remain on the Docker-based localhost path. They
-must not be converted automatically to Podman, WireGuard, or the native v5
+must not be converted automatically to Podman, WireGuard, or the node
 worker stack. Legacy servers keep container Sentinel and SSH. Coolify does not
 install host-native Sentinel, issue Flux assignments, or send Flux commands to
 legacy servers.
@@ -133,7 +133,7 @@ legacy servers.
 ### Fresh v5 installations
 
 The accepted target supports combined, control-plane-only, and worker modes.
-Fresh installations can use the native v5 host stack. The full installer,
+Fresh installations can use the node host stack. The full installer,
 Podman execution, networking, and placement flows are not implemented in this
 slice.
 

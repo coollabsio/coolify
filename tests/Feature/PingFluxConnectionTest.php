@@ -18,7 +18,7 @@ it('sends an authenticated ping to the internal Flux API', function () {
     ]);
     $server = new Server;
     $server->uuid = 'server-1';
-    $server->mode = 'v5-worker';
+    $server->mode = 'node-worker';
 
     $result = PingFluxConnection::run($server);
 
@@ -36,7 +36,7 @@ it('does not send Flux commands to legacy servers', function () {
     Http::fake();
 
     expect(fn () => PingFluxConnection::run(new Server))
-        ->toThrow(RuntimeException::class, 'Flux is available only for native v5 servers.');
+        ->toThrow(RuntimeException::class, 'Flux is available only for nodes.');
 
     Http::assertNothingSent();
 });

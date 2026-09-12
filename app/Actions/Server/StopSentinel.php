@@ -11,7 +11,7 @@ class StopSentinel
 
     public function handle(Server $server)
     {
-        if ($server->isNativeV5()) {
+        if ($server->isNode()) {
             return;
         }
 

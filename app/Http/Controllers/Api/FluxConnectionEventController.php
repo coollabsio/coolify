@@ -37,7 +37,7 @@ class FluxConnectionEventController extends Controller
         }
         $data = $validator->validated();
         $server = Server::query()->where('uuid', $data['server_id'])->firstOrFail();
-        abort_unless($server->isNativeV5(), 404);
+        abort_unless($server->isNode(), 404);
         $key = "flux:connection:{$server->uuid}";
         $current = Cache::get($key, []);
 

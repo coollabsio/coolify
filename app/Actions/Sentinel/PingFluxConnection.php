@@ -17,8 +17,8 @@ class PingFluxConnection
      */
     public function handle(Server $server): array
     {
-        if (! $server->isNativeV5()) {
-            throw new RuntimeException('Flux is available only for native v5 servers.');
+        if (! $server->isNode()) {
+            throw new RuntimeException('Flux is available only for nodes.');
         }
 
         $url = config('constants.flux.internal_url');

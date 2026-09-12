@@ -338,7 +338,7 @@ class Server extends BaseModel
         return $this->mode?->usesPodman() ?? false;
     }
 
-    public function isNativeV5(): bool
+    public function isNode(): bool
     {
         return $this->mode instanceof ServerMode && $this->mode !== ServerMode::LEGACY;
     }
@@ -1830,7 +1830,7 @@ $siteAddress {
     public function restartSentinel(?string $customImage = null, bool $async = true)
     {
         try {
-            if ($this->isNativeV5()) {
+            if ($this->isNode()) {
                 return instant_remote_process(['systemctl restart sentinel.service'], $this);
             }
             if ($async) {

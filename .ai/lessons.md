@@ -4,7 +4,7 @@
 - Use a staged Sentinel migration without a second product name: keep the current Sentinel container on existing observation work, run the same Sentinel product and executable as a host-native service for v5 control and privileged work, move capabilities in stages, and retire the container after parity and rollback validation.
 - Docker Compose profiles are additive. To replace the normal testing host with a systemd variant, use a v5 override file for the same `testing-host` service instead of adding a second profiled service.
 - Coolify owns Sentinel installation, upgrade, health validation, handover, and rollback over SSH. The Sentinel repository owns portable binaries and their release metadata, but it must not own the server rollout policy.
-- Never convert an existing Coolify localhost installation from Docker to Podman, WireGuard, or the native v5 worker stack automatically. Keep it as an explicit legacy control plane, and reserve native combined or control-plane-only modes for fresh v5 installations.
+- Never convert an existing Coolify localhost installation from Docker to Podman, WireGuard, or the node stack automatically. Keep it as an explicit legacy control plane, and reserve combined or controller-only node modes for fresh installations.
 - Keep the development Host Sentinel action button text-only. Do not add an icon unless the design explicitly requires one.
 - Do not describe a Sentinel client as active from its crate implementation alone. Verify that `main` starts its runtime loop before claiming that the Sentinel process calls an endpoint.
 - Use a 100-year validity period for each Coolify-managed Flux installation CA; do not use a shorter default.
@@ -12,5 +12,6 @@
 - Implement directly in the primary session when the user asks not to use agents; do not delegate implementation or review work.
 - In development, materialize Flux TLS files as the same UID that runs both Coolify web actions and Flux. Do not let a root-only PKI initializer create files that later UI actions must update.
 - Show transient Sentinel and Flux action results as toast notifications, not as content inside the settings page. Keep only durable connection state in the page.
-- Do not bypass server validation by marking a v5 Podman worker usable during development seeding. Store the server mode explicitly, then validate Docker for legacy servers and Podman for native v5 workers.
-- Keep host-native Sentinel and Flux exclusive to native v5 server modes. Legacy servers must continue to use container Sentinel and SSH, and must not receive Flux assignments or commands.
+- Do not bypass server validation by marking a Podman worker node usable during development seeding. Store the server mode explicitly, then validate Docker for legacy servers and Podman for worker nodes.
+- Keep host-native Sentinel and Flux exclusive to nodes. Legacy servers must continue to use container Sentinel and SSH, and must not receive Flux assignments or commands.
+- Use node terminology for runtime resources. Do not encode a Coolify release number in server modes, eligibility methods, QEMU profiles, domains, UUIDs, or user-facing names.

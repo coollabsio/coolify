@@ -21,7 +21,7 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        if ($this->server->isNativeV5() || ! $this->sentinelIsEnabled()) {
+        if ($this->server->isNode() || ! $this->sentinelIsEnabled()) {
             return;
         }
 

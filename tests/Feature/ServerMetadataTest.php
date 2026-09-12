@@ -178,7 +178,7 @@ it('can overwrite server_metadata with new values', function () {
 it('refreshes server information through Flux when the host control channel is enabled', function () {
     config()->set('app.env', 'local');
     config()->set('constants.sentinel.host_enabled', true);
-    $this->server->update(['mode' => 'v5-worker']);
+    $this->server->update(['mode' => 'node-worker']);
     FetchFluxServerInformation::partialMock()
         ->shouldReceive('handle')
         ->once()

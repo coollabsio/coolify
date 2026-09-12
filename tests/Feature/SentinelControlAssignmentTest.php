@@ -25,7 +25,7 @@ beforeEach(function () {
     $user = User::factory()->create();
     $this->server = Server::factory()->create([
         'team_id' => $user->teams()->firstOrFail()->id,
-        'mode' => 'v5-worker',
+        'mode' => 'node-worker',
     ]);
     $this->server->settings->update([
         'is_reachable' => true,

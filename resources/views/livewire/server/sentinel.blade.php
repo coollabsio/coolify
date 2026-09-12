@@ -60,7 +60,7 @@
                 </div>
             </x-application.settings-section>
 
-            @if (isDev() && !$server->isNativeV5())
+            @if (isDev() && !$server->isNode())
                 <x-application.settings-section id="server-sentinel-development-section"
                     title="Development overrides"
                     helper="Local testing controls that are unavailable in production.">
@@ -98,7 +98,7 @@
                 </x-application.settings-section>
             @endif
 
-            @if (isDev() && config('constants.sentinel.host_enabled', false) && $server->isNativeV5())
+            @if (isDev() && config('constants.sentinel.host_enabled', false) && $server->isNode())
                 <x-application.settings-section id="server-sentinel-flux-development-section"
                     title="Flux control channel"
                     helper="Experimental direct connection from the host Sentinel to Flux.">

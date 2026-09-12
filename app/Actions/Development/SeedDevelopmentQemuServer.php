@@ -45,7 +45,7 @@ class SeedDevelopmentQemuServer
             'user' => $profile['user'],
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
-            'mode' => ($profile['runtime'] ?? null) === 'podman' ? ServerMode::V5_WORKER : ServerMode::LEGACY,
+            'mode' => ($profile['runtime'] ?? null) === 'podman' ? ServerMode::NODE_WORKER : ServerMode::LEGACY,
         ]);
         $server->deleted_at = null;
         $server->save();

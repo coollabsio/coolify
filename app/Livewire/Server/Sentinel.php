@@ -126,7 +126,7 @@ class Sentinel extends Component
 
     public function installHostSentinel(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5(), 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode(), 404);
 
         try {
             $this->authorize('manageSentinel', $this->server);
@@ -139,7 +139,7 @@ class Sentinel extends Component
 
     public function refreshFluxConnection(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5(), 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode(), 404);
         $this->authorize('view', $this->server);
         $this->loadFluxConnection();
         $state = data_get($this->fluxConnection, 'status', 'disconnected');
@@ -148,7 +148,7 @@ class Sentinel extends Component
 
     public function testFluxConnection(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5(), 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode(), 404);
 
         try {
             $this->authorize('manageSentinel', $this->server);
@@ -163,7 +163,7 @@ class Sentinel extends Component
 
     public function repairFluxTrust(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5(), 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode(), 404);
 
         try {
             $this->authorize('manageSentinel', $this->server);
@@ -176,7 +176,7 @@ class Sentinel extends Component
 
     public function renewFluxCertificate(): void
     {
-        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5(), 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode(), 404);
 
         try {
             $this->authorize('manageSentinel', $this->server);
@@ -196,7 +196,7 @@ class Sentinel extends Component
 
     private function loadFluxConnection(): void
     {
-        $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5()
+        $this->fluxConnection = isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNode()
             ? Cache::get("flux:connection:{$this->server->uuid}")
             : null;
     }

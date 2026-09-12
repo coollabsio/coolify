@@ -51,7 +51,7 @@ compose up --detach --pull missing
 
 if automatic_qemu_start_enabled; then
     wait_for_coolify
-    php artisan dev:qemu v5-worker
+    php artisan dev:qemu node-worker
 fi
 
 compose logs --follow

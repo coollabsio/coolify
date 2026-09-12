@@ -61,9 +61,9 @@ it('records active v5 decisions separately from the archived prototype', functio
         ->toContain('Status: Accepted')
         ->toContain('legacy-control-plane')
         ->toContain('prevent the v5 scheduler from placing new v5 workloads on localhost')
-        ->toContain('v5-combined')
-        ->toContain('v5-control-plane')
-        ->toContain('v5-worker')
+        ->toContain('node-controller-worker')
+        ->toContain('node-controller')
+        ->toContain('node-worker')
         ->toContain('in-place conversion');
 });
 

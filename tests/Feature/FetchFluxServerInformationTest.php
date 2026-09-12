@@ -33,7 +33,7 @@ it('fetches and stores server information through Flux', function () {
     ]);
     $server = Server::factory()->create([
         'team_id' => Team::factory(),
-        'mode' => 'v5-worker',
+        'mode' => 'node-worker',
         'server_metadata' => ['transfer' => ['status' => 'pending']],
     ]);
 
@@ -70,7 +70,7 @@ it('rejects an invalid Flux server information response', function () {
 
     $server = Server::factory()->create([
         'team_id' => Team::factory(),
-        'mode' => 'v5-worker',
+        'mode' => 'node-worker',
     ]);
 
     expect(fn () => FetchFluxServerInformation::run($server))

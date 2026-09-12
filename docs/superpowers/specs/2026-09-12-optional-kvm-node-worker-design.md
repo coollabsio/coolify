@@ -1,4 +1,4 @@
-# Optional KVM v5 worker design
+# Optional KVM node worker design
 
 **Status:** Implemented
 **Date:** 2026-09-12
@@ -6,7 +6,7 @@
 ## Goal
 
 Add an optional Linux virtual machine to the Coolify development environment.
-The VM acts as a real v5 worker with systemd, host-native Sentinel, and Podman.
+The VM acts as a real node worker with systemd, host-native Sentinel, and Podman.
 It complements the existing Docker testing host and does not replace it.
 
 The first use case is the `containers.list.v1` flow through Coolify, Flux,
@@ -15,7 +15,7 @@ Sentinel, and Podman.
 ## Chosen approach
 
 Extend Coolify's existing libvirt-based development VM manager with a dedicated
-Ubuntu v5 worker profile. The existing manager already creates cloud-image VMs,
+Ubuntu node worker profile. The existing manager already creates cloud-image VMs,
 configures a NAT network that the Coolify container can reach, assigns fixed IP
 addresses, and seeds normal remote-server records.
 
@@ -25,7 +25,7 @@ Docker development stack
   Flux     ◄──── TLS gRPC through host port 7443 ────────────────┤
                                                                  │
 Host machine and libvirt NAT network                             │
-  QEMU/KVM v5 worker VM ◄────────────────────────────────────────┘
+  QEMU/KVM node worker VM ◄────────────────────────────────────────┘
     systemd
     Sentinel
     Podman
@@ -45,14 +45,14 @@ that v5 works on a normal Linux server.
 
 Coolify already has tested libvirt host setup, VM creation, cloud-init, fixed IP
 allocation, and database seeding. Reusing it avoids a second VM manager and keeps
-the v5 worker compatible with the existing root and non-root test profiles.
+the node worker compatible with the existing root and non-root test profiles.
 
 ## Developer interface
 
 Use the existing Artisan interface:
 
 ```text
-php artisan dev:qemu v5-worker
+php artisan dev:qemu node-worker
 ```
 
 The command uses the existing `dev:qemu` reset behavior. It prepares libvirt,
@@ -142,7 +142,7 @@ The first implementation is complete when these checks pass:
 
 1. The normal Docker development stack still starts without KVM.
 2. The profile appears in the existing `dev:qemu` selector.
-3. `php artisan dev:qemu v5-worker` starts a fresh VM and SSH becomes ready.
+3. `php artisan dev:qemu node-worker` starts a fresh VM and SSH becomes ready.
 4. The guest runs systemd and Podman.
 5. Coolify can reach the VM through the forwarded SSH port.
 6. Coolify installs host-native Sentinel on the VM.

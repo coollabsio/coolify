@@ -1,17 +1,18 @@
-# Separate legacy and native v5 Sentinel paths
+# Rename native servers to nodes
 
-- [x] Find every host-native Sentinel and Flux entry point.
-- [x] Add failing tests for legacy-server denial and v5 access.
-- [x] Centralize the native-v5 eligibility rule on Server.
-- [x] Enforce the rule in APIs, actions, jobs, and Livewire methods.
-- [x] Hide host-native Sentinel and Flux UI from legacy servers.
-- [x] Verify legacy and v5 behavior.
+- [x] Rename all active node-mode values.
+- [x] Rename the eligibility API from `isNativeV5()` to `isNode()`.
+- [x] Add a data migration for existing `v5-*` rows.
+- [x] Rename the QEMU profile, domain, UUID, labels, and automatic startup.
+- [x] Update active architecture documents, tests, and lessons.
+- [x] Recreate the development QEMU node and restart the stack.
+- [x] Verify code, database state, VM state, Sentinel, and Flux.
 
 ## Review
 
-- `Server::isNativeV5()` is the central boundary for host-native Sentinel and Flux.
-- Legacy servers cannot receive Flux assignments, report Flux connection events, or run Flux commands.
-- Host Sentinel install, trust repair, state, and controls are unavailable on legacy servers.
-- Native v5 servers cannot start or stop the legacy container Sentinel path.
-- Server information uses Flux only for native v5 servers and keeps SSH for legacy servers.
-- Focused tests passed: 84 tests and 426 assertions.
+- Runtime modes are now `legacy`, `node-worker`, `node-controller-worker`, and `node-controller`.
+- Existing `v5-*` database values migrate to the matching node modes.
+- The development VM is now `coolify-dev-node-worker` with UUID `development-qemu-node-worker`.
+- Reset removes the old `coolify-dev-v5-worker` domain and files.
+- The recreated node runs host-native Sentinel and reconnects to Flux over TLS after the Coolify and Flux containers restart.
+- Focused verification passed: 77 tests and 366 assertions.

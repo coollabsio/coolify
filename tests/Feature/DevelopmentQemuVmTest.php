@@ -48,7 +48,7 @@ it('provides root and non-root profiles for every supported distribution', funct
     $profiles = collect(config('development-qemu.profiles'));
 
     expect($profiles->keys()->all())->toBe([
-        'v5-worker',
+        'node-worker',
         'ubuntu-root',
         'ubuntu-non-root',
         'debian-root',
@@ -63,8 +63,8 @@ it('provides root and non-root profiles for every supported distribution', funct
         ->and($profiles->filter(fn (array $profile) => $profile['user'] !== 'root')->count())->toBe(4);
 });
 
-it('provisions the v5 worker with podman and a reachable flux hostname', function () {
-    $storagePath = sys_get_temp_dir().'/coolify-qemu-v5-worker-test-'.uniqid();
+it('provisions the node worker with podman and a reachable flux hostname', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-node-worker-test-'.uniqid();
     config(['development-qemu.storage_path' => $storagePath]);
     Process::fake([
         '* net-dumpxml *' => Process::result(output: '<network></network>'),
@@ -73,9 +73,9 @@ it('provisions the v5 worker with podman and a reachable flux hostname', functio
         '*' => Process::result(),
     ]);
 
-    StartDevelopmentQemuVm::run('v5-worker');
+    StartDevelopmentQemuVm::run('node-worker');
 
-    $userData = File::get("{$storagePath}/coolify-dev-v5-worker-user-data.yaml");
+    $userData = File::get("{$storagePath}/coolify-dev-node-worker-user-data.yaml");
 
     expect($userData)
         ->toContain('  - podman')
@@ -85,6 +85,8 @@ it('provisions the v5 worker with podman and a reachable flux hostname', functio
         ->toContain('192.168.122.1 coolify-flux')
         ->not->toContain('docker.io')
         ->not->toContain('get.docker.com');
+
+    Process::assertRan(fn ($process) => $process->command === "virsh destroy 'coolify-dev-v5-worker'");
 });
 
 it('stores vm disks in a libvirt-accessible directory', function () {
@@ -161,7 +163,7 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect(File::get(base_path('.env.development.example')))->toContain('DEVELOPMENT_QEMU_AUTO_START=false')
         ->and($jean['scripts']['run'])->toBe('bash scripts/dev-stack')
         ->and($script)->toContain('DEVELOPMENT_QEMU_AUTO_START')
-        ->and($script)->toContain('php artisan dev:qemu v5-worker')
+        ->and($script)->toContain('php artisan dev:qemu node-worker')
         ->and($script)->toContain('compose up --detach --pull missing')
         ->and($script)->toContain('config --environment');
 
@@ -169,11 +171,11 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect($compose)->toContain("postgres:\n        condition: service_healthy");
 });
 
-it('seeds the v5 worker with the host gateway sentinel endpoint', function () {
-    $server = SeedDevelopmentQemuServer::run('v5-worker');
+it('seeds the node worker with the host gateway sentinel endpoint', function () {
+    $server = SeedDevelopmentQemuServer::run('node-worker');
 
-    expect($server->uuid)->toBe('development-qemu-v5-worker')
-        ->and($server->mode->value)->toBe('v5-worker')
+    expect($server->uuid)->toBe('development-qemu-node-worker')
+        ->and($server->mode->value)->toBe('node-worker')
         ->and($server->ip)->toBe('192.168.122.50')
         ->and($server->user)->toBe('root')
         ->and($server->settings->sentinel_custom_url)->toBe('http://192.168.122.1:8000')

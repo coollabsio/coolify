@@ -20,7 +20,7 @@ beforeEach(function () {
     $this->actingAs($user);
     $this->server = Server::factory()->create([
         'team_id' => $user->teams()->firstOrFail()->id,
-        'mode' => 'v5-worker',
+        'mode' => 'node-worker',
     ]);
 });
 

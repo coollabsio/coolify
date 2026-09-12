@@ -13,7 +13,7 @@ class RepairSentinelFluxTrust
 
     public function handle(Server $server): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || ! $server->isNativeV5()) {
+        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || ! $server->isNode()) {
             return null;
         }
 
