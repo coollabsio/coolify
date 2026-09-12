@@ -26,6 +26,43 @@
         </div>
     </div>
 
+    @if ($nodes->isNotEmpty())
+        <section class="mb-6">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-[15px]! font-semibold!">Nodes</h2>
+                    <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Podman hosts managed by host-native Sentinel and Flux.</p>
+                </div>
+                <x-status-badge label="Dev" />
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+                <div class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_8rem_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    <div>Node</div>
+                    <div>Role</div>
+                    <div>Status</div>
+                </div>
+                @foreach ($nodes as $node)
+                    <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" {{ wireNavigate() }}
+                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_8rem_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <x-reicon name="servers" class="size-4" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</p>
+                                <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description ?: 'No description' }}</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">{{ str($node->role->value)->replace('-', ' ')->title() }}</div>
+                        <div class="text-[11px] font-medium">
+                            <x-status-badge :status="$node->is_usable ? 'Ready' : 'Validation required'" :type="$node->is_usable ? 'success' : 'warning'" />
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     @php
         $serverRows = $servers->map(function ($server) {
             $isTransferredAway = $server->isTransferredAway();

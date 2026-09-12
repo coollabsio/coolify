@@ -20,3 +20,4 @@
 
 - When runtime roles are renamed, search shared credential claims and protocol constants in both Coolify and Sentinel. Rename issuer and verifier values in the same change.
 - Treat legacy Docker servers and Podman nodes as permanent parallel products. Keep `Server` for SSH-managed legacy hosts and use a separate `Node` model for Flux-managed hosts; do not plan to remove legacy support or require conversion.
+- When the user asks to "add" a verified development host, interpret it as adding the host to the visible Coolify resource list unless the context clearly refers to starting or seeding it.
