@@ -37,7 +37,7 @@ class IssueFluxCredential
         $credential = JWT::encode([
             'iss' => $issuer,
             'aud' => 'flux',
-            'purpose' => 'v5-control-channel',
+            'purpose' => 'node-control-channel',
             'sub' => $server->uuid,
             'jti' => (string) Str::uuid(),
             'iat' => $now->timestamp,

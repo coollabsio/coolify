@@ -86,7 +86,6 @@ it('provisions the node worker with podman and a reachable flux hostname', funct
         ->not->toContain('docker.io')
         ->not->toContain('get.docker.com');
 
-    Process::assertRan(fn ($process) => $process->command === "virsh destroy 'coolify-dev-v5-worker'");
 });
 
 it('stores vm disks in a libvirt-accessible directory', function () {

@@ -31,11 +31,6 @@ class StartDevelopmentQemuVm
                 Process::run('virsh undefine '.escapeshellarg($managedProfile['domain']));
                 $this->deleteVmData($managedProfile['domain']);
             }
-            foreach (config('development-qemu.legacy_domains', []) as $legacyDomain) {
-                Process::run('virsh destroy '.escapeshellarg($legacyDomain));
-                Process::run('virsh undefine '.escapeshellarg($legacyDomain));
-                $this->deleteVmData($legacyDomain);
-            }
         }
 
         $this->createVm($profile);

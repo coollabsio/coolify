@@ -60,7 +60,7 @@ it('returns an enabled development assignment with a bound short-lived credentia
         ->toMatchArray([
             'iss' => 'coolify-dev',
             'aud' => 'flux',
-            'purpose' => 'v5-control-channel',
+            'purpose' => 'node-control-channel',
             'sub' => $this->server->uuid,
             'pmin' => 1,
             'pmax' => 1,

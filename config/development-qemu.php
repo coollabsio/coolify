@@ -15,7 +15,6 @@ return [
     'coolify_container' => 'coolify',
     'private_key_path' => '/var/www/html/storage/app/ssh/keys/ssh_key@ssh',
     'coolify_host_port' => (int) env('DEVELOPMENT_QEMU_COOLIFY_PORT', 8000),
-    'legacy_domains' => ['coolify-dev-v5-worker'],
     'profiles' => [
         'node-worker' => [
             'label' => 'Coolify worker node (Ubuntu 24.04, Podman)',

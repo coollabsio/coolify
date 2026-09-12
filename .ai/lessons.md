@@ -17,3 +17,5 @@
 - Use node terminology for runtime resources. Do not encode a Coolify release number in server modes, eligibility methods, QEMU profiles, domains, UUIDs, or user-facing names.
 
 - When an unreleased branch has several dependent migrations, consolidate them before merge so a new installation applies one final schema instead of branch-history patches.
+
+- When runtime roles are renamed, search shared credential claims and protocol constants in both Coolify and Sentinel. Rename issuer and verifier values in the same change.
