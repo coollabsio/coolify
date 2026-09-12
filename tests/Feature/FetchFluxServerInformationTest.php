@@ -27,12 +27,13 @@ it('fetches and stores server information through Flux', function () {
             'sentinel_version' => '1.0.1',
             'boot_id' => 'boot-1',
             'uptime_seconds' => 3600,
-            'container_runtime' => 'docker',
-            'container_runtime_version' => '29.4.3',
+            'container_runtime' => 'podman',
+            'container_runtime_version' => '5.4.2',
         ]),
     ]);
     $server = Server::factory()->create([
         'team_id' => Team::factory(),
+        'mode' => 'v5-worker',
         'server_metadata' => ['transfer' => ['status' => 'pending']],
     ]);
 
@@ -51,12 +52,11 @@ it('fetches and stores server information through Flux', function () {
             'disk_available_bytes' => 322_122_547_200,
             'sentinel_version' => '1.0.1',
             'boot_id' => 'boot-1',
-            'container_runtime' => 'docker',
-            'container_runtime_version' => '29.4.3',
+            'container_runtime' => 'podman',
+            'container_runtime_version' => '5.4.2',
             'source' => 'flux',
             'transfer' => ['status' => 'pending'],
-        ])
-        ->and($server->fresh()->dockerVersion())->toBe('29.4.3');
+        ]);
 
     Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/system.info'
         && $request->hasHeader('Authorization', 'Bearer internal-secret')
@@ -68,7 +68,10 @@ it('rejects an invalid Flux server information response', function () {
     config()->set('constants.flux.internal_token', 'internal-secret');
     Http::fake(['*' => Http::response(['hostname' => ['invalid']])]);
 
-    $server = Server::factory()->create(['team_id' => Team::factory()]);
+    $server = Server::factory()->create([
+        'team_id' => Team::factory(),
+        'mode' => 'v5-worker',
+    ]);
 
     expect(fn () => FetchFluxServerInformation::run($server))
         ->toThrow(RuntimeException::class, 'Flux returned an invalid server information response.');

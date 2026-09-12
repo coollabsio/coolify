@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Server\StartSentinel;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\PrivateKey;
@@ -62,4 +64,14 @@ it('shows podman validation checkpoints for v5 workers', function () {
         ->assertSee('Podman is installed')
         ->assertSee('Podman API is available')
         ->assertDontSee('Docker Compose is installed');
+});
+
+it('never starts the legacy container Sentinel on native v5 servers', function () {
+    $server = createServerForModeValidation(['mode' => 'v5-worker'])->fresh();
+    Process::fake();
+
+    (new CheckAndStartSentinelJob($server))->handle();
+    StartSentinel::run($server);
+
+    Process::assertNothingRan();
 });

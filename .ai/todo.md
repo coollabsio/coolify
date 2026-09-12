@@ -1,16 +1,17 @@
-# Automatic development QEMU worker
+# Separate legacy and native v5 Sentinel paths
 
-- [x] Find the normal development startup entry point and existing environment conventions.
-- [x] Add a failing test for the opt-in reset and seed behavior.
-- [x] Add one disabled-by-default environment variable.
-- [x] Run the QEMU reset only when the variable is enabled.
-- [x] Verify disabled and enabled startup behavior.
+- [x] Find every host-native Sentinel and Flux entry point.
+- [x] Add failing tests for legacy-server denial and v5 access.
+- [x] Centralize the native-v5 eligibility rule on Server.
+- [x] Enforce the rule in APIs, actions, jobs, and Livewire methods.
+- [x] Hide host-native Sentinel and Flux UI from legacy servers.
+- [x] Verify legacy and v5 behavior.
 
 ## Review
 
-- Added `DEVELOPMENT_QEMU_AUTO_START=false` to the development environment example.
-- Jean now runs `scripts/dev-stack`, which reads the Compose environment and only recreates `v5-worker` when the variable is enabled.
-- The startup waits for Coolify, recreates the VM, waits for cloud-init, and seeds the server before following Compose logs.
-- Flux PKI initialization now waits for Postgres health as well as Coolify health.
-- The full enabled startup completed and seeded `v5-worker` at `192.168.122.50`.
-- Focused tests passed: 16 tests and 75 assertions.
+- `Server::isNativeV5()` is the central boundary for host-native Sentinel and Flux.
+- Legacy servers cannot receive Flux assignments, report Flux connection events, or run Flux commands.
+- Host Sentinel install, trust repair, state, and controls are unavailable on legacy servers.
+- Native v5 servers cannot start or stop the legacy container Sentinel path.
+- Server information uses Flux only for native v5 servers and keeps SSH for legacy servers.
+- Focused tests passed: 84 tests and 426 assertions.

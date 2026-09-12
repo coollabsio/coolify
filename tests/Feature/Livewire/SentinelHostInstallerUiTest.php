@@ -18,7 +18,10 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $user = User::factory()->create();
     $this->actingAs($user);
-    $this->server = Server::factory()->create(['team_id' => $user->teams()->firstOrFail()->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $user->teams()->firstOrFail()->id,
+        'mode' => 'v5-worker',
+    ]);
 });
 
 it('shows and runs the host installer in the gated development environment', function () {
@@ -49,6 +52,18 @@ it('hides the host installer when its gate is disabled', function () {
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->assertDontSee('Install host Sentinel');
+});
+
+it('hides and blocks host-native Sentinel controls for legacy servers', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $this->server->update(['mode' => 'legacy']);
+
+    Livewire::test(Sentinel::class, ['server' => $this->server->fresh()])
+        ->assertDontSee('Flux control channel')
+        ->assertDontSee('Install host Sentinel')
+        ->call('installHostSentinel')
+        ->assertNotFound();
 });
 
 it('shows the host installer button without an icon', function () {

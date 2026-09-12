@@ -338,6 +338,11 @@ class Server extends BaseModel
         return $this->mode?->usesPodman() ?? false;
     }
 
+    public function isNativeV5(): bool
+    {
+        return $this->mode instanceof ServerMode && $this->mode !== ServerMode::LEGACY;
+    }
+
     public static function isPlaceholderIp(?string $ip): bool
     {
         return blank($ip) || in_array($ip, self::PLACEHOLDER_IPS, true);
@@ -1825,6 +1830,9 @@ $siteAddress {
     public function restartSentinel(?string $customImage = null, bool $async = true)
     {
         try {
+            if ($this->isNativeV5()) {
+                return instant_remote_process(['systemctl restart sentinel.service'], $this);
+            }
             if ($async) {
                 StartSentinel::dispatch($this, true, null, $customImage);
             } else {

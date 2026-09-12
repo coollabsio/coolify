@@ -126,7 +126,9 @@ worker usable before that validation succeeds.
 
 Existing Coolify installations remain on the Docker-based localhost path. They
 must not be converted automatically to Podman, WireGuard, or the native v5
-worker stack. Remote servers can adopt host-native Sentinel in stages.
+worker stack. Legacy servers keep container Sentinel and SSH. Coolify does not
+install host-native Sentinel, issue Flux assignments, or send Flux commands to
+legacy servers.
 
 ### Fresh v5 installations
 

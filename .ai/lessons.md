@@ -13,3 +13,4 @@
 - In development, materialize Flux TLS files as the same UID that runs both Coolify web actions and Flux. Do not let a root-only PKI initializer create files that later UI actions must update.
 - Show transient Sentinel and Flux action results as toast notifications, not as content inside the settings page. Keep only durable connection state in the page.
 - Do not bypass server validation by marking a v5 Podman worker usable during development seeding. Store the server mode explicitly, then validate Docker for legacy servers and Podman for native v5 workers.
+- Keep host-native Sentinel and Flux exclusive to native v5 server modes. Legacy servers must continue to use container Sentinel and SSH, and must not receive Flux assignments or commands.

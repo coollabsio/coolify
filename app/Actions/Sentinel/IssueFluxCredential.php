@@ -16,6 +16,10 @@ class IssueFluxCredential
      */
     public function issue(Server $server, array $capabilities, int $protocolMin, int $protocolMax): array
     {
+        if (! $server->isNativeV5()) {
+            throw new RuntimeException('Flux is available only for native v5 servers.');
+        }
+
         $privateKey = config('constants.flux.signing_private_key');
         $keyId = config('constants.flux.signing_key_id');
         $issuer = config('constants.flux.issuer');

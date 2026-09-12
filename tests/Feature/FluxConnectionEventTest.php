@@ -15,7 +15,10 @@ beforeEach(function () {
     config()->set('constants.flux.public_url', 'http://flux:7443');
     config()->set('constants.flux.development_allow_plaintext', true);
     $user = User::factory()->create();
-    $this->server = Server::factory()->create(['team_id' => $user->teams()->firstOrFail()->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $user->teams()->firstOrFail()->id,
+        'mode' => 'v5-worker',
+    ]);
 });
 
 it('records a bounded Flux connection observation', function () {
@@ -113,4 +116,18 @@ it('rejects invalid internal credentials and unknown servers', function () {
     $payload = ['event' => 'connected', 'server_id' => $this->server->uuid, 'connection_id' => '11111111-1111-4111-8111-111111111111', 'sentinel_version' => 'main', 'protocol_version' => 1, 'trust_bundle_version' => 1, 'transport' => 'tls'];
     $this->postJson('/api/v1/internal/sentinel/control/events', $payload)->assertUnauthorized();
     $this->postJson('/api/v1/internal/sentinel/control/events', [...$payload, 'server_id' => 'missing'], ['Authorization' => 'Bearer internal-secret'])->assertNotFound();
+});
+
+it('rejects connection events for legacy servers', function () {
+    $this->server->update(['mode' => 'legacy']);
+
+    $this->postJson('/api/v1/internal/sentinel/control/events', [
+        'event' => 'connected',
+        'server_id' => $this->server->uuid,
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+        'sentinel_version' => 'main',
+        'protocol_version' => 1,
+        'trust_bundle_version' => 1,
+        'transport' => 'tls',
+    ], ['Authorization' => 'Bearer internal-secret'])->assertNotFound();
 });

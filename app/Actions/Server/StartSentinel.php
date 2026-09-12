@@ -46,7 +46,7 @@ class StartSentinel
 
     public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null)
     {
-        if ($server->isSwarm() || $server->isBuildServer()) {
+        if ($server->isNativeV5() || $server->isSwarm() || $server->isBuildServer()) {
             return;
         }
         if ($restart) {

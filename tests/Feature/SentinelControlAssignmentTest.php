@@ -25,6 +25,7 @@ beforeEach(function () {
     $user = User::factory()->create();
     $this->server = Server::factory()->create([
         'team_id' => $user->teams()->firstOrFail()->id,
+        'mode' => 'v5-worker',
     ]);
     $this->server->settings->update([
         'is_reachable' => true,
@@ -102,6 +103,12 @@ it('derives the direct Flux URL from the Coolify URL and configured port', funct
 
 it('is unavailable when the development gate is disabled', function () {
     config()->set('constants.sentinel.host_enabled', false);
+
+    requestSentinelAssignment($this->token)->assertNotFound();
+});
+
+it('is unavailable to legacy servers', function () {
+    $this->server->update(['mode' => 'legacy']);
 
     requestSentinelAssignment($this->token)->assertNotFound();
 });

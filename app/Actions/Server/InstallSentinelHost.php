@@ -13,7 +13,7 @@ class InstallSentinelHost
 
     public function handle(Server $server, ?string $image = null): ?string
     {
-        if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
+        if (! isDev() || ! config('constants.sentinel.host_enabled', false) || ! $server->isNativeV5()) {
             return null;
         }
 

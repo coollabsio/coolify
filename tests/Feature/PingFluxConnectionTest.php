@@ -18,6 +18,7 @@ it('sends an authenticated ping to the internal Flux API', function () {
     ]);
     $server = new Server;
     $server->uuid = 'server-1';
+    $server->mode = 'v5-worker';
 
     $result = PingFluxConnection::run($server);
 
@@ -29,4 +30,13 @@ it('sends an authenticated ping to the internal Flux API', function () {
     Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/system.ping'
         && $request->hasHeader('Authorization', 'Bearer internal-secret')
         && $request['server_id'] === 'server-1');
+});
+
+it('does not send Flux commands to legacy servers', function () {
+    Http::fake();
+
+    expect(fn () => PingFluxConnection::run(new Server))
+        ->toThrow(RuntimeException::class, 'Flux is available only for native v5 servers.');
+
+    Http::assertNothingSent();
 });

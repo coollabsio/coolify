@@ -31,6 +31,9 @@ class SentinelController extends Controller
         if ($server === null) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
+        if (! $server->isNativeV5()) {
+            return response()->json(['message' => 'Not found.'], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'sentinel_version' => ['required', 'string', 'max:100'],

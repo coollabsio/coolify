@@ -644,7 +644,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            if (isDev() && config('constants.sentinel.host_enabled', false)) {
+            if (isDev() && config('constants.sentinel.host_enabled', false) && $this->server->isNativeV5()) {
                 FetchFluxServerInformation::run($this->server);
                 $this->server->refresh()->load('settings');
                 $this->dispatch('success', 'Server details refreshed through Flux.');

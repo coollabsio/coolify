@@ -104,6 +104,16 @@ it('does not use ssh outside development', function () {
     Process::assertNothingRan();
 });
 
+it('does not install host-native Sentinel on legacy servers', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    Process::fake();
+
+    expect(InstallSentinelHost::run(new Server))->toBeNull();
+
+    Process::assertNothingRan();
+});
+
 it('elevates the encoded installer for a non-root server user', function () {
     $server = new Server(['user' => 'coolify']);
     $command = InstallSentinelHost::remoteCommand('set -eu');
