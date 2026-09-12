@@ -76,6 +76,18 @@ host-local operation.
 - In development, the existing refresh action uses Flux. Outside the feature
   gate, it keeps the current SSH behavior.
 
+### Container inventory
+
+- `container.list.v1` reads the complete Podman container list from a Node.
+- Sentinel normalizes runtime data and returns it through the typed control
+  protocol. It does not change containers.
+- Coolify validates the complete response before it changes stored data, then
+  reconciles the snapshot into `node_containers` in one transaction.
+- Standard Coolify labels link observed containers to an assigned workload and
+  immutable revision. Containers are shown as managed, external, or
+  unrecognized.
+- The Node page shows the stored inventory and has a manual refresh action.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -155,7 +167,8 @@ cross-instance command routing are not implemented yet.
 - direct TLS gRPC connection, heartbeats, and connection reporting;
 - private CA issuance, Flux leaf issuance, automatic leaf renewal, rollback,
   and SSH trust repair;
-- `system.ping.v1` and `system.info.v1` typed commands;
+- `system.ping.v1`, `system.info.v1`, and read-only `container.list.v1` typed
+  commands;
 - development-only UI controls and connection state;
 - separate `Node`, `NodeWorkload`, immutable workload revision, assignment, and
   observed `NodeContainer` models;
@@ -176,7 +189,6 @@ cross-instance command routing are not implemented yet.
 
 ## Next safe step
 
-Implement the read-only `container.list` command and feed its validated result
-into the existing `node_containers` reconciliation action. Do
-not start mutating workload operations until command reconciliation,
-idempotency, audit, and restart behavior are specified.
+Specify command reconciliation, idempotency, audit, and restart behavior for
+mutating workload operations. Do not add container create, update, or delete
+commands before these guarantees are defined.

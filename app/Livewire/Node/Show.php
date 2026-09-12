@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Node;
 
+use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\ValidateNode;
@@ -32,6 +33,7 @@ class Show extends Component
             ->firstOrFail();
         $this->authorize('view', $this->node);
         $this->loadFluxConnection();
+        $this->node->load('containers');
     }
 
     public function installSentinel(): void
@@ -54,6 +56,19 @@ class Show extends Component
     {
         $this->runAction(fn () => FetchFluxNodeInformation::run($this->node), 'Node details refreshed through Flux.');
         $this->node->refresh();
+    }
+
+    public function refreshContainers(): void
+    {
+        try {
+            $this->authorize('view', $this->node);
+            $count = FetchContainers::run($this->node);
+            $this->node->load('containers');
+            $label = $count === 1 ? 'container' : 'containers';
+            $this->dispatch('success', "Container inventory refreshed. {$count} {$label} found.");
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function testFluxConnection(): void

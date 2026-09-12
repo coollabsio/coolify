@@ -1,8 +1,10 @@
 <?php
 
+use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Sentinel\PingFluxConnection;
+use App\Enums\NodeContainerManagementState;
 use App\Livewire\Node\Show;
 use App\Livewire\Server\Sentinel as LegacySentinel;
 use App\Models\InstanceSettings;
@@ -93,4 +95,32 @@ it('wraps node actions on narrow screens and has no button icons', function () {
 
     expect($view)->toContain('flex flex-wrap items-center gap-2')
         ->not->toContain('<x-reicon');
+});
+
+it('shows and refreshes the read-only Node container inventory', function () {
+    $this->node->containers()->create([
+        'runtime_id' => 'external-container-1',
+        'name' => 'manual-nginx',
+        'image' => 'docker.io/library/nginx:latest',
+        'state' => 'running',
+        'labels' => [],
+        'management_state' => NodeContainerManagementState::EXTERNAL,
+        'observed_at' => now(),
+    ]);
+    FetchContainers::partialMock()
+        ->shouldReceive('handle')
+        ->once()
+        ->with(Mockery::type(Node::class))
+        ->andReturn(1);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSee('Containers')
+        ->assertSee('manual-nginx')
+        ->assertSee('nginx:latest')
+        ->assertSee('External')
+        ->assertDontSee('Start container')
+        ->assertDontSee('Stop container')
+        ->assertDontSee('Delete container')
+        ->call('refreshContainers')
+        ->assertDispatched('success', 'Container inventory refreshed. 1 container found.');
 });

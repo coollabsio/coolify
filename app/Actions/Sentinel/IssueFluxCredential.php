@@ -28,6 +28,7 @@ class IssueFluxCredential
         $grantedCapabilities = array_values(array_intersect([
             'system.ping.v1',
             'system.info.v1',
+            'container.list.v1',
         ], $capabilities));
 
         $credential = JWT::encode([
