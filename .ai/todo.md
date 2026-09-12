@@ -1,22 +1,16 @@
-# Review and document the current v5 control architecture
+# Optional KVM v5 worker
 
-- [x] Reconcile the active architecture documents with the implemented Sentinel and Flux slice.
-- [x] Add a brief current-state architecture document.
-- [x] Remove stale coold naming from active architecture references.
-- [x] Check links, terminology, and repository state.
-- [x] Search related GitHub issues and discussions.
-- [x] Record review results.
+- [x] Review the current development host, v5 Compose override, and server seeding.
+- [x] Select the first KVM worker design.
+- [x] Write the design specification.
+- [ ] Get user approval for the written specification.
+- [ ] Write the implementation plan.
+- [ ] Implement and verify the optional worker.
 
-## Review
+## Current decision
 
-- `docs/v5/architecture/current-state.md` is the canonical snapshot of the
-  implemented Coolify, Flux, and Sentinel control path.
-- The snapshot separates implemented diagnostics from planned runtime and
-  scaling capabilities.
-- Active architecture references now use the Sentinel name and the implemented
-  internal HTTP and outbound TLS gRPC transports. Historical ADRs keep the old
-  coold name for context.
-- All relative links in the active architecture documents resolve, and
-  `git diff --check` passes.
-- GitHub issue #5685 is an open related v5 tracking issue. No matching GitHub
-  discussion was found.
+- Keep the Docker testing host for fast control-channel tests.
+- Add an optional QEMU/KVM worker for Podman and host-level integration tests.
+- Use QEMU user networking with fixed host port forwarding. This avoids host
+  bridge and libvirt network changes.
+- Do not add WireGuard, Corrosion, or firewall tests in the first slice.
