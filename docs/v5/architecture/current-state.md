@@ -127,6 +127,19 @@ host-local operation.
   recover it by sending the same operation UUID again. Sentinel then replays
   its stored result instead of running the command twice.
 
+### Operation recovery policy
+
+The first release uses manual recovery. The Node page shows durable operation
+states and provides a **Recover** button for an `uncertain` deployment. An
+operator can also refresh workload and container state before recovery.
+
+Coolify does not yet run a scheduled stale-operation recovery job. This keeps
+the first deployment slice small. Add automatic recovery later if normal use
+shows that operations often remain `queued`, `dispatched`, `running`, or
+`uncertain` after a queue worker or control-plane restart. Automatic recovery
+must reuse the existing operation UUID. It must not create a new deployment
+command for the same attempt.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -227,6 +240,7 @@ cross-instance command routing are not implemented yet.
 - multi-Flux routing and horizontal scaling;
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
+- scheduled recovery of stale Node operations. Recovery is manual for now;
 - the Podman, firewall, DNS, Corrosion, ingress, and builder capabilities that
   will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
