@@ -148,7 +148,7 @@
 
                 <x-application.settings-section id="server-sentinel-host-development-section"
                     title="Host Sentinel"
-                    helper="Install the experimental host-native Sentinel service for local v5 development.">
+                    helper="Install the experimental host-native Sentinel service for local node development.">
                     <x-slot:actions>
                         <x-forms.button canGate="update" :canResource="$server"
                             wire:click="installHostSentinel" wire:loading.attr="disabled"

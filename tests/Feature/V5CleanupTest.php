@@ -67,8 +67,8 @@ it('records active v5 decisions separately from the archived prototype', functio
         ->toContain('in-place conversion');
 });
 
-it('replaces the normal testing host with systemd for v5 development', function () {
-    $compose = file_get_contents(base_path('docker-compose.v5-dev.yml'));
+it('replaces the normal testing host with systemd for node development', function () {
+    $compose = file_get_contents(base_path('docker-compose.node-dev.yml'));
     $defaultCompose = file_get_contents(base_path('docker-compose.dev.yml'));
     $dockerfile = file_get_contents(base_path('docker/testing-host/Dockerfile'));
 
@@ -87,8 +87,8 @@ it('replaces the normal testing host with systemd for v5 development', function 
         ->toContain('CMD ["/sbin/init"]');
 });
 
-it('runs the v5 development control channel with generated TLS files', function () {
-    $compose = file_get_contents(base_path('docker-compose.v5-dev.yml'));
+it('runs the node development control channel with generated TLS files', function () {
+    $compose = file_get_contents(base_path('docker-compose.node-dev.yml'));
 
     expect($compose)
         ->toContain('flux-pki-init:')

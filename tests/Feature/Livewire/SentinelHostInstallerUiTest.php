@@ -31,6 +31,7 @@ it('shows and runs the host installer in the gated development environment', fun
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->assertSee('Install host Sentinel')
+        ->assertSee('local node development')
         ->call('installHostSentinel')
         ->assertDispatched('success', 'Host Sentinel installed and started.');
 });

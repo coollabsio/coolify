@@ -5,7 +5,7 @@ set -Eeuo pipefail
 compose_files=(
     -f docker-compose.yml
     -f docker-compose.dev.yml
-    -f docker-compose.v5-dev.yml
+    -f docker-compose.node-dev.yml
 )
 
 compose() {

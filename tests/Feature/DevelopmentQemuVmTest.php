@@ -166,7 +166,7 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
         ->and($script)->toContain('compose up --detach --pull missing')
         ->and($script)->toContain('config --environment');
 
-    $compose = File::get(base_path('docker-compose.v5-dev.yml'));
+    $compose = File::get(base_path('docker-compose.node-dev.yml'));
     expect($compose)->toContain("postgres:\n        condition: service_healthy");
 });
 
