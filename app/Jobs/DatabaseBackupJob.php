@@ -894,4 +894,139 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
     }
+
+    private function handleFailure(\Throwable $e): void
+    {
+        if ($this->backup_log) {
+            $this->backup_log->update([
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function cleanupContainer(string $containerName): void
+    {
+
+        try {
+            instant_remote_process(
+                command: "docker rm -f {$containerName}",
+                server: $this->server,
+                throwError: false
+            );
+        } catch (\Throwable $ignored) {
+        }
+    }
+
+    private function finalizeExecution(): void
+    {
+        if ($this->team) {
+            BackupCreated::dispatch($this->team->id);
+        }
+
+        if ($this->backup_log) {
+            $this->reconcileLogStatus();
+        } elseif ($this->backup_log_uuid) {
+            $this->reconcileOrphanedLog();
+        }
+    }
+
+    private function reconcileLogStatus(): void
+    {
+        $updateData = ['finished_at' => \Carbon\Carbon::now()->toImmutable()];
+
+        if ($this->backup_log->status === 'running') {
+            if ($this->backup_location && $this->size > 0) {
+                $updateData['status'] = 'success';
+                $updateData['size'] = $this->size;
+                $updateData['message'] = $this->backup_output ?? 'Backup completed successfully';
+            } else {
+                $updateData['status'] = 'failed';
+                $updateData['message'] = 'Backup execution ended unexpectedly.';
+            }
+        }
+
+        $this->backup_log->update($updateData);
+    }
+
+    private function reconcileOrphanedLog(): void
+    {
+        $log = \App\Models\ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+
+        if ($log && $log->status === 'running') {
+            $log->update([
+                'status' => 'failed',
+                'message' => 'Backup execution finished but model reference was lost.',
+                'finished_at' => \Carbon\Carbon::now()->toImmutable(),
+            ]);
+        }
+    }
 }
+
+    private function handleFailure(\Throwable $e): void
+    {
+        if ($this->backup_log) {
+            $this->backup_log->update([
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function cleanupContainer(string $containerName): void
+    {
+        if (!$this->server) return;
+
+        try {
+            instant_remote_process(
+                command: "docker rm -f {$containerName}",
+                server: $this->server,
+                throwError: false
+            );
+        } catch (\Throwable $ignored) {
+        }
+    }
+
+    private function finalizeExecution(): void
+    {
+        if ($this->team) {
+            BackupCreated::dispatch($this->team->id);
+        }
+
+        if ($this->backup_log) {
+            $this->reconcileLogStatus();
+        } elseif ($this->backup_log_uuid) {
+            $this->reconcileOrphanedLog();
+        }
+    }
+
+    private function reconcileLogStatus(): void
+    {
+        $updateData = ['finished_at' => \Carbon\Carbon::now()->toImmutable()];
+
+        if ($this->backup_log->status === 'running') {
+            if ($this->backup_location && $this->size > 0) {
+                $updateData['status'] = 'success';
+                $updateData['size'] = $this->size;
+                $updateData['message'] = $this->backup_output ?? 'Backup completed successfully';
+            } else {
+                $updateData['status'] = 'failed';
+                $updateData['message'] = 'Backup execution ended unexpectedly.';
+            }
+        }
+
+        $this->backup_log->update($updateData);
+    }
+
+    private function reconcileOrphanedLog(): void
+    {
+        $log = \App\Models\ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+
+        if ($log && $log->status === 'running') {
+            $log->update([
+                'status' => 'failed',
+                'message' => 'Backup execution finished but model reference was lost.',
+                'finished_at' => \Carbon\Carbon::now()->toImmutable(),
+            ]);
+        }
+    }
