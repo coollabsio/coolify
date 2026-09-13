@@ -47,11 +47,13 @@
                                     <p class="truncate text-black dark:text-fg">{{ $nodeNamesByAddress[$ownerNodeIp] ?? 'Unknown Node' }}</p>
                                     <p class="font-mono text-[10px] text-neutral-500 dark:text-fg-faint">{{ $ownerNodeIp }}</p>
                                 </div>
-                                <x-status-badge :status="$statusLabel" :type="match ($status) {
-                                    'healthy', 'running' => 'success',
-                                    'expired', 'unhealthy' => 'error',
-                                    default => 'warning',
-                                }" />
+                                <div class="justify-self-start">
+                                    <x-status-badge :status="$statusLabel" :type="match ($status) {
+                                        'healthy', 'running' => 'success',
+                                        'expired', 'unhealthy' => 'error',
+                                        default => 'warning',
+                                    }" />
+                                </div>
                                 <span class="text-neutral-500 dark:text-fg-faint" title="{{ \Carbon\Carbon::createFromTimestamp(data_get($endpoint, 'expires_at'))->toIso8601String() }}">
                                     {{ \Carbon\Carbon::createFromTimestamp(data_get($endpoint, 'expires_at'))->diffForHumans() }}
                                 </span>

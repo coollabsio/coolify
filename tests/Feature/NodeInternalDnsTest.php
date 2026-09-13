@@ -91,6 +91,7 @@ it('shows dotted IP owner keys and falls back to the running state without a hea
         ->set('endpoints.0.expires_at', now()->addMinutes(5)->timestamp)
         ->assertSee('Worker Node A')
         ->assertSee('Running')
+        ->assertSee('justify-self-start', false)
         ->assertDontSee('Not reported')
         ->assertDontSee('Unknown Node');
 });
