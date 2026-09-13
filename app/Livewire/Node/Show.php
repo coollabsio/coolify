@@ -7,6 +7,7 @@ use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
+use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\ValidateNode;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
@@ -18,9 +19,12 @@ use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -35,6 +39,9 @@ class Show extends Component
 
     /** @var array<string, array{status: string, type: string}> */
     public array $workloadStates = [];
+
+    /** @var array<string, string> */
+    public array $dnsNames = [];
 
     public function mount(string $node_uuid): void
     {
@@ -156,6 +163,57 @@ class Show extends Component
         $this->dispatch('info', 'Workload state refreshed.');
     }
 
+    public function saveWorkloadDnsName(string $workloadUuid): void
+    {
+        $field = 'dnsNames.'.$workloadUuid;
+
+        try {
+            $this->authorize('update', $this->node);
+            $this->dnsNames[$workloadUuid] = strtolower(trim($this->dnsNames[$workloadUuid] ?? ''));
+            $this->validate([
+                $field => ['required', 'string', 'max:63', 'regex:/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/'],
+            ], [
+                $field.'.regex' => 'Use lowercase letters, numbers, and hyphens. Do not start or end with a hyphen.',
+            ]);
+
+            $workload = DB::transaction(function () use ($field, $workloadUuid): NodeWorkload {
+                $workload = NodeWorkload::query()
+                    ->where('uuid', $workloadUuid)
+                    ->where('team_id', $this->node->team_id)
+                    ->whereHas('nodes', fn ($query) => $query->whereKey($this->node->id))
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $dnsName = $this->dnsNames[$workloadUuid];
+                $hasCollision = $this->node->node_cluster_id !== null
+                    && NodeWorkload::query()
+                        ->whereKeyNot($workload->id)
+                        ->where('internal_dns_name', $dnsName)
+                        ->whereHas('nodes', fn ($query) => $query->where('node_cluster_id', $this->node->node_cluster_id))
+                        ->exists();
+                if ($hasCollision) {
+                    throw ValidationException::withMessages([
+                        $field => 'This internal DNS name is already in use in this mesh.',
+                    ]);
+                }
+
+                $workload->update(['internal_dns_name' => $dnsName]);
+
+                return $workload->load('nodes.cluster');
+            });
+
+            foreach ($workload->nodes as $workloadNode) {
+                PublishNodeDiscoveryEndpoints::run($workloadNode, now());
+            }
+
+            $this->loadNodeData();
+            $this->dispatch('success', 'Internal DNS name updated.');
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function testFluxConnection(): void
     {
         try {
@@ -215,6 +273,9 @@ class Show extends Component
                     'type' => $state->badgeType(),
                 ]];
             })
+            ->all();
+        $this->dnsNames = $this->node->workloads
+            ->mapWithKeys(fn ($workload): array => [$workload->uuid => $workload->internal_dns_name ?? ''])
             ->all();
     }
 

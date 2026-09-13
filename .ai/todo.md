@@ -1,25 +1,25 @@
-# Make internal workload DNS names permanent
+# Add internal DNS name editing to the Node UI
 
-- [x] Add failing tests for first-owner collision behavior and rename stability.
-- [x] Persist an immutable internal DNS label for each Node workload.
-- [x] Keep the first workload on the plain slug and suffix only later collisions.
-- [x] Keep the stored DNS label when the workload display name changes.
-- [x] Verify movement, collision, and ownership tests.
-- [x] Run formatting and focused tests.
+- [x] Add failing Livewire tests for valid, invalid, and colliding DNS names.
+- [x] Add an editable DNS label to each workload row.
+- [x] Validate authorization, DNS label syntax, and mesh uniqueness.
+- [x] Republish endpoint snapshots after a saved change.
+- [x] Run focused tests, Blade validation, and the frontend build.
+- [x] Verify the rendered UI behavior with Livewire tests. No Jean Run environment was available for browser automation.
 - [x] Search GitHub issues and discussions.
 - [x] Record review evidence and commit the change.
 
 ## Review
 
-- `node_workloads.internal_dns_name` stores the permanent DNS label.
-- The first assigned workload claims the plain slug. A later workload with the same slug in that mesh gets the shortest unique UUID suffix, starting at eight characters.
-- Allocation uses a database transaction and row locks. Existing stored names take precedence over unallocated names.
-- Renaming a workload changes only its display name. Publication continues to use its stored DNS label.
-- The same plain DNS label can exist in a separate mesh because Corrosion data is mesh-local.
-- Coolify tests: 18 passed, 83 assertions.
-- Pint and `git diff --check` passed.
-- Live test at http://localhost:8000: `web-a` kept `web-a.default.coolify.internal`; a new colliding workload received `web-a-dnscolli.default.coolify.internal` and resolved to Node B.
-- Live rename test: renaming `web-b` to `web-a` kept its permanent `web-b.default.coolify.internal` record.
-- Live cleanup removed the temporary workload, container row, pivot row, and suffixed DNS record. The original `web-a` and `web-b` records still resolve.
+- Admins and owners can edit the permanent DNS label from each workload row on the Node page.
+- The UI shows the fixed `.default.coolify.internal` suffix and sends one workload UUID to the save action.
+- Input is normalized to lowercase and must be one valid DNS label of at most 63 characters.
+- A name already used by another workload in the same mesh is rejected with an inline validation error.
+- The save query is scoped to the current team and Node. Members and cross-team identifiers cannot update a workload.
+- A successful save republishes owned discovery snapshots for all Nodes assigned to that workload.
+- Coolify tests: 32 passed, 144 assertions.
+- Pint, Blade cache validation, Blade cache clearing, Vite production build, and `git diff --check` passed.
+- Vite reported the existing CSS comment parser warning; the build completed successfully.
+- The development app is available at http://localhost:8000, but Jean reported no Run environment for browser automation.
 - Related: open issue https://github.com/coollabsio/coolify/issues/5685.
-- Similar: closed issue https://github.com/coollabsio/coolify/issues/11142 and open discussion https://github.com/coollabsio/coolify/discussions/9377.
+- Similar: closed issues https://github.com/coollabsio/coolify/issues/11142 and https://github.com/coollabsio/coolify/issues/11254, plus open discussion https://github.com/coollabsio/coolify/discussions/9377.

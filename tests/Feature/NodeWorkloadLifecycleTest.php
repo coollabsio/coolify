@@ -8,6 +8,7 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Node\Show;
 use App\Models\InstanceSettings;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -184,6 +185,99 @@ it('queues an authorized lifecycle action from the Node page', function () {
         'action' => 'restart',
     ]);
     Queue::assertPushed(ManageNodeWorkloadJob::class, fn ($job) => $job->operationId === $operation->id);
+});
+
+it('updates a permanent workload dns name from the Node page', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $user->teams()->attach($this->team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+    $cluster = NodeCluster::factory()->create([
+        'team_id' => $this->team->id,
+        'network_status' => 'active',
+    ]);
+    $this->node->update([
+        'node_cluster_id' => $cluster->id,
+        'wireguard_ip' => '10.250.0.2',
+    ]);
+    $this->workload->update(['internal_dns_name' => 'example-app']);
+    Http::fake(fn ($request) => Http::response([
+        'command_id' => $request['command_id'],
+        'observed_at_unix_ms' => now()->getTimestampMs(),
+        'owner_node_ip' => $request['owner_node_ip'],
+        'endpoint_count' => count($request['endpoints']),
+    ]));
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSet('dnsNames.'.$this->workload->uuid, 'example-app')
+        ->assertSee('Internal DNS name')
+        ->set('dnsNames.'.$this->workload->uuid, 'stable-api')
+        ->call('saveWorkloadDnsName', $this->workload->uuid)
+        ->assertHasNoErrors()
+        ->assertDispatched('success', 'Internal DNS name updated.');
+
+    expect($this->workload->refresh()->internal_dns_name)->toBe('stable-api');
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/v1/commands/discovery.corrosion.endpoints.reconcile'));
+});
+
+it('rejects invalid or colliding workload dns names from the Node page', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $user->teams()->attach($this->team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $this->node->update(['node_cluster_id' => $cluster->id]);
+    $this->workload->update(['internal_dns_name' => 'example-app']);
+    $otherWorkload = NodeWorkload::factory()->create([
+        'team_id' => $this->team->id,
+        'internal_dns_name' => 'existing-api',
+    ]);
+    $this->node->workloads()->attach($otherWorkload);
+
+    $component = Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->set('dnsNames.'.$this->workload->uuid, 'Invalid DNS Name')
+        ->call('saveWorkloadDnsName', $this->workload->uuid)
+        ->assertHasErrors('dnsNames.'.$this->workload->uuid);
+
+    $component->set('dnsNames.'.$this->workload->uuid, 'existing-api')
+        ->call('saveWorkloadDnsName', $this->workload->uuid)
+        ->assertHasErrors('dnsNames.'.$this->workload->uuid);
+
+    expect($this->workload->refresh()->internal_dns_name)->toBe('example-app');
+});
+
+it('does not let members or cross-team identifiers change workload dns names', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $this->workload->update(['internal_dns_name' => 'example-app']);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->set('dnsNames.'.$this->workload->uuid, 'member-change')
+        ->call('saveWorkloadDnsName', $this->workload->uuid);
+
+    expect($this->workload->refresh()->internal_dns_name)->toBe('example-app');
+
+    $owner = User::factory()->create();
+    $owner->teams()->attach($this->team, ['role' => 'owner']);
+    $foreignWorkload = NodeWorkload::factory()->create([
+        'team_id' => $owner->teams->firstWhere('id', '!=', $this->team->id)->id,
+        'internal_dns_name' => 'foreign-app',
+    ]);
+    $this->actingAs($owner);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->set('dnsNames.'.$foreignWorkload->uuid, 'stolen-name')
+        ->call('saveWorkloadDnsName', $foreignWorkload->uuid);
+
+    expect($foreignWorkload->refresh()->internal_dns_name)->toBe('foreign-app');
 });
 
 it('queues lifecycle recovery from the Node page', function () {

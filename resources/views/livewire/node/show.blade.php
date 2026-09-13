@@ -89,6 +89,19 @@
                             @else
                                 <p class="text-xs text-neutral-500 dark:text-fg-faint">No revision is available.</p>
                             @endif
+                            @can('update', $node)
+                                <form wire:submit="saveWorkloadDnsName('{{ $workload->uuid }}')" class="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+                                    <div class="min-w-0 flex-1">
+                                        <x-forms.input wire:model="dnsNames.{{ $workload->uuid }}" label="Internal DNS name" maxlength="63" required />
+                                        <p class="mt-1 truncate font-mono text-[10px] text-neutral-500 dark:text-fg-faint">.default.coolify.internal</p>
+                                    </div>
+                                    <x-forms.button type="submit" wire:loading.attr="disabled" wire:target="saveWorkloadDnsName('{{ $workload->uuid }}')">Save DNS name</x-forms.button>
+                                </form>
+                            @else
+                                @if ($workload->internal_dns_name)
+                                    <p class="mt-2 truncate font-mono text-[10px] text-neutral-500 dark:text-fg-faint">{{ $workload->internal_dns_name }}.default.coolify.internal</p>
+                                @endif
+                            @endcan
                         </div>
                         @if ($revision)
                             <div class="flex flex-wrap items-center gap-2">
