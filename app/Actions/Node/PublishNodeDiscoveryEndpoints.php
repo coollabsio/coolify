@@ -25,6 +25,20 @@ class PublishNodeDiscoveryEndpoints
         }
 
         $updatedAt = $observedAt->getTimestamp();
+        $nodeId = Str::slug($node->name);
+        if ($nodeId === '') {
+            $nodeId = strtolower($node->uuid);
+        }
+        $nodeEndpoint = [
+            'workload_id' => Str::limit($nodeId, 63, ''),
+            'namespace' => 'nodes',
+            'owner_node_ip' => $node->wireguard_ip,
+            'container_ip' => $node->wireguard_ip,
+            'state' => 'running',
+            'health' => 'healthy',
+            'updated_at_unix_seconds' => $updatedAt,
+            'expires_at_unix_seconds' => $updatedAt + self::ENDPOINT_TTL_SECONDS,
+        ];
         $endpoints = $node->containers()
             ->where('is_managed', true)
             ->with('workload:id,uuid,name')
@@ -48,6 +62,7 @@ class PublishNodeDiscoveryEndpoints
                     'expires_at_unix_seconds' => $updatedAt + self::ENDPOINT_TTL_SECONDS,
                 ];
             })
+            ->prepend($nodeEndpoint)
             ->values()
             ->all();
         $request = [

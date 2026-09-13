@@ -89,7 +89,7 @@ it('publishes an owned expiring discovery snapshot for managed cluster workloads
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
     $cluster = CreateNodeCluster::run($team, $user, 'Discovery mesh');
-    $node = Node::factory()->create(['team_id' => $team->id]);
+    $node = Node::factory()->create(['team_id' => $team->id, 'name' => 'Worker Node A']);
     AssignNodeToCluster::run($cluster, $node);
     $cluster->update(['network_status' => 'active']);
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'Example App']);
@@ -124,7 +124,7 @@ it('publishes an owned expiring discovery snapshot for managed cluster workloads
             'command_id' => $request['command_id'],
             'observed_at_unix_ms' => 1_789_237_260_100,
             'owner_node_ip' => $node->wireguard_ip,
-            'endpoint_count' => 1,
+            'endpoint_count' => 2,
         ]);
     });
 
@@ -134,6 +134,15 @@ it('publishes an owned expiring discovery snapshot for managed cluster workloads
     expect($operation->status)->toBe(NodeOperationStatus::SUCCEEDED)
         ->and($operation->request['owner_node_ip'])->toBe($node->wireguard_ip)
         ->and($operation->request['endpoints'])->toBe([[
+            'workload_id' => 'worker-node-a',
+            'namespace' => 'nodes',
+            'owner_node_ip' => $node->wireguard_ip,
+            'container_ip' => $node->wireguard_ip,
+            'state' => 'running',
+            'health' => 'healthy',
+            'updated_at_unix_seconds' => 1_789_237_260,
+            'expires_at_unix_seconds' => 1_789_237_560,
+        ], [
             'workload_id' => 'example-app',
             'namespace' => 'default',
             'owner_node_ip' => $node->wireguard_ip,

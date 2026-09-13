@@ -1,20 +1,19 @@
-# Add the Node internal DNS view
+# Add canonical Node DNS records
 
-- [x] Add tests for Corrosion row parsing, authorization, route visibility, and refresh behavior.
-- [x] Add a Node-scoped action that reads discovery endpoints from Corrosion.
-- [x] Add an Internal DNS page to the existing Node side menu.
-- [x] Show hostname, address, owner Node, runtime status, and expiry with copy controls.
-- [x] Add a refresh action and clear error state.
-- [x] Run focused tests, Pint, Blade validation, frontend build, and live data verification.
+- [x] Add a failing test for the canonical Node endpoint in each discovery snapshot.
+- [x] Publish a stable `<node>.nodes.coolify.internal` record with the Node WireGuard address.
+- [x] Show the Node record in the existing Internal DNS view.
+- [x] Verify forward and reverse lookup on both Nodes, including replication and restart.
+- [x] Run focused tests, Pint, Blade validation, and the frontend build.
 - [x] Search related GitHub issues and discussions.
 - [x] Record review and verification results.
 
 ## Review
 
-- The page reuses the existing Node settings workspace and side menu.
-- Reads are scoped to a current-team Node and authorized with the Node view policy.
-- Corrosion output is validated before it reaches Livewire state; SSH errors use safe UI text.
-- The live development cluster returned both `web-a` and `web-b` records through the new action.
-- Pint, 44 focused tests with 109 assertions, Blade cache validation, and the Vite production build passed.
-- Jean reported no configured Run environment, so no browser session was available for live visual verification.
-- No exact GitHub issue matches were found. Related open issue: https://github.com/coollabsio/coolify/issues/5685. Similar open discussion: https://github.com/coollabsio/coolify/discussions/9377.
+- Each Node now adds one healthy `nodes` namespace endpoint to its existing owned Corrosion snapshot.
+- The Node hostname uses the slug of the Node name and expires through the same five-minute ownership lease as workload records.
+- Both Nodes resolved `qemu-worker-node-a.nodes.coolify.internal` and `qemu-worker-node-b.nodes.coolify.internal` after replication and service restarts.
+- PTR responses include the canonical Node name and the workload name for the shared Node address.
+- The existing Internal DNS action returned both Node records and both workload records.
+- Pint, 13 focused tests with 67 assertions, Blade compilation, and the Vite production build passed.
+- No exact matching GitHub issue was found. Related open issue: https://github.com/coollabsio/coolify/issues/5685. Similar open discussion: https://github.com/coollabsio/coolify/discussions/9377.
