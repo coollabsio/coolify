@@ -76,3 +76,21 @@ test('rejecting resumes with a reject decision', function () {
 
     Bus::assertDispatched(ResumeAssistantTurn::class, fn ($job) => $job->decisions['call_1'] === ['action' => 'reject']);
 });
+
+test('accepting hides the approval card immediately without waiting for the turn', function () {
+    Bus::fake();
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->assertSee('Create postgresql database.')
+        ->call('approve', 'call_1')
+        ->assertDontSee('Create postgresql database.');
+});
+
+test('rejecting hides the approval card immediately without waiting for the turn', function () {
+    Bus::fake();
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->assertSee('Create postgresql database.')
+        ->call('reject', 'call_1')
+        ->assertDontSee('Create postgresql database.');
+});

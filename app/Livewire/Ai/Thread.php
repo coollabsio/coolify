@@ -53,6 +53,15 @@ class Thread extends Component
     public array $approvalInputs = [];
 
     /**
+     * Tool-call ids the viewer has already accepted or cancelled this session.
+     * Their cards are hidden immediately, without waiting for the resumed turn
+     * to finish and clear the pending marker in the database.
+     *
+     * @var array<int, string>
+     */
+    public array $resolvedApprovals = [];
+
+    /**
      * Approvable AI tools that expose a generative approval form.
      *
      * @var array<int, class-string>
@@ -217,6 +226,7 @@ class Thread extends Component
         }
 
         $pending = (array) (json_decode($row->approval_state ?? 'null', true)['pending'] ?? []);
+        $pending = collect($pending)->except($this->resolvedApprovals)->all();
         if ($pending === []) {
             return [];
         }
@@ -347,7 +357,10 @@ class Thread extends Component
         }
 
         ResumeAssistantTurn::dispatch($conversation->id, [$callId => $this->decisionFor($callId, $approved)], auth()->id());
-        unset($this->conversation, $this->busy);
+
+        // Hide the card now; don't wait for the resumed turn to clear the DB marker.
+        $this->resolvedApprovals[] = $callId;
+        unset($this->conversation, $this->busy, $this->pendingApprovals);
     }
 
     /**
