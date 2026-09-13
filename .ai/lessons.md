@@ -45,3 +45,4 @@
 - Add a UUID suffix only for DNS slugs that collide inside the same mesh; keep unique friendly names unchanged.
 - Internal DNS labels are permanent identifiers: persist them separately from display names, keep the first mesh owner on the plain slug, and suffix only later collisions.
 - When the user defers workload scheduling hardening, return to the agreed Node networking architecture roadmap instead of continuing move-specific work.
+- When the user returns to the networking architecture firewall part, focus on scoped nftables policy, published-port intent, reconciliation, rollback, and verification before service routing work.
