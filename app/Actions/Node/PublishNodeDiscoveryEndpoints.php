@@ -19,12 +19,19 @@ class PublishNodeDiscoveryEndpoints
 
     public function handle(Node $node, Carbon $observedAt): void
     {
-        $node->loadMissing('cluster');
+        $node->loadMissing('cluster.nodes.workloads');
         if ($node->cluster === null || $node->cluster->network_status !== 'active' || blank($node->wireguard_ip)) {
             return;
         }
 
         $updatedAt = $observedAt->getTimestamp();
+        $collidingWorkloadIds = $node->cluster->nodes
+            ->flatMap->workloads
+            ->unique('uuid')
+            ->groupBy(fn ($workload): string => $this->baseWorkloadId($workload->name, $workload->uuid))
+            ->filter(fn ($workloads, string $workloadId): bool => $workloadId !== '' && $workloads->count() > 1)
+            ->keys()
+            ->flip();
         $nodeId = Str::slug($node->name);
         if ($nodeId === '') {
             $nodeId = strtolower($node->uuid);
@@ -45,14 +52,15 @@ class PublishNodeDiscoveryEndpoints
             ->orderBy('id')
             ->get()
             ->filter(fn ($container): bool => $container->workload !== null)
-            ->map(function ($container) use ($node, $updatedAt): array {
-                $workloadId = Str::slug($container->workload->name);
-                if ($workloadId === '') {
-                    $workloadId = strtolower($container->workload->uuid);
+            ->map(function ($container) use ($collidingWorkloadIds, $node, $updatedAt): array {
+                $workloadId = $this->baseWorkloadId($container->workload->name, $container->workload->uuid);
+                if ($collidingWorkloadIds->has($workloadId)) {
+                    $suffix = strtolower(substr($container->workload->uuid, 0, 8));
+                    $workloadId = Str::limit($workloadId, 63 - strlen($suffix) - 1, '').'-'.$suffix;
                 }
 
                 return [
-                    'workload_id' => Str::limit($workloadId, 63, ''),
+                    'workload_id' => $workloadId,
                     'namespace' => 'default',
                     'owner_node_ip' => $node->wireguard_ip,
                     'container_ip' => $node->wireguard_ip,
@@ -118,6 +126,16 @@ class PublishNodeDiscoveryEndpoints
             }
             throw $exception;
         }
+    }
+
+    private function baseWorkloadId(string $name, string $uuid): string
+    {
+        $workloadId = Str::slug($name);
+        if ($workloadId === '') {
+            $workloadId = strtolower($uuid);
+        }
+
+        return Str::limit($workloadId, 63, '');
     }
 
     private function discoveryState(string $state): string

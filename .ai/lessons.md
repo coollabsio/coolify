@@ -42,3 +42,4 @@
 - Do not use `data_get` for maps keyed by IP addresses because dots are treated as nested paths. Use direct array access. When container health is unavailable, show the known runtime state instead of another unknown-style label.
 - Keep inline badges from stretching in layout containers. Use a `justify-self-start` wrapper for CSS Grid items and `self-start` for items in column flex layouts.
 - When the user selects DNS lifecycle verification, test workload movement, stop, removal, expiry, and recovery before proposing DNS-name customization.
+- Add a UUID suffix only for DNS slugs that collide inside the same mesh; keep unique friendly names unchanged.

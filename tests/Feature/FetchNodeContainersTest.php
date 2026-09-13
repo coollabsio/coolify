@@ -3,6 +3,7 @@
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Enums\NodeContainerManagementState;
 use App\Enums\NodeOperationStatus;
 use App\Models\InstanceSettings;
@@ -250,4 +251,101 @@ it('withdraws and republishes workload discovery when a workload moves between n
         ->toBe(NodeContainerManagementState::UNRECOGNIZED)
         ->and($nodeB->containers()->where('runtime_id', 'container-'.$nodeB->uuid)->firstOrFail()->management_state)
         ->toBe(NodeContainerManagementState::MANAGED);
+});
+
+it('adds a short uuid only when workload slugs collide in the same mesh', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $user, 'Collision mesh');
+    $nodeA = Node::factory()->create(['team_id' => $team->id, 'name' => 'Worker A']);
+    $nodeB = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $nodeA->private_key_id,
+        'name' => 'Worker B',
+    ]);
+    AssignNodeToCluster::run($cluster, $nodeA);
+    AssignNodeToCluster::run($cluster, $nodeB);
+    $cluster->update(['network_status' => 'active']);
+    $firstWorkload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'My App']);
+    $secondWorkload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'my-app']);
+    $nodeA->workloads()->attach($firstWorkload);
+    $nodeB->workloads()->attach($secondWorkload);
+    $nodeA->containers()->create([
+        'runtime_id' => 'container-a',
+        'name' => 'container-a',
+        'image' => 'alpine',
+        'state' => 'running',
+        'labels' => [],
+        'management_state' => NodeContainerManagementState::MANAGED,
+        'is_managed' => true,
+        'node_workload_id' => $firstWorkload->id,
+        'observed_at' => now(),
+    ]);
+    $nodeB->containers()->create([
+        'runtime_id' => 'container-b',
+        'name' => 'container-b',
+        'image' => 'alpine',
+        'state' => 'running',
+        'labels' => [],
+        'management_state' => NodeContainerManagementState::MANAGED,
+        'is_managed' => true,
+        'node_workload_id' => $secondWorkload->id,
+        'observed_at' => now(),
+    ]);
+    $otherCluster = CreateNodeCluster::run($team, $user, 'Other mesh');
+    $nodeC = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $nodeA->private_key_id,
+        'name' => 'Worker C',
+    ]);
+    AssignNodeToCluster::run($otherCluster, $nodeC);
+    $otherCluster->update(['network_status' => 'active']);
+    $otherMeshWorkload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'My App']);
+    $nodeC->workloads()->attach($otherMeshWorkload);
+    $nodeC->containers()->create([
+        'runtime_id' => 'container-c',
+        'name' => 'container-c',
+        'image' => 'alpine',
+        'state' => 'running',
+        'labels' => [],
+        'management_state' => NodeContainerManagementState::MANAGED,
+        'is_managed' => true,
+        'node_workload_id' => $otherMeshWorkload->id,
+        'observed_at' => now(),
+    ]);
+    $requests = [];
+    Http::fake(function (Request $request) use (&$requests) {
+        $requests[] = $request->data();
+
+        return Http::response([
+            'command_id' => $request['command_id'],
+            'observed_at_unix_ms' => now()->getTimestampMs(),
+            'owner_node_ip' => $request['owner_node_ip'],
+            'endpoint_count' => count($request['endpoints']),
+        ]);
+    });
+
+    PublishNodeDiscoveryEndpoints::run($nodeA->refresh(), now());
+    PublishNodeDiscoveryEndpoints::run($nodeB->refresh(), now()->addSecond());
+    PublishNodeDiscoveryEndpoints::run($nodeC->refresh(), now()->addSeconds(2));
+
+    $workloadIds = collect($requests)
+        ->flatMap(fn (array $request): array => collect($request['endpoints'])
+            ->where('namespace', 'default')
+            ->pluck('workload_id')
+            ->all())
+        ->sort()
+        ->values()
+        ->all();
+
+    $expectedWorkloadIds = collect([
+        'my-app',
+        'my-app-'.strtolower(substr($firstWorkload->uuid, 0, 8)),
+        'my-app-'.strtolower(substr($secondWorkload->uuid, 0, 8)),
+    ])->sort()->values()->all();
+
+    expect($workloadIds)->toBe($expectedWorkloadIds)
+        ->and($workloadIds)->not->toContain('my-app-'.strtolower(substr($otherMeshWorkload->uuid, 0, 8)));
 });
