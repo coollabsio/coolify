@@ -41,8 +41,6 @@ class ToolActivity
         'set' => 'Updating',
     ];
 
-    public function __construct() {}
-
     public static function label(?string $toolName): string
     {
         $words = Str::of((string) $toolName)->snake()->replace('_', ' ')->squish();

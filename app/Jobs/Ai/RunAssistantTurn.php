@@ -16,6 +16,7 @@ use App\Events\Ai\AssistantTurnFailed;
 use App\Jobs\Ai\Concerns\ActsAsTeamMember;
 use App\Models\AiConversation;
 use App\Models\AiProviderCredential;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -52,6 +53,10 @@ class RunAssistantTurn implements ShouldQueue
         }
 
         $isFirstTurn = ! $conversation->sdk_conversation_id;
+
+        // Drop a stale stop flag from a late "stop" click on a previous turn, so
+        // this fresh turn is not cancelled before it starts.
+        AssistantTurn::clearStop($conversation->uuid);
 
         try {
             $credential = AiProviderCredential::defaultForTeam($conversation->team_id);
@@ -135,6 +140,10 @@ class RunAssistantTurn implements ShouldQueue
             if ($isFirstTurn && blank($conversation->title)) {
                 GenerateConversationTitle::dispatch($conversation->id, $this->message, $this->userId);
             }
+        } catch (AuthorizationException $e) {
+            // Deny-before-card / policy denial from a tool: report it cleanly
+            // rather than surfacing the raw "This action is unauthorized." string.
+            broadcast(new AssistantTurnFailed($conversation->uuid, 'You do not have permission to perform that action.'));
         } catch (Throwable $e) {
             broadcast(new AssistantTurnFailed($conversation->uuid, $e->getMessage()));
         } finally {
@@ -142,6 +151,24 @@ class RunAssistantTurn implements ShouldQueue
             $conversation->release();
             $this->clearTeamMemberContext();
         }
+    }
+
+    /**
+     * On a hard failure (e.g. the worker killing the process on timeout), the
+     * finally block above never runs, so the conversation stays stuck in
+     * "responding" and every later send throws AssistantBusyException. Clear the
+     * turn state, release the claim, and tell the client the turn failed.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $conversation = AiConversation::find($this->conversationId);
+        if (! $conversation) {
+            return;
+        }
+
+        AssistantTurn::clear($conversation->uuid);
+        $conversation->release();
+        broadcast(new AssistantTurnFailed($conversation->uuid, 'The assistant stopped unexpectedly. Please try again.'));
     }
 
     /**

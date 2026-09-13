@@ -16,14 +16,26 @@ class AssistantConversationRenamed implements ShouldBroadcastNow
         public int $teamId,
         public int $conversationId,
         public string $title,
+        public string $visibility = 'team',
+        public ?int $ownerUserId = null,
     ) {}
 
     /**
+     * A private conversation's title (derived from its first message) must not
+     * leak to the whole team, so it is broadcast only to its owner. Shared
+     * conversations broadcast to the team so every member's sidebar updates.
+     *
      * @return array<int, PrivateChannel>
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("team.{$this->teamId}")];
+        if ($this->visibility === 'team') {
+            return [new PrivateChannel("team.{$this->teamId}")];
+        }
+
+        return $this->ownerUserId
+            ? [new PrivateChannel("user.{$this->ownerUserId}")]
+            : [];
     }
 
     public function broadcastAs(): string

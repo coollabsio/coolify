@@ -6,6 +6,7 @@ use App\Ai\TestConnection;
 use App\Enums\AiProvider;
 use App\Models\AiProviderCredential;
 use App\Models\InstanceSettings;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -84,7 +85,9 @@ class Ai extends Component
                 'newProvider' => 'required|string|in:'.implode(',', array_column(AiProvider::cases(), 'value')),
                 'newModel' => 'required|string|max:255',
                 'newApiKey' => 'required|string|max:1000',
-                'newBaseUrl' => 'nullable|url|max:2000',
+                // Block SSRF to internal services (TestConnection echoes the response
+                // body back to the admin); reuse the shared internal-host allowlist.
+                'newBaseUrl' => ['nullable', 'url', 'max:2000', new SafeExternalUrl],
             ]);
 
             $isFirst = AiProviderCredential::where('team_id', currentTeam()->id)->count() === 0;

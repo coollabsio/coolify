@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\Ai\ResumeAssistantTurn;
 use App\Livewire\Ai\Thread;
 use App\Models\AiConversation;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
@@ -80,4 +82,25 @@ test('pending create approval carries a pre-filled editable form and seeds input
     expect($html)->toContain('approvalInputs.call_1.name')
         ->and($html)->toContain('Deploy immediately')
         ->and($html)->toContain('Engine');
+});
+
+test('approving ignores client edits to locked fields', function () {
+    Bus::fake();
+    seedPendingCreate([
+        'type' => 'postgresql', 'name' => 'seed-pg',
+        'project_uuid' => 'p1', 'environment_name' => 'production', 'server_uuid' => 's1',
+    ]);
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->set('approvalInputs.call_1.name', 'renamed')        // editable → kept
+        ->set('approvalInputs.call_1.project_uuid', 'p2')     // locked → must be dropped
+        ->call('approve', 'call_1');
+
+    Bus::assertDispatched(ResumeAssistantTurn::class, function ($job) {
+        $decision = $job->decisions['call_1'];
+
+        return $decision['action'] === 'edit'
+            && ($decision['arguments']['name'] ?? null) === 'renamed'
+            && ($decision['arguments']['project_uuid'] ?? null) === 'p1';
+    });
 });

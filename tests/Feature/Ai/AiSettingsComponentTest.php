@@ -38,6 +38,21 @@ test('admin can add a credential and it becomes default when first', function ()
         ->and($cred->api_key)->toBe('sk-abc');
 });
 
+test('a base url pointing at an internal host is rejected (SSRF)', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => ['id' => $this->team->id]]);
+
+    Livewire::test(Ai::class)
+        ->set('newProvider', AiProvider::OPENAI_COMPATIBLE->value)
+        ->set('newModel', 'local-model')
+        ->set('newApiKey', 'sk-abc')
+        ->set('newBaseUrl', 'http://169.254.169.254/latest/meta-data')
+        ->call('addCredential')
+        ->assertDispatched('error');
+
+    expect(AiProviderCredential::where('team_id', $this->team->id)->count())->toBe(0);
+});
+
 test('member cannot open the ai settings page', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => ['id' => $this->team->id]]);

@@ -3,30 +3,32 @@
 {{-- Only known field types render; unknown types are ignored (catalog guardrail). --}}
 <div class="flex flex-col gap-3">
     @foreach ($form['fields'] as $field)
+        {{-- The form components use `id` as their wire:model binding, so passing a
+             separate `id` alongside `wire:model` renders a duplicate (and wrong)
+             wire:model. Bind with wire:model only. --}}
         @php($model = "approvalInputs.{$callId}.{$field['key']}")
-        @php($fieldId = "approval-{$callId}-{$field['key']}")
         @switch($field['type'])
             @case('text')
-                <x-forms.input :id="$fieldId" :label="$field['label']" wire:model="{{ $model }}"
+                <x-forms.input :label="$field['label']" wire:model="{{ $model }}"
                     :required="$field['required']" :helper="$field['help']" />
                 @break
 
             @case('number')
-                <x-forms.input type="number" :id="$fieldId" :label="$field['label']" wire:model="{{ $model }}"
+                <x-forms.input type="number" :label="$field['label']" wire:model="{{ $model }}"
                     :required="$field['required']" :helper="$field['help']" />
                 @break
 
             @case('textarea')
-                <x-forms.textarea :id="$fieldId" :label="$field['label']" wire:model="{{ $model }}"
+                <x-forms.textarea :label="$field['label']" wire:model="{{ $model }}"
                     :required="$field['required']" :helper="$field['help']" />
                 @break
 
             @case('toggle')
-                <x-forms.checkbox :id="$fieldId" :label="$field['label']" wire:model="{{ $model }}" />
+                <x-forms.checkbox :label="$field['label']" wire:model="{{ $model }}" />
                 @break
 
             @case('select')
-                <x-forms.select :id="$fieldId" :label="$field['label']" wire:model="{{ $model }}">
+                <x-forms.select :label="$field['label']" wire:model="{{ $model }}">
                     @foreach ($field['options'] as $option)
                         <option value="{{ $option }}">{{ $option }}</option>
                     @endforeach

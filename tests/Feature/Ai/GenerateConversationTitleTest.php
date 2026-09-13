@@ -1,12 +1,15 @@
 <?php
 
 use App\Ai\Support\PageContext;
+use App\Events\Ai\AssistantConversationRenamed;
 use App\Jobs\Ai\GenerateConversationTitle;
 use App\Models\AiConversation;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
@@ -74,4 +77,40 @@ test('uses a sensible default when the prompt is empty', function () {
     (new GenerateConversationTitle($conversation->id, '   ', $this->user->id))->handle();
 
     expect($conversation->fresh()->title)->toBe('New conversation');
+});
+
+test('a private title broadcasts only to its owner, never the whole team', function () {
+    Event::fake([AssistantConversationRenamed::class]);
+    $conversation = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'title' => null,
+        'visibility' => AiConversation::VISIBILITY_PRIVATE,
+    ]);
+
+    (new GenerateConversationTitle($conversation->id, 'Fix my crashing database', $this->user->id))->handle();
+
+    Event::assertDispatched(AssistantConversationRenamed::class, function ($event) {
+        $channels = collect($event->broadcastOn())->map(fn (PrivateChannel $c) => $c->name);
+
+        return $event->visibility === 'private'
+            && $channels->contains("private-user.{$this->user->id}")
+            && ! $channels->contains("private-team.{$this->team->id}");
+    });
+});
+
+test('a shared title broadcasts to the team', function () {
+    Event::fake([AssistantConversationRenamed::class]);
+    $conversation = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'title' => null,
+        'visibility' => AiConversation::VISIBILITY_TEAM,
+    ]);
+
+    (new GenerateConversationTitle($conversation->id, 'Team-wide question', $this->user->id))->handle();
+
+    Event::assertDispatched(AssistantConversationRenamed::class, function ($event) {
+        $channels = collect($event->broadcastOn())->map(fn (PrivateChannel $c) => $c->name);
+
+        return $channels->contains("private-team.{$this->team->id}");
+    });
 });

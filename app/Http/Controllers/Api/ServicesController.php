@@ -469,7 +469,10 @@ class ServicesController extends Controller
         ], fn ($v) => $v !== null);
 
         try {
-            $service = CreateService::run($placement, $isCompose ? null : $request->type, $isCompose ? $request->docker_compose_raw : null, $data, (bool) $instantDeploy);
+            // Create without deploying: the service is only safe to deploy once
+            // URL validation below has passed. A 409/422 here deletes the service,
+            // and an already-queued StartService would still deploy the deleted one.
+            $service = CreateService::run($placement, $isCompose ? null : $request->type, $isCompose ? $request->docker_compose_raw : null, $data, false);
         } catch (ResourcePlacementException|ResourceCreationException $e) {
             return $this->creationErrorResponse($e);
         } catch (\RuntimeException $e) {
@@ -493,6 +496,11 @@ class ServicesController extends Controller
         }
         if ($request->has('tags')) {
             $this->attachTagsToResource($service, $request->tags, $teamId);
+        }
+
+        // Deploy only now that creation, URL validation, and tagging all succeeded.
+        if ($instantDeploy) {
+            StartService::dispatch($service);
         }
 
         auditLog('api.service.created', [

@@ -1,10 +1,22 @@
 <div x-data="{
+    teamChannel: 'team.{{ currentTeam()->id }}',
+    userChannel: 'user.{{ auth()->id() }}',
     init() {
         if (! window.Echo) { return; }
         // Live-refresh the sidebar + header when a conversation is renamed
-        // (AI title generation lands after the first reply).
-        window.Echo.private('team.{{ currentTeam()->id }}')
-            .listen('.assistant.conversation.renamed', () => $wire.$refresh());
+        // (AI title generation lands after the first reply). Team-shared renames
+        // arrive on the team channel; a private conversation's title is scoped to
+        // its owner's user channel so it never leaks to other members.
+        const refresh = () => $wire.$refresh();
+        window.Echo.private(this.teamChannel).listen('.assistant.conversation.renamed', refresh);
+        window.Echo.private(this.userChannel).listen('.assistant.conversation.renamed', refresh);
+    },
+    destroy() {
+        // Leave the channels on teardown (SPA navigation) so listeners do not
+        // stack up on components that no longer exist.
+        if (! window.Echo) { return; }
+        window.Echo.leave(this.teamChannel);
+        window.Echo.leave(this.userChannel);
     },
 }"
     {{-- Full-bleed app shell: on desktop it fills the area below the top bar and

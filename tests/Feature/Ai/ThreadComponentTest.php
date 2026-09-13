@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -134,6 +135,21 @@ test('a member cannot open another members private thread', function () {
 
     expect(fn () => Livewire::test(Thread::class, ['conversationId' => $private->id]))
         ->toThrow(AuthorizationException::class);
+});
+
+test('the client cannot repoint the thread at another conversation (locked)', function () {
+    $other = User::factory()->create();
+    $other->teams()->attach($this->team, ['role' => 'member']);
+    $foreign = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $other->id,
+        'visibility' => AiConversation::VISIBILITY_PRIVATE,
+    ]);
+
+    // mount authorizes the caller's own conversation; #[Locked] then blocks any
+    // client attempt to swap conversationId to a thread they cannot view.
+    expect(fn () => Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->set('conversationId', $foreign->id))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
 });
 
 test('user messages carry the sender avatar and the viewer avatar is exposed', function () {

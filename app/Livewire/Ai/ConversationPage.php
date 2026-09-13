@@ -3,6 +3,7 @@
 namespace App\Livewire\Ai;
 
 use App\Ai\Exceptions\AssistantBusyException;
+use App\Ai\Exceptions\AssistantDisabledException;
 use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\Exceptions\NoAiCredentialException;
 use App\Ai\StartAssistantTurn;
@@ -69,7 +70,7 @@ class ConversationPage extends Component
         try {
             $pageContext = PageContext::resolve($pagePath);
             app(StartAssistantTurn::class)->handle($conversation, auth()->user(), $message, $pageContext);
-        } catch (AssistantBusyException|AssistantRateLimitedException|NoAiCredentialException $e) {
+        } catch (AssistantBusyException|AssistantRateLimitedException|NoAiCredentialException|AssistantDisabledException $e) {
             $conversation->delete();
             $this->dispatch('error', $e->getMessage());
 

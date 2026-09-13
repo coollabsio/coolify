@@ -3,6 +3,7 @@
 namespace App\Ai;
 
 use App\Ai\Exceptions\AssistantBusyException;
+use App\Ai\Exceptions\AssistantDisabledException;
 use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\Exceptions\NoAiCredentialException;
 use App\Jobs\Ai\RunAssistantTurn;
@@ -22,6 +23,10 @@ class StartAssistantTurn
     public function handle(AiConversation $conversation, User $user, string $message, ?array $pageContext = null): void
     {
         Gate::forUser($user)->authorize('view', $conversation);
+
+        if (! aiAssistantEnabledForTeam($conversation->team)) {
+            throw new AssistantDisabledException;
+        }
 
         $key = "ai-turn:{$conversation->team_id}:{$user->id}";
         if (RateLimiter::tooManyAttempts($key, self::MAX_PER_MINUTE)) {

@@ -70,3 +70,20 @@ test('a stop request halts the stream and releases', function () {
     expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE)
         ->and(AssistantTurn::shouldStop($this->conversation->uuid))->toBeFalse();
 });
+
+test('failed() clears the turn and returns the conversation to idle', function () {
+    Event::fake([AssistantTurnFailed::class]);
+    $this->conversation->update([
+        'status' => AiConversation::STATUS_RESPONDING,
+        'responding_user_id' => $this->user->id,
+    ]);
+    AssistantTurn::putPartial($this->conversation->uuid, 'half a reply');
+
+    (new RunAssistantTurn($this->conversation->id, 'go', $this->user->id))
+        ->failed(new RuntimeException('worker timed out'));
+
+    expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE)
+        ->and($this->conversation->fresh()->responding_user_id)->toBeNull()
+        ->and(AssistantTurn::getPartial($this->conversation->uuid))->toBe('');
+    Event::assertDispatched(AssistantTurnFailed::class);
+});

@@ -4,6 +4,7 @@ namespace App\Livewire\Ai;
 
 use App\Ai\Contracts\HasApprovalForm;
 use App\Ai\Exceptions\AssistantBusyException;
+use App\Ai\Exceptions\AssistantDisabledException;
 use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\Exceptions\NoAiCredentialException;
 use App\Ai\StartAssistantTurn;
@@ -25,15 +26,21 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\ToolNameResolver;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Thread extends Component
 {
     use AuthorizesRequests;
 
+    // Locked: the client must not be able to repoint the component at another
+    // team's conversation. mount() authorizes the initial value; #[Locked] keeps
+    // it immutable for every later request.
+    #[Locked]
     public int $conversationId;
 
     /** Full-page mode: centers the conversation in a readable column (ChatGPT-style). */
+    #[Locked]
     public bool $wide = false;
 
     public string $composerMessage = '';
@@ -42,6 +49,7 @@ class Thread extends Component
     public ?string $pagePath = null;
 
     /** First message shown optimistically when a conversation is opened right after being started. */
+    #[Locked]
     public ?string $initialPending = null;
 
     /**
@@ -320,6 +328,22 @@ class Thread extends Component
         return $map;
     }
 
+    /**
+     * Authoritative turn state for the WebSocket-down fallback: when Echo is
+     * unavailable the client polls this so the composer is never stuck disabled.
+     *
+     * @return array{busy: bool, partial: string}
+     */
+    public function pollStatus(): array
+    {
+        unset($this->conversation, $this->busy);
+
+        return [
+            'busy' => $this->busy(),
+            'partial' => $this->partial(),
+        ];
+    }
+
     public function partial(): string
     {
         return AssistantTurn::getPartial($this->conversation()->uuid);
@@ -347,7 +371,7 @@ class Thread extends Component
             app(StartAssistantTurn::class)->handle($this->conversation(), auth()->user(), $message, $pageContext);
             $this->composerMessage = '';
             unset($this->conversation, $this->busy);
-        } catch (AssistantBusyException|AssistantRateLimitedException|NoAiCredentialException $e) {
+        } catch (AssistantBusyException|AssistantRateLimitedException|NoAiCredentialException|AssistantDisabledException $e) {
             $this->dispatch('error', $e->getMessage());
             $this->dispatch('assistant-idle');
         } catch (\Throwable $e) {
@@ -425,28 +449,52 @@ class Thread extends Component
             return ['action' => 'reject'];
         }
 
-        $edits = $this->approvalInputs[$callId] ?? [];
+        $call = $this->pendingCall($callId);
+        $arguments = (array) ($call['arguments'] ?? []);
+
+        // Never trust the client to edit locked fields: keep only the values the
+        // tool's approval form marks editable, so the decision (and its audit note)
+        // can only differ from the model's request within the allowed fields.
+        $edits = array_intersect_key(
+            $this->approvalInputs[$callId] ?? [],
+            array_flip($this->editableKeysFor($call)),
+        );
         if ($edits === []) {
             return ['action' => 'approve'];
         }
 
         return [
             'action' => 'edit',
-            'arguments' => array_merge($this->pendingCallArguments($callId), $edits),
+            'arguments' => array_merge($arguments, $edits),
         ];
     }
 
     /**
-     * The model's original arguments for a pending tool call, from the latest
-     * paused assistant row.
+     * The keys the tool's approval form allows a user to edit for a pending call.
      *
-     * @return array<string, mixed>
+     * @param  array<string, mixed>|null  $call
+     * @return array<int, string>
      */
-    private function pendingCallArguments(string $callId): array
+    private function editableKeysFor(?array $call): array
+    {
+        $tool = $this->approvalFormToolMap()[$call['name'] ?? ''] ?? null;
+
+        return $tool
+            ? $tool->approvalForm((array) ($call['arguments'] ?? []))->editableKeys()
+            : [];
+    }
+
+    /**
+     * The full pending tool call (id, name, arguments) from the latest paused
+     * assistant row, or null when there is none.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function pendingCall(string $callId): ?array
     {
         $sdkId = $this->conversation()->sdk_conversation_id;
         if (! $sdkId) {
-            return [];
+            return null;
         }
 
         $row = DB::table('agent_conversation_messages')
@@ -457,12 +505,10 @@ class Thread extends Component
             ->first(['tool_calls']);
 
         if (! $row) {
-            return [];
+            return null;
         }
 
-        $call = collect(json_decode($row->tool_calls ?? '[]', true))->firstWhere('id', $callId);
-
-        return (array) ($call['arguments'] ?? []);
+        return collect(json_decode($row->tool_calls ?? '[]', true))->firstWhere('id', $callId);
     }
 
     public function render()

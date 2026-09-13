@@ -55,7 +55,15 @@ class CreateService
         }
 
         $dockerComposeRaw = base64_decode($compose);
-        validateDockerComposeForInjection($dockerComposeRaw);
+        // Normalize the base Exception the injection guard throws to a
+        // RuntimeException so API callers get a 422 (validation) rather than a 500.
+        try {
+            validateDockerComposeForInjection($dockerComposeRaw);
+        } catch (\RuntimeException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            throw new \RuntimeException($e->getMessage(), 0, $e);
+        }
 
         $payload = [
             'name' => "$slug-".str()->random(10),

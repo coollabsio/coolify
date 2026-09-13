@@ -1,21 +1,26 @@
 <?php
 
 use App\Ai\Exceptions\AssistantBusyException;
+use App\Ai\Exceptions\AssistantDisabledException;
 use App\Ai\Exceptions\AssistantRateLimitedException;
 use App\Ai\StartAssistantTurn;
 use App\Enums\AiProvider;
 use App\Jobs\Ai\RunAssistantTurn;
 use App\Models\AiConversation;
 use App\Models\AiProviderCredential;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'admin']);
@@ -47,6 +52,15 @@ test('a busy thread refuses a second turn', function () {
 
     expect(fn () => app(StartAssistantTurn::class)->handle($this->conversation, $this->user, 'Hi'))
         ->toThrow(AssistantBusyException::class);
+    Bus::assertNotDispatched(RunAssistantTurn::class);
+});
+
+test('a team with the assistant disabled cannot start a turn', function () {
+    Bus::fake();
+    $this->team->update(['is_ai_assistant_enabled' => false]);
+
+    expect(fn () => app(StartAssistantTurn::class)->handle($this->conversation, $this->user, 'Hi'))
+        ->toThrow(AssistantDisabledException::class);
     Bus::assertNotDispatched(RunAssistantTurn::class);
 });
 

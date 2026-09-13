@@ -246,6 +246,7 @@
                 busy: initialBusy ?? false,
                 pending: [],
                 lastSeq: 0,
+                pollTimer: null,
                 init() {
                     this.partial = @js($this->partial());
                     this.reasoning = @js($this->reasoning());
@@ -258,6 +259,9 @@
                         this.thinking = true;
                     }
                     if (! window.Echo) {
+                        // No realtime transport: fall back to polling the server so
+                        // the composer can never stay disabled forever.
+                        this.startPollingFallback();
                         return;
                     }
                     window.Echo.private(channel)
@@ -308,6 +312,34 @@
                             this.finish();
                             this.$dispatch('error', e.message ?? 'The assistant turn failed.');
                         });
+                },
+                destroy() {
+                    // Leave the channel and stop polling on teardown (switching
+                    // conversations) so listeners/timers do not stack up.
+                    if (window.Echo) {
+                        window.Echo.leave(channel);
+                    }
+                    if (this.pollTimer) {
+                        clearInterval(this.pollTimer);
+                        this.pollTimer = null;
+                    }
+                },
+                startPollingFallback() {
+                    this.pollTimer = setInterval(() => {
+                        if (! this.busy) {
+                            return;
+                        }
+                        this.$wire.pollStatus().then(({ busy, partial }) => {
+                            if (partial) {
+                                this.partial = partial;
+                                this.streaming = true;
+                                this.thinking = false;
+                            }
+                            if (! busy) {
+                                this.finish();
+                            }
+                        });
+                    }, 3000);
                 },
                 submit() {
                     this.dispatchMessage(this.draft);

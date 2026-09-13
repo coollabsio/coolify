@@ -57,7 +57,13 @@ class GenerateConversationTitle implements ShouldQueue
 
         $conversation->forceFill(['title' => $title])->save();
 
-        broadcast(new AssistantConversationRenamed($conversation->team_id, $conversation->id, $title));
+        broadcast(new AssistantConversationRenamed(
+            $conversation->team_id,
+            $conversation->id,
+            $title,
+            $conversation->visibility,
+            $conversation->created_by_user_id,
+        ));
     }
 
     private function generateTitle(string $prompt, string $provider, string $model): string
