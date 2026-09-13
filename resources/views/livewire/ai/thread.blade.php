@@ -23,11 +23,19 @@
                 <div wire:key="msg-{{ $message['id'] }}" class="flex justify-center py-1">
                     <span
                         class="inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] font-medium text-neutral-500 dark:bg-white/[0.05] dark:text-fg-faint">
-                        <svg class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
-                            <path d="m9 9 6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.6"
-                                stroke-linecap="round" />
-                        </svg>
+                        @if (($message['variant'] ?? 'cancelled') === 'approved')
+                            <svg class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                                <path d="m8.5 12 2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.6"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        @else
+                            <svg class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                                <path d="m9 9 6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.6"
+                                    stroke-linecap="round" />
+                            </svg>
+                        @endif
                         {{ $message['content'] }}
                     </span>
                 </div>

@@ -94,3 +94,46 @@ test('rejecting hides the approval card immediately without waiting for the turn
         ->call('reject', 'call_1')
         ->assertDontSee('Create postgresql database.');
 });
+
+test('accepting records an approved note in the transcript immediately', function () {
+    Bus::fake();
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->assertDontSee('You approved this action.')
+        ->call('approve', 'call_1')
+        ->assertSee('You approved this action.')
+        ->assertDontSee('Create postgresql database.');
+});
+
+test('rejecting records a cancelled note in the transcript immediately', function () {
+    Bus::fake();
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->call('reject', 'call_1')
+        ->assertSee('You cancelled this action.');
+});
+
+test('a resolved approval row shows the approved note after reload', function () {
+    DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->conversation->sdk_conversation_id)
+        ->update([
+            'tool_results' => json_encode([['id' => 'call_1', 'name' => 'create_service', 'result' => 'Created service.']]),
+            'approval_state' => json_encode(['pending' => []]),
+        ]);
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->assertSee('You approved this action.')
+        ->assertDontSee('Create postgresql database.');
+});
+
+test('a resolved rejection row shows the cancelled note after reload', function () {
+    DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->conversation->sdk_conversation_id)
+        ->update([
+            'tool_results' => json_encode([['id' => 'call_1', 'name' => 'create_service', 'denied' => true, 'result' => 'Cancelled.']]),
+            'approval_state' => json_encode(['pending' => []]),
+        ]);
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->assertSee('You cancelled this action.');
+});
