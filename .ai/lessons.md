@@ -1,5 +1,10 @@
 # Lessons
 
+## Check prior fixes before changing a repeated symptom
+- When a reported regression matches a recent fix, inspect that fix and reproduce why it no longer works before adding another workaround.
+- Do not claim a redirect or lifecycle root cause from an effects assertion alone. Prove the reported HTTP or browser failure first.
+- Preserve SPA navigation when it is a product requirement. Do not replace it with a full-page redirect to mask a deletion race; fix the ordering or state race instead.
+
 ## Confirm which surface becomes the modal
 - When a user wants two settings pages replaced by a modal, identify the parent page that owns the trigger and confirm that the complete child settings view moves into that modal.
 - Do not make one child page a modal inside the other child page when the user wants both child URLs removed.
@@ -82,3 +87,7 @@
 
 ## Keep modal actions in the footer
 - When a modal has a large editable body, put preview, validation, and save controls in a fixed footer. Keep the title bar for the title and close action.
+
+## Prefer named API values over numeric sentinels
+- When an API option means an unbounded or special mode, expose a clear named value such as `all`.
+- Keep an existing numeric sentinel such as `-1` only as a compatibility alias unless the user requests a breaking change.
