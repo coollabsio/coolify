@@ -59,7 +59,14 @@ wg show "\$interface"
 wireguard_address="\$(ip -4 -o address show dev "\$interface" scope global | awk '{ split(\$4, address, "/"); print address[1]; exit }')"
 test -n "\$wireguard_address"
 resolvectl dns "\$interface" "\$wireguard_address"
-resolvectl domain "\$interface" ~coolify.internal
+reverse_domains="\$(
+    {
+        printf '%s\n' "\$wireguard_address"
+        wg show "\$interface" allowed-ips | awk '{ for (index = 2; index <= NF; index++) print \$index }'
+    } | awk -F'[./]' 'NF >= 4 { print "~" \$4 "." \$3 "." \$2 "." \$1 ".in-addr.arpa" }' | sort -u | tr '\n' ' '
+)"
+test -n "\$reverse_domains"
+resolvectl domain "\$interface" ~coolify.internal \$reverse_domains
 
 test -s "\$firewall_last_good"
 if nft list table inet coolify_cluster >/dev/null 2>&1; then
