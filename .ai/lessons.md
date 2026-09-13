@@ -24,3 +24,4 @@
 - In Blade text, do not place `@` directly before a `{{ ... }}` expression. Blade treats `@{{` as an escaped client-side expression. Build SSH addresses in one expression or insert the separator safely.
 - Scope deployment idempotency to one attempt, not permanently to a Node and revision. Allow redeployment after a final operation, while reusing an active operation to prevent concurrent duplicate commands.
 - A host agent that starts Podman containers must not let systemd kill its `conmon` child processes during an agent restart. Use `KillMode=process`, and wait for transitional runtime states to settle before declaring lifecycle convergence.
+- Before adding more workload features, define and validate the node network foundation: WireGuard topology, firewall ownership, address allocation, routing, and recovery. Keep this aligned with the proven coold design where applicable.
