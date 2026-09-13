@@ -80,10 +80,15 @@ return new class extends Migration
                 $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('title')->nullable();
                 $table->string('visibility')->default('private');
+                $table->timestamp('pinned_at')->nullable();
+                $table->timestamp('archived_at')->nullable();
                 $table->string('sdk_conversation_id', 36)->nullable()->index();
                 $table->string('default_provider')->nullable();
                 $table->string('default_model')->nullable();
                 $table->string('status')->default('idle');
+                // Resolved tool-approval decisions, keyed by tool-call id:
+                // ['decision' => 'approved'|'cancelled', 'reason' => '<action description>'].
+                $table->json('decision_log')->nullable();
                 $table->foreignId('responding_user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
 
