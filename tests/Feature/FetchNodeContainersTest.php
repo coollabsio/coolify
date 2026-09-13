@@ -156,3 +156,98 @@ it('publishes an owned expiring discovery snapshot for managed cluster workloads
         && $request['server_id'] === $node->uuid
         && $request['owner_node_ip'] === $node->wireguard_ip);
 });
+
+it('withdraws and republishes workload discovery when a workload moves between nodes', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $user, 'Movement mesh');
+    $nodeA = Node::factory()->create(['team_id' => $team->id, 'name' => 'Worker Node A']);
+    $nodeB = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $nodeA->private_key_id,
+        'name' => 'Worker Node B',
+    ]);
+    AssignNodeToCluster::run($cluster, $nodeA);
+    AssignNodeToCluster::run($cluster, $nodeB);
+    $cluster->update(['network_status' => 'active']);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'Moving App']);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
+    $nodeA->workloads()->attach($workload);
+    $inventoryCalls = [];
+    $discoveryRequests = [];
+
+    Http::fake(function (Request $request) use ($nodeA, $nodeB, $workload, $revision, &$inventoryCalls, &$discoveryRequests) {
+        if (str_ends_with($request->url(), '/v1/commands/container.list')) {
+            $nodeUuid = $request['server_id'];
+            $inventoryCalls[$nodeUuid] = ($inventoryCalls[$nodeUuid] ?? 0) + 1;
+            $hasContainer = $nodeUuid === $nodeA->uuid || $inventoryCalls[$nodeUuid] !== 3;
+            $state = $nodeUuid === $nodeB->uuid && $inventoryCalls[$nodeUuid] === 2 ? 'stopped' : 'running';
+
+            return Http::response([
+                'command_id' => 'inventory-'.$nodeUuid.'-'.$inventoryCalls[$nodeUuid],
+                'observed_at_unix_ms' => 1_789_237_260_000 + (array_sum($inventoryCalls) * 1000),
+                'containers' => $hasContainer ? [[
+                    'runtime_id' => 'container-'.$nodeUuid,
+                    'name' => 'coolify-'.$workload->uuid.'-main',
+                    'image' => $revision->image,
+                    'state' => $state,
+                    'health_status' => 'healthy',
+                    'restart_count' => 0,
+                    'ports' => [],
+                    'labels' => [
+                        'coolify.managed' => 'true',
+                        'coolify.instance' => 'instance-test',
+                        'coolify.workload' => $workload->uuid,
+                        'coolify.revision' => $revision->uuid,
+                        'coolify.component' => 'main',
+                    ],
+                ]] : [],
+            ]);
+        }
+
+        $discoveryRequests[] = $request->data();
+
+        return Http::response([
+            'command_id' => $request['command_id'],
+            'observed_at_unix_ms' => 1_789_237_260_100,
+            'owner_node_ip' => $request['owner_node_ip'],
+            'endpoint_count' => count($request['endpoints']),
+        ]);
+    });
+
+    FetchContainers::run($nodeA->refresh());
+
+    $nodeA->workloads()->detach($workload);
+    $nodeB->workloads()->attach($workload);
+    FetchContainers::run($nodeA->refresh());
+    FetchContainers::run($nodeB->refresh());
+    FetchContainers::run($nodeB->refresh());
+    FetchContainers::run($nodeB->refresh());
+    FetchContainers::run($nodeB->refresh());
+
+    $workloadEndpoints = fn (array $request): array => collect($request['endpoints'])
+        ->where('namespace', 'default')
+        ->values()
+        ->all();
+
+    expect($discoveryRequests)->toHaveCount(6)
+        ->and(data_get($workloadEndpoints($discoveryRequests[0]), '0.workload_id'))->toBe('moving-app')
+        ->and(data_get($workloadEndpoints($discoveryRequests[0]), '0.owner_node_ip'))->toBe($nodeA->wireguard_ip)
+        ->and($workloadEndpoints($discoveryRequests[1]))->toBe([])
+        ->and(data_get($workloadEndpoints($discoveryRequests[2]), '0.owner_node_ip'))->toBe($nodeB->wireguard_ip)
+        ->and(data_get($workloadEndpoints($discoveryRequests[2]), '0.state'))->toBe('running')
+        ->and(data_get($workloadEndpoints($discoveryRequests[3]), '0.state'))->toBe('stopped')
+        ->and($workloadEndpoints($discoveryRequests[4]))->toBe([])
+        ->and(data_get($workloadEndpoints($discoveryRequests[5]), '0.state'))->toBe('running')
+        ->and(data_get($workloadEndpoints($discoveryRequests[5]), '0.expires_at_unix_seconds')
+            - data_get($workloadEndpoints($discoveryRequests[5]), '0.updated_at_unix_seconds'))->toBe(300)
+        ->and($nodeA->containers()->where('runtime_id', 'container-'.$nodeA->uuid)->firstOrFail()->management_state)
+        ->toBe(NodeContainerManagementState::UNRECOGNIZED)
+        ->and($nodeB->containers()->where('runtime_id', 'container-'.$nodeB->uuid)->firstOrFail()->management_state)
+        ->toBe(NodeContainerManagementState::MANAGED);
+});
