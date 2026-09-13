@@ -49,6 +49,11 @@ it('shows an authorized terminal menu on the node view', function () {
         ->assertSee(route('node.command', $this->node->uuid), false);
 });
 
+it('keeps the mobile Node readiness badge compact', function () {
+    expect(file_get_contents(resource_path('views/components/node/navbar.blade.php')))
+        ->toMatch('/<x-status-badge[^>]*class="self-start"/s');
+});
+
 it('opens the node terminal through the shared terminal page', function () {
     $this->get(route('node.command', $this->node->uuid))
         ->assertSuccessful()
