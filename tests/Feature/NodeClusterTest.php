@@ -270,11 +270,13 @@ it('builds an SSH repair script that restores only Coolify network state', funct
     $script = RepairNodeClusterNetwork::repairScript('coolify0');
 
     expect($script)
+        ->toContain('set -euo pipefail')
         ->toContain('/var/lib/coolify/network/coolify0.last-good.conf')
         ->toContain('/var/lib/coolify/network/firewall.last-good.nft')
         ->toContain('delete table inet coolify_cluster')
         ->toContain('resolvectl dns "$interface" "$wireguard_address"')
         ->toContain('wg show "$interface" allowed-ips')
+        ->toContain('for (field = 2; field <= NF; field++)')
         ->toContain('print "~" $4 "." $3 "." $2 "." $1 ".in-addr.arpa"')
         ->toContain('resolvectl domain "$interface" ~coolify.internal $reverse_domains')
         ->toContain('systemctl restart coolify-discovery-dns.service')

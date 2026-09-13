@@ -37,7 +37,7 @@ class RepairNodeClusterNetwork
         }
 
         return <<<SCRIPT
-set -eu
+set -euo pipefail
 umask 077
 
 interface='{$interface}'
@@ -62,7 +62,7 @@ resolvectl dns "\$interface" "\$wireguard_address"
 reverse_domains="\$(
     {
         printf '%s\n' "\$wireguard_address"
-        wg show "\$interface" allowed-ips | awk '{ for (index = 2; index <= NF; index++) print \$index }'
+        wg show "\$interface" allowed-ips | awk '{ for (field = 2; field <= NF; field++) print \$field }'
     } | awk -F'[./]' 'NF >= 4 { print "~" \$4 "." \$3 "." \$2 "." \$1 ".in-addr.arpa" }' | sort -u | tr '\n' ' '
 )"
 test -n "\$reverse_domains"
