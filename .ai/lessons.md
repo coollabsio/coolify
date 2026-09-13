@@ -91,3 +91,7 @@
 ## Prefer named API values over numeric sentinels
 - When an API option means an unbounded or special mode, expose a clear named value such as `all`.
 - Keep an existing numeric sentinel such as `-1` only as a compatibility alias unless the user requests a breaking change.
+
+## Do not auto-heal existing deployments without a request
+- When a parser or label fix can apply only after container recreation, keep the change limited to new deployments and later user-initiated redeployments unless the user explicitly asks for live reconciliation.
+- Do not add status lookup fallbacks that alter existing deployment behavior when the requested scope is new deployments only.
