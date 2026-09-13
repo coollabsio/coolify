@@ -126,6 +126,37 @@ it('purchases a Hostinger VPS and creates the linked Coolify server', function (
         && $request['setup']['public_key']['key'] === $this->privateKey->getPublicKey());
 });
 
+it('keeps a purchased Hostinger VPS linked while its public IP is pending', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19]]),
+        'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([['id' => 1130, 'name' => 'Ubuntu']]),
+        'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
+            ['name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['data' => []]),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['data' => []]),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'virtual_machine' => ['id' => 17923, 'state' => 'creating', 'ipv4' => []],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/17923' => Http::response([
+            'message' => 'Still provisioning',
+        ], 503),
+    ]);
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->set('server_name', 'pending-hostinger.example.com')
+        ->set('selected_data_center_id', 19)
+        ->set('selected_template_id', 1130)
+        ->set('selected_price_id', 'kvm2-monthly')
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Server::query()->where('hostinger_virtual_machine_id', 17923)->firstOrFail()->ip)
+        ->toBe(Server::PLACEHOLDER_IP);
+});
+
 it('revalidates the selected Hostinger price before making a purchase', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
@@ -211,5 +242,6 @@ it('warns that deleting from Coolify does not cancel the Hostinger VPS', functio
     ]);
 
     Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
-        ->assertSee('The Hostinger VPS and its subscription will not be deleted or cancelled.');
+        ->assertSee('The Hostinger VPS and its subscription will not be deleted or changed.')
+        ->assertSee('https://hpanel.hostinger.com/', false);
 });

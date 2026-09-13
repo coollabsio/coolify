@@ -25,7 +25,9 @@
                             if those resources should also be removed.
                         @endif
                         @if ($server->hostinger_virtual_machine_id)
-                            The Hostinger VPS and its subscription will not be deleted or cancelled. Manage billing and cancellation in hPanel.
+                            The Hostinger VPS and its subscription will not be deleted or changed.
+                            <a class="underline" href="https://hpanel.hostinger.com/" target="_blank"
+                                rel="noopener noreferrer">Manage the VPS and billing in hPanel.</a>
                         @endif
                     </x-callout>
 

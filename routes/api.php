@@ -229,6 +229,8 @@ Route::group([
     Route::get('/hostinger/data-centers', [HostingerController::class, 'dataCenters'])->middleware(['api.ability:read']);
     Route::get('/hostinger/catalog', [HostingerController::class, 'catalog'])->middleware(['api.ability:read']);
     Route::get('/hostinger/templates', [HostingerController::class, 'templates'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/ssh-keys', [HostingerController::class, 'sshKeys'])->middleware(['api.ability:read']);
+    Route::get('/hostinger/post-install-scripts', [HostingerController::class, 'postInstallScripts'])->middleware(['api.ability:read']);
     Route::post('/servers/hostinger', [HostingerController::class, 'createServer'])->middleware(['api.ability:write']);
 
     Route::get('/resources', [ResourcesController::class, 'resources'])->middleware(['api.ability:read']);

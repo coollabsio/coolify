@@ -41,6 +41,36 @@ it('fetches Hostinger provisioning options', function () {
         ->and($service->getCatalogItems()[0]['prices'][0]['price'])->toBe(1799);
 });
 
+it('fetches and attaches Hostinger account SSH keys', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response([
+            'data' => [['id' => 42, 'name' => 'Operations', 'key' => 'ssh-ed25519 AAAA']],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys/attach/17923' => Http::response([
+            'id' => 456,
+            'state' => 'running',
+        ]),
+    ]);
+
+    $service = new HostingerService('test-token');
+
+    expect($service->getPublicKeys()[0]['id'])->toBe(42)
+        ->and($service->attachPublicKeys(17923, [42])['id'])->toBe(456);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://developers.hostinger.com/api/vps/v1/public-keys/attach/17923'
+        && $request['ids'] === [42]);
+});
+
+it('fetches Hostinger post-install scripts', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response([
+            'data' => [['id' => 73, 'name' => 'Bootstrap Coolify']],
+        ]),
+    ]);
+
+    expect((new HostingerService('test-token'))->getPostInstallScripts()[0]['id'])->toBe(73);
+});
+
 it('purchases a Hostinger virtual machine with its setup options', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([

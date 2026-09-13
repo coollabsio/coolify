@@ -52,6 +52,10 @@
                         'value' => $key->id,
                         'label' => $key->name,
                     ])->values()->all();
+                    $postInstallScriptOptions = collect($post_install_scripts)->map(fn ($script) => [
+                        'value' => $script['id'],
+                        'label' => $script['name'],
+                    ])->values()->all();
                 @endphp
 
                 <form wire:submit="submit" class="flex flex-col gap-6">
@@ -104,9 +108,32 @@
                     </x-application.settings-section>
 
                     <x-application.settings-section title="Advanced options"
-                        description="Provider backups and purchase details.">
+                        description="Provider backups, account SSH keys, and post-install automation.">
                         <div class="flex flex-col gap-4">
                             <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups" fullWidth />
+                            @if ($hostinger_public_keys)
+                                <div>
+                                    <div class="mb-2 text-sm font-medium">Additional Hostinger SSH keys</div>
+                                    <div class="flex flex-col gap-2">
+                                        @foreach ($hostinger_public_keys as $publicKey)
+                                            <label class="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs hover:bg-neutral-100/80 dark:hover:bg-white/[0.035]">
+                                                <span>{{ $publicKey['name'] }}</span>
+                                                <input class="rounded" type="checkbox" wire:model="selected_public_key_ids"
+                                                    value="{{ $publicKey['id'] }}">
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    @error('selected_public_key_ids')
+                                        <div class="mt-1 text-xs text-error">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            @endif
+                            @if ($post_install_scripts)
+                                <x-forms.listbox id="selected_post_install_script_id"
+                                    label="Hostinger post-install script"
+                                    placeholder="No post-install script" :options="$postInstallScriptOptions"
+                                    helper="Hostinger runs this as /post_install after setup and writes output to /post_install.log." />
+                            @endif
                             <x-callout type="warning" title="This purchase is billed by Hostinger">
                                 The VPS is purchased with your Hostinger account's default payment method. Review the
                                 selected plan and billing period before continuing.

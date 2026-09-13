@@ -46,6 +46,29 @@ it('gets Hostinger data centers', function () {
         ->assertJsonFragment(['id' => 19, 'city' => 'Amsterdam']);
 });
 
+it('gets Hostinger SSH keys and post-install scripts', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response([
+            'data' => [['id' => 42, 'name' => 'Operations']],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response([
+            'data' => [['id' => 73, 'name' => 'Bootstrap Coolify']],
+        ]),
+    ]);
+
+    $query = '?cloud_provider_token_id='.$this->hostingerToken->uuid;
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/ssh-keys'.$query)
+        ->assertSuccessful()
+        ->assertJsonFragment(['id' => 42, 'name' => 'Operations']);
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/post-install-scripts'.$query)
+        ->assertSuccessful()
+        ->assertJsonFragment(['id' => 73, 'name' => 'Bootstrap Coolify']);
+});
+
 it('creates a Hostinger VPS server through the API', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([

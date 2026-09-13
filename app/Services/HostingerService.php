@@ -54,6 +54,23 @@ class HostingerService
         return $this->request('get', '/api/billing/v1/catalog', ['category' => 'VPS']);
     }
 
+    public function getPublicKeys(): array
+    {
+        return $this->request('get', '/api/vps/v1/public-keys')['data'] ?? [];
+    }
+
+    public function getPostInstallScripts(): array
+    {
+        return $this->request('get', '/api/vps/v1/post-install-scripts')['data'] ?? [];
+    }
+
+    public function attachPublicKeys(int $virtualMachineId, array $publicKeyIds): array
+    {
+        return $this->request('post', "/api/vps/v1/public-keys/attach/{$virtualMachineId}", [
+            'ids' => array_values($publicKeyIds),
+        ]);
+    }
+
     public function purchaseVirtualMachine(array $params): array
     {
         $response = $this->request('post', '/api/vps/v1/virtual-machines', $params);

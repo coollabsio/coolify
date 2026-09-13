@@ -92,7 +92,8 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $servers->each(function (Server $server) {
             $hasCloudResource = $server->hetzner_server_id
                 || $server->vultr_instance_id
-                || $server->digitalocean_droplet_id;
+                || $server->digitalocean_droplet_id
+                || $server->hostinger_virtual_machine_id;
 
             if ($hasCloudResource && $server->cloudProviderToken) {
                 ServerCloudProviderStatusCheckJob::dispatch($server);

@@ -39,11 +39,19 @@ class ByHostinger extends Component
 
     public array $catalog_items = [];
 
+    public array $hostinger_public_keys = [];
+
+    public array $post_install_scripts = [];
+
     public ?int $selected_data_center_id = null;
 
     public ?int $selected_template_id = null;
 
     public ?string $selected_price_id = null;
+
+    public array $selected_public_key_ids = [];
+
+    public ?int $selected_post_install_script_id = null;
 
     public string $server_name = '';
 
@@ -104,6 +112,9 @@ class ByHostinger extends Component
                 'selected_price_id' => 'required|string',
                 'private_key_id' => 'required|integer|exists:private_keys,id,team_id,'.currentTeam()->id,
                 'enable_backups' => 'required|boolean',
+                'selected_public_key_ids' => 'array',
+                'selected_public_key_ids.*' => 'integer',
+                'selected_post_install_script_id' => 'nullable|integer',
             ]);
         }
 
@@ -195,6 +206,8 @@ class ByHostinger extends Component
                 ->values()
                 ->toArray();
             $this->catalog_items = $hostingerService->getCatalogItems();
+            $this->hostinger_public_keys = $hostingerService->getPublicKeys();
+            $this->post_install_scripts = $hostingerService->getPostInstallScripts();
         } catch (\Throwable $e) {
             $this->provider_data_error = $e->getMessage();
             $this->dispatch('error', $this->provider_data_error);
@@ -247,6 +260,8 @@ class ByHostinger extends Component
     {
         $this->validate();
 
+        $virtualMachineId = null;
+
         try {
             $this->authorize('create', Server::class);
 
@@ -262,29 +277,29 @@ class ByHostinger extends Component
             }
 
             $normalizedServerName = strtolower(trim($this->server_name));
+            $setup = [
+                'data_center_id' => $this->selected_data_center_id,
+                'template_id' => $this->selected_template_id,
+                'hostname' => $normalizedServerName,
+                'enable_backups' => $this->enable_backups,
+                'public_key' => [
+                    'name' => $privateKey->name,
+                    'key' => $privateKey->getPublicKey(),
+                ],
+            ];
+            if ($this->selected_post_install_script_id) {
+                $setup['post_install_script_id'] = $this->selected_post_install_script_id;
+            }
+
             $virtualMachine = $hostingerService->purchaseVirtualMachine([
                 'item_id' => $this->selected_price_id,
-                'setup' => [
-                    'data_center_id' => $this->selected_data_center_id,
-                    'template_id' => $this->selected_template_id,
-                    'hostname' => $normalizedServerName,
-                    'enable_backups' => $this->enable_backups,
-                    'public_key' => [
-                        'name' => $privateKey->name,
-                        'key' => $privateKey->getPublicKey(),
-                    ],
-                ],
+                'setup' => $setup,
             ]);
-            $virtualMachine = $hostingerService->waitForPublicIp($virtualMachine);
-            $ipAddress = $hostingerService->getPublicIpAddress($virtualMachine);
-
-            if (! $ipAddress) {
-                throw new \Exception('No public IP address available for the new Hostinger VPS. Complete setup in hPanel, then link it to Coolify manually.');
-            }
+            $virtualMachineId = (int) $virtualMachine['id'];
 
             $server = Server::create([
                 'name' => $normalizedServerName,
-                'ip' => $ipAddress,
+                'ip' => Server::PLACEHOLDER_IP,
                 'user' => 'root',
                 'port' => 22,
                 'team_id' => currentTeam()->id,
@@ -298,6 +313,22 @@ class ByHostinger extends Component
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
 
+            try {
+                if ($this->selected_public_key_ids) {
+                    $hostingerService->attachPublicKeys((int) $virtualMachine['id'], $this->selected_public_key_ids);
+                }
+                $virtualMachine = $hostingerService->waitForPublicIp($virtualMachine);
+                $ipAddress = $hostingerService->getPublicIpAddress($virtualMachine);
+                if ($ipAddress) {
+                    $server->update([
+                        'ip' => $ipAddress,
+                        'hostinger_virtual_machine_status' => $virtualMachine['state'] ?? $server->hostinger_virtual_machine_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
             if ($this->from_onboarding) {
                 currentTeam()->update(['show_boarding' => false]);
                 refreshSession();
@@ -305,6 +336,14 @@ class ByHostinger extends Component
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {
+            if ($virtualMachineId) {
+                logger()->warning('Hostinger VPS was purchased but could not be saved in Coolify', [
+                    'team_id' => currentTeam()->id,
+                    'hostinger_virtual_machine_id' => $virtualMachineId,
+                ]);
+                $this->dispatch('error', "Hostinger VPS {$virtualMachineId} was purchased but could not be saved in Coolify. Manage it in hPanel.");
+            }
+
             return handleError($e, $this);
         }
     }
@@ -336,6 +375,8 @@ class ByHostinger extends Component
             ->flatMap(fn (array $item) => collect($item['prices'] ?? [])->pluck('id'));
         $dataCenterIds = collect($hostingerService->getDataCenters())->pluck('id')->map(fn ($id) => (int) $id);
         $templateIds = collect($hostingerService->getTemplates())->pluck('id')->map(fn ($id) => (int) $id);
+        $publicKeyIds = collect($hostingerService->getPublicKeys())->pluck('id')->map(fn ($id) => (int) $id);
+        $postInstallScriptIds = collect($hostingerService->getPostInstallScripts())->pluck('id')->map(fn ($id) => (int) $id);
 
         if (! $priceIds->contains($this->selected_price_id)) {
             $this->addError('selected_price_id', 'The selected Hostinger plan or billing period is no longer available.');
@@ -347,6 +388,14 @@ class ByHostinger extends Component
 
         if (! $templateIds->contains($this->selected_template_id)) {
             $this->addError('selected_template_id', 'The selected Hostinger operating system is no longer available.');
+        }
+
+        if (collect($this->selected_public_key_ids)->contains(fn ($id) => ! $publicKeyIds->contains((int) $id))) {
+            $this->addError('selected_public_key_ids', 'One or more selected Hostinger SSH keys are no longer available.');
+        }
+
+        if ($this->selected_post_install_script_id && ! $postInstallScriptIds->contains($this->selected_post_install_script_id)) {
+            $this->addError('selected_post_install_script_id', 'The selected Hostinger post-install script is no longer available.');
         }
 
         return ! $this->getErrorBag()->isNotEmpty();

@@ -69,6 +69,40 @@ class HostingerController extends Controller
         return $this->providerData($request, 'getTemplates', 'templates');
     }
 
+    #[OA\Get(
+        path: '/hostinger/ssh-keys',
+        operationId: 'get-hostinger-ssh-keys',
+        summary: 'Get Hostinger account SSH keys',
+        security: [['bearerAuth' => []]],
+        tags: ['Hostinger'],
+        responses: [
+            new OA\Response(response: 200, description: 'List of Hostinger account SSH keys.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 422, description: 'Validation failed.'),
+        ]
+    )]
+    public function sshKeys(Request $request): JsonResponse
+    {
+        return $this->providerData($request, 'getPublicKeys', 'SSH keys');
+    }
+
+    #[OA\Get(
+        path: '/hostinger/post-install-scripts',
+        operationId: 'get-hostinger-post-install-scripts',
+        summary: 'Get Hostinger post-install scripts',
+        security: [['bearerAuth' => []]],
+        tags: ['Hostinger'],
+        responses: [
+            new OA\Response(response: 200, description: 'List of Hostinger post-install scripts.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 422, description: 'Validation failed.'),
+        ]
+    )]
+    public function postInstallScripts(Request $request): JsonResponse
+    {
+        return $this->providerData($request, 'getPostInstallScripts', 'post-install scripts');
+    }
+
     #[OA\Post(
         path: '/servers/hostinger',
         operationId: 'create-hostinger-server',
@@ -93,6 +127,8 @@ class HostingerController extends Controller
             'name',
             'private_key_uuid',
             'enable_backups',
+            'public_key_ids',
+            'post_install_script_id',
             'instant_validate',
         ];
         $teamId = getTeamIdFromToken();
@@ -117,6 +153,9 @@ class HostingerController extends Controller
             'name' => ['nullable', 'string', 'max:253', new ValidHostname],
             'private_key_uuid' => 'required|string',
             'enable_backups' => 'nullable|boolean',
+            'public_key_ids' => 'nullable|array',
+            'public_key_ids.*' => 'integer',
+            'post_install_script_id' => 'nullable|integer',
             'instant_validate' => 'nullable|boolean',
         ]);
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -148,32 +187,34 @@ class HostingerController extends Controller
             return response()->json(['message' => 'Private key not found.'], 404);
         }
 
+        $virtualMachineId = null;
+
         try {
             $hostingerService = new HostingerService($token->token);
             $normalizedServerName = strtolower(trim($request->name ?: generate_random_name()));
+            $setup = [
+                'data_center_id' => $request->integer('data_center_id'),
+                'template_id' => $request->integer('template_id'),
+                'hostname' => $normalizedServerName,
+                'enable_backups' => $request->boolean('enable_backups', true),
+                'public_key' => [
+                    'name' => $privateKey->name,
+                    'key' => $privateKey->getPublicKey(),
+                ],
+            ];
+            if ($request->filled('post_install_script_id')) {
+                $setup['post_install_script_id'] = $request->integer('post_install_script_id');
+            }
+
             $virtualMachine = $hostingerService->purchaseVirtualMachine([
                 'item_id' => $request->item_id,
-                'setup' => [
-                    'data_center_id' => $request->integer('data_center_id'),
-                    'template_id' => $request->integer('template_id'),
-                    'hostname' => $normalizedServerName,
-                    'enable_backups' => $request->boolean('enable_backups', true),
-                    'public_key' => [
-                        'name' => $privateKey->name,
-                        'key' => $privateKey->getPublicKey(),
-                    ],
-                ],
+                'setup' => $setup,
             ]);
-            $virtualMachine = $hostingerService->waitForPublicIp($virtualMachine);
-            $ipAddress = $hostingerService->getPublicIpAddress($virtualMachine);
-
-            if (! $ipAddress) {
-                throw new \Exception('No public IP address available for the new Hostinger VPS.');
-            }
+            $virtualMachineId = (int) $virtualMachine['id'];
 
             $server = Server::create([
                 'name' => $normalizedServerName,
-                'ip' => $ipAddress,
+                'ip' => Server::PLACEHOLDER_IP,
                 'user' => 'root',
                 'port' => 22,
                 'team_id' => $teamId,
@@ -187,7 +228,25 @@ class HostingerController extends Controller
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
 
-            if ($request->boolean('instant_validate')) {
+            try {
+                if ($request->array('public_key_ids')) {
+                    $hostingerService->attachPublicKeys((int) $virtualMachine['id'], $request->array('public_key_ids'));
+                }
+                $virtualMachine = $hostingerService->waitForPublicIp($virtualMachine);
+                $ipAddress = $hostingerService->getPublicIpAddress($virtualMachine);
+                if ($ipAddress) {
+                    $server->update([
+                        'ip' => $ipAddress,
+                        'hostinger_virtual_machine_status' => $virtualMachine['state'] ?? $server->hostinger_virtual_machine_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            $ipAddress = $server->fresh()->ip;
+
+            if ($request->boolean('instant_validate') && ! $server->hasPlaceholderIp()) {
                 ValidateServer::dispatch($server);
             }
 
@@ -203,6 +262,7 @@ class HostingerController extends Controller
                 'uuid' => $server->uuid,
                 'hostinger_virtual_machine_id' => $virtualMachine['id'],
                 'ip' => $ipAddress,
+                'provisioning' => $ipAddress === Server::PLACEHOLDER_IP,
             ])->setStatusCode(201);
         } catch (RateLimitException $e) {
             $response = response()->json(['message' => $e->getMessage()], 429);
@@ -212,9 +272,18 @@ class HostingerController extends Controller
 
             return $response;
         } catch (\Throwable $e) {
-            logger()->error('Failed to create Hostinger server', ['error' => $e->getMessage()]);
+            logger()->error('Failed to create Hostinger server', [
+                'error' => $e->getMessage(),
+                'team_id' => $teamId,
+                'hostinger_virtual_machine_id' => $virtualMachineId,
+            ]);
 
-            return response()->json(['message' => 'Failed to create Hostinger server.'], 500);
+            return response()->json(array_filter([
+                'message' => $virtualMachineId
+                    ? 'The Hostinger VPS was purchased but could not be saved in Coolify. Manage it in hPanel.'
+                    : 'Failed to create Hostinger server.',
+                'hostinger_virtual_machine_id' => $virtualMachineId,
+            ]), 500);
         }
     }
 
