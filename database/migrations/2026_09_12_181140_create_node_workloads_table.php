@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('environment_id')->nullable()->constrained()->nullOnDelete();
             $table->nullableMorphs('resource');
             $table->string('name');
+            $table->string('internal_dns_name', 63)->nullable();
             $table->string('desired_state')->default('running')->index();
             $table->timestamps();
         });

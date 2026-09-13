@@ -2,6 +2,7 @@
 
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
+use App\Actions\Node\EnsureNodeWorkloadDnsNames;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Enums\NodeContainerManagementState;
@@ -253,7 +254,7 @@ it('withdraws and republishes workload discovery when a workload moves between n
         ->toBe(NodeContainerManagementState::MANAGED);
 });
 
-it('adds a short uuid only when workload slugs collide in the same mesh', function () {
+it('keeps the first dns name permanent and suffixes only a later mesh collision', function () {
     config()->set('constants.flux.internal_url', 'http://flux:7080');
     config()->set('constants.flux.internal_token', 'internal-secret');
     $user = User::factory()->create();
@@ -271,6 +272,7 @@ it('adds a short uuid only when workload slugs collide in the same mesh', functi
     $firstWorkload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'My App']);
     $secondWorkload = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'my-app']);
     $nodeA->workloads()->attach($firstWorkload);
+    EnsureNodeWorkloadDnsNames::run($nodeA->refresh());
     $nodeB->workloads()->attach($secondWorkload);
     $nodeA->containers()->create([
         'runtime_id' => 'container-a',
@@ -342,10 +344,18 @@ it('adds a short uuid only when workload slugs collide in the same mesh', functi
 
     $expectedWorkloadIds = collect([
         'my-app',
-        'my-app-'.strtolower(substr($firstWorkload->uuid, 0, 8)),
+        'my-app',
         'my-app-'.strtolower(substr($secondWorkload->uuid, 0, 8)),
     ])->sort()->values()->all();
 
     expect($workloadIds)->toBe($expectedWorkloadIds)
-        ->and($workloadIds)->not->toContain('my-app-'.strtolower(substr($otherMeshWorkload->uuid, 0, 8)));
+        ->and($firstWorkload->refresh()->internal_dns_name)->toBe('my-app')
+        ->and($secondWorkload->refresh()->internal_dns_name)->toBe('my-app-'.strtolower(substr($secondWorkload->uuid, 0, 8)))
+        ->and($otherMeshWorkload->refresh()->internal_dns_name)->toBe('my-app');
+
+    $firstWorkload->update(['name' => 'Renamed App']);
+    PublishNodeDiscoveryEndpoints::run($nodeA->refresh(), now()->addSeconds(3));
+
+    expect($firstWorkload->refresh()->internal_dns_name)->toBe('my-app')
+        ->and(collect($requests[3]['endpoints'])->where('namespace', 'default')->value('workload_id'))->toBe('my-app');
 });

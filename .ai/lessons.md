@@ -43,3 +43,4 @@
 - Keep inline badges from stretching in layout containers. Use a `justify-self-start` wrapper for CSS Grid items and `self-start` for items in column flex layouts.
 - When the user selects DNS lifecycle verification, test workload movement, stop, removal, expiry, and recovery before proposing DNS-name customization.
 - Add a UUID suffix only for DNS slugs that collide inside the same mesh; keep unique friendly names unchanged.
+- Internal DNS labels are permanent identifiers: persist them separately from display names, keep the first mesh owner on the plain slug, and suffix only later collisions.
