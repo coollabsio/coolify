@@ -33,6 +33,7 @@ class CreateDeploymentOperation
             $active = NodeOperation::query()
                 ->where('node_id', $node->id)
                 ->where('node_workload_id', $workload->id)
+                ->whereIn('command_type', ['workload.deploy.v1', 'workload.lifecycle.v1'])
                 ->whereIn('status', [
                     NodeOperationStatus::QUEUED,
                     NodeOperationStatus::DISPATCHED,

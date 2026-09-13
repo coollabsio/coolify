@@ -28,6 +28,15 @@ class DispatchWorkloadDeployment
 
         $configuration = $this->validatedConfiguration($operation->revision->configuration ?? []);
         $environment = $configuration['environment'] ?? [];
+        $ports = collect($configuration['ports'] ?? [])
+            ->map(function (array $port) use ($operation): array {
+                if (filled($operation->node->wireguard_ip)) {
+                    $port['host_ip'] = $operation->node->wireguard_ip;
+                }
+
+                return $port;
+            })
+            ->all();
         $name = 'coolify-'.$operation->workload->uuid.'-main';
         $response = Http::withToken($token)
             ->acceptJson()
@@ -40,7 +49,7 @@ class DispatchWorkloadDeployment
                 'image' => $operation->revision->image,
                 'command' => $configuration['command'] ?? [],
                 'environment' => $environment === [] ? (object) [] : $environment,
-                'ports' => $configuration['ports'] ?? [],
+                'ports' => $ports,
                 'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
                 'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
             ]);

@@ -73,6 +73,58 @@ it('converges each workload lifecycle command', function (NodeWorkloadAction $ac
     'remove' => fn () => [NodeWorkloadAction::REMOVE, []],
 ]);
 
+it('reconciles discovery immediately after each converged lifecycle action', function (NodeWorkloadAction $action, array $containers, bool $isPublished) {
+    $cluster = NodeCluster::factory()->create([
+        'team_id' => $this->team->id,
+        'network_status' => 'active',
+    ]);
+    $this->node->update([
+        'node_cluster_id' => $cluster->id,
+        'wireguard_ip' => '10.250.0.2',
+    ]);
+    $operation = CreateLifecycleOperation::run($this->node, $this->revision, $action);
+    $discoveryEndpoints = null;
+    Http::fake(function ($request) use ($action, $containers, $operation, &$discoveryEndpoints) {
+        if (str_ends_with($request->url(), '/v1/commands/workload.lifecycle')) {
+            return Http::response([
+                'command_id' => $operation->uuid,
+                'observed_at_unix_ms' => 1_700_000_000_000,
+                'name' => 'coolify-'.$this->workload->uuid.'-main',
+                'action' => $action->value,
+            ]);
+        }
+        if (str_ends_with($request->url(), '/v1/commands/container.list')) {
+            return Http::response([
+                'command_id' => 'inventory-1',
+                'observed_at_unix_ms' => 1_700_000_000_100,
+                'containers' => $containers,
+            ]);
+        }
+
+        $discoveryEndpoints = collect($request['endpoints'])->where('namespace', 'default')->values()->all();
+
+        return Http::response([
+            'command_id' => $request['command_id'],
+            'observed_at_unix_ms' => 1_700_000_000_200,
+            'owner_node_ip' => $request['owner_node_ip'],
+            'endpoint_count' => count($request['endpoints']),
+        ]);
+    });
+
+    (new ManageNodeWorkloadJob($operation->id))->handle();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
+        ->and($discoveryEndpoints !== [])->toBe($isPublished);
+    if ($isPublished) {
+        expect(data_get($discoveryEndpoints, '0.state'))->toBe($action === NodeWorkloadAction::STOP ? 'exited' : 'running');
+    }
+})->with([
+    'start publishes' => fn () => [NodeWorkloadAction::START, [lifecycleContainer($this, 'running')], true],
+    'restart publishes' => fn () => [NodeWorkloadAction::RESTART, [lifecycleContainer($this, 'running')], true],
+    'stop withdraws from DNS' => fn () => [NodeWorkloadAction::STOP, [lifecycleContainer($this, 'exited')], true],
+    'remove withdraws its row' => fn () => [NodeWorkloadAction::REMOVE, [], false],
+]);
+
 it('waits for a transitional container state to converge', function () {
     Sleep::fake();
     $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::STOP);

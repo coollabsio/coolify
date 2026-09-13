@@ -4,6 +4,7 @@ namespace App\Livewire\Node;
 
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
+use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
@@ -17,6 +18,7 @@ use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
+use App\Jobs\MoveNodeWorkloadJob;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -42,6 +44,9 @@ class Show extends Component
 
     /** @var array<string, string> */
     public array $dnsNames = [];
+
+    /** @var array<string, string> */
+    public array $moveTargets = [];
 
     public function mount(string $node_uuid): void
     {
@@ -214,6 +219,36 @@ class Show extends Component
         }
     }
 
+    public function moveWorkload(string $workloadUuid): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $field = 'moveTargets.'.$workloadUuid;
+            $this->validate([$field => ['required', 'string']]);
+            $target = Node::query()
+                ->where('uuid', $this->moveTargets[$workloadUuid])
+                ->where('team_id', $this->node->team_id)
+                ->where('node_cluster_id', $this->node->node_cluster_id)
+                ->whereKeyNot($this->node->id)
+                ->firstOrFail();
+            $revision = NodeWorkloadRevision::query()
+                ->whereHas('workload', fn ($query) => $query
+                    ->where('uuid', $workloadUuid)
+                    ->where('team_id', $this->node->team_id)
+                    ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
+                ->latest('id')
+                ->firstOrFail();
+            $operation = CreateMoveOperation::run($this->node, $target, $revision, auth()->user());
+            MoveNodeWorkloadJob::dispatch($operation->id);
+            $this->dispatch('success', 'Workload move queued. The source stays active until the target is ready.');
+            $this->loadNodeData();
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function testFluxConnection(): void
     {
         try {
@@ -259,7 +294,7 @@ class Show extends Component
     private function loadNodeData(): void
     {
         $this->node->load([
-            'cluster',
+            'cluster.nodes',
             'containers',
             'workloads' => fn ($query) => $query->with(['revisions' => fn ($revisions) => $revisions->latest('id')->limit(1)]),
             'operations' => fn ($query) => $query->with('workload')->latest('id')->limit(20),
@@ -277,6 +312,9 @@ class Show extends Component
         $this->dnsNames = $this->node->workloads
             ->mapWithKeys(fn ($workload): array => [$workload->uuid => $workload->internal_dns_name ?? ''])
             ->all();
+        foreach ($this->node->workloads as $workload) {
+            $this->moveTargets[$workload->uuid] ??= '';
+        }
     }
 
     private function runAction(callable $action, string $message): void

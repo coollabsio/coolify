@@ -117,6 +117,17 @@
                                 @if (in_array($workloadState, ['Running', 'Stopped', 'Outdated'], true))
                                     <x-forms.button isError wire:confirm="Remove this workload container from the node?" wire:click="manageWorkload('remove', '{{ $revision->uuid }}')" wire:loading.attr="disabled">Remove</x-forms.button>
                                 @endif
+                                @if ($node->cluster && $node->cluster->nodes->where('id', '!=', $node->id)->isNotEmpty())
+                                    <form wire:submit="moveWorkload('{{ $workload->uuid }}')" class="flex items-end gap-2">
+                                        <x-forms.select wire:model="moveTargets.{{ $workload->uuid }}" label="Move to Node" required>
+                                            <option value="">Select a Node</option>
+                                            @foreach ($node->cluster->nodes->where('id', '!=', $node->id)->sortBy('name') as $targetNode)
+                                                <option value="{{ $targetNode->uuid }}">{{ $targetNode->name }}</option>
+                                            @endforeach
+                                        </x-forms.select>
+                                        <x-forms.button type="submit" wire:loading.attr="disabled" wire:target="moveWorkload('{{ $workload->uuid }}')">Move</x-forms.button>
+                                    </form>
+                                @endif
                             </div>
                         @endif
                     </div>
