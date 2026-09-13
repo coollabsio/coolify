@@ -44,3 +44,4 @@
 - When the user selects DNS lifecycle verification, test workload movement, stop, removal, expiry, and recovery before proposing DNS-name customization.
 - Add a UUID suffix only for DNS slugs that collide inside the same mesh; keep unique friendly names unchanged.
 - Internal DNS labels are permanent identifiers: persist them separately from display names, keep the first mesh owner on the plain slug, and suffix only later collisions.
+- When the user defers workload scheduling hardening, return to the agreed Node networking architecture roadmap instead of continuing move-specific work.
