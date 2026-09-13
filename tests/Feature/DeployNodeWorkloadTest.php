@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\CreateOperation;
+use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Enums\NodeOperationStatus;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Livewire\Node\Show;
@@ -103,6 +104,25 @@ it('deploys a revision with the durable operation UUID and refreshes inventory',
         && $request['command_id'] === $operation->uuid
         && $request['environment'] === ['APP_ENV' => 'production']
         && $request['labels']['coolify.revision'] === $this->revision->uuid);
+});
+
+it('encodes an empty environment as a json object', function () {
+    $configuration = ['restart_policy' => 'unless-stopped'];
+    $this->revision->update([
+        'configuration' => $configuration,
+        'configuration_hash' => hash('sha256', json_encode($configuration, JSON_THROW_ON_ERROR)),
+    ]);
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    Http::assertSent(fn ($request): bool => str_contains($request->body(), '"environment":{}'));
 });
 
 it('fails when the deployed revision is not running after inventory refresh', function () {

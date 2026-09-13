@@ -56,6 +56,7 @@ completed=false
 changed=false
 was_active=false
 was_enabled=false
+discovery_dns_was_active=false
 had_binary=false
 had_environment=false
 had_unit=false
@@ -64,6 +65,7 @@ had_ca_version=false
 
 if systemctl is-active --quiet sentinel.service >/dev/null 2>&1; then was_active=true; fi
 if systemctl is-enabled --quiet sentinel.service >/dev/null 2>&1; then was_enabled=true; fi
+if systemctl is-active --quiet coolify-discovery-dns.service >/dev/null 2>&1; then discovery_dns_was_active=true; fi
 
 cleanup() {
     if [ -n "\$container_id" ]; then
@@ -103,6 +105,9 @@ rollback() {
         if [ "\$was_active" = true ]; then
             systemctl start sentinel.service || true
         fi
+        if [ "\$discovery_dns_was_active" = true ]; then
+            systemctl restart coolify-discovery-dns.service || true
+        fi
     fi
     cleanup
     exit "\$exit_code"
@@ -139,6 +144,10 @@ systemctl daemon-reload
 systemctl enable sentinel.service
 systemctl restart sentinel.service
 systemctl is-active --quiet sentinel.service
+if [ "\$discovery_dns_was_active" = true ]; then
+    systemctl restart coolify-discovery-dns.service
+    systemctl is-active --quiet coolify-discovery-dns.service
+fi
 
 attempt=0
 until curl --fail --silent http://127.0.0.1:8888/api/health >/dev/null; do
@@ -161,6 +170,7 @@ SCRIPT;
         return implode("\n", [
             'TOKEN='.$token,
             'PUSH_ENDPOINT='.$endpoint,
+            'PUSH_ENABLED=false',
             'FLUX_CA_PATH=/etc/coolify/sentinel-flux-ca.pem',
             'FLUX_TRUST_BUNDLE_VERSION='.$trustBundleVersion,
             'CONTROL_PLANE_ENABLED=true',

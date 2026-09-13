@@ -201,6 +201,7 @@ class Show extends Component
     private function loadNodeData(): void
     {
         $this->node->load([
+            'cluster',
             'containers',
             'workloads' => fn ($query) => $query->with(['revisions' => fn ($revisions) => $revisions->latest('id')->limit(1)]),
             'operations' => fn ($query) => $query->with('workload')->latest('id')->limit(20),

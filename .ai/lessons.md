@@ -25,3 +25,16 @@
 - Scope deployment idempotency to one attempt, not permanently to a Node and revision. Allow redeployment after a final operation, while reusing an active operation to prevent concurrent duplicate commands.
 - A host agent that starts Podman containers must not let systemd kill its `conmon` child processes during an agent restart. Use `KillMode=process`, and wait for transitional runtime states to settle before declaring lifecycle convergence.
 - Before adding more workload features, define and validate the node network foundation: WireGuard topology, firewall ownership, address allocation, routing, and recovery. Keep this aligned with the proven coold design where applicable.
+- When the user explicitly says to implement an approved multi-slice feature, continue making code changes and running tests across turns. Do not stop after planning or report partial scaffolding as the deliverable.
+- When a development VM profile is renamed, keep its old libvirt domain in an explicit cleanup list until existing environments can reset it. A renamed profile can otherwise leave a running VM that owns the new profile's MAC address.
+- WireGuard staging files passed to `wg-quick` must keep a valid `<interface>.conf` basename. Put them in a staging directory on the same filesystem instead of adding a suffix after `.conf`.
+- Disable Sentinel's legacy metrics push on control-only Node hosts. A valid Flux control credential is not a legacy `/api/v1/sentinel/push` token, so leaving both clients enabled causes repeated unauthorized requests.
+- Do not make Corrosion depend on `wg-quick@<interface>.service` when Sentinel activates the WireGuard interface directly with `wg-quick`. Verify `corrosion.service` is active before a reconcile command reports success.
+- After a failed staged network change starts its rollback service immediately, stop the paired timer. Otherwise, the armed timer applies the same rollback a second time after recovery.
+- Set Corrosion's numeric cluster ID through its cluster API after the agent starts. A cluster name in generated configuration does not isolate gossip groups, and the current Corrosion ID is a non-zero 16-bit value.
+- Publish an address that is routable across the Node WireGuard mesh. A Podman bridge address is Node-local; bind the workload port to the Node WireGuard address and publish that address for cross-Node discovery.
+- An idempotent reconcile result must return the same complete observed state as a changed reconcile. Do not replace live peer data with an empty synthetic result on the no-change path.
+- Build Flux's negotiation set from the complete shared capability groups. Fixed array indexes silently omit new capabilities even when Sentinel advertises them and Coolify grants them.
+- Encode empty PHP maps as JSON objects for Rust map fields. Laravel's HTTP client encodes an empty PHP array as `[]`, which Serde rejects when it expects a map.
+- An IPv4-only DNS service must still answer AAAA questions with an authoritative empty response. Do not ignore AAAA questions, because dual-stack clients wait for both A and AAAA results.
+- `resolvectl` settings belong to a live link instance. After `wg-quick` recreates a WireGuard interface, apply its DNS server and route-only domain again on both the success and rollback paths.

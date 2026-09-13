@@ -1,0 +1,281 @@
+<?php
+
+use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\CreateNodeCluster;
+use App\Actions\Node\RemoveNodeFromCluster;
+use App\Actions\Node\RepairNodeClusterNetwork;
+use App\Actions\Node\UpdateNodeCluster;
+use App\Jobs\ReconcileNodeClusterNetworkJob;
+use App\Livewire\NodeCluster\Index;
+use App\Livewire\NodeCluster\Show;
+use App\Models\InstanceSettings;
+use App\Models\Node;
+use App\Models\NodeCluster;
+use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $this->user = User::factory()->create();
+    $this->actingAs($this->user);
+    session(['currentTeam' => $this->user->teams()->firstOrFail()]);
+});
+
+it('allocates a different automatic private cidr for each cluster', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $first = CreateNodeCluster::run($team, $this->user, 'First');
+    $second = CreateNodeCluster::run($team, $this->user, 'Second');
+    expect($first->cidr)->toBe('10.240.0.0/24')->and($second->cidr)->toBe('10.240.1.0/24');
+});
+
+it('stores cluster descriptions as text', function () {
+    expect(Schema::getColumnType('node_clusters', 'description'))->toBe('text');
+});
+
+it('assigns one node with a stable private address', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Production');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    expect($node->refresh()->node_cluster_id)->toBe($cluster->id)
+        ->and($node->wireguard_ip)->toBe('10.240.0.2');
+    AssignNodeToCluster::run($cluster, $node);
+    expect($node->refresh()->wireguard_ip)->toBe('10.240.0.2');
+});
+
+it('rejects cross-team membership', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Private');
+    $foreign = Node::factory()->create();
+    expect(fn () => AssignNodeToCluster::run($cluster, $foreign))->toThrow(DomainException::class);
+});
+
+it('requires explicit removal before assigning a node to another cluster', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $first = CreateNodeCluster::run($team, $this->user, 'First');
+    $second = CreateNodeCluster::run($team, $this->user, 'Second');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($first, $node);
+
+    expect(fn () => AssignNodeToCluster::run($second, $node->refresh()))
+        ->toThrow(DomainException::class, 'already belongs');
+});
+
+it('shows only team clusters in the cluster UI', function () {
+    $own = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Own cluster');
+    NodeCluster::factory()->create(['name' => 'Foreign cluster']);
+    Livewire::test(Index::class)
+        ->assertSee($own->name)->assertDontSee('Foreign cluster');
+});
+
+it('validates and canonicalizes private cidrs', function (string $cidr) {
+    $team = $this->user->teams()->firstOrFail();
+
+    expect(fn () => CreateNodeCluster::run($team, $this->user, 'Invalid', cidr: $cidr))
+        ->toThrow(DomainException::class);
+})->with([
+    'public range' => '8.8.8.0/24',
+    'host bits' => '10.10.0.1/24',
+    'ipv6' => 'fd00::/64',
+    'too small for the node limit' => '10.10.0.0/26',
+    'invalid prefix' => '10.10.0.0/33',
+]);
+
+it('rejects cidr overlap across all teams', function () {
+    $team = $this->user->teams()->firstOrFail();
+    CreateNodeCluster::run($team, $this->user, 'First', cidr: '10.20.0.0/16');
+
+    $foreign = User::factory()->create();
+    expect(fn () => CreateNodeCluster::run($foreign->teams()->firstOrFail(), $foreign, 'Overlap', cidr: '10.20.1.0/24'))
+        ->toThrow(DomainException::class, 'overlaps');
+});
+
+it('assigns unique stable addresses and increments the desired revision', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Network');
+    $first = Node::factory()->create(['team_id' => $team->id]);
+    $second = Node::factory()->create(['team_id' => $team->id]);
+
+    AssignNodeToCluster::run($cluster, $first);
+    AssignNodeToCluster::run($cluster->refresh(), $second);
+
+    expect($first->refresh()->wireguard_ip)->toBe('10.240.0.2')
+        ->and($second->refresh()->wireguard_ip)->toBe('10.240.0.3')
+        ->and($cluster->refresh()->desired_revision)->toBe(3);
+});
+
+it('removes membership and increments the desired revision', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Network');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+
+    RemoveNodeFromCluster::run($cluster->refresh(), $node->refresh());
+
+    expect($node->refresh()->node_cluster_id)->toBeNull()
+        ->and($node->wireguard_ip)->toBeNull()
+        ->and($cluster->refresh()->desired_revision)->toBe(3);
+});
+
+it('limits a cluster to one hundred nodes', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Full');
+    Node::factory()->count(100)->create(['team_id' => $team->id, 'node_cluster_id' => $cluster->id]);
+
+    expect(fn () => AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id])))
+        ->toThrow(DomainException::class, 'at most 100');
+});
+
+it('uses a real detail component and denies cross-team routes', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Own');
+    $foreign = NodeCluster::factory()->create();
+
+    $this->get(route('node-cluster.show', $cluster->uuid))->assertSuccessful()->assertSeeLivewire(Show::class);
+    $this->get(route('node-cluster.show', $foreign->uuid))->assertNotFound();
+});
+
+it('prevents members from mutating clusters', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Protected');
+    $team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('saveSettings')
+        ->assertForbidden();
+});
+
+it('does not allow active cidr changes', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Active');
+    $cluster->update(['network_status' => 'active']);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('cidr', '10.30.0.0/24')
+        ->call('saveSettings')
+        ->assertHasErrors('cidr');
+
+    expect(fn () => UpdateNodeCluster::run(
+        $cluster->refresh(),
+        $cluster->name,
+        $cluster->description,
+        '10.30.0.0/24',
+        $cluster->wireguard_interface,
+        $cluster->wireguard_port,
+    ))->toThrow(DomainException::class, 'cannot be changed');
+});
+
+it('does not allow cidr changes after an active network enters an error state', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Previously active');
+    $cluster->update(['network_status' => 'error', 'last_reconciled_at' => now()]);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('cidr', '10.30.0.0/24')
+        ->call('saveSettings')
+        ->assertHasErrors('cidr');
+});
+
+it('prevents deletion while nodes are assigned', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Used');
+    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('deleteCluster')
+        ->assertForbidden();
+});
+
+it('creates edits assigns removes and deletes through Livewire', function () {
+    $team = $this->user->teams()->firstOrFail();
+    Livewire::test(Index::class)->set('name', 'UI cluster')->call('createCluster')->assertDispatched('success');
+    $cluster = NodeCluster::query()->where('team_id', $team->id)->sole();
+    $node = Node::factory()->create(['team_id' => $team->id]);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('description', 'Updated')
+        ->call('saveSettings')->assertDispatched('success')
+        ->set('nodeUuid', $node->uuid)
+        ->call('assignNode')->assertDispatched('success')
+        ->call('removeNode', $node->uuid)->assertDispatched('success')
+        ->call('deleteCluster');
+
+    expect(NodeCluster::query()->whereKey($cluster->id)->exists())->toBeFalse();
+});
+
+it('does not expose foreign nodes to assignment actions', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Own');
+    $foreign = Node::factory()->create();
+
+    expect(fn () => Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('nodeUuid', $foreign->uuid)
+        ->call('assignNode'))
+        ->toThrow(ModelNotFoundException::class);
+});
+
+it('queues cluster network reconciliation once', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Mesh');
+    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->assertSee('Reconcile network')
+        ->call('reconcileNetwork')
+        ->assertDispatched('success');
+
+    expect($cluster->refresh()->network_status)->toBe('reconciling');
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 1);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('reconcileNetwork')
+        ->assertDispatched('info');
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 1);
+});
+
+it('prevents members from reconciling cluster networking', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Protected mesh');
+    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
+    $team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    auth()->user()->unsetRelation('teams');
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('reconcileNetwork')
+        ->assertForbidden();
+
+    Queue::assertNothingPushed();
+});
+
+it('runs the scoped SSH network repair from the cluster page', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Repairable mesh');
+    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
+    RepairNodeClusterNetwork::mock()
+        ->shouldReceive('handle')
+        ->once();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->assertSee('Repair over SSH')
+        ->call('repairNetwork')
+        ->assertDispatched('success');
+});
+
+it('builds an SSH repair script that restores only Coolify network state', function () {
+    $script = RepairNodeClusterNetwork::repairScript('coolify0');
+
+    expect($script)
+        ->toContain('/var/lib/coolify/network/coolify0.last-good.conf')
+        ->toContain('/var/lib/coolify/network/firewall.last-good.nft')
+        ->toContain('delete table inet coolify_cluster')
+        ->toContain('resolvectl dns "$interface" "$wireguard_address"')
+        ->toContain('resolvectl domain "$interface" ~coolify.internal')
+        ->toContain('systemctl restart coolify-discovery-dns.service')
+        ->toContain('systemctl restart sentinel.service')
+        ->not->toContain('flush ruleset');
+});

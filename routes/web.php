@@ -15,6 +15,8 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Node\Show as NodeShow;
+use App\Livewire\NodeCluster\Index as NodeClusterIndex;
+use App\Livewire\NodeCluster\Show as NodeClusterShow;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
@@ -361,6 +363,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
     });
 
+    Route::get('/node-clusters', NodeClusterIndex::class)->name('node-cluster.index');
+    Route::get('/node-clusters/{cluster_uuid}', NodeClusterShow::class)->name('node-cluster.show');
     Route::get('/node/{node_uuid}', NodeShow::class)->name('node.show');
 
     Route::get('/servers', ServerIndex::class)->name('server.index');

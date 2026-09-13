@@ -49,7 +49,8 @@ it('provides root and non-root profiles for every supported distribution', funct
     $profiles = collect(config('development-qemu.profiles'));
 
     expect($profiles->keys()->all())->toBe([
-        'node-worker',
+        'node-worker-a',
+        'node-worker-b',
         'ubuntu-root',
         'ubuntu-non-root',
         'debian-root',
@@ -58,9 +59,11 @@ it('provides root and non-root profiles for every supported distribution', funct
         'centos-non-root',
         'alpine-root',
         'alpine-non-root',
-    ])->and($profiles->pluck('ip')->unique()->count())->toBe(9)
-        ->and($profiles->pluck('mac')->unique()->count())->toBe(9)
-        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(5)
+    ])->and($profiles->pluck('ip')->unique()->count())->toBe(10)
+        ->and($profiles->pluck('mac')->unique()->count())->toBe(10)
+        ->and($profiles->pluck('uuid')->unique()->count())->toBe(10)
+        ->and($profiles->pluck('domain')->unique()->count())->toBe(10)
+        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(6)
         ->and($profiles->filter(fn (array $profile) => $profile['user'] !== 'root')->count())->toBe(4);
 });
 
@@ -74,13 +77,17 @@ it('provisions the node worker with podman and a reachable flux hostname', funct
         '*' => Process::result(),
     ]);
 
-    StartDevelopmentQemuVm::run('node-worker');
+    StartDevelopmentQemuVm::run('node-worker-a');
 
-    $userData = File::get("{$storagePath}/coolify-dev-node-worker-user-data.yaml");
+    $userData = File::get("{$storagePath}/coolify-dev-node-worker-a-user-data.yaml");
 
     expect($userData)
         ->toContain('  - podman')
         ->toContain('  - podman-docker')
+        ->toContain('  - wireguard-tools')
+        ->toContain('  - nftables')
+        ->toContain('  - iputils-ping')
+        ->toContain('  - curl')
         ->toContain('systemctl enable --now podman.socket')
         ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
         ->toContain('192.168.122.1 coolify-flux')
@@ -163,7 +170,7 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect(File::get(base_path('.env.development.example')))->toContain('DEVELOPMENT_QEMU_AUTO_START=false')
         ->and($jean['scripts']['run'])->toBe('bash scripts/dev-stack')
         ->and($script)->toContain('DEVELOPMENT_QEMU_AUTO_START')
-        ->and($script)->toContain('php artisan dev:qemu node-worker')
+        ->and($script)->toContain('php artisan dev:qemu node-worker-a node-worker-b')
         ->and($script)->toContain('compose up --detach --pull missing')
         ->and($script)->toContain('config --environment');
 
@@ -171,17 +178,35 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect($compose)->toContain("postgres:\n        condition: service_healthy");
 });
 
-it('seeds the node worker as a separate node with the host gateway endpoint', function () {
-    $node = SeedDevelopmentQemuServer::run('node-worker');
+it('seeds the first node worker as a separate node with the host gateway endpoint', function () {
+    $node = SeedDevelopmentQemuServer::run('node-worker-a');
 
     expect($node)->toBeInstanceOf(Node::class)
-        ->and($node->uuid)->toBe('development-qemu-node-worker')
+        ->and($node->uuid)->toBe('development-qemu-node-worker-a')
         ->and($node->role->value)->toBe('worker')
         ->and($node->ip)->toBe('192.168.122.50')
         ->and($node->user)->toBe('root')
         ->and($node->sentinel_url)->toBe('http://192.168.122.1:8000')
         ->and($node->is_usable)->toBeFalse()
         ->and(Server::query()->where('uuid', $node->uuid)->exists())->toBeFalse();
+});
+
+it('starts and seeds both node workers together', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-node-mesh-test-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '*' => Process::result(),
+    ]);
+
+    ManageDevelopmentQemuVm::run(['node-worker-a', 'node-worker-b']);
+
+    expect(Node::query()->whereIn('uuid', [
+        'development-qemu-node-worker-a',
+        'development-qemu-node-worker-b',
+    ])->count())->toBe(2);
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-worker-a'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-worker-b'));
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {
@@ -199,6 +224,7 @@ it('deletes managed vm data and freshly creates only the selected vm', function 
     File::ensureDirectoryExists($storagePath);
     File::put("{$storagePath}/coolify-dev-ubuntu-root.qcow2", 'old data');
     File::put("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2", 'old data');
+    File::put("{$storagePath}/coolify-dev-node-worker.qcow2", 'legacy data');
 
     Process::fake([
         '* net-dumpxml *' => Process::result(output: '<network></network>'),
@@ -211,6 +237,7 @@ it('deletes managed vm data and freshly creates only the selected vm', function 
     StartDevelopmentQemuVm::run('ubuntu-non-root');
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh destroy') && str_contains($process->command, 'coolify-dev-ubuntu-root'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh destroy') && str_contains($process->command, 'coolify-dev-node-worker'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh destroy') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh undefine') && str_contains($process->command, 'coolify-dev-ubuntu-root'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh undefine') && str_contains($process->command, 'coolify-dev-ubuntu-non-root'));
@@ -221,7 +248,8 @@ it('deletes managed vm data and freshly creates only the selected vm', function 
     Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -D LIBVIRT_FWI'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec') && str_contains($process->command, 'coolify'));
     expect(File::exists("{$storagePath}/coolify-dev-ubuntu-root.qcow2"))->toBeFalse()
-        ->and(File::exists("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2"))->toBeFalse();
+        ->and(File::exists("{$storagePath}/coolify-dev-ubuntu-non-root.qcow2"))->toBeFalse()
+        ->and(File::exists("{$storagePath}/coolify-dev-node-worker.qcow2"))->toBeFalse();
 });
 
 it('rejects qemu vm management outside development', function () {

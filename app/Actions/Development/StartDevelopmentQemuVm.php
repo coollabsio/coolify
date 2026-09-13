@@ -26,10 +26,13 @@ class StartDevelopmentQemuVm
         $this->configureDhcpReservation($profile);
 
         if ($resetManagedVms) {
-            foreach ($profiles as $managedProfile) {
-                Process::run('virsh destroy '.escapeshellarg($managedProfile['domain']));
-                Process::run('virsh undefine '.escapeshellarg($managedProfile['domain']));
-                $this->deleteVmData($managedProfile['domain']);
+            $managedDomains = collect($profiles)->pluck('domain')
+                ->merge(config('development-qemu.legacy_domains', []))
+                ->unique();
+            foreach ($managedDomains as $managedDomain) {
+                Process::run('virsh destroy '.escapeshellarg($managedDomain));
+                Process::run('virsh undefine '.escapeshellarg($managedDomain));
+                $this->deleteVmData($managedDomain);
             }
         }
 
@@ -130,7 +133,7 @@ class StartDevelopmentQemuVm
         $sudo = $profile['user'] === 'root' ? '' : "    groups: [{$adminGroup}]\n    sudo: ALL=(ALL) NOPASSWD:ALL\n";
 
         if (($profile['runtime'] ?? 'docker') === 'podman') {
-            $packages = "  - podman\n  - podman-docker\n  - sudo";
+            $packages = "  - podman\n  - podman-docker\n  - wireguard-tools\n  - nftables\n  - iputils-ping\n  - curl\n  - ca-certificates\n  - sudo";
             $runtimeSetup = "systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '{$gateway} coolify-flux\\n' >> /etc/hosts";
         } else {
             [$packages, $startDocker] = match ($profile['provisioner']) {

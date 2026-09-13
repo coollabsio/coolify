@@ -27,6 +27,7 @@ class DispatchWorkloadDeployment
         }
 
         $configuration = $this->validatedConfiguration($operation->revision->configuration ?? []);
+        $environment = $configuration['environment'] ?? [];
         $name = 'coolify-'.$operation->workload->uuid.'-main';
         $response = Http::withToken($token)
             ->acceptJson()
@@ -38,7 +39,7 @@ class DispatchWorkloadDeployment
                 'name' => $name,
                 'image' => $operation->revision->image,
                 'command' => $configuration['command'] ?? [],
-                'environment' => $configuration['environment'] ?? [],
+                'environment' => $environment === [] ? (object) [] : $environment,
                 'ports' => $configuration['ports'] ?? [],
                 'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
                 'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',

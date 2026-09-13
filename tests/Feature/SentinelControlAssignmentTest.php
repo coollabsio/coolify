@@ -65,6 +65,17 @@ it('returns an enabled development assignment with a bound short-lived credentia
         ->and($claims['caps'])->toBe(['system.ping.v1', 'system.info.v1', 'container.list.v1', 'workload.deploy.v1', 'workload.lifecycle.v1']);
 });
 
+it('grants the typed endpoint reconciliation capability to Nodes', function () {
+    $assignment = requestSentinelAssignment($this->token, [
+        'capabilities' => ['discovery.corrosion.endpoints.reconcile.v1'],
+    ])
+        ->assertOk()
+        ->json();
+
+    $claims = (array) JWT::decode($assignment['credential'], new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
+    expect($claims['caps'])->toBe(['discovery.corrosion.endpoints.reconcile.v1']);
+});
+
 it('rejects a plaintext Flux endpoint without the development override', function () {
     config()->set('constants.flux.development_allow_plaintext', false);
 

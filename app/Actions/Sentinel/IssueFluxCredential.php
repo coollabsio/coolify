@@ -31,6 +31,14 @@ class IssueFluxCredential
             'container.list.v1',
             'workload.deploy.v1',
             'workload.lifecycle.v1',
+            'network.wireguard.key.ensure.v1',
+            'network.wireguard.inspect.v1',
+            'network.wireguard.reconcile.v1',
+            'network.firewall.inspect.v1',
+            'network.firewall.reconcile.v1',
+            'discovery.corrosion.inspect.v1',
+            'discovery.corrosion.reconcile.v1',
+            'discovery.corrosion.endpoints.reconcile.v1',
         ], $capabilities));
 
         $credential = JWT::encode([

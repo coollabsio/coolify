@@ -2,7 +2,7 @@
 
 **Status:** Development only  
 **Feature gate:** `SENTINEL_HOST_ENABLED`  
-**Last reviewed:** 2026-09-12
+**Last reviewed:** 2026-09-13
 
 ## Purpose
 
@@ -36,6 +36,13 @@ Host-native Sentinel (systemd)
   - TLS connection and heartbeats
   - typed, capability-gated host commands
   - host information collection
+  - WireGuard and dedicated nftables reconciliation
+        |
+        v
+Node cluster data plane
+  - full-mesh WireGuard on stable private addresses
+  - Corrosion endpoint replication over WireGuard
+  - private workload DNS on each Node WireGuard address
 ```
 
 Flux does not make product decisions. Coolify selects and authorizes the server
@@ -182,6 +189,43 @@ command for the same attempt.
   Sentinel must not kill the Podman `conmon` processes that supervise running
   workloads.
 
+### Node cluster network
+
+- A team-owned Node cluster is the authority for Node membership, one private
+  IPv4 CIDR, stable Node addresses, WireGuard peer intent, firewall policy, and
+  the desired network revision. A Node can belong to zero or one cluster.
+- Coolify allocates an unused `/24` from `10.240.0.0/12`. The first usable
+  address is reserved for cluster infrastructure, and Node addresses start at
+  the second usable address. A cluster is limited to 100 Nodes.
+- The first network topology is a full WireGuard mesh. Sentinel creates private
+  keys on each Node and returns only public keys and observed interface state.
+- Sentinel stages each WireGuard and firewall change, arms a systemd rollback,
+  checks the applied state and Flux access, and cancels rollback only after the
+  checks pass. Automatic rollback waits for the restore command to finish.
+  Successful activation, rollback, and SSH repair restore the route-only DNS
+  settings after the WireGuard link is recreated.
+- Sentinel owns only the `inet coolify_cluster` nftables table. It does not
+  flush or replace UFW, firewalld, or user-owned nftables rules.
+
+### Replicated endpoint discovery
+
+- Sentinel installs the pinned Corrosion release as a separate host-native
+  systemd service. Gossip and the HTTP API bind only to the Node WireGuard
+  address. A stable non-zero Corrosion cluster ID separates each Coolify Node
+  cluster.
+- After each complete container inventory, Coolify sends one owned endpoint
+  snapshot for that Node through a typed, durable operation. Sentinel replaces
+  only rows whose owner matches the local Node WireGuard address.
+- Corrosion replicates workload identity, namespace, owning Node, reachable
+  endpoint address, state, health, update time, and expiry. It cannot change
+  authoritative membership or network configuration.
+- Each Node runs a small authoritative DNS service on its WireGuard address for
+  `<workload>.<namespace>.coolify.internal`. It returns only running,
+  healthy-or-unknown, non-expired IPv4 endpoints. It returns an authoritative
+  empty response for AAAA questions so dual-stack clients do not wait for a
+  timeout. Systemd-resolved routes only the `coolify.internal` zone to this
+  service.
+
 ## Security model
 
 - Sentinel connects to Flux with TLS and verifies the exact DNS name or IP
@@ -219,10 +263,11 @@ container, and host-native Sentinel runs as a systemd service inside it. The
 stack uses published `main` images from GHCR. This setup tests the production
 process model while keeping local development reproducible.
 
-Developers with KVM access can also start the optional `node-worker` QEMU profile.
-It runs Ubuntu, systemd, Podman, the Podman API socket, and host-native Sentinel
-on a normal virtual machine. The VM connects to the same development Coolify and
-Flux services and is the target for runtime and host-network integration tests.
+Developers with KVM access can also start the optional two-Node QEMU profile.
+Each worker runs Ubuntu, systemd, Podman, the Podman API socket, WireGuard,
+nftables, host-native Sentinel, Corrosion, and private discovery DNS on a normal
+virtual machine. Both VMs connect to the same development Coolify and Flux
+services and provide a complete cross-Node integration topology.
 Legacy hosts are stored in `servers`, and nodes are stored in the separate
 `nodes` table. Legacy servers validate Docker and Docker Compose. Nodes validate
 Podman, systemd, and the rootful Podman API socket. Development seeding does not
@@ -240,9 +285,9 @@ released; they are not a temporary compatibility mode.
 ### Fresh v5 installations
 
 The accepted target supports combined, control-plane-only, and worker modes.
-Fresh installations can use the node host stack. The full installer,
-Podman execution, networking, and placement flows are not implemented in this
-slice.
+Fresh installations can use the Node host stack. The full installer, complete
+application orchestration, volumes, secrets, ingress, and placement flows are
+not implemented in this slice.
 
 ### Coolify Cloud
 
@@ -261,8 +306,8 @@ cross-instance command routing are not implemented yet.
 - direct TLS gRPC connection, heartbeats, and connection reporting;
 - private CA issuance, Flux leaf issuance, automatic leaf renewal, rollback,
   and SSH trust repair;
-- `system.ping.v1`, `system.info.v1`, read-only `container.list.v1`, and minimal
-  `workload.deploy.v1` typed commands;
+- `system.ping.v1`, `system.info.v1`, read-only `container.list.v1`, minimal
+  workload control, and typed Node network and discovery commands;
 - development-only UI controls and connection state;
 - separate `Node`, `NodeWorkload`, immutable workload revision, assignment, and
   observed `NodeContainer` models;
@@ -278,6 +323,14 @@ cross-instance command routing are not implemented yet.
   operation recovery.
 - durable start, stop, restart, and remove commands with observed-state
   convergence and manual recovery.
+- team-owned Node cluster model, authorization, UI, membership, CIDR and stable
+  address allocation, revision tracking, and a 100-Node limit;
+- full-mesh WireGuard reconciliation with host-only private keys, observed
+  state, drift checks, staged activation, systemd rollback, and SSH repair;
+- scoped nftables reconciliation in the dedicated `coolify_cluster` table;
+- pinned host-native Corrosion, owned and expiring endpoint snapshots, cluster
+  membership observation, and private internal workload DNS;
+- explicit two-QEMU-Node development topology for cross-Node network tests.
 
 ### Not implemented
 
@@ -287,8 +340,8 @@ cross-instance command routing are not implemented yet.
 - complete application deployment orchestration, volumes, secrets, networks,
   proxy configuration, health gates, rollback, and placement;
 - scheduled recovery of stale Node operations. Recovery is manual for now;
-- the Podman, firewall, DNS, Corrosion, ingress, and builder capabilities that
-  will move from the earlier coold design into Sentinel;
+- the remaining Podman volume, secret, network, ingress, and builder
+  capabilities that will move from the earlier coold design into Sentinel;
 - on-demand Sentinel log transport;
 - retirement of the existing Sentinel container.
 
@@ -296,4 +349,5 @@ cross-instance command routing are not implemented yet.
 
 Add persistent volume support to immutable workload revisions and Podman
 deployment. Volume creation and attachment must remain Node-local operations,
-while Coolify owns the desired volume configuration and identity.
+while Coolify owns the desired volume configuration and identity. Keep the Node
+cluster network as the private transport and discovery foundation.

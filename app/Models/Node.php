@@ -28,12 +28,19 @@ class Node extends BaseModel
             'metadata' => 'array',
             'is_reachable' => 'boolean',
             'is_usable' => 'boolean',
+            'network_observed_state' => 'array',
+            'wireguard_last_handshake_at' => 'datetime',
         ];
     }
 
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function cluster(): BelongsTo
+    {
+        return $this->belongsTo(NodeCluster::class, 'node_cluster_id');
     }
 
     public function privateKey(): BelongsTo

@@ -17,6 +17,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -58,6 +59,7 @@ use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\IntegrationTokenPolicy;
+use App\Policies\NodeClusterPolicy;
 use App\Policies\NodeContainerPolicy;
 use App\Policies\NodeOperationPolicy;
 use App\Policies\NodePolicy;
@@ -91,6 +93,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         Server::class => ServerPolicy::class,
         Node::class => NodePolicy::class,
+        NodeCluster::class => NodeClusterPolicy::class,
         NodeWorkload::class => NodeWorkloadPolicy::class,
         NodeContainer::class => NodeContainerPolicy::class,
         NodeOperation::class => NodeOperationPolicy::class,

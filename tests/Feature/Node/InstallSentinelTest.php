@@ -48,6 +48,7 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toContain('FLUX_TRUST_BUNDLE_VERSION='.$authority->version)
         ->toContain('TOKEN=sentinel-token')
         ->toContain('PUSH_ENDPOINT=http://coolify:8000/api/v1/sentinel')
+        ->toContain('PUSH_ENABLED=false')
         ->and($unit)->toContain('ExecStart=/usr/local/bin/sentinel')
         ->toContain('EnvironmentFile=/etc/coolify/sentinel.env')
         ->toContain('KillMode=process')
@@ -67,6 +68,11 @@ it('installs a public CA bundle and version atomically before Sentinel starts', 
         ->toBeLessThan(strrpos($script, 'systemctl enable sentinel.service'));
     expect(strrpos($script, 'changed=true'))
         ->toBeGreaterThan(strpos($script, 'had_ca_version=true'));
+    expect($script)
+        ->toContain('if systemctl is-active --quiet coolify-discovery-dns.service')
+        ->toContain('if [ "$discovery_dns_was_active" = true ]')
+        ->and(substr_count($script, 'systemctl restart coolify-discovery-dns.service'))
+        ->toBe(2);
 });
 
 it('rejects unsafe installer inputs', function (string $token, string $endpoint, string $image) {

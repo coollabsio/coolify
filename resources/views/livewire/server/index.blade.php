@@ -6,6 +6,9 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
+            @if (isDev() && config('constants.sentinel.host_enabled', false))
+                <a href="{{ route('node-cluster.index') }}" {{ wireNavigate() }} class="button w-fit shrink-0 whitespace-nowrap">Node clusters <x-status-badge label="Dev" /></a>
+            @endif
             @if (isDev())
                 @can('create', App\Models\Server::class)
                     <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}

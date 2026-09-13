@@ -115,6 +115,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>
                 </a>
             </li>
+            @if (isDev() && config('constants.sentinel.host_enabled', false))
+                <li>
+                    <a title="Node clusters" {{ wireNavigate() }}
+                        class="{{ request()->is('node-clusters*') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('node-cluster.index') }}">
+                        <x-reicon name="servers" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Node clusters</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="Sources" {{ wireNavigate() }}
                     class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"

@@ -11,6 +11,19 @@
         </div>
     </div>
 
+    <x-application.settings-section title="Cluster network" helper="Coolify owns Node membership and desired private network state.">
+        @if ($node->cluster)
+            <div class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div><span class="text-neutral-500 dark:text-fg-dim">Cluster</span><p><a href="{{ route('node-cluster.show', $node->cluster->uuid) }}">{{ $node->cluster->name }}</a></p></div>
+                <div><span class="text-neutral-500 dark:text-fg-dim">WireGuard address</span><p class="font-mono text-xs">{{ $node->wireguard_ip }}/32</p></div>
+                <div><span class="text-neutral-500 dark:text-fg-dim">Revision</span><p>{{ $node->network_applied_revision ?? 'Pending' }} / {{ $node->cluster->desired_revision }}</p></div>
+                <div><span class="text-neutral-500 dark:text-fg-dim">Discovery</span><p>{{ $node->corrosion_status ?? 'Pending' }}</p></div>
+            </div>
+        @else
+            <p class="text-sm text-neutral-500 dark:text-fg-dim">This Node is not assigned to a cluster.</p>
+        @endif
+    </x-application.settings-section>
+
     <x-application.settings-section title="Host Sentinel" helper="Install and manage Sentinel as a systemd service on this node.">
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
