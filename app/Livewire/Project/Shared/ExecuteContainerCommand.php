@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
+use App\Models\Node;
 use App\Models\Server;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
@@ -81,8 +82,20 @@ class ExecuteContainerCommand extends Component
             $this->authorize('view', $this->resource);
             $this->servers = $this->servers->push($this->resource);
             $this->containersLoaded = true;
+        } elseif (data_get($this->parameters, 'node_uuid')) {
+            abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+            $this->type = 'node';
+            $this->resource = Node::query()
+                ->where('uuid', $this->parameters['node_uuid'])
+                ->where('team_id', currentTeam()->id)
+                ->firstOrFail();
+            $this->authorize('view', $this->resource);
+            $this->servers = $this->servers->push($this->resource);
+            $this->containersLoaded = true;
         }
-        $this->servers = $this->servers->sortByDesc(fn ($server) => $server->isTerminalEnabled());
+        if ($this->type !== 'node') {
+            $this->servers = $this->servers->sortByDesc(fn ($server) => $server->isTerminalEnabled());
+        }
     }
 
     public function loadContainers(): void
@@ -177,14 +190,18 @@ class ExecuteContainerCommand extends Component
             $this->authorize('canAccessTerminal');
             $server = $this->servers->first();
             $this->authorize('view', $server);
-            if ($server->isForceDisabled()) {
+            if ($server instanceof Server && $server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
+            }
+            if ($server instanceof Node && (! $server->is_reachable || ! $server->is_usable)) {
+                throw new \RuntimeException('Node is not ready.');
             }
             $this->dispatch(
                 'send-terminal-command',
                 false,
                 data_get($server, 'name'),
-                data_get($server, 'uuid')
+                data_get($server, 'uuid'),
+                $server instanceof Node ? 'node' : 'server',
             );
 
             // Dispatch a frontend event to ensure terminal gets focus after connection

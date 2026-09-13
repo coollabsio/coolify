@@ -109,7 +109,7 @@
             <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
             <li>
                 <a title="Servers" {{ wireNavigate() }}
-                    class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                    class="{{ request()->is('server/*') || request()->is('servers') || request()->is('node/*') ? 'menu-item menu-item-active' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="/servers">
                     <x-reicon name="servers" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>

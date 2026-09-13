@@ -41,7 +41,7 @@ class Show extends Component
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->node = Node::query()
             ->where('uuid', $node_uuid)
-            ->whereIn('team_id', auth()->user()->teams()->select('teams.id'))
+            ->where('team_id', currentTeam()->id)
             ->firstOrFail();
         $this->authorize('view', $this->node);
         $this->loadFluxConnection();

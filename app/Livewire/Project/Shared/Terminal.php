@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Helpers\SshMultiplexingHelper;
+use App\Models\Node;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -37,14 +38,25 @@ class Terminal extends Component
     }
 
     #[On('send-terminal-command')]
-    public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
-    {
+    public function sendTerminalCommand(
+        bool $isContainer,
+        string $identifier,
+        string $serverUuid,
+        string $targetType = 'server',
+    ): void {
         $this->authorize('canAccessTerminal');
 
-        $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
+        $server = match ($targetType) {
+            'node' => $this->terminalNode($serverUuid, (bool) $isContainer),
+            'server' => Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail(),
+            default => abort(404),
+        };
         $this->authorize('view', $server);
 
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+        if ($server instanceof Node && (! $server->is_reachable || ! $server->is_usable)) {
+            abort(403, 'Terminal access is unavailable while this Node is not ready.');
+        }
+        if ($server instanceof Server && (! $server->isTerminalEnabled() || $server->isForceDisabled())) {
             abort(403, 'Terminal access is disabled on this server.');
         }
 
@@ -103,6 +115,17 @@ class Terminal extends Component
         //     - https://github.com/coollabsio/coolify/issues/2298
         //     - https://github.com/coollabsio/coolify/discussions/3362
         $this->dispatch('send-back-command', $command);
+    }
+
+    private function terminalNode(string $uuid, bool $isContainer): Node
+    {
+        abort_if($isContainer, 404);
+        abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
+
+        return Node::query()
+            ->where('team_id', currentTeam()->id)
+            ->where('uuid', $uuid)
+            ->firstOrFail();
     }
 
     #[On('terminalConnected')]

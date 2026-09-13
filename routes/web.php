@@ -110,6 +110,7 @@ use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
+use App\Models\Node;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
@@ -250,6 +251,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     '127.0.0.1',
                     base_ip(),
                 ])->filter()->unique()->values();
+
+                if (config('constants.sentinel.host_enabled', false)) {
+                    $nodeIpAddresses = Node::query()
+                        ->where('team_id', $team->id)
+                        ->where('is_reachable', true)
+                        ->where('is_usable', true)
+                        ->pluck('ip');
+                    $ipAddresses = $ipAddresses->merge($nodeIpAddresses)->filter()->unique()->values();
+                }
             }
 
             return response()->json(['ipAddresses' => $ipAddresses->all()], 200);
@@ -365,7 +375,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/node-clusters', NodeClusterIndex::class)->name('node-cluster.index');
     Route::get('/node-clusters/{cluster_uuid}', NodeClusterShow::class)->name('node-cluster.show');
-    Route::get('/node/{node_uuid}', NodeShow::class)->name('node.show');
+    Route::prefix('node/{node_uuid}')->group(function () {
+        Route::get('/', NodeShow::class)->name('node.show');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('node.command')->middleware('can.access.terminal');
+    });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
     Route::get('/servers/import', ServerTransferImport::class)->name('server.transfer.import')->middleware('can:create,'.Server::class);

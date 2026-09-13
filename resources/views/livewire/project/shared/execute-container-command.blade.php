@@ -1,4 +1,4 @@
-<div @if ($type !== 'server') wire:init="loadContainers" @endif>
+<div @unless(in_array($type, ['server', 'node'], true)) wire:init="loadContainers" @endunless>
     <x-slot:title>
         {{ data_get_str($resource, 'name')->limit(10) }} > Terminal | Coolify
     </x-slot>
@@ -10,13 +10,21 @@
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
-    @else
+    @elseif ($type === 'server')
         <livewire:server.navbar :server="$servers->first()" />
+    @else
+        <x-node.navbar :node="$resource" />
     @endif
 
     @php
-        $consoleUnavailable = ($type === 'server' && (! $servers->first()->isTerminalEnabled() || ! $servers->first()->isFunctional()))
-            || ($type !== 'server' && $containersLoaded && $containers->isEmpty());
+        $isHostTerminal = in_array($type, ['server', 'node'], true);
+        $hostTerminalAvailable = match ($type) {
+            'server' => $servers->first()->isTerminalEnabled() && $servers->first()->isFunctional(),
+            'node' => $resource->is_reachable && $resource->is_usable,
+            default => false,
+        };
+        $consoleUnavailable = ($isHostTerminal && ! $hostTerminalAvailable)
+            || (! $isHostTerminal && $containersLoaded && $containers->isEmpty());
         $consoleThemes = [
             ['key' => 'system', 'name' => 'System', 'background' => 'linear-gradient(135deg, #ffffff 0 50%, #121214 50% 100%)', 'accent' => '#8C8E9C'],
             ['key' => 'shadows-midnight', 'name' => 'Midnight', 'background' => 'linear-gradient(135deg, #2a3b4c, rgba(42, 59, 76, 0.4))', 'accent' => '#6d7a7c'],
@@ -39,11 +47,13 @@
         ])->values();
     @endphp
 
-    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
+    @if (in_array($type, ['application', 'database', 'service', 'server', 'node'], true))
         <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
             <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
                 @if ($type === 'server')
                     <x-server.sidebar :server="$resource" activeMenu="terminal" />
+                @elseif ($type === 'node')
+                    <x-node.sidebar :node="$resource" activeMenu="terminal" />
                 @elseif ($type === 'application')
                     <x-application.configuration-sidebar :application="$resource" current-route="project.application.command" />
                 @elseif ($type === 'database')
@@ -56,9 +66,11 @@
 
     @if ($consoleUnavailable)
         <section class="mt-8 w-full max-w-none xl:mt-0">
-            @if ($type === 'server')
+            @if ($isHostTerminal)
                 <x-empty size="lg" title="Terminal unavailable"
-                    description="This server is not functional or terminal access is disabled."
+                    :description="$type === 'node'
+                        ? 'This Node is not ready for terminal access.'
+                        : 'This server is not functional or terminal access is disabled.'"
                     icon-name="browser-terminal" />
             @else
                 <x-empty size="lg" title="Terminal unavailable"
@@ -111,10 +123,10 @@
                 :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
                 <header
                     class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
-                    @if ($type === 'server')
+                    @if ($isHostTerminal)
                         <div class="terminal-session-target-trigger flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70"
                             x-data="{ autoConnected: false }"
-                            @if ($servers->first()->isTerminalEnabled() && $servers->first()->isFunctional())
+                            @if ($hostTerminalAvailable)
                                 x-on:terminal-websocket-ready.window="if (!autoConnected) {
                                     autoConnected = true;
                                     $nextTick(() => $wire.dispatchSelf('connectToServer'));
@@ -177,7 +189,7 @@
 
                 <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
                 <div class="application-console-block min-h-0 flex-1">
-                    @if ($type !== 'server' && $containers->count() > 1)
+                    @if (! $isHostTerminal && $containers->count() > 1)
                         <div x-cloak x-show="!targetChosen" data-terminal-target-picker="launcher"
                             class="absolute inset-0 z-20 flex items-start justify-start p-6 sm:p-10">
                             <div class="terminal-target-picker w-full max-w-md rounded-lg border p-2 shadow-[var(--shadow-dropdown)]">
@@ -201,13 +213,13 @@
                         </div>
                     @endif
                     <livewire:project.shared.terminal variant="application"
-                        :auto-start="$type === 'server' || ! $containersLoaded || $containers->count() === 1" />
+                        :auto-start="$isHostTerminal || ! $containersLoaded || $containers->count() === 1" />
                 </div>
                 </div>
             </div>
         </section>
     @endif
-    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
+    @if (in_array($type, ['application', 'database', 'service', 'server', 'node'], true))
                 </div>
             </div>
         </section>

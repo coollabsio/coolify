@@ -8,6 +8,7 @@ test('terminal and console views use the browser-terminal icon', function () {
     $files = [
         resource_path('views/components/navbar.blade.php'),
         resource_path('views/components/backup-sidebar.blade.php'),
+        resource_path('views/components/node/navbar.blade.php'),
         resource_path('views/components/server/sidebar-security.blade.php'),
         resource_path('views/livewire/terminal/index.blade.php'),
         resource_path('views/livewire/project/shared/terminal.blade.php'),

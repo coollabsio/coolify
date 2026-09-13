@@ -24,7 +24,9 @@ beforeEach(function () {
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
     $this->actingAs($user);
-    $this->node = Node::factory()->create(['team_id' => $user->teams()->firstOrFail()->id]);
+    $team = $user->teams()->firstOrFail();
+    session(['currentTeam' => $team]);
+    $this->node = Node::factory()->create(['team_id' => $team->id]);
 });
 
 it('shows and runs node Sentinel controls in development', function () {

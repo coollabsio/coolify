@@ -87,7 +87,7 @@
         request()->routeIs('dashboard') => 'Dashboard',
         request()->routeIs('project.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
-        request()->routeIs('server.*') => 'Servers',
+        request()->routeIs('server.*', 'node.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
         request()->routeIs('destination.*') => 'Destinations',
         request()->routeIs('storage.*') => 'S3 Storage',

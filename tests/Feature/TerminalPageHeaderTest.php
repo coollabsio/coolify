@@ -126,6 +126,34 @@ it('keeps the server terminal navigation active during Livewire requests', funct
         ->toContain("'active' => \$currentRoute === 'server.command'");
 });
 
+it('uses the grouped server-style side submenu on node pages', function () {
+    $sidebarPath = resource_path('views/components/node/sidebar.blade.php');
+    $sidebar = file_exists($sidebarPath) ? file_get_contents($sidebarPath) : '';
+    $navbar = file_get_contents(resource_path('views/components/node/navbar.blade.php'));
+    $overview = file_get_contents(resource_path('views/livewire/node/show.blade.php'));
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect(file_exists($sidebarPath))->toBeTrue()
+        ->and($sidebar)
+        ->toContain('application-settings-navigation')
+        ->toContain('aria-label="Node configuration sections"')
+        ->toContain("'group' => 'Settings'")
+        ->toContain("'group' => 'Operations'")
+        ->toContain("route(\$menuItem['route']")
+        ->toContain("\$activeMenu === 'terminal'")
+        ->toContain("'navigate' => false")
+        ->toContain("@if (\$menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif")
+        ->and($navbar)
+        ->toContain("@teleport('#server-topbar-context')")
+        ->toContain('data-testid="node-topbar-context"')
+        ->toContain('lg:hidden')
+        ->and($overview)
+        ->toContain('node-settings-workspace application-settings-workspace')
+        ->toContain('<x-node.sidebar :node="$node" activeMenu="general" />')
+        ->and($terminal)
+        ->toContain('<x-node.sidebar :node="$resource" activeMenu="terminal" />');
+});
+
 it('uses floating rounded controls instead of the legacy terminal header bar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 

@@ -1,16 +1,12 @@
-<div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+<div>
     <x-slot:title>{{ $node->name }} | Node | Coolify</x-slot>
 
-    <div>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h1>Node</h1>
-                <p class="mt-1 text-sm text-neutral-500 dark:text-fg-dim">{{ $node->name }} · {{ $node->role->value }}</p>
-            </div>
-            <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'" :type="$node->is_usable ? 'success' : 'warning'" />
-        </div>
-    </div>
+    <x-node.navbar :node="$node" />
 
+    <div
+        class="node-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-node.sidebar :node="$node" activeMenu="general" />
+        <div class="flex w-full min-w-0 flex-col gap-6">
     <x-application.settings-section title="Cluster network" helper="Coolify owns Node membership and desired private network state.">
         @if ($node->cluster)
             <div class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -187,4 +183,6 @@
             </div>
         @endif
     </x-application.settings-section>
+        </div>
+    </div>
 </div>

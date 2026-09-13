@@ -10,7 +10,7 @@ it('renders the resource terminal shell while containers are discovered', functi
         ->toContain('wire:init="loadContainers"')
         ->not->toContain('@if (! $containersLoaded)')
         ->not->toContain('Loading terminal containers…')
-        ->toContain(':auto-start="$type === \'server\' || ! $containersLoaded || $containers->count() === 1"')
+        ->toContain(':auto-start="$isHostTerminal || ! $containersLoaded || $containers->count() === 1"')
         ->not->toContain('Loading targets…')
         ->not->toContain('<x-loading text="Loading containers" />');
 });
@@ -55,7 +55,7 @@ it('integrates automatic terminal startup into the terminal console', function (
         ->toContain('data-auto-start="{{ $autoStart ? \'true\' : \'false\' }}"')
         ->toContain("starting ? 'connecting…'")
         ->and($commandView)
-        ->toContain(':auto-start="$type === \'server\' || ! $containersLoaded || $containers->count() === 1"')
+        ->toContain(':auto-start="$isHostTerminal || ! $containersLoaded || $containers->count() === 1"')
         ->not->toContain('terminalLoading')
         ->not->toContain('Starting terminal');
 });
