@@ -80,29 +80,33 @@ test('rejecting resumes with a reject decision', function () {
 test('accepting hides the approval card immediately without waiting for the turn', function () {
     Bus::fake();
 
-    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
-        ->assertSee('Create postgresql database.')
-        ->call('approve', 'call_1')
-        ->assertDontSee('Create postgresql database.');
+    $component = Livewire::test(Thread::class, ['conversationId' => $this->conversation->id]);
+    expect($component->instance()->pendingApprovals())->toHaveCount(1);
+
+    $component->call('approve', 'call_1');
+    expect($component->instance()->pendingApprovals())->toHaveCount(0);
 });
 
 test('rejecting hides the approval card immediately without waiting for the turn', function () {
     Bus::fake();
 
-    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
-        ->assertSee('Create postgresql database.')
-        ->call('reject', 'call_1')
-        ->assertDontSee('Create postgresql database.');
+    $component = Livewire::test(Thread::class, ['conversationId' => $this->conversation->id]);
+    expect($component->instance()->pendingApprovals())->toHaveCount(1);
+
+    $component->call('reject', 'call_1');
+    expect($component->instance()->pendingApprovals())->toHaveCount(0);
 });
 
 test('accepting records an approved note in the transcript immediately', function () {
     Bus::fake();
 
     Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
-        ->assertDontSee('You approved this action.')
+        ->assertDontSee('Approved: Create postgresql database.')
         ->call('approve', 'call_1')
-        ->assertSee('You approved this action.')
-        ->assertDontSee('Create postgresql database.');
+        ->assertSee('Approved: Create postgresql database.');
+
+    expect($this->conversation->fresh()->decision_log['call_1'])
+        ->toMatchArray(['decision' => 'approved', 'reason' => 'Create postgresql database.']);
 });
 
 test('rejecting records a cancelled note in the transcript immediately', function () {
@@ -110,10 +114,13 @@ test('rejecting records a cancelled note in the transcript immediately', functio
 
     Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
         ->call('reject', 'call_1')
-        ->assertSee('You cancelled this action.');
+        ->assertSee('Cancelled: Create postgresql database.');
 });
 
-test('a resolved approval row shows the approved note after reload', function () {
+test('a resolved approval row shows the informative note after reload', function () {
+    $this->conversation->update(['decision_log' => [
+        'call_1' => ['decision' => 'approved', 'reason' => 'Create postgresql database.'],
+    ]]);
     DB::table('agent_conversation_messages')
         ->where('conversation_id', $this->conversation->sdk_conversation_id)
         ->update([
@@ -122,8 +129,8 @@ test('a resolved approval row shows the approved note after reload', function ()
         ]);
 
     Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
-        ->assertSee('You approved this action.')
-        ->assertDontSee('Create postgresql database.');
+        ->assertSee('Approved: Create postgresql database.')
+        ->assertDontSee('You approved this action.');
 });
 
 test('a resolved rejection row shows the cancelled note after reload', function () {

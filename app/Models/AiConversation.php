@@ -29,6 +29,7 @@ class AiConversation extends BaseModel
         'default_model',
         'status',
         'responding_user_id',
+        'decision_log',
     ];
 
     protected $attributes = [
@@ -41,6 +42,7 @@ class AiConversation extends BaseModel
         return [
             'pinned_at' => 'datetime',
             'archived_at' => 'datetime',
+            'decision_log' => 'array',
         ];
     }
 

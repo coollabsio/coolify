@@ -53,15 +53,6 @@ class Thread extends Component
     public array $approvalInputs = [];
 
     /**
-     * Tool-call ids the viewer has already accepted or cancelled this session,
-     * mapped to 'approved'|'cancelled'. Their cards hide immediately and a
-     * decision note shows, without waiting for the resumed turn to land.
-     *
-     * @var array<string, string>
-     */
-    public array $resolvedApprovals = [];
-
-    /**
      * Approvable AI tools that expose a generative approval form.
      *
      * @var array<int, class-string>
@@ -111,19 +102,16 @@ class Thread extends Component
         $rows = DB::table('agent_conversation_messages')
             ->where('conversation_id', $sdkId)
             ->orderBy('id')
-            ->get(['id', 'role', 'content', 'author_user_id', 'tool_results', 'approval_state']);
+            ->get(['id', 'role', 'content', 'author_user_id', 'tool_calls', 'tool_results', 'approval_state']);
 
         // Keep id 0 (the root user): reject only nulls, never filter() which drops 0.
         $authorIds = $rows->pluck('author_user_id')->reject(fn ($id) => is_null($id))->unique();
         $users = User::whereIn('id', $authorIds)->get(['id', 'name', 'email', 'avatar_path'])->keyBy('id');
         $viewerId = auth()->id();
+        $decisionLog = $this->conversation()->decision_log ?? [];
 
-        // Call ids already recorded as a decision note from the database, so the
-        // optimistic notes appended below don't duplicate them after the turn lands.
-        $notedCallIds = [];
-
-        $messages = $rows
-            ->flatMap(function ($row) use ($users, $viewerId, &$notedCallIds) {
+        return $rows
+            ->flatMap(function ($row) use ($users, $viewerId, $decisionLog) {
                 if (! in_array($row->role, ['user', 'assistant'], true)) {
                     return [];
                 }
@@ -158,11 +146,9 @@ class Thread extends Component
                     ];
                 }
 
-                // A row that paused for approval (approval_state present) records
-                // each resolved tool call as a durable decision note, so the
-                // transcript shows what the user picked — approved or cancelled.
-                foreach ($this->decisionNotes($row) as $callId => $note) {
-                    $notedCallIds[] = $callId;
+                // A row that paused for approval records each resolved tool call
+                // as a durable decision note that describes what the user picked.
+                foreach ($this->decisionNotes($row, $decisionLog) as $note) {
                     $out[] = $note;
                 }
 
@@ -170,63 +156,63 @@ class Thread extends Component
             })
             ->values()
             ->all();
-
-        // Optimistic decision notes for approvals the viewer just resolved this
-        // request, before the resumed turn has written its results to the
-        // database. Skipped once the durable note above covers the same call id.
-        foreach ($this->resolvedApprovals as $callId => $decision) {
-            if (in_array($callId, $notedCallIds, true)) {
-                continue;
-            }
-            $messages[] = [
-                'id' => 'pending-decision-'.$callId,
-                'role' => 'note',
-                'variant' => $decision === 'cancelled' ? 'cancelled' : 'approved',
-                'content' => $decision === 'cancelled' ? 'You cancelled this action.' : 'You approved this action.',
-                'author' => null,
-                'avatar' => null,
-            ];
-        }
-
-        return $messages;
     }
 
     /**
-     * Durable decision notes for a resolved approval row, keyed by tool-call id.
-     * Only rows that actually paused for approval (approval_state present, with
-     * resolved tool results) produce notes; auto-run tool rows produce none.
+     * Durable decision notes for an assistant row that paused for approval, in
+     * tool-call order. The description comes from the decision the viewer made
+     * (recorded on the conversation); a denied tool result with no recorded
+     * decision falls back to a plain cancellation note.
      *
-     * @return array<string, array<string, mixed>>
+     * @param  array<string, array{decision?: string, reason?: string|null}>  $decisionLog
+     * @return array<int, array<string, mixed>>
      */
-    private function decisionNotes(object $row): array
+    private function decisionNotes(object $row, array $decisionLog): array
     {
-        $wasApprovalRow = ! is_null($row->approval_state);
-
         $notes = [];
+        $seen = [];
+
+        foreach (json_decode($row->tool_calls ?? '[]', true) ?: [] as $call) {
+            $id = $call['id'] ?? null;
+            if ($id === null || ! isset($decisionLog[$id])) {
+                continue;
+            }
+            $decision = ($decisionLog[$id]['decision'] ?? 'approved') === 'cancelled' ? 'cancelled' : 'approved';
+            $reason = $decisionLog[$id]['reason'] ?? null;
+            $seen[$id] = true;
+            $notes[] = $this->decisionNote($row->id, $id, $decision, $reason);
+        }
+
         foreach (json_decode($row->tool_results ?? '[]', true) ?: [] as $result) {
-            if (! is_array($result) || ! isset($result['id'])) {
+            $id = $result['id'] ?? null;
+            if ($id === null || isset($seen[$id]) || ($result['denied'] ?? false) !== true) {
                 continue;
             }
-            $denied = ($result['denied'] ?? false) === true;
-
-            // A denied result is always a cancellation. An accepted result only
-            // counts as a decision on a row that paused for approval, so ordinary
-            // auto-run tool results never render as "approved".
-            if (! $denied && ! $wasApprovalRow) {
-                continue;
-            }
-
-            $notes[$result['id']] = [
-                'id' => $row->id.'-decision-'.$result['id'],
-                'role' => 'note',
-                'variant' => $denied ? 'cancelled' : 'approved',
-                'content' => $denied ? 'You cancelled this action.' : 'You approved this action.',
-                'author' => null,
-                'avatar' => null,
-            ];
+            $seen[$id] = true;
+            $notes[] = $this->decisionNote($row->id, $id, 'cancelled', null);
         }
 
         return $notes;
+    }
+
+    /**
+     * Build a single transcript decision note.
+     *
+     * @return array<string, mixed>
+     */
+    private function decisionNote(string $rowId, string $callId, string $decision, ?string $reason): array
+    {
+        $fallback = $decision === 'cancelled' ? 'You cancelled this action.' : 'You approved this action.';
+        $prefix = $decision === 'cancelled' ? 'Cancelled' : 'Approved';
+
+        return [
+            'id' => $rowId.'-decision-'.$callId,
+            'role' => 'note',
+            'variant' => $decision,
+            'content' => filled($reason) ? "{$prefix}: {$reason}" : $fallback,
+            'author' => null,
+            'avatar' => null,
+        ];
     }
 
     /**
@@ -278,7 +264,9 @@ class Thread extends Component
         }
 
         $pending = (array) (json_decode($row->approval_state ?? 'null', true)['pending'] ?? []);
-        $pending = collect($pending)->except(array_keys($this->resolvedApprovals))->all();
+        // Drop cards the viewer already resolved this session (before the resumed
+        // turn clears the pending marker in the database).
+        $pending = collect($pending)->except(array_keys($this->conversation()->decision_log ?? []))->all();
         if ($pending === []) {
             return [];
         }
@@ -408,10 +396,19 @@ class Thread extends Component
             return;
         }
 
+        // Capture the tool-authored action description before the resumed turn
+        // clears the pending marker, so the transcript note stays informative.
+        $reason = collect($this->pendingApprovals())->firstWhere('id', $callId)['reason'] ?? null;
+
         ResumeAssistantTurn::dispatch($conversation->id, [$callId => $this->decisionFor($callId, $approved)], auth()->id());
 
-        // Hide the card now; don't wait for the resumed turn to clear the DB marker.
-        $this->resolvedApprovals[$callId] = $approved ? 'approved' : 'cancelled';
+        // Record the decision durably: hides the card at once and leaves a
+        // permanent transcript note of what the viewer approved or cancelled.
+        $log = $conversation->decision_log ?? [];
+        $log[$callId] = ['decision' => $approved ? 'approved' : 'cancelled', 'reason' => $reason];
+        $conversation->decision_log = $log;
+        $conversation->save();
+
         unset($this->conversation, $this->busy, $this->pendingApprovals, $this->messages);
     }
 
