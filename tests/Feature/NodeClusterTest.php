@@ -2,6 +2,7 @@
 
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
+use App\Actions\Node\EnsureNodeWorkloadAddress;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\UpdateNodeCluster;
@@ -11,6 +12,8 @@ use App\Livewire\NodeCluster\Show;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\NodeFirewallRule;
+use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +52,24 @@ it('assigns one node with a stable private address', function () {
         ->and($node->wireguard_ip)->toBe('10.240.0.2');
     AssignNodeToCluster::run($cluster, $node);
     expect($node->refresh()->wireguard_ip)->toBe('10.240.0.2');
+});
+
+it('allocates stable workload subnets and container addresses', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Workload network');
+    $first = Node::factory()->create(['team_id' => $team->id]);
+    $second = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $first);
+    AssignNodeToCluster::run($cluster->refresh(), $second);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+
+    $address = EnsureNodeWorkloadAddress::run($first, $workload);
+
+    expect($first->refresh()->workload_cidr)->toBe('100.64.0.0/24')
+        ->and($second->refresh()->workload_cidr)->toBe('100.64.1.0/24')
+        ->and($address)->toBe('100.64.0.2')
+        ->and(EnsureNodeWorkloadAddress::run($first, $workload))->toBe($address)
+        ->and($first->workloads()->whereKey($workload->id)->firstOrFail()->pivot->container_ip)->toBe($address);
 });
 
 it('rejects cross-team membership', function () {
@@ -151,6 +172,16 @@ it('prevents members from mutating clusters', function () {
         ->assertForbidden();
 });
 
+it('prevents members from changing firewall rules', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Protected firewall');
+    $team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('addFirewallRule')
+        ->assertForbidden();
+});
+
 it('does not allow active cidr changes', function () {
     $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Active');
     $cluster->update(['network_status' => 'active']);
@@ -215,6 +246,60 @@ it('does not expose foreign nodes to assignment actions', function () {
         ->set('nodeUuid', $foreign->uuid)
         ->call('assignNode'))
         ->toThrow(ModelNotFoundException::class);
+});
+
+it('adds and removes scoped workload firewall rules', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Firewall mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $source = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $source);
+    EnsureNodeWorkloadAddress::run($node, $destination);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallDestinationUuid', $destination->uuid)
+        ->set('firewallProtocol', 'tcp')
+        ->set('firewallPort', 5432)
+        ->call('addFirewallRule')
+        ->assertDispatched('success');
+
+    $rule = NodeFirewallRule::query()->sole();
+    expect($rule->source_workload_id)->toBe($source->id)
+        ->and($rule->destination_workload_id)->toBe($destination->id)
+        ->and($rule->port)->toBe(5432)
+        ->and($cluster->refresh()->desired_revision)->toBe(3);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('removeFirewallRule', $rule->uuid)
+        ->assertDispatched('success');
+
+    expect(NodeFirewallRule::query()->exists())->toBeFalse()
+        ->and($cluster->refresh()->desired_revision)->toBe(4);
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 2);
+});
+
+it('rejects firewall rules for workloads outside the mesh', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Own mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $source = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $source);
+    $foreign = NodeWorkload::factory()->create();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallDestinationUuid', $foreign->uuid)
+        ->set('firewallPort', 80)
+        ->call('addFirewallRule')
+        ->assertHasErrors('firewallDestinationUuid');
+
+    expect(NodeFirewallRule::query()->exists())->toBeFalse();
 });
 
 it('queues cluster network reconciliation once', function () {

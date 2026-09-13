@@ -37,6 +37,10 @@ class DispatchWorkloadDeployment
                 return $port;
             })
             ->all();
+        $containerIp = null;
+        if ($operation->node->node_cluster_id !== null) {
+            $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
+        }
         $name = 'coolify-'.$operation->workload->uuid.'-main';
         $response = Http::withToken($token)
             ->acceptJson()
@@ -52,6 +56,9 @@ class DispatchWorkloadDeployment
                 'ports' => $ports,
                 'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
                 'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
+                'network_name' => $containerIp === null ? '' : 'coolify-'.$operation->node->uuid,
+                'network_subnet' => $operation->node->workload_cidr ?? '',
+                'container_ip' => $containerIp ?? '',
             ]);
         $response->throw();
 

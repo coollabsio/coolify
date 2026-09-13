@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\CreateNodeCluster;
 use App\Actions\Node\CreateOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Enums\NodeOperationStatus;
@@ -123,6 +125,24 @@ it('encodes an empty environment as a json object', function () {
     DispatchWorkloadDeployment::run($this->operation);
 
     Http::assertSent(fn ($request): bool => str_contains($request->body(), '"environment":{}'));
+});
+
+it('deploys a clustered workload with its stable managed network address', function () {
+    $cluster = CreateNodeCluster::run($this->node->team, User::factory()->create(), 'Mesh');
+    AssignNodeToCluster::run($cluster, $this->node);
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    Http::assertSent(fn ($request): bool => $request['network_name'] === 'coolify-'.$this->node->uuid
+        && $request['network_subnet'] === '100.64.0.0/24'
+        && $request['container_ip'] === '100.64.0.2');
 });
 
 it('fails when the deployed revision is not running after inventory refresh', function () {

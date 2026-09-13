@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
@@ -34,6 +35,16 @@ class ReconcileNodeClusterNetwork
             if ($nodes->isEmpty()) {
                 throw new RuntimeException('Assign at least one Node before network activation.');
             }
+            foreach ($nodes as $node) {
+                if (blank($node->workload_cidr)) {
+                    AssignNodeToCluster::run($cluster, $node);
+                    $node->refresh();
+                }
+                foreach ($node->workloads as $workload) {
+                    EnsureNodeWorkloadAddress::run($node, $workload);
+                }
+            }
+            $nodes = $this->lockedNodes($cluster);
 
             $operations = [];
             foreach ($nodes as $node) {
@@ -51,7 +62,7 @@ class ReconcileNodeClusterNetwork
                 $peers = $nodes->where('id', '!=', $node->id)->map(fn (Node $peer): array => [
                     'public_key' => $peer->wireguard_public_key,
                     'endpoint' => $peer->wireguard_endpoint ?: $peer->ip.':'.$cluster->wireguard_port,
-                    'allowed_ip' => $peer->wireguard_ip.'/32',
+                    'allowed_ips' => [$peer->wireguard_ip.'/32', $peer->workload_cidr],
                     'persistent_keepalive_seconds' => 25,
                 ])->values()->all();
                 $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.reconcile.v1', [
@@ -71,10 +82,8 @@ class ReconcileNodeClusterNetwork
                     'wireguard_interface' => $cluster->wireguard_interface,
                     'cluster_cidr' => $cluster->cidr,
                     'flux_probe_host' => $fluxProbeHost,
-                    'rules' => [
-                        ['chain' => 'input', 'expression' => 'iifname "'.$cluster->wireguard_interface.'" udp dport 53 accept'],
-                        ['chain' => 'input', 'expression' => 'iifname "'.$cluster->wireguard_interface.'" tcp dport 53 accept'],
-                    ],
+                    'workload_cidrs' => $nodes->pluck('workload_cidr')->filter()->values()->all(),
+                    'rules' => $this->firewallRules($cluster),
                 ]);
             }
 
@@ -116,6 +125,28 @@ class ReconcileNodeClusterNetwork
             $cluster->update(['network_status' => 'error']);
             throw $exception;
         }
+    }
+
+    /** @return list<array{source_ip: string, destination_ip: string, protocol: string, port: int}> */
+    private function firewallRules(NodeCluster $cluster): array
+    {
+        return NodeFirewallRule::query()
+            ->with(['sourceWorkload.nodes', 'destinationWorkload.nodes'])
+            ->where('node_cluster_id', $cluster->id)
+            ->get()
+            ->flatMap(function (NodeFirewallRule $rule) use ($cluster) {
+                $sources = $rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
+                $destinations = $rule->destinationWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
+
+                return $sources->crossJoin($destinations)->map(fn (array $addresses): array => [
+                    'source_ip' => $addresses[0],
+                    'destination_ip' => $addresses[1],
+                    'protocol' => $rule->protocol,
+                    'port' => $rule->port,
+                ]);
+            })
+            ->values()
+            ->all();
     }
 
     /** @return Collection<int, Node> */

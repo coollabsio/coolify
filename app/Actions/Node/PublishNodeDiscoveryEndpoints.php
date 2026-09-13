@@ -26,6 +26,7 @@ class PublishNodeDiscoveryEndpoints
 
         $updatedAt = $observedAt->getTimestamp();
         $workloadDnsNames = EnsureNodeWorkloadDnsNames::run($node);
+        $workloadAddresses = $node->workloads()->pluck('node_workload_nodes.container_ip', 'node_workloads.id');
         $nodeId = Str::slug($node->name);
         if ($nodeId === '') {
             $nodeId = strtolower($node->uuid);
@@ -46,12 +47,12 @@ class PublishNodeDiscoveryEndpoints
             ->orderBy('id')
             ->get()
             ->filter(fn ($container): bool => $container->workload !== null)
-            ->map(function ($container) use ($node, $updatedAt, $workloadDnsNames): array {
+            ->map(function ($container) use ($node, $updatedAt, $workloadDnsNames, $workloadAddresses): array {
                 return [
                     'workload_id' => $workloadDnsNames[$container->workload->id],
                     'namespace' => 'default',
                     'owner_node_ip' => $node->wireguard_ip,
-                    'container_ip' => $node->wireguard_ip,
+                    'container_ip' => $workloadAddresses[$container->workload->id] ?? $node->wireguard_ip,
                     'state' => $this->discoveryState($container->state),
                     'health' => $this->discoveryHealth($container->health_status),
                     'updated_at_unix_seconds' => $updatedAt,

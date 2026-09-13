@@ -47,7 +47,7 @@ class NodeWorkload extends BaseModel
 
     public function nodes(): BelongsToMany
     {
-        return $this->belongsToMany(Node::class, 'node_workload_nodes')->withTimestamps();
+        return $this->belongsToMany(Node::class, 'node_workload_nodes')->withPivot('container_ip')->withTimestamps();
     }
 
     public function containers(): HasMany

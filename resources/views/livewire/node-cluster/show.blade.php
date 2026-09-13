@@ -53,6 +53,35 @@
                 </div>
             </x-application.settings-section>
         </div>
+        <x-application.settings-section title="Firewall" helper="Workloads cannot connect to other workloads by default. Outbound internet access stays available.">
+            @can('update', $cluster)
+                <form wire:submit="addFirewallRule" class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
+                    <x-forms.select wire:model="firewallSourceUuid" label="Source workload" required>
+                        <option value="">Select a workload</option>
+                        @foreach ($workloads as $workload)<option value="{{ $workload->uuid }}">{{ $workload->name }}</option>@endforeach
+                    </x-forms.select>
+                    <x-forms.select wire:model="firewallDestinationUuid" label="Destination workload" required>
+                        <option value="">Select a workload</option>
+                        @foreach ($workloads as $workload)<option value="{{ $workload->uuid }}">{{ $workload->name }}</option>@endforeach
+                    </x-forms.select>
+                    <div class="grid grid-cols-2 gap-3">
+                        <x-forms.select wire:model="firewallProtocol" label="Protocol" required><option value="tcp">TCP</option><option value="udp">UDP</option></x-forms.select>
+                        <x-forms.input wire:model="firewallPort" type="number" min="1" max="65535" label="Port" required />
+                    </div>
+                    <x-forms.button type="submit">Allow traffic</x-forms.button>
+                </form>
+            @endcan
+            <div class="flex flex-col gap-2">
+                @forelse ($firewallRules as $rule)
+                    <div wire:key="firewall-rule-{{ $rule->uuid }}" class="flex flex-col gap-2 rounded-xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.08]">
+                        <div><p class="text-sm font-medium">{{ $rule->sourceWorkload->name }} → {{ $rule->destinationWorkload->name }}</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">{{ $rule->protocol }} / {{ $rule->port }}</p></div>
+                        @can('update', $cluster)<x-forms.button wire:click="removeFirewallRule('{{ $rule->uuid }}')" wire:confirm="Remove this firewall rule?">Remove</x-forms.button>@endcan
+                    </div>
+                @empty
+                    <x-empty size="sm" title="No allow rules" description="East-west workload traffic is blocked." icon-name="servers" />
+                @endforelse
+            </div>
+        </x-application.settings-section>
         <x-application.settings-section title="Operations" helper="Network changes use durable, typed Flux commands.">
             <div class="flex flex-col gap-2">
                 @forelse ($operations as $operation)

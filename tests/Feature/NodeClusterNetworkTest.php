@@ -2,11 +2,14 @@
 
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
+use App\Actions\Node\EnsureNodeWorkloadAddress;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeOperationStatus;
 use App\Models\InstanceSettings;
 use App\Models\Node;
+use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -32,6 +35,17 @@ it('reconciles a complete full mesh through durable typed operations', function 
     $second = Node::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $first->private_key_id, 'ip' => '192.0.2.11']);
     AssignNodeToCluster::run($cluster, $first);
     AssignNodeToCluster::run($cluster->refresh(), $second);
+    $source = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
+    $destination = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
+    $sourceIp = EnsureNodeWorkloadAddress::run($first, $source);
+    $destinationIp = EnsureNodeWorkloadAddress::run($second, $destination);
+    NodeFirewallRule::factory()->create([
+        'node_cluster_id' => $cluster->id,
+        'source_workload_id' => $source->id,
+        'destination_workload_id' => $destination->id,
+        'protocol' => 'tcp',
+        'port' => 5432,
+    ]);
 
     $requests = collect();
     Http::fake(function (Request $request) use ($requests) {
@@ -68,10 +82,19 @@ it('reconciles a complete full mesh through durable typed operations', function 
     $wireguardRequests->each(function (array $request): void {
         expect($request['data']['address'])->toEndWith('/32')
             ->and($request['data']['peers'])->toHaveCount(1)
-            ->and($request['data']['peers'][0]['allowed_ip'])->toEndWith('/32');
+            ->and($request['data']['peers'][0]['allowed_ips'])->toHaveCount(2)
+            ->and($request['data']['peers'][0]['allowed_ips'][0])->toEndWith('/32')
+            ->and($request['data']['peers'][0]['allowed_ips'][1])->toEndWith('/24');
     });
     $firewallRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'network.firewall.reconcile'));
-    $firewallRequests->each(fn (array $request) => expect($request['data']['flux_probe_host'])->toBe('192.0.2.1'));
+    $firewallRequests->each(fn (array $request) => expect($request['data']['flux_probe_host'])->toBe('192.0.2.1')
+        ->and($request['data']['workload_cidrs'])->toHaveCount(2)
+        ->and($request['data']['rules'])->toBe([[
+            'source_ip' => $sourceIp,
+            'destination_ip' => $destinationIp,
+            'protocol' => 'tcp',
+            'port' => 5432,
+        ]]));
 });
 
 it('marks the cluster unhealthy when a staged host change fails', function () {

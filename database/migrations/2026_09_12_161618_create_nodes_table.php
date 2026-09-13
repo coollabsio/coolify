@@ -39,6 +39,7 @@ return new class extends Migration
             $table->unsignedInteger('port')->default(22);
             $table->string('user')->default('root');
             $table->string('wireguard_ip')->nullable();
+            $table->string('workload_cidr')->nullable()->unique();
             $table->string('wireguard_public_key')->nullable();
             $table->string('wireguard_endpoint')->nullable();
             $table->unsignedBigInteger('network_applied_revision')->nullable();

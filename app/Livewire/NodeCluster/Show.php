@@ -9,10 +9,14 @@ use App\Actions\Node\UpdateNodeCluster;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
+use App\Models\NodeWorkload;
 use App\Rules\PrivateIpv4Cidr;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -34,6 +38,14 @@ class Show extends Component
     public int $wireguardPort = 51820;
 
     public string $nodeUuid = '';
+
+    public string $firewallSourceUuid = '';
+
+    public string $firewallDestinationUuid = '';
+
+    public string $firewallProtocol = 'tcp';
+
+    public int $firewallPort = 80;
 
     public function mount(string $cluster_uuid): void
     {
@@ -96,6 +108,65 @@ class Show extends Component
         $this->redirectRoute('node-cluster.index', navigate: true);
     }
 
+    public function addFirewallRule(): void
+    {
+        $this->authorize('update', $this->cluster);
+        $validated = $this->validate([
+            'firewallSourceUuid' => ['required', 'string'],
+            'firewallDestinationUuid' => ['required', 'string', 'different:firewallSourceUuid'],
+            'firewallProtocol' => ['required', Rule::in(['tcp', 'udp'])],
+            'firewallPort' => ['required', 'integer', 'between:1,65535'],
+        ]);
+        $workloads = $this->meshWorkloads()
+            ->whereIn('uuid', [$validated['firewallSourceUuid'], $validated['firewallDestinationUuid']])
+            ->get()
+            ->keyBy('uuid');
+        if (! $workloads->has($validated['firewallSourceUuid'])) {
+            $this->addError('firewallSourceUuid', 'Select a workload from this mesh.');
+        }
+        if (! $workloads->has($validated['firewallDestinationUuid'])) {
+            $this->addError('firewallDestinationUuid', 'Select a workload from this mesh.');
+        }
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        $created = DB::transaction(function () use ($validated, $workloads): bool {
+            $rule = NodeFirewallRule::query()->firstOrCreate([
+                'node_cluster_id' => $this->cluster->id,
+                'source_workload_id' => $workloads[$validated['firewallSourceUuid']]->id,
+                'destination_workload_id' => $workloads[$validated['firewallDestinationUuid']]->id,
+                'protocol' => $validated['firewallProtocol'],
+                'port' => $validated['firewallPort'],
+            ]);
+            if ($rule->wasRecentlyCreated) {
+                $this->cluster->increment('desired_revision');
+            }
+
+            return $rule->wasRecentlyCreated;
+        });
+        if ($created) {
+            $this->queueNetworkReconciliation();
+        }
+        $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
+        $this->dispatch('success', $created ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
+    }
+
+    public function removeFirewallRule(string $ruleUuid): void
+    {
+        $this->authorize('update', $this->cluster);
+        DB::transaction(function () use ($ruleUuid): void {
+            NodeFirewallRule::query()
+                ->where('node_cluster_id', $this->cluster->id)
+                ->where('uuid', $ruleUuid)
+                ->firstOrFail()
+                ->delete();
+            $this->cluster->increment('desired_revision');
+        });
+        $this->queueNetworkReconciliation();
+        $this->dispatch('success', 'Firewall rule removed and reconciliation queued.');
+    }
+
     public function reconcileNetwork(): void
     {
         $this->authorize('update', $this->cluster);
@@ -128,6 +199,12 @@ class Show extends Component
     {
         $nodes = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->orderBy('name')->get();
         $availableNodes = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->orderBy('name')->get();
+        $workloads = $this->meshWorkloads()->orderBy('name')->get();
+        $firewallRules = NodeFirewallRule::query()
+            ->with(['sourceWorkload', 'destinationWorkload'])
+            ->where('node_cluster_id', $this->cluster->id)
+            ->orderBy('id')
+            ->get();
         $operations = NodeOperation::query()
             ->with('node')
             ->whereHas('node', fn ($query) => $query->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id))
@@ -135,7 +212,20 @@ class Show extends Component
             ->limit(30)
             ->get();
 
-        return view('livewire.node-cluster.show', compact('nodes', 'availableNodes', 'operations'));
+        return view('livewire.node-cluster.show', compact('nodes', 'availableNodes', 'workloads', 'firewallRules', 'operations'));
+    }
+
+    private function meshWorkloads(): Builder
+    {
+        return NodeWorkload::query()
+            ->where('team_id', $this->cluster->team_id)
+            ->whereHas('nodes', fn ($query) => $query->where('nodes.node_cluster_id', $this->cluster->id));
+    }
+
+    private function queueNetworkReconciliation(): void
+    {
+        $this->cluster->refresh()->update(['network_status' => 'reconciling']);
+        ReconcileNodeClusterNetworkJob::dispatch($this->cluster->id, auth()->id());
     }
 
     private function fillFromCluster(): void
