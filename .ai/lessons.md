@@ -39,3 +39,4 @@
 - An IPv4-only DNS service must still answer AAAA questions with an authoritative empty response. Do not ignore AAAA questions, because dual-stack clients wait for both A and AAAA results.
 - `resolvectl` settings belong to a live link instance. After `wg-quick` recreates a WireGuard interface, apply its DNS server and route-only domain again on both the success and rollback paths.
 - When a Node view must match the Server submenu, reuse the Server settings workspace and grouped side-navigation pattern. Do not add a custom horizontal tab bar.
+- Do not use `data_get` for maps keyed by IP addresses because dots are treated as nested paths. Use direct array access. When container health is unavailable, show the known runtime state instead of another unknown-style label.

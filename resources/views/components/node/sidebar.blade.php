@@ -11,6 +11,13 @@
             'group' => 'Settings',
         ],
         [
+            'label' => 'Internal DNS',
+            'route' => 'node.internal-dns',
+            'active' => $activeMenu === 'internal-dns',
+            'icon' => 'network',
+            'group' => 'Operations',
+        ],
+        [
             'label' => 'Terminal',
             'route' => 'node.command',
             'active' => $activeMenu === 'terminal',

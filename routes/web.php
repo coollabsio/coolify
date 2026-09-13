@@ -14,6 +14,7 @@ use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
+use App\Livewire\Node\InternalDns as NodeInternalDns;
 use App\Livewire\Node\Show as NodeShow;
 use App\Livewire\NodeCluster\Index as NodeClusterIndex;
 use App\Livewire\NodeCluster\Show as NodeClusterShow;
@@ -377,6 +378,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/node-clusters/{cluster_uuid}', NodeClusterShow::class)->name('node-cluster.show');
     Route::prefix('node/{node_uuid}')->group(function () {
         Route::get('/', NodeShow::class)->name('node.show');
+        Route::get('/internal-dns', NodeInternalDns::class)->name('node.internal-dns');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('node.command')->middleware('can.access.terminal');
     });
 
