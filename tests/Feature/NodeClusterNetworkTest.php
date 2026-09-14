@@ -47,6 +47,14 @@ it('reconciles a complete full mesh through durable typed operations', function 
         'protocol' => 'tcp',
         'port' => 5432,
     ]);
+    NodeFirewallRule::factory()->create([
+        'node_cluster_id' => $cluster->id,
+        'source_workload_id' => null,
+        'source_node_id' => $first->id,
+        'destination_workload_id' => $destination->id,
+        'protocol' => 'icmp',
+        'port' => 0,
+    ]);
     NodeIngressRule::factory()->create([
         'node_cluster_id' => $cluster->id,
         'destination_workload_id' => $destination->id,
@@ -95,13 +103,22 @@ it('reconciles a complete full mesh through durable typed operations', function 
     });
     $firewallRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'network.firewall.reconcile'));
     $firewallRequests->each(fn (array $request) => expect($request['data']['flux_probe_host'])->toBe('192.0.2.1')
+        ->and($request['data']['local_node_ip'])->toBeIn([$first->wireguard_ip, $second->wireguard_ip])
         ->and($request['data']['workload_cidrs'])->toHaveCount(2)
-        ->and($request['data']['rules'])->toBe([[
-            'source_ip' => $sourceIp,
-            'destination_ip' => $destinationIp,
-            'protocol' => 'tcp',
-            'port' => 5432,
-        ]])
+        ->and($request['data']['rules'])->toBe([
+            [
+                'source_ip' => $sourceIp,
+                'destination_ip' => $destinationIp,
+                'protocol' => 'tcp',
+                'port' => 5432,
+            ],
+            [
+                'source_ip' => $first->wireguard_ip,
+                'destination_ip' => $destinationIp,
+                'protocol' => 'icmp',
+                'port' => 0,
+            ],
+        ])
         ->and($request['data']['ingress_rules'])->toBe([[
             'destination_ip' => $destinationIp,
             'protocol' => 'tcp',

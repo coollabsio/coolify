@@ -281,7 +281,7 @@ it('adds and removes scoped workload firewall rules', function () {
     EnsureNodeWorkloadAddress::run($node, $destination);
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallSourceUuid', 'workload:'.$source->uuid)
         ->set('firewallDestinationUuid', $destination->uuid)
         ->set('firewallProtocol', 'tcp')
         ->set('firewallPort', 5432)
@@ -315,7 +315,7 @@ it('adds an ICMP firewall rule without a port', function () {
     EnsureNodeWorkloadAddress::run($node, $destination);
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallSourceUuid', 'workload:'.$source->uuid)
         ->set('firewallDestinationUuid', $destination->uuid)
         ->set('firewallProtocol', 'icmp')
         ->call('addFirewallRule')
@@ -323,6 +323,31 @@ it('adds an ICMP firewall rule without a port', function () {
 
     $rule = NodeFirewallRule::query()->sole();
     expect($rule->protocol)->toBe('icmp')
+        ->and($rule->port)->toBe(0);
+});
+
+it('adds a firewall rule from a Node to a workload', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Node source mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $destination);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->assertSee($node->name)
+        ->set('firewallSourceUuid', 'node:'.$node->uuid)
+        ->set('firewallDestinationUuid', $destination->uuid)
+        ->set('firewallProtocol', 'icmp')
+        ->call('addFirewallRule')
+        ->assertDispatched('success');
+
+    $rule = NodeFirewallRule::query()->sole();
+    expect($rule->source_node_id)->toBe($node->id)
+        ->and($rule->source_workload_id)->toBeNull()
+        ->and($rule->destination_workload_id)->toBe($destination->id)
+        ->and($rule->protocol)->toBe('icmp')
         ->and($rule->port)->toBe(0);
 });
 
@@ -337,7 +362,7 @@ it('rejects firewall rules for workloads outside the mesh', function () {
     $foreign = NodeWorkload::factory()->create();
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallSourceUuid', 'workload:'.$source->uuid)
         ->set('firewallDestinationUuid', $foreign->uuid)
         ->set('firewallPort', 80)
         ->call('addFirewallRule')

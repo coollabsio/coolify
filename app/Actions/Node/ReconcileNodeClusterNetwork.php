@@ -82,6 +82,7 @@ class ReconcileNodeClusterNetwork
                     'wireguard_port' => $cluster->wireguard_port,
                     'wireguard_interface' => $cluster->wireguard_interface,
                     'cluster_cidr' => $cluster->cidr,
+                    'local_node_ip' => $node->wireguard_ip,
                     'flux_probe_host' => $fluxProbeHost,
                     'workload_cidrs' => $nodes->pluck('workload_cidr')->filter()->values()->all(),
                     'rules' => $this->firewallRules($cluster),
@@ -133,11 +134,13 @@ class ReconcileNodeClusterNetwork
     private function firewallRules(NodeCluster $cluster): array
     {
         return NodeFirewallRule::query()
-            ->with(['sourceWorkload.nodes', 'destinationWorkload.nodes'])
+            ->with(['sourceWorkload.nodes', 'sourceNode', 'destinationWorkload.nodes'])
             ->where('node_cluster_id', $cluster->id)
             ->get()
             ->flatMap(function (NodeFirewallRule $rule) use ($cluster) {
-                $sources = $rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
+                $sources = $rule->sourceNode !== null
+                    ? collect([$rule->sourceNode->wireguard_ip])->filter()
+                    : $rule->sourceWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
                 $destinations = $rule->destinationWorkload->nodes->where('node_cluster_id', $cluster->id)->pluck('pivot.container_ip')->filter();
 
                 return $sources->crossJoin($destinations)->map(fn (array $addresses): array => [

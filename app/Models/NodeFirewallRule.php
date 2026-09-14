@@ -26,6 +26,11 @@ class NodeFirewallRule extends BaseModel
         return $this->belongsTo(NodeWorkload::class, 'source_workload_id');
     }
 
+    public function sourceNode(): BelongsTo
+    {
+        return $this->belongsTo(Node::class, 'source_node_id');
+    }
+
     public function destinationWorkload(): BelongsTo
     {
         return $this->belongsTo(NodeWorkload::class, 'destination_workload_id');

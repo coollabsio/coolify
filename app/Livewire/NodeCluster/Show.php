@@ -123,31 +123,37 @@ class Show extends Component
         }
         $validated = $this->validate([
             'firewallSourceUuid' => ['required', 'string'],
-            'firewallDestinationUuid' => ['required', 'string', 'different:firewallSourceUuid'],
+            'firewallDestinationUuid' => ['required', 'string'],
             'firewallProtocol' => ['required', Rule::in(['tcp', 'udp', 'icmp'])],
             'firewallPort' => $this->firewallProtocol === 'icmp'
                 ? ['required', 'integer', 'in:0']
                 : ['required', 'integer', 'between:1,65535'],
         ]);
-        $workloads = $this->meshWorkloads()
-            ->whereIn('uuid', [$validated['firewallSourceUuid'], $validated['firewallDestinationUuid']])
-            ->get()
-            ->keyBy('uuid');
-        if (! $workloads->has($validated['firewallSourceUuid'])) {
-            $this->addError('firewallSourceUuid', 'Select a workload from this mesh.');
+        [$sourceType, $sourceUuid] = array_pad(explode(':', $validated['firewallSourceUuid'], 2), 2, null);
+        $sourceWorkload = $sourceType === 'workload' ? $this->meshWorkloads()->where('uuid', $sourceUuid)->first() : null;
+        $sourceNode = $sourceType === 'node'
+            ? Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $sourceUuid)->first()
+            : null;
+        $destination = $this->meshWorkloads()->where('uuid', $validated['firewallDestinationUuid'])->first();
+        if ($sourceWorkload === null && $sourceNode === null) {
+            $this->addError('firewallSourceUuid', 'Select a workload or Node from this mesh.');
         }
-        if (! $workloads->has($validated['firewallDestinationUuid'])) {
+        if ($destination === null) {
             $this->addError('firewallDestinationUuid', 'Select a workload from this mesh.');
+        }
+        if ($sourceWorkload?->id === $destination?->id) {
+            $this->addError('firewallDestinationUuid', 'The source and destination workloads must be different.');
         }
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
 
-        $created = DB::transaction(function () use ($validated, $workloads): bool {
+        $created = DB::transaction(function () use ($validated, $sourceWorkload, $sourceNode, $destination): bool {
             $rule = NodeFirewallRule::query()->firstOrCreate([
                 'node_cluster_id' => $this->cluster->id,
-                'source_workload_id' => $workloads[$validated['firewallSourceUuid']]->id,
-                'destination_workload_id' => $workloads[$validated['firewallDestinationUuid']]->id,
+                'source_workload_id' => $sourceWorkload?->id,
+                'source_node_id' => $sourceNode?->id,
+                'destination_workload_id' => $destination->id,
                 'protocol' => $validated['firewallProtocol'],
                 'port' => $validated['firewallPort'],
             ]);
@@ -263,7 +269,7 @@ class Show extends Component
         $availableNodes = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->orderBy('name')->get();
         $workloads = $this->meshWorkloads()->orderBy('name')->get();
         $firewallRules = NodeFirewallRule::query()
-            ->with(['sourceWorkload', 'destinationWorkload'])
+            ->with(['sourceWorkload', 'sourceNode', 'destinationWorkload'])
             ->where('node_cluster_id', $this->cluster->id)
             ->orderBy('id')
             ->get();
