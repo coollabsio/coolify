@@ -102,6 +102,14 @@ class CloneMe extends Component
             if (! $selectedDestination) {
                 throw new \Exception('Destination not found.');
             }
+            auditLog('ui.project.clone_started', [
+                'team_id' => $this->project->team_id,
+                'project_uuid' => $this->project->uuid,
+                'project_name' => $this->project->name,
+                'clone_type' => $type,
+                'new_name' => $this->newName,
+                'destination_uuid' => $selectedDestination->uuid,
+            ]);
             if ($type === 'project') {
                 $foundProject = Project::where('name', $this->newName)->first();
                 if ($foundProject) {
