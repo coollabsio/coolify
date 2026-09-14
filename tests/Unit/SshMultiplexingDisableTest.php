@@ -23,6 +23,16 @@ class SshMultiplexingDisableTest extends TestCase
         );
     }
 
+    public function test_remote_shell_prefers_bash_and_falls_back_to_sh()
+    {
+        $reflection = new \ReflectionMethod(SshMultiplexingHelper::class, 'remoteShellCommand');
+
+        $this->assertSame(
+            'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi',
+            $reflection->invoke(null)
+        );
+    }
+
     public function test_generate_ssh_command_accepts_disable_multiplexing_parameter()
     {
         $reflection = new \ReflectionMethod(SshMultiplexingHelper::class, 'generateSshCommand');

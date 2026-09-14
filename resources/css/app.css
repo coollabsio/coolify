@@ -98,7 +98,7 @@
 
 .button.button-highlighted:not(:disabled),
 .button[isHighlighted]:not(:disabled) {
-    --button-depth-color: color-mix(in oklab, var(--color-coollabs) 52%, black);
+    --button-depth-color: var(--color-coollabs-300);
 }
 
 .dark .button:not(.button-highlighted):not(.button-error):not([isHighlighted]):not(:disabled) {
@@ -166,6 +166,50 @@ select,
     transition-property: color, background-color, border-color, box-shadow;
     transition-timing-function: var(--ease-out);
     transition-duration: 120ms;
+}
+
+/*
+  Traffic-analytics chart tokens (light defaults; dark overrides below).
+  One source of truth shared by ApexCharts donuts, the geo choropleth SVG,
+  and proportional bars — JS reads them at runtime via getComputedStyle.
+  Palette validated with the dataviz skill; contrast ratios are recorded in
+  the PR description. See resources/views/livewire/traffic/_geo.blade.php.
+*/
+:root {
+    /* Categorical HTTP status palette (labelled 2xx/3xx/4xx/5xx in every legend). */
+    --chart-status-2xx: #15803d;
+    --chart-status-3xx: #2563eb;
+    --chart-status-4xx: #d97706;
+    --chart-status-5xx: #dc2626;
+
+    /* KPI sparkline accent for Bandwidth (violet — distinct from the status hues). */
+    --chart-spark-bandwidth: #7c3aed;
+
+    /* Sequential 5-step geo ramp (low -> high traffic) + neutral empty. */
+    --chart-geo-1: #3b82f6;
+    --chart-geo-2: #2563eb;
+    --chart-geo-3: #1d4ed8;
+    --chart-geo-4: #1e40af;
+    --chart-geo-5: #172554;
+    --chart-geo-empty: #e5e7eb;
+    --chart-geo-stroke: #ffffff;
+}
+
+.dark {
+    --chart-status-2xx: #22c55e;
+    --chart-status-3xx: #3b82f6;
+    --chart-status-4xx: #f59e0b;
+    --chart-status-5xx: #ef4444;
+
+    --chart-spark-bandwidth: #a78bfa;
+
+    --chart-geo-1: #2563eb;
+    --chart-geo-2: #3b82f6;
+    --chart-geo-3: #60a5fa;
+    --chart-geo-4: #93c5fd;
+    --chart-geo-5: #bfdbfe;
+    --chart-geo-empty: #262626;
+    --chart-geo-stroke: #101010;
 }
 
 /*
@@ -2262,7 +2306,7 @@ html[data-theme="custom"] textarea:disabled {
     outline: none;
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 40%, transparent);
+    box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .application-heading-actions .split-action-main,
@@ -3923,6 +3967,232 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .dark .runtime-log-viewport {
     background: var(--color-log);
     color: var(--color-fg-dim);
+}
+
+.runtime-log-panel {
+    --runtime-log-line: rgba(0, 0, 0, 0.08);
+    --runtime-log-muted: #66666f;
+    --runtime-log-hover: rgba(0, 0, 0, 0.04);
+    --runtime-log-detail: rgba(0, 0, 0, 0.03);
+    --runtime-log-columns: 12.75rem 5.5rem minmax(0, 1fr);
+}
+
+.dark .runtime-log-panel {
+    --runtime-log-line: var(--glass-line, rgba(255, 255, 255, 0.065));
+    --runtime-log-muted: #a09da5;
+    --runtime-log-hover: rgba(255, 255, 255, 0.035);
+    --runtime-log-detail: rgba(0, 0, 0, 0.24);
+}
+
+.runtime-log-viewport.logs-viewer-viewport {
+    container: runtime-log-explorer / inline-size;
+    padding: 0;
+}
+
+.runtime-log-viewport.logs-viewer-viewport::after {
+    display: none;
+}
+
+.runtime-log-columns,
+.runtime-log-viewport [data-log-line]:not(.hidden) {
+    display: grid;
+    grid-template-columns: var(--runtime-log-columns);
+    gap: 0.625rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    align-items: center;
+    padding: 0.6875rem 1.875rem 0.6875rem 1rem;
+}
+
+.runtime-log-columns {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 1px solid var(--runtime-log-line);
+    background: #f0eff2;
+    color: var(--runtime-log-muted);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.dark .runtime-log-columns {
+    background: var(--coollabs-elevated);
+}
+
+html[data-theme="custom"] .runtime-log-columns {
+    background: var(--color-log-toolbar);
+}
+
+.runtime-log-viewport [data-log-line] {
+    position: relative;
+    border-bottom: 1px solid var(--runtime-log-line);
+    border-radius: 0;
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+}
+
+.runtime-log-viewport [data-log-line]:hover,
+.runtime-log-viewport [data-log-line][aria-expanded="true"] {
+    background: var(--runtime-log-hover);
+}
+
+.runtime-log-viewport [data-log-line]:focus-visible {
+    outline: 2px solid var(--color-accent, #b93642);
+    outline-offset: -2px;
+}
+
+.runtime-log-viewport [data-log-line]::before {
+    content: "[" attr(data-log-level) "]";
+    grid-column: 2;
+    grid-row: 1;
+    color: var(--runtime-log-muted);
+    text-transform: uppercase;
+}
+
+.runtime-log-viewport [data-log-line]::after {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 0.75rem;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-right: 1.5px solid var(--runtime-log-muted);
+    border-bottom: 1.5px solid var(--runtime-log-muted);
+    transform: rotate(45deg);
+}
+
+.runtime-log-viewport [data-log-line][aria-expanded="true"]::after {
+    top: 1.1875rem;
+    transform: rotate(225deg);
+}
+
+.runtime-log-viewport .log-error::before { color: #e55e73; }
+.runtime-log-viewport .log-warning::before { color: #d79945; }
+.runtime-log-viewport .log-debug::before { color: #929099; }
+.runtime-log-viewport .log-info::before { color: #8891f0; }
+
+.runtime-log-viewport .logs-viewer-timestamp {
+    grid-column: 1;
+    grid-row: 1;
+    color: var(--runtime-log-muted);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.runtime-log-viewport [data-line-text] {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-log-detail {
+    margin: 0 0 0.25rem;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--runtime-log-line);
+    background: var(--runtime-log-detail);
+    color: inherit;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.8;
+}
+
+.dark .runtime-log-detail {
+    color: #adbdc9;
+}
+
+.runtime-log-viewport [data-log-line].hidden + .runtime-log-detail {
+    display: none !important;
+}
+
+.runtime-log-without-time {
+    --runtime-log-columns: 5.5rem minmax(0, 1fr);
+}
+
+.runtime-log-without-time [data-log-line]::before {
+    grid-column: 1;
+}
+
+.runtime-log-without-time [data-line-text] {
+    grid-column: 2;
+}
+
+@container runtime-log-explorer (max-width: 650px) {
+    .runtime-log-columns,
+    .runtime-log-viewport [data-log-line]:not(.hidden) {
+        grid-template-columns: minmax(0, 1fr) 5.5rem;
+        gap: 0.1875rem 0.5rem;
+    }
+
+    .runtime-log-columns > :last-child,
+    .runtime-log-viewport [data-line-text] {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .runtime-log-without-time [data-line-text] {
+        grid-column: 1 / -1;
+    }
+}
+
+.runtime-log-empty {
+    display: flex;
+    min-height: 18rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    color: var(--runtime-log-muted);
+    text-align: left;
+}
+
+.runtime-log-loading {
+    min-height: 18rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 2rem;
+    color: var(--runtime-log-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.runtime-log-empty-icon {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--runtime-log-line);
+    border-radius: 0.5rem;
+    background: var(--runtime-log-detail);
+}
+
+.runtime-log-empty p {
+    color: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.runtime-log-empty div > span {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+}
+
+.env-table-detail {
+    padding: 0.25rem 1rem 1.25rem;
 }
 
 /* Small pill badges for table cells */

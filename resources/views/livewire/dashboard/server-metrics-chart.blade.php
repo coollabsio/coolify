@@ -92,15 +92,21 @@
                                 const memory = series[1][dataPointIndex];
                                 const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
                                 const formatPercent = value => Number.isFinite(value) ? `${Number(value.toFixed(1))}%` : '—';
-                                const formatTimestamp = timestamp => `${new Date(timestamp).toLocaleString(undefined, {
-                                    timeZone: 'UTC',
+                                const formatLocalTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
                                     hour12: false,
-                                })} UTC`;
+                                    timeZoneName: 'short',
+                                });
+                                const formatUtcTimestamp = timestamp => new Date(timestamp).toLocaleString(undefined, {
+                                    hour12: false,
+                                    timeZone: 'UTC',
+                                    timeZoneName: 'short',
+                                });
 
                                 return `<div class="apexcharts-tooltip-custom">
                                     <div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">${formatPercent(cpu)}</span></div>
                                     <div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">${formatPercent(memory)}</span></div>
-                                    <div class="apexcharts-tooltip-custom-title">${formatTimestamp(timestamp)}</div>
+                                    <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
+                                    <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
                                 </div>`;
                             },
                         },

@@ -21,6 +21,7 @@ use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
@@ -111,7 +112,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     /**
      * Sentinel IP for servers that do not have a real address yet
@@ -983,6 +984,11 @@ $siteAddress {
     public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
+    }
+
+    public function isTrafficAnalyticsEnabled(): bool
+    {
+        return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
     }
 
     public function isServerApiEnabled(): bool

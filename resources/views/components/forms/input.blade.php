@@ -37,7 +37,7 @@
                 @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
-                @if ($autofocus) x-ref="autofocusInput" @endif>
+                @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
             @if ($allowToPeak)
                 <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
                     class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
@@ -60,7 +60,7 @@
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
-            @if ($autofocus) x-ref="autofocusInput" @endif>
+            @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
