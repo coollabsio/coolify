@@ -95,3 +95,7 @@
 ## Do not auto-heal existing deployments without a request
 - When a parser or label fix can apply only after container recreation, keep the change limited to new deployments and later user-initiated redeployments unless the user explicitly asks for live reconciliation.
 - Do not add status lookup fallbacks that alter existing deployment behavior when the requested scope is new deployments only.
+
+## Trace image replacements through build stages
+- When replacing a container image for development, inspect both Compose services and every development Dockerfile `FROM` stage.
+- A successful Compose pull does not prove the application build is free of the old image; validate the complete build dependency chain.
