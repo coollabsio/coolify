@@ -33,6 +33,7 @@ use App\Traits\Auditable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
@@ -176,6 +177,70 @@ test('auditable models record authenticated create update and delete actions', f
         'ui.project.updated',
         'ui.project.deleted',
     ])->and($events[1]->metadata['changed_fields'])->toBe(['name']);
+});
+
+test('auditable models store encrypted changes for create update and delete actions', function () {
+    $project = Project::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Website project',
+        'description' => 'Original description',
+    ]);
+    $project->update(['description' => 'Updated description']);
+    $project->delete();
+
+    $events = AuditEvent::query()->where('resource_type', 'project')->orderBy('id')->get();
+
+    expect($events[0]->changes)->toMatchArray([
+        'name' => ['old' => null, 'new' => 'Website project'],
+        'description' => ['old' => null, 'new' => 'Original description'],
+    ])->and($events[0]->changes)->not->toHaveKeys(['id', 'uuid', 'team_id', 'created_at', 'updated_at'])
+        ->and($events[1]->changes)->toBe([
+            'description' => ['old' => 'Original description', 'new' => 'Updated description'],
+        ])->and($events[2]->changes)->toMatchArray([
+            'name' => ['old' => 'Website project', 'new' => null],
+            'description' => ['old' => 'Updated description', 'new' => null],
+        ]);
+
+    $storedChanges = DB::table('audit_events')->where('id', $events[1]->id)->value('changes');
+
+    expect($storedChanges)->not->toContain('Original description')
+        ->and($storedChanges)->not->toContain('Updated description');
+});
+
+test('auditable models exclude hidden and encrypted attributes from changes', function () {
+    SharedEnvironmentVariable::query()->create([
+        'team_id' => $this->team->id,
+        'key' => 'API_TOKEN',
+        'value' => 'super-secret',
+        'comment' => 'Used by the API',
+    ]);
+
+    $event = AuditEvent::query()->where('resource_type', 'shared_environment_variable')->sole();
+
+    expect($event->changes)->toMatchArray([
+        'key' => ['old' => null, 'new' => 'API_TOKEN'],
+        'comment' => ['old' => null, 'new' => 'Used by the API'],
+    ])->and($event->changes)->not->toHaveKey('value')
+        ->and(DB::table('audit_events')->where('id', $event->id)->value('changes'))
+        ->not->toContain('super-secret');
+});
+
+test('auditable models exclude timestamp attributes from changes', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    AuditEvent::query()->delete();
+
+    StandalonePostgresql::query()->create([
+        'uuid' => fake()->uuid(),
+        'name' => 'Timestamp test database',
+        'environment_id' => $environment->id,
+        'destination_type' => Server::class,
+        'destination_id' => 0,
+        'postgres_password' => 'password',
+        'last_restart_at' => now(),
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->not->toHaveKey('last_restart_at');
 });
 
 test('deleting a project dispatches deleted events for its environments', function () {
@@ -618,6 +683,37 @@ test('audit log page only shows events for the current team', function () {
         ->assertDontSee('Private app deleted');
 });
 
+test('audit log expands encrypted model changes for team admins and owners', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'description' => 'Website updated',
+        'changes' => [
+            'name' => ['old' => 'Website', 'new' => 'Store'],
+        ],
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertSee('View changes')
+        ->assertSee('Name')
+        ->assertSee('Website')
+        ->assertSee('Store');
+});
+
+test('manual audit events do not store model changes', function () {
+    auditLog('ui.application.restarted', [
+        'team_id' => $this->team->id,
+        'application_uuid' => 'app-123',
+        'audit_changes' => [
+            'name' => ['old' => 'Injected', 'new' => 'Value'],
+        ],
+    ]);
+
+    $event = AuditEvent::query()->sole();
+
+    expect($event->changes)->toBeNull()
+        ->and($event->metadata)->not->toHaveKey('audit_changes');
+});
+
 test('audit log is available under team settings', function () {
     $this->get('/team/audit-log')
         ->assertSuccessful()
@@ -653,6 +749,7 @@ test('team admins can query only their team audit events through the api', funct
         'actor_email' => 'owner@example.com',
         'actor_token_name' => 'production token',
         'metadata' => ['changed_fields' => ['name']],
+        'changes' => ['name' => ['old' => 'Old project', 'new' => 'New project']],
         'ip_address' => '192.0.2.1',
         'user_agent' => 'Sensitive user agent',
     ]);
@@ -678,6 +775,7 @@ test('team admins can query only their team audit events through the api', funct
         ->assertJsonMissingPath('data.0.actor_token_id')
         ->assertJsonMissingPath('data.0.actor_token_name')
         ->assertJsonMissingPath('data.0.metadata')
+        ->assertJsonMissingPath('data.0.changes')
         ->assertJsonMissingPath('data.0.ip_address')
         ->assertJsonMissingPath('data.0.user_agent');
 });
@@ -688,6 +786,7 @@ test('team admins with sensitive read access can query full audit event details'
         'actor_email' => 'owner@example.com',
         'actor_token_name' => 'production token',
         'metadata' => ['changed_fields' => ['name']],
+        'changes' => ['name' => ['old' => 'Old project', 'new' => 'New project']],
         'ip_address' => '192.0.2.1',
         'user_agent' => 'Sensitive user agent',
     ]);
@@ -703,6 +802,8 @@ test('team admins with sensitive read access can query full audit event details'
         ->assertJsonPath('data.0.actor_email', 'owner@example.com')
         ->assertJsonPath('data.0.actor_token_name', 'production token')
         ->assertJsonPath('data.0.metadata.changed_fields.0', 'name')
+        ->assertJsonPath('data.0.changes.name.old', 'Old project')
+        ->assertJsonPath('data.0.changes.name.new', 'New project')
         ->assertJsonPath('data.0.ip_address', '192.0.2.1')
         ->assertJsonPath('data.0.user_agent', 'Sensitive user agent');
 });

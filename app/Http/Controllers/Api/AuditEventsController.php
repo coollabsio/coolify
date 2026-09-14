@@ -62,6 +62,7 @@ class AuditEventsController extends Controller
                 'actor_token_id',
                 'actor_token_name',
                 'metadata',
+                'changes',
                 'ip_address',
                 'user_agent',
             ]))
