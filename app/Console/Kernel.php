@@ -6,7 +6,6 @@ use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\CheckMissingDatabaseBackupsJob;
-use App\Jobs\CheckTraefikVersionJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
@@ -90,8 +89,6 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
-
-            $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();

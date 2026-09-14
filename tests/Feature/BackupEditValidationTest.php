@@ -8,6 +8,8 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -341,6 +343,61 @@ it('disables S3 backup when saved without a selected S3 storage', function () {
     $backup->refresh();
     expect($backup->save_s3)->toBeFalsy();
     expect($backup->s3_storage_id)->toBeNull();
+});
+
+it('deletes a service database backup schedule without rendering the deleted relationship', function () {
+    InstanceSettings::get()->update(['disable_two_step_confirmation' => true]);
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'server_id' => $server->id,
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgres',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'enabled' => true,
+        'save_s3' => false,
+        'database_backup_retention_amount_locally' => 0,
+        'database_backup_retention_days_locally' => 0,
+        'database_backup_retention_max_storage_locally' => 0,
+        'database_backup_retention_amount_s3' => 0,
+        'database_backup_retention_days_s3' => 0,
+        'database_backup_retention_max_storage_s3' => 0,
+        'dump_all' => false,
+        'timeout' => 3600,
+        'missing_backup_notification_days' => 0,
+        'database_type' => $database->getMorphClass(),
+        'database_id' => $database->id,
+        'team_id' => $this->team->id,
+    ]);
+    $parameters = [
+        'project_uuid' => $project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'service_uuid' => $service->uuid,
+        'stack_service_uuid' => $database->uuid,
+    ];
+
+    $component = Livewire::test(BackupEdit::class, [
+        'backup' => $backup,
+        'availableS3Storages' => collect(),
+        'section' => 'danger',
+    ]);
+    $component
+        ->call('delete', '')
+        ->assertRedirectToRoute('project.service.database.backups', $parameters);
+
+    expect(ScheduledDatabaseBackup::find($backup->id))->toBeNull();
 });
 
 it('cascades to disabling local backup deletion when S3 is force-disabled', function () {
