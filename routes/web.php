@@ -32,6 +32,7 @@ use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
+use App\Livewire\Project\ClusterApplication\Show as ClusterApplicationShow;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
@@ -282,6 +283,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
+        Route::get('/cluster-application/{workload_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.show');
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');

@@ -21,6 +21,8 @@ class Index extends Component
 
     protected Collection $applications;
 
+    protected Collection $nodeWorkloads;
+
     protected Collection $postgresqls;
 
     protected Collection $redis;
@@ -41,7 +43,7 @@ class Index extends Component
 
     public function mount(): void
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->nodeWorkloads = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -59,6 +61,7 @@ class Index extends Component
         $this->allProjects = Project::ownedByCurrentTeamCached();
         $environmentRelations = [
             'applications:id,uuid,name,environment_id',
+            'nodeWorkloads:id,uuid,name,environment_id',
             'services:id,uuid,name,environment_id',
             'postgresqls:id,uuid,name,environment_id',
             'redis:id,uuid,name,environment_id',
@@ -77,6 +80,7 @@ class Index extends Component
 
         $this->environment = $environment->loadCount([
             'applications',
+            'nodeWorkloads',
             'redis',
             'postgresqls',
             'mysqls',
@@ -106,6 +110,17 @@ class Index extends Component
             return $application;
         });
         $this->applications = $this->applications->sortBy('name');
+
+        $this->nodeWorkloads = $this->environment->nodeWorkloads()
+            ->with([
+                'nodes:id,uuid,name,node_cluster_id',
+                'nodes.cluster:id,uuid,name',
+                'containers:id,node_workload_id,node_id,state,is_managed',
+                'operations' => fn ($query) => $query->latest('id')->limit(1),
+                'revisions' => fn ($query) => $query->latest('id')->limit(1),
+            ])
+            ->get()
+            ->sortBy('name');
 
         // Load all database resources in a single query per type
         $databaseTypes = [
@@ -155,6 +170,7 @@ class Index extends Component
     {
         return view('livewire.project.resource.index', [
             'applications' => $this->applications,
+            'nodeWorkloads' => $this->nodeWorkloads,
             'postgresqls' => $this->postgresqls,
             'redis' => $this->redis,
             'mongodbs' => $this->mongodbs,
@@ -165,6 +181,7 @@ class Index extends Component
             'clickhouses' => $this->clickhouses,
             'services' => $this->services,
             'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
+            'nodeWorkloadsJs' => $this->nodeWorkloadsToSearchableArray(),
             'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'Database'),
             'redisJs' => $this->toSearchableArray($this->redis, 'database', 'Database'),
             'mongodbsJs' => $this->toSearchableArray($this->mongodbs, 'database', 'Database'),
@@ -204,5 +221,47 @@ class Index extends Component
                 'name' => $tag->name,
             ])->values()->toArray(),
         ])->values()->toArray();
+    }
+
+    private function nodeWorkloadsToSearchableArray(): array
+    {
+        return $this->nodeWorkloads->map(function ($workload): array {
+            $node = $workload->nodes->first();
+            $container = $workload->containers
+                ->where('node_id', $node?->id)
+                ->where('is_managed', true)
+                ->first();
+            $operationStatus = $workload->operations->first()?->status?->value;
+            $status = $container?->state ?? match ($operationStatus) {
+                'queued', 'dispatched', 'running', 'verifying' => 'starting',
+                'failed' => 'failed',
+                default => 'unknown',
+            };
+
+            return [
+                'uuid' => $workload->uuid,
+                'name' => $workload->name,
+                'type' => 'application',
+                'typeLabel' => 'Cluster application',
+                'fqdn' => null,
+                'description' => $workload->revisions->first()?->image,
+                'status' => $status,
+                'restartLimitReached' => false,
+                'restartCount' => 0,
+                'maxRestartCount' => 0,
+                'server_status' => null,
+                'hrefLink' => route('project.cluster-application.show', [
+                    'project_uuid' => $this->project->uuid,
+                    'environment_uuid' => $this->environment->uuid,
+                    'workload_uuid' => $workload->uuid,
+                ]),
+                'destination' => [
+                    'server' => [
+                        'name' => $node?->cluster?->name ?? $node?->name ?? 'Unknown',
+                    ],
+                ],
+                'tags' => [],
+            ];
+        })->values()->all();
     }
 }

@@ -173,7 +173,7 @@
                     <div class="resource-type">Type</div>
                     <div>Status</div>
                     <div class="resource-domain">Domain</div>
-                    <div class="resource-server">Server</div>
+                    <div class="resource-server">Target</div>
                     <div class="resource-tags">Tags</div>
                 </div>
 
@@ -352,6 +352,7 @@
             pageSize: 10,
             resources: [
                 ...@js($applicationsJs),
+                ...@js($nodeWorkloadsJs),
                 ...@js($postgresqlsJs),
                 ...@js($redisJs),
                 ...@js($mongodbsJs),
@@ -380,7 +381,7 @@
                     },
                     {
                         key: 'serverFilters',
-                        label: 'Servers',
+                        label: 'Targets',
                         options: this.uniqueOptions(this.resources.map((item) => ({
                             value: item.destination?.server?.name || 'Unknown',
                             label: item.destination?.server?.name || 'Unknown',

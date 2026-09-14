@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -56,6 +57,7 @@ class Environment extends BaseModel
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
+            $this->nodeWorkloads()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
@@ -75,6 +77,11 @@ class Environment extends BaseModel
     public function applications()
     {
         return $this->hasMany(Application::class);
+    }
+
+    public function nodeWorkloads(): HasMany
+    {
+        return $this->hasMany(NodeWorkload::class);
     }
 
     public function postgresqls()

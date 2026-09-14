@@ -303,6 +303,29 @@ it('adds and removes scoped workload firewall rules', function () {
     Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 2);
 });
 
+it('adds an ICMP firewall rule without a port', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'ICMP mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $source = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $source);
+    EnsureNodeWorkloadAddress::run($node, $destination);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('firewallSourceUuid', $source->uuid)
+        ->set('firewallDestinationUuid', $destination->uuid)
+        ->set('firewallProtocol', 'icmp')
+        ->call('addFirewallRule')
+        ->assertDispatched('success');
+
+    $rule = NodeFirewallRule::query()->sole();
+    expect($rule->protocol)->toBe('icmp')
+        ->and($rule->port)->toBe(0);
+});
+
 it('rejects firewall rules for workloads outside the mesh', function () {
     Queue::fake();
     $team = $this->user->teams()->firstOrFail();

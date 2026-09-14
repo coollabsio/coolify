@@ -21,7 +21,11 @@
     $currentService = $currentEnvironment && $serviceUuid
         ? $currentEnvironment->services()->where('uuid', $serviceUuid)->first()
         : null;
-    $currentResource = $currentApplication ?? $currentDatabase ?? $currentService;
+    $workloadUuid = request()->route('workload_uuid');
+    $currentWorkload = $currentEnvironment && $workloadUuid
+        ? $currentEnvironment->nodeWorkloads()->where('uuid', $workloadUuid)->first()
+        : null;
+    $currentResource = $currentApplication ?? $currentDatabase ?? $currentService ?? $currentWorkload;
     $resourceItems = $currentEnvironment
         ? collect()
             ->concat($currentEnvironment->applications->map(fn ($application) => [
@@ -35,6 +39,10 @@
             ->concat($currentEnvironment->services->map(fn ($service) => [
                 'type' => 'service',
                 'resource' => $service,
+            ]))
+            ->concat($currentEnvironment->nodeWorkloads->map(fn ($workload) => [
+                'type' => 'cluster-application',
+                'resource' => $workload,
             ]))
             ->sortBy(fn ($item) => strtolower($item['resource']->name))
             ->map(fn ($item) => [
@@ -54,6 +62,11 @@
                         'project_uuid' => $currentProject->uuid,
                         'environment_uuid' => $currentEnvironment->uuid,
                         'service_uuid' => $item['resource']->uuid,
+                    ]),
+                    'cluster-application' => route('project.cluster-application.show', [
+                        'project_uuid' => $currentProject->uuid,
+                        'environment_uuid' => $currentEnvironment->uuid,
+                        'workload_uuid' => $item['resource']->uuid,
                     ]),
                 },
                 'active' => $item['resource']->uuid === $currentResource?->uuid,
@@ -299,6 +312,14 @@
                 @elseif ($currentDatabase)
                     <livewire:project.database.status :database="$currentDatabase"
                         :wire:key="'database-status-'.$currentDatabase->uuid" />
+                @elseif ($currentWorkload)
+                    @php
+                        $workloadNode = $currentWorkload->nodes()->first();
+                        $workloadState = $workloadNode
+                            ? \App\Actions\Node\DetermineWorkloadState::run($workloadNode, $currentWorkload)
+                            : \App\Enums\NodeWorkloadState::UNKNOWN;
+                    @endphp
+                    <x-status-summary :status="$workloadState->value" />
                 @else
                     <livewire:project.service.status :service="$currentService"
                         :wire:key="'service-status-'.$currentService->uuid" />

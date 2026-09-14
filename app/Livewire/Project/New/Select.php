@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -25,6 +28,8 @@ class Select extends Component
     public Collection|null|Server $servers;
 
     public ?Collection $buildServers = null;
+
+    public ?Collection $clusters = null;
 
     public bool $onlyBuildServerAvailable = false;
 
@@ -392,6 +397,11 @@ class Select extends Component
 
             return;
         }
+        if ($type === 'docker-image' && $this->clusters?->isNotEmpty()) {
+            $this->current_step = 'targets';
+
+            return;
+        }
         if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
@@ -432,6 +442,43 @@ class Select extends Component
         return $this->whatToDoNext();
     }
 
+    public function setCluster(string $clusterUuid): RedirectResponse
+    {
+        $cluster = NodeCluster::query()
+            ->where('team_id', currentTeam()->id)
+            ->where('uuid', $clusterUuid)
+            ->where('network_status', 'active')
+            ->whereHas('nodes', fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker']))
+            ->firstOrFail();
+
+        return redirect()->route('project.resource.create', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'type' => 'docker-image',
+            'cluster' => $cluster->uuid,
+        ]);
+    }
+
+    public function setNode(string $nodeUuid): RedirectResponse
+    {
+        $node = Node::query()
+            ->where('team_id', currentTeam()->id)
+            ->where('uuid', $nodeUuid)
+            ->where('is_usable', true)
+            ->whereIn('role', ['worker', 'controller-worker'])
+            ->whereHas('cluster', fn ($query) => $query->where('network_status', 'active'))
+            ->firstOrFail();
+
+        return redirect()->route('project.resource.create', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'type' => 'docker-image',
+            'node' => $node->uuid,
+        ]);
+    }
+
     public function setPostgresqlType(string $type)
     {
         $this->postgresql_type = $type;
@@ -467,5 +514,20 @@ class Select extends Component
         $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
         $this->allServers = $this->servers->concat($this->buildServers);
         $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
+        $this->clusters = NodeCluster::query()
+            ->where('team_id', currentTeam()->id)
+            ->where('network_status', 'active')
+            ->whereHas('nodes', fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker']))
+            ->withCount(['nodes' => fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker'])])
+            ->with(['nodes' => fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->orderBy('name')])
+            ->orderBy('name')
+            ->get();
     }
 }

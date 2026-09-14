@@ -32,6 +32,11 @@ class Create extends Component
         if (! $environment) {
             return redirect()->route('dashboard');
         }
+        if ($type->value() === 'docker-image' && request()->filled('cluster')) {
+            $this->type = $type->value();
+
+            return;
+        }
         if (isset($type) && isset($destination_uuid)) {
             $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {

@@ -118,11 +118,16 @@ class Show extends Component
     public function addFirewallRule(): void
     {
         $this->authorize('update', $this->cluster);
+        if ($this->firewallProtocol === 'icmp') {
+            $this->firewallPort = 0;
+        }
         $validated = $this->validate([
             'firewallSourceUuid' => ['required', 'string'],
             'firewallDestinationUuid' => ['required', 'string', 'different:firewallSourceUuid'],
-            'firewallProtocol' => ['required', Rule::in(['tcp', 'udp'])],
-            'firewallPort' => ['required', 'integer', 'between:1,65535'],
+            'firewallProtocol' => ['required', Rule::in(['tcp', 'udp', 'icmp'])],
+            'firewallPort' => $this->firewallProtocol === 'icmp'
+                ? ['required', 'integer', 'in:0']
+                : ['required', 'integer', 'between:1,65535'],
         ]);
         $workloads = $this->meshWorkloads()
             ->whereIn('uuid', [$validated['firewallSourceUuid'], $validated['firewallDestinationUuid']])

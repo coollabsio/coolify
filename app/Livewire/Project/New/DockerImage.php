@@ -2,7 +2,12 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Actions\Node\CreateClusterDockerImageWorkload;
+use App\Jobs\DeployNodeWorkloadJob;
 use App\Models\Application;
+use App\Models\Node;
+use App\Models\NodeCluster;
+use App\Models\NodeWorkload;
 use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
@@ -19,6 +24,11 @@ class DockerImage extends Component
 
     public string $imageSha256 = '';
 
+    public string $deploymentTarget = '';
+
+    /** @var array<int, array{value: string, label: string, disabled: bool}> */
+    public array $deploymentTargets = [];
+
     public array $parameters;
 
     public array $query;
@@ -27,6 +37,66 @@ class DockerImage extends Component
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
+        $this->loadDeploymentTargets();
+    }
+
+    public function loadDeploymentTargets(): void
+    {
+        $clusterUuid = $this->query['cluster'] ?? null;
+        $nodeUuid = $this->query['node'] ?? null;
+        $destinationUuid = $this->query['destination'] ?? null;
+        $this->deploymentTarget = is_string($nodeUuid) && $nodeUuid !== ''
+            ? 'node:'.$nodeUuid
+            : (is_string($clusterUuid) && $clusterUuid !== ''
+                ? 'cluster:'.$clusterUuid
+                : (is_string($destinationUuid) && $destinationUuid !== '' ? 'destination:'.$destinationUuid : ''));
+
+        $this->deploymentTargets = NodeCluster::query()
+            ->where('team_id', currentTeam()->id)
+            ->with(['nodes' => fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->orderBy('name')])
+            ->withCount(['nodes as available_nodes_count' => fn ($query) => $query
+                ->where('is_usable', true)
+                ->whereIn('role', ['worker', 'controller-worker'])])
+            ->orderBy('name')
+            ->get()
+            ->flatMap(function (NodeCluster $cluster): array {
+                $ready = $cluster->network_status === 'active' && $cluster->available_nodes_count > 0;
+
+                $targets = [[
+                    'value' => 'cluster:'.$cluster->uuid,
+                    'label' => $cluster->name.' — Automatic placement — '.($ready
+                        ? $cluster->available_nodes_count.' available '.str('node')->plural($cluster->available_nodes_count)
+                        : 'not ready'),
+                    'disabled' => ! $ready,
+                ]];
+                if ($ready) {
+                    foreach ($cluster->nodes as $node) {
+                        $targets[] = [
+                            'value' => 'node:'.$node->uuid,
+                            'label' => $cluster->name.' — Node: '.$node->name,
+                            'disabled' => false,
+                        ];
+                    }
+                }
+
+                return $targets;
+            })
+            ->values()
+            ->all();
+
+        if (is_string($destinationUuid) && $destinationUuid !== '') {
+            $destination = find_resource_destination_for_current_team($destinationUuid);
+            if ($destination !== null) {
+                $this->deploymentTargets[] = [
+                    'value' => 'destination:'.$destination->uuid,
+                    'label' => $destination->server->name.' — Legacy server',
+                    'disabled' => false,
+                ];
+            }
+        }
     }
 
     /**
@@ -86,6 +156,7 @@ class DockerImage extends Component
         $this->authorize('create', Application::class);
 
         $this->validate([
+            'deploymentTarget' => ['required', 'string', 'regex:/^(cluster|node|destination):.+$/'],
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
             'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
@@ -114,13 +185,44 @@ class DockerImage extends Component
         $parser = new DockerImageParser;
         $parser->parse($dockerImage);
 
-        $destination_uuid = $this->query['destination'] ?? null;
-        $destination = find_resource_destination_for_current_team($destination_uuid);
+        [$targetType, $targetUuid] = explode(':', $this->deploymentTarget, 2);
+        if (in_array($targetType, ['cluster', 'node'], true)) {
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+            $this->authorize('create', NodeWorkload::class);
+            $targetNode = $targetType === 'node'
+                ? Node::query()
+                    ->where('team_id', $project->team_id)
+                    ->where('uuid', $targetUuid)
+                    ->whereNotNull('node_cluster_id')
+                    ->firstOrFail()
+                : null;
+            $cluster = $targetNode?->cluster ?? NodeCluster::query()
+                ->where('team_id', $project->team_id)
+                ->where('uuid', $targetUuid)
+                ->firstOrFail();
+            $deployment = CreateClusterDockerImageWorkload::run(
+                $project,
+                $environment,
+                $cluster,
+                $dockerImage,
+                auth()->user(),
+                $targetNode,
+            );
+            DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
+
+            return redirectRoute($this, 'project.cluster-application.show', [
+                'environment_uuid' => $environment->uuid,
+                'project_uuid' => $project->uuid,
+                'workload_uuid' => $deployment['workload']->uuid,
+            ]);
+        }
+
+        $destination = find_resource_destination_for_current_team($targetUuid);
         if (! $destination) {
             throw new \Exception('Destination not found.');
         }
         $destination_class = $destination->getMorphClass();
-
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 

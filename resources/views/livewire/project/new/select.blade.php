@@ -616,6 +616,52 @@
             </script>
         @endif
     </div>
+    @if ($current_step === 'targets')
+        <x-application.settings-section title="Select a deployment target"
+            description="Deploy this Docker image to a legacy server or a Node cluster." flush>
+            <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
+                @foreach($clusters ?? [] as $cluster)
+                    <button type="button" wire:click="setCluster('{{ $cluster->uuid }}')"
+                        class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                            <x-reicon name="layers" class="size-4" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $cluster->name }}</span>
+                            <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->nodes_count }} available {{ Str::plural('node', $cluster->nodes_count) }}</span>
+                        </span>
+                        <x-status-badge status="running" text="Node cluster" />
+                    </button>
+                    @foreach($cluster->nodes as $node)
+                        <button type="button" wire:click="setNode('{{ $node->uuid }}')"
+                            class="group flex min-h-14 w-full items-center gap-3 bg-neutral-50/50 px-4 py-3 pl-10 text-left transition-colors hover:bg-neutral-100 dark:bg-white/[0.015] dark:hover:bg-white/[0.04]">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <x-reicon name="servers" class="size-4" />
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</span>
+                                <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Deploy to this Node in {{ $cluster->name }}</span>
+                            </span>
+                            <x-status-badge status="running" text="Node" />
+                        </button>
+                    @endforeach
+                @endforeach
+                @foreach($servers ?? [] as $server)
+                    <button type="button" wire:click="setServer({{ $server }})"
+                        class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                            <x-reicon name="servers" class="size-4" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $server->name }}</span>
+                            <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $server->description ?: $server->ip }}</span>
+                        </span>
+                        <x-status-badge status="running" text="Legacy server" />
+                    </button>
+                @endforeach
+            </div>
+        </x-application.settings-section>
+    @endif
     @if ($current_step === 'servers')
         <x-application.settings-section title="Select a server"
             description="Choose the machine that will host this resource." flush>

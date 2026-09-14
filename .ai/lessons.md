@@ -166,3 +166,4 @@
 - Do not replace a removed image with a floating `latest` tag. Find the newest stable release tag and pin it consistently in Compose and every Dockerfile stage.
 - When the Clusters page becomes the home for Node infrastructure, move the Nodes collection there instead of showing it on both Clusters and Servers, and use the concise "Clusters" label throughout navigation.
 - For the Clusters sidebar item, use the layered-stack icon instead of the generic network icon; it distinguishes Clusters from both Servers and network settings.
+- When ICMP is permitted from Nodes to workload addresses, cover both the local output path and the remote WireGuard-to-workload forward path. A local ping can pass while a ping from another mesh Node still fails.
