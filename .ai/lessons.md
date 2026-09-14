@@ -148,3 +148,4 @@
 ## Trace image replacements through build stages
 - When replacing a container image for development, inspect both Compose services and every development Dockerfile `FROM` stage.
 - A successful Compose pull does not prove the application build is free of the old image; validate the complete build dependency chain.
+- Do not replace a removed image with a floating `latest` tag. Find the newest stable release tag and pin it consistently in Compose and every Dockerfile stage.

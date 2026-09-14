@@ -12,7 +12,7 @@ ARG NGINX_VERSION=1.31.2-r1
 # =================================================================
 # Get MinIO client
 # =================================================================
-FROM quay.io/minio/aistor/mc:latest AS minio-client
+FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 # =================================================================
 # Final Stage: Production image

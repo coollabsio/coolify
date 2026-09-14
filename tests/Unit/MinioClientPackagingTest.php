@@ -1,20 +1,21 @@
 <?php
 
-it('pins the same MinIO client release in every Coolify image', function () {
-    $dockerfiles = [
+it('pins the AIStor MinIO client release in every Coolify image', function () {
+    $imageFiles = [
         dirname(__DIR__, 2).'/docker/production/Dockerfile',
         dirname(__DIR__, 2).'/docker/development/Dockerfile',
         dirname(__DIR__, 2).'/docker/coolify-helper/Dockerfile',
+        dirname(__DIR__, 2).'/docker-compose.dev.yml',
+        dirname(__DIR__, 2).'/docker-compose.dev-multi.yml',
+        dirname(__DIR__, 2).'/docker-compose-maxio.dev.yml',
     ];
 
-    $versions = collect($dockerfiles)->map(function (string $dockerfile): string {
-        $contents = file_get_contents($dockerfile);
+    foreach ($imageFiles as $imageFile) {
+        $contents = file_get_contents($imageFile);
 
-        expect(preg_match('/^ARG MINIO_VERSION=(.+)$/m', $contents, $matches))->toBe(1);
-
-        return $matches[1];
-    });
-
-    expect($versions->unique()->values()->all())
-        ->toBe(['RELEASE.2025-08-13T08-35-41Z']);
+        expect($contents)
+            ->toContain('quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z')
+            ->not->toContain('quay.io/minio/aistor/mc:latest')
+            ->not->toContain('minio/mc:');
+    }
 });
