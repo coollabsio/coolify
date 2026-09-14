@@ -5,7 +5,7 @@
 - [x] Send the selected Node WireGuard IP to Sentinel.
 - [x] Update the firewall UI and existing rule display.
 - [x] Run focused tests, formatting, build, and browser verification.
-- [ ] Commit, push, wait for builds, and update local VMs.
+- [x] Commit, push, wait for builds, and update local VMs.
 - [x] Record review results.
 
 ## Review
@@ -16,3 +16,7 @@
 - Focused Coolify tests passed: 40 tests and 169 assertions.
 - The production frontend build and all Sentinel workspace checks passed.
 - Browser verification showed both local Nodes in the Source control.
+
+- Sentinel CI and release passed for commit `4154f53`.
+- Both local VMs use the published Sentinel binary with SHA-256 `49ebc09d8b5e533d5962074d207690ebfd4ff801b4d73b631f14fcf3cfac019b`.
+- Live verification proved that the selected Node can ping the workload and the unselected Node cannot. After rule removal, both Nodes were blocked.
