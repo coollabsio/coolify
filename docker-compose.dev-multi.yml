@@ -195,8 +195,7 @@ services:
 
   minio-init:
     profiles: ["minio"]
-    # MinIO removed the mc client from Docker Hub; pull it from MinIO's own registry.
-    image: quay.io/minio/mc:latest
+    image: minio/mc:latest
     pull_policy: always
     restart: "no"
     depends_on:
