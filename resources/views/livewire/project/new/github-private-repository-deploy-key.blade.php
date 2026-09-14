@@ -1,4 +1,4 @@
-<div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
+<div x-data="{ envModalOpen: false }" class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
     @if ($current_step === 'private_keys')
         <section class="application-settings-section">
             <div class="application-settings-section-header">
@@ -103,8 +103,71 @@
                         <x-forms.input wire:model="base_directory" label="Base directory"
                             helper="Repository directory used as the build root." />
                     @endif
+
+                    {{-- Smart Scan --}}
+                    <div class="border-t border-neutral-200 pt-5 dark:border-white/[0.06]">
+                        <h3 class="text-sm font-semibold text-black dark:text-fg">Smart Scan</h3>
+                        <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Scan for Dockerfiles, Docker Compose files, and environment configuration.</p>
+
+                        <div class="flex items-center gap-3 pt-3">
+                            <x-forms.button type="button" wire:click="detectRepository">
+                                <span wire:loading.remove wire:target="detectRepository">Detect Repository</span>
+                                <span wire:loading wire:target="detectRepository" class="inline-flex items-center gap-2">
+                                    <x-loading /> Scanning...
+                                </span>
+                            </x-forms.button>
+                        </div>
+
+                        @if ($detectionRan)
+                            <div wire:loading.remove wire:target="detectRepository" class="pt-3">
+                                <div class="flex items-center gap-3 flex-wrap text-sm">
+                                    @if (count($detectedDockerfiles))
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
+                                            <span class="badge badge-success"></span>
+                                            Dockerfile{{ count($detectedDockerfiles) > 1 ? 's' : '' }}
+                                            <span class="dark:text-neutral-400">({{ count($detectedDockerfiles) }})</span>
+                                        </span>
+                                    @endif
+                                    @if (count($detectedDockerComposeFiles))
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300">
+                                            <span class="badge badge-success"></span>
+                                            Docker Compose
+                                            <span class="dark:text-neutral-400">({{ count($detectedDockerComposeFiles) }})</span>
+                                        </span>
+                                    @endif
+                                    @include('livewire.project.new.partials.env-detection-badges')
+                                    @if (!count($detectedDockerfiles) && !count($detectedDockerComposeFiles) && !count($detectedEnvFiles))
+                                        <span class="dark:text-neutral-400">No Dockerfile, Docker Compose, or env files detected.</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Dockerfile selector when multiple detected --}}
+                    @if ($build_pack === 'dockerfile' && count($detectedDockerfiles) > 1)
+                        <x-forms.select wire:model.live="selectedDockerfile" label="Dockerfile"
+                            helper="Multiple Dockerfiles were detected in your repository. Select which one to use.">
+                            @foreach ($detectedDockerfiles as $df)
+                                <option value="{{ $df }}">{{ $df }}</option>
+                            @endforeach
+                        </x-forms.select>
+                    @endif
+
+                    {{-- Docker Compose file selector when multiple detected --}}
+                    @if ($build_pack === 'dockercompose' && count($detectedDockerComposeFiles) > 1)
+                        <x-forms.select wire:model.live="selectedDockerComposeFile" label="Docker Compose File"
+                            helper="Multiple Docker Compose files were detected. Select which one to use.">
+                            @foreach ($detectedDockerComposeFiles as $cf)
+                                <option value="{{ $cf }}">{{ $cf }}</option>
+                            @endforeach
+                        </x-forms.select>
+                    @endif
                 </div>
             </section>
         </form>
+
+        {{-- Environment Variables Import Modal --}}
+        @include('livewire.project.new.partials.env-import-modal')
     @endif
 </div>
