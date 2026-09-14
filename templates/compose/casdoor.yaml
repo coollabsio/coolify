@@ -1,0 +1,37 @@
+# documentation: https://casdoor.ai/docs/overview
+# slogan: An open-source identity and access management (IAM) and single sign-on (SSO) platform with a web UI.
+# category: auth
+# tags: casdoor,identity,sso,authentication,oauth,oidc,saml,cas,ldap,scim,mfa
+# logo: svgs/casdoor.png
+# port: 8000
+
+services:
+  casdoor:
+    image: casbin/casdoor:${CASDOOR_TAG:-4.4.0}
+    environment:
+      - SERVICE_URL_CASDOOR
+      - driverName=postgres
+      - dataSourceName=user=${SERVICE_USER_POSTGRES} password=${SERVICE_PASSWORD_POSTGRES} host=${POSTGRES_HOST:-postgres} port=5432 sslmode=disable dbname=${POSTGRES_DB:-casdoor}
+      - dbName=${POSTGRES_DB:-casdoor}
+      - origin=${SERVICE_URL_CASDOOR}
+      - runmode=${CASDOOR_RUNMODE:-prod}
+      - showSql=${CASDOOR_SHOW_SQL:-false}
+      - defaultLanguage=${CASDOOR_DEFAULT_LANGUAGE:-en}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-casdoor}
+    volumes:
+      - casdoor-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-casdoor}
+      interval: 5s
+      timeout: 20s
+      retries: 10
