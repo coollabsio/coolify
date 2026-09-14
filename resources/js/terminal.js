@@ -601,13 +601,10 @@ export function initializeTerminalComponent() {
                 const connectionString = {
                     protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
                     host: window.location.hostname,
-                    port: ":6002",
+                    port: window.location.port ? `:${window.location.port}` : '',
                     path: '/terminal/ws'
                 }
 
-                if (!window.location.port) {
-                    connectionString.port = ''
-                }
                 if (predefined.host) {
                     connectionString.host = predefined.host
                 }
