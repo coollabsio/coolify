@@ -160,7 +160,7 @@ function ensureProxyNetworksExist(Server $server)
 
             return [
                 "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
+                dockerNetworkCreateCommand($network),
             ];
         });
     }
