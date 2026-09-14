@@ -1,10 +1,12 @@
 <div>
-    <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
-    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-        @if ($resourceType === 'database')
+    @unless ($embedded)
+        <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
+    @endunless
+    <section @class(['application-settings-workspace mt-4 w-full max-w-none lg:mt-0' => ! $embedded])>
+        <div @class(['grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8' => ! $embedded])>
+        @if (! $embedded && $resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" />
-        @else
+        @elseif (! $embedded)
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Compose resource settings"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -19,95 +21,19 @@
                     <x-reicon name="settings" class="menu-item-icon" />
                     <span class="menu-item-label">General</span>
                 </a>
-                <a @class(['menu-item', 'menu-item-active' => request()->routeIs('project.service.index.advanced')])
-                    {{ wireNavigate() }} href="{{ route('project.service.index.advanced', $parameters) }}">
-                    <x-reicon name="grid" class="menu-item-icon" />
-                    <span class="menu-item-label">Advanced</span>
-                </a>
                 </nav>
             </aside>
         @endif
         <div class="min-w-0">
             @if ($resourceType === 'application')
-                <x-slot:title>
-                    {{ data_get_str($service, 'name')->limit(10) }} >
-                    {{ data_get_str($serviceApplication, 'name')->limit(10) }} | Coolify
-                </x-slot>
-                @if ($currentRoute === 'project.service.index.advanced')
-                    <section class="application-settings-section">
-                        <div class="application-settings-section-header">
-                            <div>
-                                <h2>Advanced</h2>
-                                <p>Control proxy, status, and logging behavior for this compose resource.</p>
-                            </div>
-                        </div>
-                        <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
-                        @if (str($serviceApplication->image)->contains('pocketbase'))
-                            <x-forms.listbox id="isGzipEnabled" label="Gzip compression"
-                                helper="PocketBase keeps compression disabled so server-sent events continue to work."
-                                :disabled="true" :options="[
-                                    ['value' => true, 'label' => 'Enabled'],
-                                    ['value' => false, 'label' => 'Disabled'],
-                                ]" />
-                        @else
-                            <x-forms.listbox id="isGzipEnabled" label="Gzip compression"
-                                onChange="instantSaveApplicationSettings" :options="[
-                                    ['value' => true, 'label' => 'Enabled'],
-                                    ['value' => false, 'label' => 'Disabled'],
-                                ]" />
-                        @endif
-                        <x-forms.listbox id="isStripprefixEnabled" label="Path prefixes"
-                            onChange="instantSaveApplicationSettings" :options="[
-                                ['value' => true, 'label' => 'Strip prefixes'],
-                                ['value' => false, 'label' => 'Keep prefixes'],
-                            ]" />
-                        <x-forms.listbox id="excludeFromStatus" label="Service status"
-                            onChange="instantSaveApplicationSettings" :options="[
-                                ['value' => false, 'label' => 'Include in status'],
-                                ['value' => true, 'label' => 'Exclude from status'],
-                            ]" />
-                        <x-forms.listbox id="isLogDrainEnabled" label="Log drain"
-                            onChange="instantSaveApplicationAdvanced" :options="[
-                                ['value' => true, 'label' => 'Send logs to drain'],
-                                ['value' => false, 'label' => 'Do not drain logs'],
-                            ]" />
-                        </div>
-                    </section>
-                @else
+                @unless ($embedded)
+                    <x-slot:title>
+                        {{ data_get_str($service, 'name')->limit(10) }} >
+                        {{ data_get_str($serviceApplication, 'name')->limit(10) }} | Coolify
+                    </x-slot>
+                @endunless
                     <form wire:submit="submitApplication" class="space-y-6">
-                        <x-unsaved-bar action="submitApplication" />
-                        <section class="application-settings-section">
-                            <div class="application-settings-section-header">
-                                <div>
-                                    <h2>{{ Str::headline($serviceApplication->human_name ?: $serviceApplication->name) }}</h2>
-                                    <p>Identity, image, and public access for this compose application.</p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                            @can('update', $serviceApplication)
-                                <x-modal-confirmation wire:click="convertToDatabase" title="Convert to Database"
-                                    buttonTitle="Convert to Database" submitAction="convertToDatabase" :actions="['The selected resource will be converted to a service database.']"
-                                    confirmationText="{{ Str::headline($serviceApplication->name) }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
-                                    shortConfirmationLabel="Service Application Name" />
-                            @endcan
-                            @can('delete', $serviceApplication)
-                                <x-modal-confirmation title="Confirm Service Application Deletion?" buttonTitle="Delete" isErrorButton
-                                    submitAction="deleteApplication" :actions="['The selected service application container will be stopped and permanently deleted.']"
-                                    confirmationText="{{ Str::headline($serviceApplication->name) }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
-                                    shortConfirmationLabel="Service Application Name" />
-                            @endcan
-                                </div>
-                            </div>
-                            <div class="application-settings-section-body space-y-4">
-                            @if ($requiredPort && !$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
-                                <x-callout type="info" title="Required Port: {{ $requiredPort }}" class="mb-2">
-                                    This service requires port <strong>{{ $requiredPort }}</strong> to function correctly. All domains must include this port number (or any other port if you know what you're doing).
-                                    <br><br>
-                                    <strong>Example:</strong> https://app.coolify.io:{{ $requiredPort }},https://www.app.coolify.io:{{ $requiredPort }}
-                                </x-callout>
-                            @endif
-
+                        <div class="space-y-4">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <x-forms.input canGate="update" :canResource="$serviceApplication" label="Name" id="humanName"
                                     placeholder="Human readable name"></x-forms.input>
@@ -116,7 +42,8 @@
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2">
                                 @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
-                                    <div class="rounded-lg border border-neutral-200 p-4 dark:border-white/[0.08]">
+                                    <div data-domain-summary
+                                        class="rounded-lg border border-neutral-200 p-4 dark:border-white/[0.08]">
                                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <p class="text-sm text-neutral-500 dark:text-fg-dim">
                                                 @php($domainCount = countDomains($fqdn))
@@ -140,8 +67,34 @@
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                     label="Image" id="image"></x-forms.input>
                             </div>
+                        </div>
+
+                        @include('livewire.project.service.advanced-settings')
+
+                        <div data-service-resource-actions
+                            class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-5 dark:border-white/[0.08]">
+                            <div>
+                                @can('delete', $serviceApplication)
+                                    <x-modal-confirmation title="Confirm Service Application Deletion?" buttonTitle="Delete"
+                                        isErrorButton submitAction="deleteApplication"
+                                        :actions="['The selected service application container will be stopped and permanently deleted.']"
+                                        confirmationText="{{ Str::headline($serviceApplication->name) }}"
+                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
+                                        shortConfirmationLabel="Service Application Name" />
+                                @endcan
                             </div>
-                        </section>
+                            <div class="ml-auto flex items-center gap-2">
+                                @can('update', $serviceApplication)
+                                    <x-modal-confirmation wire:click="convertToDatabase" title="Convert to Database"
+                                        buttonTitle="Convert to Database" submitAction="convertToDatabase"
+                                        :actions="['The selected resource will be converted to a service database.']"
+                                        confirmationText="{{ Str::headline($serviceApplication->name) }}"
+                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
+                                        shortConfirmationLabel="Service Application Name" />
+                                    <x-forms.button type="submit" isHighlighted>Save changes</x-forms.button>
+                                @endcan
+                            </div>
+                        </div>
                     </form>
 
                     <x-domain-conflict-modal
@@ -212,64 +165,18 @@
                             </template>
                         </div>
                     @endif
-                @endif
             @elseif ($resourceType === 'database')
-                <x-slot:title>
-                    {{ data_get_str($service, 'name')->limit(10) }} >
-                    {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
-                </x-slot>
+                @unless ($embedded)
+                    <x-slot:title>
+                        {{ data_get_str($service, 'name')->limit(10) }} >
+                        {{ data_get_str($serviceDatabase, 'name')->limit(10) }} | Coolify
+                    </x-slot>
+                @endunless
                 @if ($currentRoute === 'project.service.database.import')
                     <livewire:project.database.import :resource="$serviceDatabase" :key="'import-' . $serviceDatabase->uuid" />
-                @elseif ($currentRoute === 'project.service.index.advanced')
-                    <section class="application-settings-section">
-                        <div class="application-settings-section-header">
-                            <div>
-                                <h2>Advanced</h2>
-                                <p>Control status aggregation and external log delivery.</p>
-                            </div>
-                        </div>
-                        <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
-                            <x-forms.listbox id="excludeFromStatus" label="Service status"
-                                onChange="instantSaveExclude" :options="[
-                                    ['value' => false, 'label' => 'Include in status'],
-                                    ['value' => true, 'label' => 'Exclude from status'],
-                                ]" />
-                            <x-forms.listbox id="isLogDrainEnabled" label="Log drain"
-                                onChange="instantSaveLogDrain" :options="[
-                                    ['value' => true, 'label' => 'Send logs to drain'],
-                                    ['value' => false, 'label' => 'Do not drain logs'],
-                                ]" />
-                        </div>
-                    </section>
                 @else
                     <form wire:submit="submitDatabase" class="space-y-6">
-                        <x-unsaved-bar action="submitDatabase" />
-                        <section class="application-settings-section">
-                            <div class="application-settings-section-header">
-                                <div>
-                                    <h2>{{ Str::headline($serviceDatabase->human_name ?: $serviceDatabase->name) }}</h2>
-                                    <p>Identity, image, and public access for this compose database.</p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                            @can('update', $serviceDatabase)
-                                <x-modal-confirmation wire:click="convertToApplication" title="Convert to Application"
-                                    buttonTitle="Convert to Application" submitAction="convertToApplication" :actions="['The selected resource will be converted to an application.']"
-                                    confirmationText="{{ Str::headline($serviceDatabase->name) }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
-                                    shortConfirmationLabel="Service Database Name" />
-                            @endcan
-                            @can('delete', $serviceDatabase)
-                                <x-modal-confirmation title="Confirm Service Database Deletion?" buttonTitle="Delete"
-                                    isErrorButton submitAction="deleteDatabase" :actions="[
-                                        'The selected service database container will be stopped and permanently deleted.',
-                                    ]"
-                                    confirmationText="{{ Str::headline($serviceDatabase->name) }}"
-                                    confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
-                                    shortConfirmationLabel="Service Database Name" />
-                            @endcan
-                                </div>
-                            </div>
-                            <div class="application-settings-section-body space-y-5">
+                        <div class="space-y-5">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <x-forms.input canGate="update" :canResource="$serviceDatabase" label="Name" id="humanName"
                                     placeholder="Name"></x-forms.input>
@@ -330,8 +237,35 @@
                                     @endif
                                 </div>
                             </div>
+                        </div>
+
+                        @include('livewire.project.service.advanced-settings')
+
+                        <div data-service-resource-actions
+                            class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 pt-5 dark:border-white/[0.08]">
+                            <div>
+                                @can('delete', $serviceDatabase)
+                                    <x-modal-confirmation title="Confirm Service Database Deletion?" buttonTitle="Delete"
+                                        isErrorButton submitAction="deleteDatabase" :actions="[
+                                            'The selected service database container will be stopped and permanently deleted.',
+                                        ]"
+                                        confirmationText="{{ Str::headline($serviceDatabase->name) }}"
+                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
+                                        shortConfirmationLabel="Service Database Name" />
+                                @endcan
                             </div>
-                        </section>
+                            <div class="ml-auto flex items-center gap-2">
+                                @can('update', $serviceDatabase)
+                                    <x-modal-confirmation wire:click="convertToApplication" title="Convert to Application"
+                                        buttonTitle="Convert to Application" submitAction="convertToApplication"
+                                        :actions="['The selected resource will be converted to an application.']"
+                                        confirmationText="{{ Str::headline($serviceDatabase->name) }}"
+                                        confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
+                                        shortConfirmationLabel="Service Database Name" />
+                                    <x-forms.button type="submit" isHighlighted>Save changes</x-forms.button>
+                                @endcan
+                            </div>
+                        </div>
                     </form>
                 @endif
             @endif

@@ -34,3 +34,25 @@ it('keeps an explicit override on the paired domain', function (string $source, 
     'www redirect' => ['https://example.com', 'https://www.example.com'],
     'non-www redirect' => ['https://www.example.com', 'https://example.com'],
 ]);
+
+it('drops hostless domains and their port overrides', function () {
+    $result = DomainPortOverrides::normalize(
+        'https://,https://example.com',
+        [
+            'https://' => 3000,
+            'https://example.com' => 8080,
+        ],
+    );
+
+    expect($result)->toBe([
+        'fqdn' => 'https://example.com',
+        'overrides' => ['https://example.com' => 8080],
+    ]);
+});
+
+it('clears an fqdn that contains only a hostless domain', function () {
+    expect(DomainPortOverrides::normalize('https://', ['https://' => 3000]))->toBe([
+        'fqdn' => null,
+        'overrides' => null,
+    ]);
+});
