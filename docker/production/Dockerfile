@@ -41,6 +41,8 @@ RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
 
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data composer.json composer.lock ./
+# Fail the build on known advisories in the locked PHP dependencies before install.
+RUN composer audit --locked --no-interaction --ansi
 RUN --mount=type=cache,target=/tmp/cache \
     COMPOSER_CACHE_DIR=/tmp/cache composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
@@ -49,14 +51,16 @@ USER www-data
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM node:24-alpine AS static-assets
+FROM oven/bun:1-alpine AS static-assets
 
 WORKDIR /app
-COPY package*.json vite.config.js postcss.config.cjs ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+# bunfig.toml enables the Socket.dev scanner: `bun install` audits JS
+# dependencies here, mirroring the `composer audit` gate above.
+COPY package.json bun.lock bunfig.toml vite.config.js postcss.config.cjs ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN bun run build
 
 # =================================================================
 # Stage 3: Get MinIO client

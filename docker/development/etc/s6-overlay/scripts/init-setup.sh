@@ -24,6 +24,9 @@ prepare_bind_mount() {
 
 prepare_bind_mount
 
+echo "👉 init-setup: composer audit..."
+composer audit --locked --no-interaction || echo "⚠️  composer audit reported advisories (continuing dev setup)."
+
 echo "👉 init-setup: composer install..."
 # Run as root when needed so a root-owned bind mount cannot block vendor/
 # creation, then hand writable paths to www-data for PHP-FPM.

@@ -1,0 +1,7 @@
+# Socket.dev supply-chain security scanning for every `bun install`.
+# Analyzes dependencies for malware, typosquatting and known advisories
+# before they are written to disk. Runs in free mode via Socket's public API;
+# set SOCKET_API_KEY to inherit your org's policies.
+# https://bun.com/docs/pm/security-scanner-api
+[install.security]
+scanner = "@socketsecurity/bun-security-scanner"
