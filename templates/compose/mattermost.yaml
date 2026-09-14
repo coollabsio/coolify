@@ -4,6 +4,7 @@
 # tags: mattermost,slack,alternative
 # logo: svgs/mattermost.svg
 # port: 8065
+# amd_only: true
 
 services:
   mattermost:
