@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -176,6 +177,23 @@ class Analytics extends Component
             return;
         }
         $this->live = ! $this->live;
+    }
+
+    #[On('trafficAnalyticsStateChanged')]
+    public function refreshTrafficAnalyticsState(): void
+    {
+        if ($this->scopedServerUuid === null) {
+            return;
+        }
+
+        $server = Server::ownedByCurrentTeam()->whereUuid($this->scopedServerUuid)->firstOrFail();
+        $this->overview = null;
+        $this->servers = $server->isTrafficAnalyticsEnabled() ? collect([$server]) : collect();
+
+        if ($this->servers->isNotEmpty()) {
+            $this->refreshAppOptions();
+            $this->loadData();
+        }
     }
 
     public function isLivePollable(): bool
@@ -564,10 +582,18 @@ class Analytics extends Component
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
     }
 
-    public function placeholder(): View
+    public function placeholder(array $params = []): View
     {
+        $scopedServerUuid = $params['scopedServerUuid'] ?? null;
+        $hideSkeleton = false;
+
+        if (is_string($scopedServerUuid)) {
+            $server = Server::ownedByCurrentTeamCached()->firstWhere('uuid', $scopedServerUuid);
+            $hideSkeleton = $server !== null && ! $server->isTrafficAnalyticsEnabled();
+        }
+
         // Rendered instantly; the Sentinel round-trips run in the deferred lazy-load request.
-        return view('livewire.analytics-placeholder');
+        return view('livewire.analytics-placeholder', compact('hideSkeleton'));
     }
 
     public function render()

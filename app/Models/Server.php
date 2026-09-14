@@ -973,12 +973,15 @@ $siteAddress {
         return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
     }
 
-    public function isSentinelEnabled()
+    public function isSentinelEnabled(): bool
     {
-        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && ! $this->isBuildServer();
+        return ! $this->isBuildServer()
+            && ! $this->isSwarm()
+            && ! $this->isForceDisabled()
+            && ! $this->isTransferredAway();
     }
 
-    public function isMetricsEnabled()
+    public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
     }
@@ -988,7 +991,7 @@ $siteAddress {
         return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
     }
 
-    public function isServerApiEnabled()
+    public function isServerApiEnabled(): bool
     {
         return $this->settings->is_sentinel_enabled;
     }

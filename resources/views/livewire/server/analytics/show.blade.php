@@ -15,7 +15,8 @@
                     :key="'server-traffic-analytics-settings-'.$server->uuid" />
             @endcan
 
-            <livewire:analytics :scoped-server-uuid="$server->uuid" :key="'server-analytics-'.$server->uuid" />
+            <livewire:analytics :scoped-server-uuid="$server->uuid" :key="'server-analytics-'.$server->uuid"
+                :lazy="$server->isTrafficAnalyticsEnabled()" />
         </div>
     </div>
 </div>

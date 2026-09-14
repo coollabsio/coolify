@@ -76,6 +76,24 @@ it('groups application navigation by user workflow', function () {
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");
 });
 
+it('uses the same responsive settings grid for applications services and databases', function () {
+    $sidebars = [
+        resource_path('views/components/application/configuration-sidebar.blade.php'),
+        resource_path('views/components/service/configuration-sidebar.blade.php'),
+        resource_path('views/components/database/configuration-sidebar.blade.php'),
+    ];
+
+    foreach ($sidebars as $sidebar) {
+        expect(file_get_contents($sidebar))
+            ->toContain('grid grid-cols-2 gap-0.5')
+            ->toContain('sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1');
+    }
+
+    expect(file_get_contents($sidebars[0]))
+        ->not->toContain('aria-label="Configuration menu"')
+        ->not->toContain('menuOpen');
+});
+
 it('shows the database sidebar on backup pages', function () {
     $configuration = file_get_contents(resource_path('views/livewire/project/database/configuration.blade.php'));
     $backups = file_get_contents(resource_path('views/livewire/project/database/backup/index.blade.php'));
@@ -236,12 +254,15 @@ it('adds a back up now action to every service backup schedule row', function ()
 
     expect($index)
         ->toContain('<span class="text-right">Actions</span>')
-        ->toContain('<div class="min-w-[59rem]">')
+        ->toContain('<div class="min-w-[64rem]">')
         ->toContain("wire:click.stop=\"backupNow('database',")
         ->toContain("wire:click.stop=\"backupNow('storage',")
         ->toContain('<x-forms.button')
         ->toContain('Back up now</x-forms.button>')
-        ->not->toContain('class="icon-button shrink-0"')
+        ->toContain('defaultClass="icon-button shrink-0"')
+        ->toContain('aria-label="Edit backup schedule"')
+        ->toContain('<x-reicon name="settings" class="size-4" />')
+        ->not->toContain('>Settings</x-forms.button>')
         ->not->toContain('class="contents cursor-pointer"');
 
     expect($styles)

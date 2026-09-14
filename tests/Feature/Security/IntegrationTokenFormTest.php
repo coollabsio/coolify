@@ -4,6 +4,7 @@ use App\Livewire\Security\IntegrationTokenEditor;
 use App\Livewire\Security\IntegrationTokenForm;
 use App\Livewire\Security\IntegrationTokens;
 use App\Models\AuditEvent;
+use App\Models\DnsProviderZone;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\Team;
@@ -46,6 +47,11 @@ test('a cloudflare dns token is validated with read only requests before it is s
             'success' => true,
             'result' => [],
         ]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
     ]);
 
     Livewire::test(IntegrationTokenForm::class, ['modal_mode' => true])
@@ -68,9 +74,32 @@ test('a cloudflare dns token is validated with read only requests before it is s
         'resource_name' => 'Production DNS',
     ]);
 
-    Http::assertSentCount(3);
+    Http::assertSentCount(4);
     Http::assertSent(fn ($request) => $request->method() === 'GET'
         && $request->url() === 'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1');
+});
+
+test('automatic dns is enabled by default and can be disabled when saving a cloudflare token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->assertSet('automaticDns', true)
+        ->set('name', 'Manual DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('automaticDns', false)
+        ->call('addToken')
+        ->assertHasNoErrors();
+
+    expect(IntegrationToken::query()->sole()->automaticDnsEnabled())->toBeFalse();
 });
 
 test('deleting an integration token is audited without storing its value', function () {
@@ -204,6 +233,11 @@ test('an integration token can be rotated after validating its capabilities', fu
             'success' => true,
             'result' => [],
         ]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
     ]);
 
     $savedToken = IntegrationToken::query()->create([
@@ -252,6 +286,25 @@ test('leaving the token field blank keeps the existing integration token', funct
     Http::assertNothingSent();
 });
 
+test('cloudflare token editor lists the zones managed by that token', function () {
+    $savedToken = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($savedToken)->create([
+        'name' => 'example.com',
+        'account_name' => 'Production Account',
+    ]);
+    DnsProviderZone::factory()->create(['name' => 'other-team.example']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->assertSee('Domains this token can manage')
+        ->assertSee('example.com')
+        ->assertSee('Production Account')
+        ->assertDontSee('other-team.example');
+});
+
 test('an invalid replacement does not rotate the integration token', function () {
     Http::fake([
         'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
@@ -282,4 +335,16 @@ test('editor updates its row without rerendering the teleported parent modal', f
         ->toContain("'integration-token-updated'")
         ->toContain("'integration-token-deleted'")
         ->not->toContain('integrationTokenChanged');
+});
+
+test('new integration token form controls declare authorization matching server-side actions', function () {
+    $editor = file_get_contents(resource_path('views/livewire/security/integration-token-editor.blade.php'));
+    $form = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
+
+    expect($editor)
+        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="edit-automatic-dns")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="refreshZones")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$integrationToken")[^>]*>/');
+
+    expect($form)
+        ->toMatch('/<x-forms\.checkbox(?=[^>]*id="automatic-dns")(?=[^>]*canGate="create")(?=[^>]*:canResource="\\\\App\\\\Models\\\\IntegrationToken::class")[^>]*>/');
 });

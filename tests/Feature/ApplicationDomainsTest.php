@@ -1,13 +1,17 @@
 <?php
 
 use App\Jobs\CheckDomainDnsJob;
+use App\Jobs\ConfigureDnsRecordJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\DnsProviderZone;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -15,7 +19,9 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -103,7 +109,7 @@ it('uses safe domain validation rules on the domains form', function () {
 });
 
 it('does not add a single-label hostname as an application domain', function () {
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->set('newDomainParts.host', 'aaa')
         ->call('addDomain')
         ->assertDispatched('error');
@@ -627,7 +633,7 @@ it('lists existing domains as individual rows', function () {
 it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
     $this->application->update(['fqdn' => 'https://app.example.com']);
 
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('isForceHttpsEnabled', true)
         ->assertSee('Redirect HTTP to HTTPS')
         ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
@@ -664,8 +670,9 @@ it('shows the compose service redirect control in domain settings', function () 
         ->assertSee('www redirect')
         ->html();
 
-    expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(1)
+    expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(0)
         ->and(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0)
+        ->and($html)->toContain('editingRedirect')
         ->and(substr_count($html, 'application-domain-direction-'))->toBeGreaterThan(0);
 });
 
@@ -821,6 +828,29 @@ it('adds a domain to the application', function () {
         ->toBe(['https://app.example.com', 'https://www.app.example.com']);
 });
 
+it('does not dispatch configure dns jobs when the server ip is missing or invalid', function () {
+    Queue::fake();
+
+    $this->server->update(['ip' => 'not-an-ip']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($token)->create(['name' => 'example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertNotDispatched('error');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://app.example.com');
+
+    Queue::assertNotPushed(ConfigureDnsRecordJob::class);
+});
+
 it('composes the complete port on the server without duplicating an existing www domain', function () {
     $this->application->update(['fqdn' => 'https://www.example.com:3000']);
 
@@ -907,7 +937,7 @@ it('updates a domain in place via modal', function () {
         'fqdn' => 'https://old.example.com,https://keep.example.com',
     ]);
 
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('startEdit', 0)
         ->assertSet('showEditDomainModal', true)
         ->assertSet('editingDomain', 'https://old.example.com')
@@ -927,7 +957,7 @@ it('updates a domain in place via modal', function () {
     expect($this->application->fqdn)->toBe('https://new.example.com,https://keep.example.com');
 });
 
-it('blocks editing a domain with bad dns until the user continues', function () {
+it('saves an edited domain and records its dns result without a confirmation gate', function () {
     $settings = InstanceSettings::get();
     $settings->is_dns_validation_enabled = true;
     $settings->save();
@@ -941,21 +971,14 @@ it('blocks editing a domain with bad dns until the user continues', function () 
         ->set('editingDomainParts.scheme', 'https')
         ->set('editingDomainParts.host', 'this-domain-should-not-resolve-for-coolify-tests.invalid')
         ->call('updateDomain')
-        ->assertSet('editDomainDnsFailed', true)
-        ->assertSet('showEditDomainModal', true)
-        ->assertSee('DNS is not pointing to the right IP')
-        ->assertSee('Are you sure you want to save it anyway');
-
-    $this->application->refresh();
-    expect($this->application->fqdn)->toBe('https://old.example.com');
-
-    $component->call('confirmUpdateDomainDespiteDns')
         ->assertSet('editDomainDnsFailed', false)
         ->assertSet('showEditDomainModal', false)
         ->assertDispatched('success');
 
     $this->application->refresh();
-    expect($this->application->fqdn)->toBe('https://this-domain-should-not-resolve-for-coolify-tests.invalid');
+    expect($this->application->fqdn)->toBe('https://this-domain-should-not-resolve-for-coolify-tests.invalid')
+        ->and($this->application->domain_dns_statuses['https://this-domain-should-not-resolve-for-coolify-tests.invalid']['status'] ?? null)
+        ->toBe('failed');
 });
 
 it('removes a domain', function () {
@@ -985,6 +1008,79 @@ it('removes consecutive domains by stable row identity after indexes change', fu
         ->assertDispatched('success');
 
     expect($this->application->fresh()->fqdn)->toBe('https://third.example.com');
+});
+
+it('deletes the managed dns record when removing a domain by key with deleteManagedDns', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'token' => 'secret',
+    ]);
+    $zone = DnsProviderZone::factory()->for($token)->create([
+        'provider_zone_id' => 'zone-1',
+        'name' => 'example.com',
+    ]);
+    $record = ManagedDnsRecord::factory()->create([
+        'team_id' => $this->team->id,
+        'integration_token_id' => $token->id,
+        'dns_provider_zone_id' => $zone->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->getKey(),
+        'provider_record_id' => 'record-1',
+        'type' => 'A',
+        'name' => 'app.example.com',
+        'content' => '203.0.113.10',
+    ]);
+
+    Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
+        ->push(['success' => true, 'result' => [
+            'id' => 'record-1',
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'content' => '203.0.113.10',
+        ]])
+        ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
+
+    $domainKey = hash('sha256', 'https://app.example.com|');
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomainByKey', $domainKey, '', ['deleteManagedDns'])
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBeNull()
+        ->and(ManagedDnsRecord::query()->find($record->id))->toBeNull();
+});
+
+it('leaves the managed dns record when removing a domain by key without deleteManagedDns', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $token = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'token' => 'secret',
+    ]);
+    $zone = DnsProviderZone::factory()->for($token)->create([
+        'provider_zone_id' => 'zone-1',
+        'name' => 'example.com',
+    ]);
+    $record = ManagedDnsRecord::factory()->create([
+        'team_id' => $this->team->id,
+        'integration_token_id' => $token->id,
+        'dns_provider_zone_id' => $zone->id,
+        'provider_record_id' => 'record-1',
+        'type' => 'A',
+        'name' => 'app.example.com',
+        'content' => '203.0.113.10',
+    ]);
+
+    $domainKey = hash('sha256', 'https://app.example.com|');
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomainByKey', $domainKey, '')
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBeNull()
+        ->and(ManagedDnsRecord::query()->find($record->id))->not->toBeNull();
 });
 
 it('does not revalidate dns on remaining domains when removing one', function () {
@@ -1237,6 +1333,60 @@ it('hides dns check buttons from members', function () {
         ->assertDontSee('Check DNS');
 });
 
+it('disables create dns record for members and hides replace confirmation', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    $proposal = [
+        'hostname' => 'app.example.com',
+        'zone_id' => 1,
+        'zone' => 'example.com',
+        'credential' => 'Cloudflare',
+        'target' => '203.0.113.10',
+        'managed' => false,
+    ];
+
+    $createHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [$proposal])
+        ->html();
+
+    expect($createHtml)->toContain('Create DNS record')
+        ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
+
+    $replaceHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [$proposal])
+        ->set('dnsProviderConflicts', [
+            'app.example.com|1' => [
+                'record_id' => 'rec-1',
+                'current' => '198.51.100.10',
+                'proposed' => '203.0.113.10',
+            ],
+        ])
+        ->html();
+
+    expect($replaceHtml)->toContain('Currently 198.51.100.10')
+        ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Replace record/s');
+});
+
+it('shows create dns record enabled for owners', function () {
+    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('showDnsProviderModal', true)
+        ->set('dnsProviderProposals', [[
+            'hostname' => 'app.example.com',
+            'zone_id' => 1,
+            'zone' => 'example.com',
+            'credential' => 'Cloudflare',
+            'target' => '203.0.113.10',
+            'managed' => false,
+        ]])
+        ->html();
+
+    expect($html)->toContain('Create DNS record')
+        ->not->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
+});
+
 it('loads persisted dns status on page load', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com',
@@ -1436,7 +1586,7 @@ it('resolves hostname server addresses to a real ip for dns messages', function 
 
     // Failed checks show required DNS record guidance; ok checks mention the hostname label.
     if ($component->get('domainRows.0.dns_status') === 'failed') {
-        expect($message)->toBe("{$recordType} record → {$resolvedIp}")
+        expect($message)->toBe("Required DNS record type {$recordType} pointing to {$resolvedIp}")
             ->and($message)->not->toContain('CNAME');
     } else {
         expect($message)->toContain($resolvedIp)
@@ -1793,6 +1943,123 @@ it('saves after confirming a domain conflict on add', function () {
     ]);
 });
 
+it('warns when adding a domain used by a docker compose application', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Compose Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose-taken.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://compose-taken.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('domainConflicts.0.service_name', 'web')
+        ->assertSet('pendingAction', 'add');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('warns when a compose domain uses a different scheme', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'HTTP Compose Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'http://scheme-conflict.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://scheme-conflict.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('domainConflicts.0.service_name', 'web');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('shows the compose service name in the domain conflict modal', function () {
+    $html = Blade::render(
+        '<x-domain-conflict-modal :conflicts="$conflicts" :show-modal="true" />',
+        ['conflicts' => [[
+            'domain' => 'https://compose-taken.example.com',
+            'resource_name' => 'Compose Conflict App',
+            'resource_link' => '#',
+            'resource_type' => 'application',
+            'service_name' => 'web',
+        ]]],
+    );
+
+    expect($html)->toContain('(application: web)');
+});
+
+it('checks each domain configured for one docker compose service', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Conflicting App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://second-compose.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => [
+                'domain' => 'https://first-compose.example.com,https://second-compose.example.com',
+                'redirect' => 'both',
+            ],
+        ]),
+    ]);
+
+    $result = checkDomainUsage(resource: $this->application->fresh());
+
+    expect($result['hasConflicts'])->toBeTrue()
+        ->and($result['conflicts'])->toHaveCount(1)
+        ->and($result['conflicts'][0]['domain'])->toBe('https://second-compose.example.com');
+});
+
+it('uses docker compose domains in API conflict checks', function () {
+    $composeApplication = Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Compose API Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://compose-api.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $result = checkIfDomainIsAlreadyUsedViaAPI(
+        ['https://compose-api.example.com'],
+        (string) $this->team->id,
+        $this->application->uuid,
+    );
+
+    expect($result['hasConflicts'])->toBeTrue()
+        ->and($result['conflicts'])->toHaveCount(1)
+        ->and($result['conflicts'][0]['resource_uuid'])->toBe($composeApplication->uuid)
+        ->and($result['conflicts'][0]['service_name'])->toBe('api');
+});
+
 it('saves after confirming a domain conflict on edit', function () {
     Application::factory()->create([
         'uuid' => (string) Str::uuid(),
@@ -1894,9 +2161,20 @@ it('uses the compact service domains layout for compose applications', function 
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain('id="edit-domain-direction"')
         ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"')
-        ->toContain('id="application-domain-direction-{{ $editingKey }}"')
-        ->toContain("\$isCompose ? 'updateServiceRedirect' : 'updateRedirect'")
+        ->toContain('htmlId="application-domain-direction"')
+        ->toContain('id="editingRedirect"')
+        ->not->toContain("\$isCompose ? 'updateServiceRedirect' : 'updateRedirect'")
         ->not->toContain('title="No domains for this service"');
+});
+
+it('uses a compact two row domain card at medium widths', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('@container service-domains (max-width: 980px)')
+        ->toContain('grid-template-columns: minmax(0, 1fr) auto auto;')
+        ->toContain('grid-template-areas: "domain dns actions" "summary summary summary";')
+        ->toContain('grid-area: summary;');
 });
 
 it('uses concise search indexing headers in application and service domain tables', function () {
@@ -1909,12 +2187,243 @@ it('uses concise search indexing headers in application and service domain table
         ->toContain('<span>Search indexing</span>');
 });
 
-it('shows save guidance in the application domain settings', function () {
+it('shows a form save button at the bottom of application domain settings', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
 
     expect($view)
-        ->toContain('Indexing and redirect changes save automatically.')
-        ->toContain('<x-unsaved-bar action="updateDomain"');
+        ->not->toContain('Indexing and redirect changes save automatically.')
+        ->toContain('data-testid="domain-settings-scroll"')
+        ->toContain('data-testid="domain-settings-footer"')
+        ->toContain('class="shrink-0 border-t')
+        ->toContain('<x-forms.button type="submit" wire:target="updateDomain" isHighlighted>')
+        ->toContain('Save')
+        ->not->toContain('<x-unsaved-bar action="updateDomain"');
+});
+
+it('opens application domain settings from browser data and shows a dns spinner', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
+
+    expect($view)
+        ->not->toContain('wire:click="startEdit(')
+        ->toContain('@click="openEditDomain(')
+        ->toContain('<x-loading compact aria-label="Checking DNS"')
+        ->not->toContain('<x-loading-on-button wire:loading.delay');
+});
+
+it('uses the dns badge as progress for single and all application checks', function (string $action, array $parameters) {
+    Queue::fake();
+    $this->application->update(['fqdn' => 'https://badge.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call($action, ...$parameters)
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->assertSee('Checking DNS...')
+        ->assertSeeHtml('loading-indicator');
+
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
+})->with([
+    'single domain' => ['checkDomainDns', [0]],
+    'all domains' => ['checkAllDns', []],
+]);
+
+it('keeps domain settings as a draft until the modal is saved', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingIndexing', 'noindex')
+        ->set('editingRedirect', 'www');
+
+    expect($this->application->fresh()->redirect)->toBe('both')
+        ->and($this->application->noindexDomains()->all())->toBe([]);
+});
+
+it('saves all domain modal settings together', function () {
+    Queue::fake();
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingIndexing', 'noindex')
+        ->set('editingRedirect', 'www')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $application = $this->application->fresh();
+
+    expect($application->redirect)->toBe('www')
+        ->and($application->noindexDomains()->all())->toBe(['https://app.example.com'])
+        ->and(explode(',', $application->fqdn))->toContain('https://www.app.example.com');
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://www.app.example.com');
+});
+
+it('regenerates an application domain as a draft while preserving its url settings', function () {
+    $this->server->settings()->update(['wildcard_domain' => 'https://wildcard.example.net']);
+    $this->application->update(['fqdn' => 'http://old.example.com:8080/api']);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->call('regenerateEditingDomain')
+        ->assertSet('editingDomainParts.scheme', 'http')
+        ->assertSet('editingDomainParts.port', '8080')
+        ->assertSet('editingDomainParts.path', '/api');
+
+    expect($component->get('editingDomainParts')['host'])
+        ->toEndWith('.sslip.io')
+        ->not->toBe('old.example.com')
+        ->and($this->application->fresh()->fqdn)->toBe('http://old.example.com/api')
+        ->and($this->application->fresh()->domain_port_overrides)->toMatchArray([
+            'http://old.example.com/api' => 8080,
+        ]);
+});
+
+it('starts a dns check after a manually edited application domain is saved', function () {
+    Queue::fake();
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = true;
+    $settings->save();
+    $this->application->update(['fqdn' => 'https://old.example.com:81']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '81')
+        ->set('editingDomainParts.host', 'manual.example.com')
+        ->call('updateDomain')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->contains(
+            fn (array $row): bool => $row['url'] === 'https://manual.example.com' && $row['dns_status'] === 'checking'
+        ));
+
+    expect($this->application->fresh()->domain_dns_statuses['https://manual.example.com']['status'] ?? null)->toBe('checking');
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://manual.example.com'
+        && $job->statusKey === 'https://manual.example.com');
+});
+
+it('does not start a dns check when only application domain settings change', function () {
+    Queue::fake();
+    $this->application->update(['fqdn' => 'https://unchanged.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingIndexing', 'noindex')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertNotPushed(CheckDomainDnsJob::class);
+});
+
+it('starts a dns check when the application domain scheme changes', function () {
+    Queue::fake();
+    $this->application->update(['fqdn' => 'http://scheme.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.scheme', 'https')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://scheme.example.com');
+});
+
+it('does not start a dns check when only the internal port changes', function () {
+    Queue::fake();
+    $this->application->update([
+        'fqdn' => 'https://port.example.com:81',
+        'ports_exposes' => '81,82',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.port', '82')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertNotPushed(CheckDomainDnsJob::class);
+});
+
+it('regenerates configured www pairs together and preserves each url settings', function () {
+    $this->server->settings()->update(['wildcard_domain' => 'https://wildcard.example.net']);
+    $this->application->update([
+        'fqdn' => 'http://app.example.com:8080/api,https://www.app.example.com:9090/admin',
+        'redirect' => 'www',
+        'noindex_domains' => ['https://www.app.example.com/admin'],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->call('regenerateEditingDomain');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    $application = $this->application->fresh();
+    expect(explode(',', $application->fqdn))->toBe([
+        "http://{$generatedHost}/api",
+        "https://www.{$generatedHost}/admin",
+    ])->and($application->noindexDomains()->all())->toBe([
+        "https://www.{$generatedHost}/admin",
+    ])->and($application->domain_port_overrides)->toMatchArray([
+        "http://{$generatedHost}/api" => 8080,
+        "https://www.{$generatedHost}/admin" => 9090,
+    ]);
+});
+
+it('does not create a missing redirect counterpart while regenerating one domain', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'redirect' => 'www',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->call('regenerateEditingDomain');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    expect($this->application->fresh()->fqdn)->toBe("https://{$generatedHost}");
+});
+
+it('saves regenerated compose domain drafts for only the selected service', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com/api', 'redirect' => 'both'],
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $webIndex = collect($component->get('domainRows'))->search(
+        fn (array $row): bool => ($row['service'] ?? null) === 'web' && ! ($row['is_suggested'] ?? false)
+    );
+
+    $component
+        ->call('startEdit', $webIndex)
+        ->set('editingIndexing', 'noindex')
+        ->set('editingRedirect', 'www')
+        ->call('regenerateEditingDomain');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    $application = $this->application->fresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains['web']['domain'])->toBe("https://{$generatedHost}/api,https://www.{$generatedHost}/api")
+        ->and($domains['web']['redirect'])->toBe('www')
+        ->and($domains['api'])->toMatchArray(['domain' => 'https://api.example.com', 'redirect' => 'both'])
+        ->and($application->noindexDomains()->all())->toBe(["https://{$generatedHost}/api"]);
 });
 
 it('does not render a last checked column in the domains table', function () {
@@ -2141,18 +2650,15 @@ it('updates search engine indexing from the domains view', function () {
         ->assertSee('Indexable')
         ->assertSee('Search engine indexing')
         ->assertSee('www redirect')
-        ->assertSee('toggleNoindexDomain', false)
-        ->assertSee('updateRedirect', false)
-        ->assertSee('wire:ignore', false)
-        ->assertDontSee('x-model="localIndexing"', false)
-        ->assertDontSee('x-model="localDirection"', false)
-        ->assertDontSee('@js(', false)
-        ->call('toggleNoindexDomain', 'https://staging.example.com', 'noindex')
+        ->assertSee('editingIndexing', false)
+        ->assertDontSee('toggleNoindexDomain', false)
+        ->set('editingIndexing', 'noindex')
+        ->call('updateDomain')
         ->assertDispatched('configurationChanged')
         ->assertDispatched('success');
 
     expect($this->application->refresh()->noindexDomains()->all())
-        ->toBe(['https://staging.example.com']);
+        ->toBe(['https://app.example.com']);
 });
 
 it('updates search engine indexing for a git docker compose domain', function () {

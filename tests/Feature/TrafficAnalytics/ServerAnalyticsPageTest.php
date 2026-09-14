@@ -3,6 +3,7 @@
 use App\Livewire\Analytics;
 use App\Livewire\Server\Analytics\Show;
 use App\Livewire\Server\TrafficAnalyticsSettings;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -13,6 +14,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->first();
     $this->actingAs($this->user);
@@ -60,11 +62,32 @@ it('moves traffic analytics configuration out of sentinel and onto analytics', f
         ->not->toContain('id="trafficTopn"');
 });
 
+it('matches the server metrics empty state when traffic analytics is disabled', function () {
+    $view = file_get_contents(resource_path('views/livewire/server/traffic-analytics-settings.blade.php'));
+    $disabledState = str($view)
+        ->after('@else')
+        ->before('@endif')
+        ->toString();
+
+    expect($disabledState)
+        ->toContain('title="Traffic analytics is disabled"')
+        ->toContain('<x-slot:contents>')
+        ->toContain('isHighlightedButton')
+        ->toContain('buttonTitle="Enable traffic analytics"');
+});
+
 it('renders traffic analytics settings above the server analytics dashboard', function () {
     $view = file_get_contents(resource_path('views/livewire/server/analytics/show.blade.php'));
 
     expect(strpos($view, '<livewire:server.traffic-analytics-settings'))
         ->toBeLessThan(strpos($view, '<livewire:analytics'));
+});
+
+it('only lazy loads the scoped dashboard when traffic analytics is enabled', function () {
+    $view = file_get_contents(resource_path('views/livewire/server/analytics/show.blade.php'));
+
+    expect($view)
+        ->toContain(':lazy="$server->isTrafficAnalyticsEnabled()"');
 });
 
 it('matches other server pages without a visible page title', function () {
@@ -86,6 +109,41 @@ it('scopes the server analytics page to its route server', function () {
     Livewire::test(Analytics::class, ['scopedServerUuid' => $server->uuid])
         ->assertSet('scopedServerUuid', $server->uuid)
         ->assertDontSee($otherServer->name);
+});
+
+it('does not duplicate the disabled state on a scoped server analytics dashboard', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(Analytics::class, ['scopedServerUuid' => $server->uuid])
+        ->assertDontSee('Traffic analytics is not enabled');
+});
+
+it('removes stale analytics content when traffic analytics is disabled', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $component = Livewire::test(Analytics::class, ['scopedServerUuid' => $server->uuid]);
+
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    $component
+        ->dispatch('trafficAnalyticsStateChanged')
+        ->assertSet('servers', fn ($servers) => $servers->isEmpty())
+        ->assertDontSee('No analytics data yet');
+});
+
+it('does not render a skeleton placeholder for a disabled scoped server', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(Analytics::class, ['scopedServerUuid' => $server->uuid, 'lazy' => true])
+        ->assertDontSee('analytics-overview-section')
+        ->assertDontSee('analytics-requests-section');
 });
 
 it('saves traffic analytics settings from the server analytics page', function () {

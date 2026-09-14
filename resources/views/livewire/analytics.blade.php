@@ -123,17 +123,17 @@ $appListboxOptions = array_merge(
     @endif
 
     @if ($servers->isEmpty())
-        <x-empty size="sm" title="Traffic analytics is not enabled"
-            description="{{ $scopedServerUuid === null ? 'Enable traffic analytics on a server to see request analytics here.' : 'Enable traffic analytics in the settings below to begin collecting requests for this server.' }}"
-            icon-name="analytics">
-            @if ($scopedServerUuid === null)
+        @if ($scopedServerUuid === null)
+            <x-empty size="sm" title="Traffic analytics is not enabled"
+                description="Enable traffic analytics on a server to see request analytics here."
+                icon-name="analytics">
                 <x-slot:contents>
                     <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
                         View servers
                     </a>
                 </x-slot:contents>
-            @endif
-        </x-empty>
+            </x-empty>
+        @endif
     @elseif (! $overview)
         <x-empty size="sm" title="No analytics data yet"
             description="We could not load traffic analytics for the selected filters and range. Try a different range or check back shortly."

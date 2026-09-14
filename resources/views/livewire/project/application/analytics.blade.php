@@ -18,7 +18,7 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                 <x-slot:actions>
                     <a class="button" href="{{ route('server.analytics', ['server_uuid' => $analyticsServerUuid]) }}"
                         {{ wireNavigate() }}>
-                        Server settings
+                        Server analytics
                         <x-external-link />
                     </a>
                 </x-slot:actions>

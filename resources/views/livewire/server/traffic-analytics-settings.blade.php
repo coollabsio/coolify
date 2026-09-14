@@ -8,10 +8,22 @@
         <x-application.settings-section id="server-traffic-analytics-settings-section" title="Traffic analytics"
             helper="Control proxy traffic collection, retention, and visitor geolocation for this server.">
             <x-slot:actions>
-                <x-forms.button canGate="update" :canResource="$server" wire:click="toggleTrafficAnalytics"
-                    wire:confirm="{{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics? The proxy and Sentinel will restart, causing a brief connectivity blip for all applications on this server.">
-                    {{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics
-                </x-forms.button>
+                @if ($isTrafficAnalyticsEnabled)
+                    <div class="flex items-center gap-3">
+                        <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
+                            text="Restarting Sentinel and proxy..." compact />
+                        <x-modal-confirmation title="Disable traffic analytics?"
+                            buttonTitle="Disable traffic analytics" submitAction="toggleTrafficAnalytics"
+                            :actions="[
+                                'Disabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.',
+                            ]"
+                            warningMessage="Application traffic may be interrupted while Sentinel and the proxy restart."
+                            :confirmWithText="false" :confirmWithPassword="false" :ignoreWire="false"
+                            step2ButtonText="Disable traffic analytics"
+                            :disabled="! auth()->user()->can('update', $server)"
+                            :authDisabled="! auth()->user()->can('update', $server)" />
+                    </div>
+                @endif
             </x-slot:actions>
 
             @if ($isTrafficAnalyticsEnabled)
@@ -45,7 +57,24 @@
             @else
                 <x-empty size="sm" title="Traffic analytics is disabled"
                     description="Enable traffic analytics to collect proxy access logs and geolocate visitor traffic."
-                    icon-name="dashboard" />
+                    icon-name="dashboard">
+                    <x-slot:contents>
+                        <div class="flex items-center gap-3">
+                            <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
+                                text="Restarting Sentinel and proxy..." compact />
+                            <x-modal-confirmation title="Enable traffic analytics?"
+                                buttonTitle="Enable traffic analytics" submitAction="toggleTrafficAnalytics"
+                                :actions="[
+                                    'Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.',
+                                ]"
+                                warningMessage="Application traffic may be interrupted while Sentinel and the proxy restart."
+                                :confirmWithText="false" :confirmWithPassword="false" :ignoreWire="false"
+                                step2ButtonText="Enable traffic analytics" isHighlightedButton
+                                :disabled="! auth()->user()->can('update', $server)"
+                                :authDisabled="! auth()->user()->can('update', $server)" />
+                        </div>
+                    </x-slot:contents>
+                </x-empty>
             @endif
         </x-application.settings-section>
     </form>

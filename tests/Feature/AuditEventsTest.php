@@ -872,6 +872,7 @@ test('critical operational events persist with their source action and actor', f
     'api.database.started',
     'api.database.stopped',
     'api.database.restarted',
+    'api.database.import_started',
 ]);
 
 test('audit log uses the standard horizontally scrollable table layout on mobile', function () {

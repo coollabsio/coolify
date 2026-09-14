@@ -63,6 +63,16 @@
                                                 <span x-text="capability"
                                                     class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium uppercase text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim"></span>
                                             </template>
+                                            @if ($savedToken->provider === 'cloudflare')
+                                                @if ($savedToken->automaticDnsEnabled())
+                                                    <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium uppercase text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                                                        Auto DNS
+                                                    </span>
+                                                @endif
+                                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                                                    {{ $savedToken->dns_zones_count }} {{ Str::plural('zone', $savedToken->dns_zones_count) }}
+                                                </span>
+                                            @endif
                                         </div>
                                         <button type="button" class="icon-button" title="Edit integration token"
                                             :aria-label="`Edit ${tokenName}`" @click="modalOpen=true">

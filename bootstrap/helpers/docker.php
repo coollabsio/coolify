@@ -349,17 +349,32 @@ function generateApplicationContainerName(Application $application, $pull_reques
     // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
 
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
-    $now = now()->format('Hisu');
+    $name = $consistent_container_name ? ($application->settings->custom_internal_name ?: $application->uuid) : $application->uuid;
+    $now = now()->format('Ymd\THis');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        return $application->uuid.'-pr-'.$pull_request_id;
+        return $name.'-pr-'.$pull_request_id;
     } else {
         if ($consistent_container_name) {
-            return $application->uuid;
+            return $name;
         }
 
-        return $application->uuid.'-'.$now;
+        return ($application->settings->custom_container_name_prefix ?: $application->uuid).'-'.$now;
     }
 }
+
+/**
+ * Generated (rolling update) container names end with the timestamp from generateApplicationContainerName().
+ * Drop the legacy pattern once containers created before the ISO 8601 suffix are gone.
+ */
+function isGeneratedContainerName(string $containerName): bool
+{
+    $isoTimestampSuffix = '/-\d{8}T\d{6}$/';
+    $legacyTimestampSuffix = '/-\d{12}$/';
+
+    return preg_match($isoTimestampSuffix, $containerName) === 1
+        || preg_match($legacyTimestampSuffix, $containerName) === 1;
+}
+
 function get_port_from_dockerfile($dockerfile): ?int
 {
     $dockerfile_array = explode("\n", $dockerfile);
@@ -1556,10 +1571,17 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int|string
 {
+    if ($lines === 'all') {
+        return 'all';
+    }
+
     $lines = filter_var($lines, FILTER_VALIDATE_INT);
-    if ($lines === false || $lines <= 0) {
+    if ($lines === -1) {
+        return 'all';
+    }
+    if ($lines === false || $lines < -1) {
         return $default;
     }
 
@@ -1571,7 +1593,7 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
     return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 }
 
-function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $command = "docker logs -n {$lines}";
     if ($server->isSwarm()) {
@@ -1585,7 +1607,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int $li
     return "{$command} ".escapeshellarg($container_id).' 2>&1';
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);

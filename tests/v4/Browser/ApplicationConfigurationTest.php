@@ -213,11 +213,15 @@ it('shows danger zone for application deletion', function () {
         ->screenshot(filename: 'application-danger-zone');
 });
 
-it('uses compact application domains with unified settings and a floating save bar', function () {
+it('uses compact application domains with unified settings and a form save button', function () {
     config()->set('app.maintenance.store', 'array');
     InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
     Cache::forget('instance_settings');
-    $this->application->update(['fqdn' => 'https://first.example.com,https://second.example.com', 'redirect' => 'both']);
+    $this->application->update([
+        'fqdn' => 'https://first.example.com,https://second.example.com',
+        'ports_exposes' => '3000,8069',
+        'redirect' => 'both',
+    ]);
     loginAndSkipBoarding();
     $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/domains';
     $page = visit($url);
@@ -232,31 +236,35 @@ it('uses compact application domains with unified settings and a floating save b
         ->click('[aria-label="Settings for https://first.example.com"]')
         ->assertSee('Domain settings')
         ->assertValue('#editingDomainParts-host', 'first.example.com')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->fill('#editingDomainParts-port', '8069')
         ->fill('#editingDomainParts-path', '/blog')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->click('[id^="application-domain-indexing-"][id$="-trigger"]')
         ->click('Noindex')
-        ->assertSee('Search engine indexing updated.')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertDontSee('Search engine indexing updated.')
+        ->click('Regenerate hostname')
         ->screenshot(filename: 'application-domain-unified-settings')
-        ->click('[wire\\:click="updateDomain"]')
+        ->click('Save')
         ->assertDontSee('Domain settings')
-        ->assertSee('https://first.example.com/blog')
+        ->assertSee('Internal port 8069')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-domains-compact');
 
+    $savedDomain = str($this->application->fresh()->fqdn)->before(',')->toString();
+    expect($savedDomain)->not->toContain('first.example.com')
+        ->and($this->application->fresh()->domain_port_overrides)->toHaveKey($savedDomain, 8069)
+        ->and($this->application->fresh()->noindexDomains()->all())->toContain($savedDomain);
+
     $page->click('[aria-label="Settings for https://second.example.com"]')
         ->fill('#editingDomainParts-path', '/discard')
-        ->click('Reset')
+        ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-path', '')
         ->click('[aria-label="Close"]:visible')
-        ->click('[wire\\:key="domain-row-'.md5('https://first.example.com/blog|').'"] [aria-label="Remove domain"]')
+        ->click('[wire\\:key="domain-row-'.md5($savedDomain.'|').'"] [aria-label="Remove domain"]')
         ->assertSee('Remove domain?')
         ->click('button:has([x-text="step2ButtonText"]):visible')
-        ->assertDontSee('https://first.example.com/blog')
+        ->assertDontSee($savedDomain)
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-host', 'second.example.com')
         ->click('[aria-label="Close"]:visible')
@@ -286,14 +294,16 @@ it('edits Compose application domain redirects in the unified settings dialog', 
         ->click('[id^="application-domain-direction-"][id$="-trigger"]')
         ->click('Redirect to www')
         ->assertDontSee('Use a different port?')
-        ->assertSee('Redirect updated for web.api.')
         ->assertNoJavaScriptErrors()
         ->screenshot(filename: 'application-compose-domain-settings');
 
-    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('www');
-    $page->click('[aria-label="Close"]:visible')
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('both');
+    $page->click('Save')
+        ->assertDontSee('Domain settings')
         ->assertSee('https://www.web.example.com')
         ->screenshot(filename: 'application-compose-domain-overview');
+
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true)['web.api']['redirect'])->toBe('www');
 });
 
 it('uses compact preview domains and opens only the selected preview settings', function (bool $isCompose) {
@@ -326,9 +336,9 @@ it('uses compact preview domains and opens only the selected preview settings', 
         ->assertVisible('[aria-label="Search indexing blocked"] >> nth=0');
     expect($page->script("[...document.querySelectorAll('[data-preview-domain-dialog]')].filter(el => el.getClientRects().length > 0).length"))->toBe(1);
     $page->fill('#editingDomainParts-host:visible', 'renamed-preview.example.com')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertSee('Regenerate hostname')
         ->screenshot(filename: 'preview-domain-unified-settings')
-        ->click('.is-dirty [wire\\:click="updateDomain"]')
+        ->click('[data-preview-domain-dialog]:visible button:has-text("Save")')
         ->assertDontSee('Domain settings')
         ->assertSee('https://renamed-preview.example.com')
         ->assertSee('https://preview-102.example.com')
@@ -337,9 +347,8 @@ it('uses compact preview domains and opens only the selected preview settings', 
     $page->click('[aria-label="Settings for https://preview-102.example.com"]')
         ->assertSee('Domain settings')
         ->fill('#editingDomainParts-path:visible', '/discard')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->screenshot(filename: 'preview-domain-before-reset')
-        ->click('.is-dirty button:has-text("Reset")')
+        ->click('[data-preview-domain-dialog]:visible [aria-label="Close"]')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://preview-102.example.com"]')
         ->assertValue('#editingDomainParts-path:visible', '')

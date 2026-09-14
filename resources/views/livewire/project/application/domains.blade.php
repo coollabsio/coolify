@@ -16,22 +16,27 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        editingDomainBaseline: null,
-        get hasAddressChanges() {
-            return this.modalOpen && this.editingDomainBaseline !== null
-                && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
-                && !$wire.showPortWarningModal && !$wire.showDomainConflictModal;
-        },
-        openEditDomain() {
-            this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
-            this.editingServiceLabel = $wire.editingService || '';
+        openEditDomain(index, domain, parts, service, indexing, redirect) {
+            if (index !== undefined) {
+                $wire.set('editingIndex', index, false);
+                $wire.set('editingDomain', domain, false);
+                $wire.set('editingDomainParts', parts, false);
+                $wire.set('editingDomainPartsChanged', false, false);
+                $wire.set('editingService', service, false);
+                $wire.set('editingIndexing', indexing, false);
+                $wire.set('editingRedirect', redirect, false);
+                $wire.set('editingOriginalRedirect', redirect, false);
+                $wire.set('editingDomainWasRegenerated', false, false);
+                $wire.set('editingGeneratedHost', null, false);
+            }
+            this.editingServiceLabel = service ?? $wire.editingService ?? '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainParts-host')?.focus?.());
         },
-        closeEditDomain() {
+        closeEditDomain(discardDraft = true) {
             this.modalOpen = false;
-            this.editingDomainBaseline = null;
             this.editingServiceLabel = '';
+            if (discardDraft) this.$wire.cancelEdit();
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -41,7 +46,7 @@
         },
     }"
     @open-edit-domain.window="openEditDomain()"
-    @edit-domain-saved.window="closeEditDomain()">
+    @edit-domain-saved.window="closeEditDomain(false)">
     @if ($hasDnsChecksInProgress)
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
     @endif
@@ -85,7 +90,7 @@
                 </div>
             @endif
             @can('update', $application)
-                <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
+                <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
                     <x-reicon name="refresh" class="size-3.5" />
                     Check all DNS
                 </x-forms.button>
@@ -299,13 +304,11 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
-                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
-                                <template x-if="modalOpen">
-                                    <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges"
-                                        targets="updateDomain,confirmUpdateDomainDespiteDns" />
-                                </template>
+                        <div class="application-settings-section-body relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                            <form wire:submit="updateDomain" class="flex min-h-0 flex-1 flex-col">
+                                <div data-testid="domain-settings-scroll"
+                                    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
+                                    style="-webkit-overflow-scrolling: touch;">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service</label>
@@ -326,47 +329,49 @@
                                     </x-callout>
                                 @endif
 
-                                @if ($editDomainDnsFailed)
-                                    <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">Continue</x-forms.button>
-                                @endif
-                            </form>
-                            @php
-                                $editingRow = $editingIndex !== null ? ($domainRows[$editingIndex] ?? null) : null;
-                            @endphp
-                            @if ($editingRow && ! $labelsAreWritable)
-                                @can('update', $application)
-                                    @php
-                                        $editingKey = hash('sha256', $editingRow['url'].'|'.($editingRow['service'] ?? ''));
-                                        $editingRedirectKey = $isCompose ? $this->serviceRedirectWireKey($editingRow['service']) : null;
-                                        $editingRedirectProperty = $isCompose ? 'serviceRedirects.'.$editingRedirectKey : 'redirect';
-                                    @endphp
-                                    <div wire:key="editing-application-domain-settings-{{ $editingKey }}"
-                                        class="mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
-                                        <p class="sm:col-span-2 text-[12px] text-neutral-500 dark:text-fg-dim">Indexing and redirect changes save automatically.</p>
-                                        <x-forms.listbox id="application-domain-indexing-{{ $editingKey }}"
-                                            label="Search engine indexing" :wire="false" preserveValue
-                                            :value="$application->isDomainNoindexed($editingRow['url']) ? 'noindex' : 'index'"
-                                            onChange="toggleNoindexDomain" :onChangeArgs="[$editingRow['url']]" portal
+                                @unless ($labelsAreWritable)
+                                    @can('update', $application)
+                                        <div
+                                            class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
+                                        <x-forms.listbox id="editingIndexing"
+                                            htmlId="application-domain-indexing" label="Search engine indexing" portal
                                             :options="[
                                                 ['value' => 'index', 'label' => 'Indexable'],
                                                 ['value' => 'noindex', 'label' => 'Noindex'],
                                             ]" />
-                                        <x-forms.listbox id="application-domain-direction-{{ $editingKey }}"
-                                            label="www redirect" :wire="false" preserveValue
-                                            :value="$isCompose ? ($serviceRedirects[$editingRedirectKey] ?? 'both') : $redirect"
-                                            :x-effect="'value = $wire.get('.json_encode($editingRedirectProperty).')'"
+                                        <x-forms.listbox id="editingRedirect"
+                                            htmlId="application-domain-direction" label="www redirect"
                                             :helper="$isCompose ? 'Applies to all domains for this Compose service.' : 'Applies to all domains for this application.'"
-                                            :onChange="$isCompose ? 'updateServiceRedirect' : 'updateRedirect'"
-                                            :onChangeArgs="$isCompose ? [$editingRow['service']] : []" portal
+                                            portal
                                             :options="[
                                                 ['value' => 'both', 'label' => 'No redirect'],
                                                 ['value' => 'www', 'label' => 'Redirect to www'],
                                                 ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                             ]" />
-                                    </div>
-                                @endcan
-                            @endif
+                                        </div>
+                                    @endcan
+                                @endunless
+                                </div>
 
+                                <div data-testid="domain-settings-footer"
+                                    class="shrink-0 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <x-forms.button type="button" wire:click="regenerateEditingDomain"
+                                        wire:target="regenerateEditingDomain">
+                                        Regenerate hostname
+                                    </x-forms.button>
+                                    @if ($editDomainDnsFailed)
+                                        <x-forms.button type="button" isError wire:click="confirmUpdateDomainDespiteDns">
+                                            Continue
+                                        </x-forms.button>
+                                    @else
+                                        <x-forms.button type="submit" wire:target="updateDomain" isHighlighted>
+                                            Save
+                                        </x-forms.button>
+                                    @endif
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -420,4 +425,5 @@
             </template>
         </div>
     @endif
+    @include('livewire.project.shared.dns-provider-management')
 </div>

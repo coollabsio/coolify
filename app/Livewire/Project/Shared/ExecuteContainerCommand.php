@@ -151,11 +151,16 @@ class ExecuteContainerCommand extends Component
         });
 
         if ($this->containers->count() === 1) {
-            $this->selected_container = data_get($this->containers->first(), 'container.Names');
+            $this->selected_container = $this->containerTarget($this->containers->first());
             $this->connectToContainer();
         }
 
         $this->containersLoaded = true;
+    }
+
+    private function containerTarget(array $container): string
+    {
+        return data_get($container, 'server.uuid').':'.data_get($container, 'container.Names');
     }
 
     public function updatedSelectedContainer()
@@ -202,12 +207,12 @@ class ExecuteContainerCommand extends Component
         try {
             $this->authorize('canAccessTerminal');
             // Validate container name format
-            if (! ValidationPatterns::isValidContainerName($this->selected_container)) {
+            if (! ValidationPatterns::isValidContainerName(str($this->selected_container)->after(':')->value())) {
                 throw new \InvalidArgumentException('Invalid container name format');
             }
 
             // Verify container exists in our allowed list
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = $this->containers->first(fn ($candidate) => $this->containerTarget($candidate) === $this->selected_container);
             if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }

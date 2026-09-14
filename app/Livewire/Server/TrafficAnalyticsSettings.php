@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
+use App\Livewire\Analytics;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
@@ -83,6 +84,7 @@ class TrafficAnalyticsSettings extends Component
             ConfigureTrafficAnalytics::run($this->server, $enable);
             $this->server->refresh();
             $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+            $this->dispatch('trafficAnalyticsStateChanged')->to(Analytics::class);
             $this->dispatch('success', $enable
                 ? 'Traffic analytics enabled. Restarting proxy and Sentinel.'
                 : 'Traffic analytics disabled. Restarting proxy and Sentinel.');

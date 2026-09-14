@@ -28,3 +28,19 @@ it('documents POST for service application actions', function () {
         ->and($openApi['paths'][$actionPaths[2]]['post']['responses']['200']['content']['application/json']['schema']['properties'])
         ->toHaveKey('message');
 });
+
+it('documents the service application restart limit setting', function () {
+    $openApi = json_decode(
+        file_get_contents(__DIR__.'/../../openapi.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+
+    $properties = $openApi['paths']['/services/{uuid}/applications/{app_uuid}']['patch']['requestBody']['content']['application/json']['schema']['properties'];
+
+    expect($properties['max_restart_count'])
+        ->toMatchArray([
+            'description' => 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.',
+            'minimum' => 0,
+        ]);
+});

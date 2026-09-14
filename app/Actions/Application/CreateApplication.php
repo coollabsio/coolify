@@ -128,7 +128,11 @@ class CreateApplication
     private function buildPublic(Application $application, array $data): void
     {
         $application->name = $data['name'] ?? generate_application_name($data['git_repository'], $data['git_branch']);
-        $parsed = Url::fromString($data['git_repository']);
+        $httpsRepository = scpStyleGitUrlToHttps($application->git_repository);
+        if (is_string($httpsRepository)) {
+            $application->git_repository = $httpsRepository;
+        }
+        $parsed = Url::fromString($application->git_repository);
         if ($parsed->getHost() === 'github.com') {
             $application->source_type = GithubApp::class;
             $application->source_id = GithubApp::find(0)->id;

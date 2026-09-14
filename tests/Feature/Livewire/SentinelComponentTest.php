@@ -10,25 +10,13 @@ it('keeps sentinel restarted events from re-syncing editable form fields', funct
         ->not->toContain('$this->syncData();');
 });
 
-it('dispatches a server navbar refresh after toggling sentinel', function () {
+it('does not expose a Sentinel disable action', function () {
     $componentSource = file_get_contents(app_path('Livewire/Server/Sentinel.php'));
+    $view = file_get_contents(resource_path('views/livewire/server/sentinel.blade.php'));
 
-    preg_match('/public function toggleSentinel\([^)]*\).*?\{(?<body>.*?)
-    \}/s', $componentSource, $matches);
-
-    expect($matches['body'] ?? '')
-        ->toContain("\$this->dispatch('refreshServerShow');");
-});
-
-it('only marks sentinel enabled after startup succeeds', function () {
-    $componentSource = file_get_contents(app_path('Livewire/Server/Sentinel.php'));
-
-    preg_match('/public function toggleSentinel\([^)]*\).*?\{(?<body>.*?)\n    \}/s', $componentSource, $matches);
-    $toggleBody = $matches['body'] ?? '';
-
-    expect(strpos($toggleBody, 'StartSentinel::run'))->toBeLessThan(
-        strpos($toggleBody, '$this->isSentinelEnabled = true;')
-    );
+    expect($componentSource)->not->toContain('function toggleSentinel')
+        ->and($view)->not->toContain('Disable')
+        ->and($view)->not->toContain('Enable Sentinel');
 });
 
 it('does not repeat a disabled status badge in the sentinel empty state', function () {
@@ -44,4 +32,12 @@ it('tells the user that saving sentinel settings initiates a restart', function 
 
     expect($matches['body'] ?? '')
         ->toContain("\$this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');");
+});
+
+it('starts mandatory Sentinel after server validation succeeds', function () {
+    $interactiveValidation = file_get_contents(app_path('Livewire/Server/ValidateAndInstall.php'));
+    $queuedValidation = file_get_contents(app_path('Jobs/ValidateAndInstallServerJob.php'));
+
+    expect($interactiveValidation)->toContain('CheckAndStartSentinelJob::dispatch($this->server);')
+        ->and($queuedValidation)->toContain('CheckAndStartSentinelJob::dispatch($this->server);');
 });

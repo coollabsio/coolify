@@ -34,7 +34,7 @@
         $consoleThemeNames = collect($consoleThemes)->pluck('name', 'key');
         $consoleThemeAccents = collect($consoleThemes)->pluck('accent', 'key');
         $containerOptions = $containers->map(fn ($container) => [
-            'value' => data_get($container, 'container.Names'),
+            'value' => data_get($container, 'server.uuid').':'.data_get($container, 'container.Names'),
             'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
         ])->values();
     @endphp

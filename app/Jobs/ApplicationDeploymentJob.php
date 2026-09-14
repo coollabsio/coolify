@@ -273,7 +273,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = $this->resolveContainerName();
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
 
         $this->saved_outputs = collect();
 
@@ -339,7 +339,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         if ($containerName === 'coolify-proxy') {
                             continue;
                         }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
+                        if (isGeneratedContainerName($containerName)) {
                             continue;
                         }
                         $containerIp = data_get($container, 'IPv4Address');
@@ -812,6 +812,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
 
+        $this->pull_docker_compose_images();
+
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
@@ -913,6 +915,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    private function pull_docker_compose_images(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
+
+        if ($this->use_build_server) {
+            $this->write_deployment_configurations();
+            $this->server = $this->mainServer;
+            $workdir = $this->application->workdir();
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+        } else {
+            $workdir = $this->workdir;
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+        }
+
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+        ]);
     }
 
     private function deploy_dockerfile_buildpack()
@@ -1992,7 +2014,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
                 throw new \InvalidArgumentException('Invalid build-time environment variable key.');
-
             }
 
             return $key;
@@ -2183,7 +2204,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->write_deployment_configurations();
                     $this->server = $this->mainServer;
                 }
-                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty() || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     if (count($this->application->ports_mappings_array) > 0) {
                         $this->application_deployment_queue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
@@ -2191,7 +2212,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                         $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                     }
-                    if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                    if ((bool) $this->application->settings->is_consistent_container_name_enabled && str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                         $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                     }
                     if ($this->pull_request_id !== 0) {
@@ -2215,19 +2236,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (Exception $e) {
             throw new DeploymentException('Rolling update failed ('.get_class($e).'): '.$e->getMessage(), $e->getCode(), $e);
         }
-    }
-
-    private function resolveContainerName(): string
-    {
-        if (str($this->application->settings->custom_internal_name)->isEmpty()) {
-            return generateApplicationContainerName($this->application, $this->pull_request_id);
-        }
-
-        if ($this->pull_request_id === 0) {
-            return $this->application->settings->custom_internal_name;
-        }
-
-        return addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
     }
 
     private function health_check()
@@ -2514,15 +2522,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $domains = str($fqdn)->explode(',')->map(fn (string $domain) => trim($domain))->filter();
-            $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
-            $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
-            if ((int) $this->application->compose_parsing_version >= 3) {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
-            } else {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+            $domains = str($fqdn)->explode(',')
+                ->map(fn (string $domain) => trim($domain))
+                ->filter()
+                ->filter(fn (string $domain) => isValidDomainUrl($domain));
+            if ($domains->isNotEmpty()) {
+                $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
+                $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
+                } else {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+                }
             }
         }
         if (isset($this->application->git_branch)) {
@@ -4285,7 +4298,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
-                if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
                         $this->graceful_shutdown_container($containerName);
