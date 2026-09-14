@@ -3203,6 +3203,11 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
 }
 
+.server-images-table-grid {
+    grid-template-columns: minmax(10rem, 1.6fr) minmax(5rem, 0.8fr) 7.5rem 6.5rem 4.5rem minmax(8rem, 1fr) 6.5rem;
+    min-width: 55rem;
+}
+
 .package-updates-table-grid {
     grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 6rem;
 }
