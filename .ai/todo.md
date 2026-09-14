@@ -1,29 +1,33 @@
-# Default-deny Node workload firewall
+# Managed Node workload ingress firewall
 
-- [x] Add stable workload network and container address data.
-- [x] Extend the Coolify-to-Sentinel protocol for workload networking and typed firewall rules.
-- [x] Create and use managed Podman workload networks on each Node.
-- [x] Enforce default-deny east-west traffic while allowing outbound internet and required mesh services.
-- [x] Add authorized workload-to-workload firewall rule management in the Node cluster UI.
-- [x] Reconcile rule changes safely and preserve rollback behavior.
-- [x] Run focused PHP and Rust tests, formatting, Blade validation, and frontend build.
-- [x] Run live network verification against the development environment.
-- [x] Search GitHub issues and discussions.
-- [x] Record review evidence and commit all repository changes.
+- [x] Specify ingress trust boundaries from the current deployment and proxy paths.
+- [x] Add failing Coolify tests for persisted ingress rules, authorization, validation, and Sentinel payloads.
+- [x] Add failing Sentinel tests for default-deny ingress and narrow allow rules.
+- [x] Implement the smallest compatible Coolify data model, reconciliation contract, and Firewall UI.
+- [x] Implement Sentinel nftables ingress enforcement with safe reconcile and rollback behavior.
+- [x] Run focused and full checks in both repositories.
+- [x] Commit and push both repositories, watch CI and release builds, and deploy published images.
+- [x] Test unmanaged-container, Node/LAN, proxy/published-port, mesh, DNS, and outbound behavior live.
+- [x] Search related GitHub issues and discussions and record review evidence.
+
+## Design
+
+- Treat traffic to managed workload addresses from outside managed workload CIDRs as ingress.
+- Deny this forwarded traffic by default. Keep established flows, WireGuard routing, internal DNS, and workload outbound traffic.
+- Store directional ingress rules by destination workload, protocol, and destination port. A rule permits any non-mesh source to that one workload port.
+- Keep east-west workload rules separate. A workload source still requires an east-west rule and cannot use an ingress rule.
+- Show ingress rules in the existing cluster Firewall view and use the existing cluster update authorization.
+- Reuse the current revision, last-known-good snapshot, validation, and rollback mechanisms.
 
 ## Review
 
-- Each Node now receives a globally unique `100.64.0.0/10` workload `/24`. Each workload assignment receives a stable address from that subnet.
-- Clustered deployments use a Node-owned Podman network and the assigned container IP. Sentinel rejects a pre-existing managed network when its subnet is different.
-- WireGuard peers advertise both the Node control `/32` and the Node workload `/24`.
-- Sentinel accepts typed source, destination, protocol, and port rules only. It rejects addresses outside managed workload subnets.
-- The owned nftables table blocks workload-to-workload and workload-to-Node traffic by default. It keeps outbound internet traffic open, accepts established traffic, and permits the WireGuard and internal DNS infrastructure.
-- Bridge netfilter is enabled so the same policy applies to workloads on one Node. Firewall activation still uses validation, a last-known-good snapshot, and the timed rollback path.
-- The cluster Firewall UI creates directional TCP or UDP allow rules and queues reconciliation. Team scope and update authorization are enforced on the server.
-- Live verification used the running development stack at http://localhost:8000 after Jean reported no registered Run environment. Two QEMU Nodes used `100.64.0.2` and `100.64.1.2`.
-- Live default-deny test: workload A to workload B TCP/80 timed out. Live outbound test: workload A downloaded `http://example.com` successfully.
-- Live allow test: after adding A → B TCP/80, workload A received the Nginx page from workload B. After rule removal and reconciliation, the request timed out again.
-- Live DNS test: `web.default.coolify.internal` resolved to the routed container address `100.64.0.2` from both Nodes. Direct PTR lookup against the Node DNS server returned `web.default.coolify.internal`.
-- Coolify focused tests: 80 passed, 304 assertions. Sentinel workspace tests passed: 62 control tests plus all other workspace tests; one existing network test stayed ignored.
-- Pint, `git diff --check`, Blade compilation, and the Vite production build passed. Vite reported the existing CSS comment parser warning.
-- GitHub search found no matching issue or discussion for this firewall feature.
+- The existing Firewall view now separates east-west workload rules from ingress rules. An ingress rule selects one destination workload, TCP or UDP, and one destination port.
+- Coolify persists ingress rules per cluster, expands them to all current workload addresses, increments the network revision, and queues reconciliation after add or removal.
+- Coolify rejects foreign-workload rules, denies member mutations, and rejects Sentinel results that do not confirm `ingress_enforced=true`.
+- Sentinel validates typed ingress rules and renders narrow nftables exceptions before default drops in the forward and output hooks. Mesh sources cannot use ingress exceptions.
+- Without an ingress rule, both a Node process and an unmanaged Podman container timed out when connecting to `100.64.0.2:80`. With the rule, both connected. After removal, access timed out again.
+- The existing mesh policy remained directional: workload B could not use the ingress rule to reach workload A. Reverse DNS and outbound internet access continued to work.
+- Coolify focused verification passed: 51 tests and 184 assertions, Pint, Blade compilation, Vite production build, and `git diff --check`.
+- Sentinel verification passed: formatting, Clippy with warnings denied, all workspace tests, local host and Flux image builds, and `git diff --check`.
+- Jean reported no registered Run environment. Live testing used the existing development stack at http://localhost:8000 and QEMU Nodes `192.168.122.50` and `192.168.122.51`.
+- GitHub issue and pull-request searches found no matching item in `coollabsio/coolify` or `coollabsio/sentinel`. Discussion search was unavailable through the current GitHub CLI search.

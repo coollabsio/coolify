@@ -13,6 +13,7 @@ use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
+use App\Models\NodeIngressRule;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -180,6 +181,10 @@ it('prevents members from changing firewall rules', function () {
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('addFirewallRule')
         ->assertForbidden();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('addIngressRule')
+        ->assertForbidden();
 });
 
 it('does not allow active cidr changes', function () {
@@ -300,6 +305,50 @@ it('rejects firewall rules for workloads outside the mesh', function () {
         ->assertHasErrors('firewallDestinationUuid');
 
     expect(NodeFirewallRule::query()->exists())->toBeFalse();
+});
+
+it('adds and removes scoped workload ingress rules', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Ingress mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $destination);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('ingressDestinationUuid', $destination->uuid)
+        ->set('ingressProtocol', 'tcp')
+        ->set('ingressPort', 8080)
+        ->call('addIngressRule')
+        ->assertDispatched('success');
+
+    $rule = NodeIngressRule::query()->sole();
+    expect($rule->destination_workload_id)->toBe($destination->id)
+        ->and($rule->port)->toBe(8080)
+        ->and($cluster->refresh()->desired_revision)->toBe(3);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('removeIngressRule', $rule->uuid)
+        ->assertDispatched('success');
+
+    expect(NodeIngressRule::query()->exists())->toBeFalse()
+        ->and($cluster->refresh()->desired_revision)->toBe(4);
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 2);
+});
+
+it('rejects ingress rules for workloads outside the mesh', function () {
+    Queue::fake();
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Own ingress mesh');
+    $foreign = NodeWorkload::factory()->create();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('ingressDestinationUuid', $foreign->uuid)
+        ->set('ingressPort', 80)
+        ->call('addIngressRule')
+        ->assertHasErrors('ingressDestinationUuid');
+
+    expect(NodeIngressRule::query()->exists())->toBeFalse();
 });
 
 it('queues cluster network reconciliation once', function () {

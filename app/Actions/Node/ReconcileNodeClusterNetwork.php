@@ -6,6 +6,7 @@ use App\Enums\NodeOperationStatus;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
+use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
@@ -84,6 +85,7 @@ class ReconcileNodeClusterNetwork
                     'flux_probe_host' => $fluxProbeHost,
                     'workload_cidrs' => $nodes->pluck('workload_cidr')->filter()->values()->all(),
                     'rules' => $this->firewallRules($cluster),
+                    'ingress_rules' => $this->ingressRules($cluster),
                 ]);
             }
 
@@ -145,6 +147,26 @@ class ReconcileNodeClusterNetwork
                     'port' => $rule->port,
                 ]);
             })
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{destination_ip: string, protocol: string, port: int}> */
+    private function ingressRules(NodeCluster $cluster): array
+    {
+        return NodeIngressRule::query()
+            ->with('destinationWorkload.nodes')
+            ->where('node_cluster_id', $cluster->id)
+            ->get()
+            ->flatMap(fn (NodeIngressRule $rule) => $rule->destinationWorkload->nodes
+                ->where('node_cluster_id', $cluster->id)
+                ->pluck('pivot.container_ip')
+                ->filter()
+                ->map(fn (string $destinationIp): array => [
+                    'destination_ip' => $destinationIp,
+                    'protocol' => $rule->protocol,
+                    'port' => $rule->port,
+                ]))
             ->values()
             ->all();
     }
@@ -225,6 +247,7 @@ class ReconcileNodeClusterNetwork
                 && filled(data_get($result, 'public_key'))
                 && count(data_get($result, 'peers', [])) === count(data_get($operation->request, 'peers', [])),
             'network.firewall.reconcile.v1' => data_get($result, 'rollback_cancelled') === true
+                && data_get($result, 'ingress_enforced') === true
                 && data_get($result, 'drifted') === false
                 && data_get($result, 'applied_revision') === data_get($operation->request, 'revision')
                 && data_get($result, 'table') === 'coolify_cluster',
