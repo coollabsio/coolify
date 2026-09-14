@@ -11,8 +11,38 @@
         $activeFilterLabels->push(str($environmentFilter)->headline()->toString());
     }
     $activeFilterText = $activeFilterLabels->implode(', ');
+    $canBulkEdit = auth()->user()?->can('manageEnvironment', $resource) ?? false;
 @endphp
-<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
+<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables"
+    x-data="{
+        selectedIds: [],
+        pageIds() {
+            return Array.from(this.$root.querySelectorAll('[data-env-select-id]'), (el) => Number(el.dataset.envSelectId));
+        },
+        get allSelected() {
+            const ids = this.pageIds();
+            return ids.length > 0 && ids.every((id) => this.selectedIds.includes(id));
+        },
+        get someSelected() {
+            return this.selectedIds.length > 0 && !this.allSelected;
+        },
+        isSelected(id) {
+            return this.selectedIds.includes(id);
+        },
+        toggleSelected(id) {
+            this.selectedIds = this.isSelected(id)
+                ? this.selectedIds.filter((selectedId) => selectedId !== id)
+                : [...this.selectedIds, id];
+        },
+        toggleAll() {
+            this.selectedIds = this.allSelected ? [] : this.pageIds();
+        },
+        applyAvailability(field, value) {
+            if (this.selectedIds.length === 0) return;
+            this.$wire.bulkUpdateAvailability(field, value, this.selectedIds);
+        },
+    }"
+    x-on:environment-variable-selection-reset.window="selectedIds = []">
     <x-application.settings-section id="environment-variables-section" title="Environment variables"
         helper="Environment variables (secrets) for this resource.">
         @can('manageEnvironment', $resource)
@@ -158,6 +188,39 @@
                         @endforeach
             </x-table.sort>
                 @can('manageEnvironment', $resource)
+                    <div class="table-availability">
+                        <x-table.dropdown panel-class="w-60!">
+                            <x-slot:trigger>
+                                <button type="button" aria-haspopup="listbox" :aria-expanded="open"
+                                    x-bind:disabled="selectedIds.length === 0"
+                                    x-bind:class="{ 'button-highlighted': selectedIds.length > 0 }"
+                                    x-bind:title="selectedIds.length > 0
+                                        ? `Change build time / runtime availability of ${selectedIds.length} selected ${selectedIds.length === 1 ? 'variable' : 'variables'}`
+                                        : 'Select environment variables to change their availability'"
+                                    class="button">
+                                    <x-reicon name="sliders" class="size-3.5 shrink-0" />
+                                    <span>Availability</span>
+                                    <span x-show="selectedIds.length > 0" x-text="selectedIds.length"
+                                        class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"></span>
+                                </button>
+                            </x-slot:trigger>
+                            <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Build time</span>
+                            <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', true); open = false">
+                                <span>Available during build</span>
+                            </button>
+                            <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', false); open = false">
+                                <span>Not available during build</span>
+                            </button>
+                            <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+                            <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Runtime</span>
+                            <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', true); open = false">
+                                <span>Available in the container</span>
+                            </button>
+                            <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', false); open = false">
+                                <span>Not available in the container</span>
+                            </button>
+                        </x-table.dropdown>
+                    </div>
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
                     <x-modal-input title="New Environment Variable" :closeOutside="false">
@@ -199,8 +262,13 @@
                         <div class="environment-table-scroll relative">
                             <div class="transition-all"
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
-                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
-                            <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
+                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage,bulkUpdateAvailability">
+                            <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }} {{ $canBulkEdit ? 'env-table-grid-selectable' : '' }}">
+                            @if ($canBulkEdit)
+                                <x-table.checkbox label="Select all environment variables on this page"
+                                    x-bind:checked="allSelected" x-effect="$el.indeterminate = someSelected"
+                                    x-on:change="toggleAll()" />
+                            @endif
                             <span>Name</span>
                             <span class="text-center">Managed</span>
                             @if ($showEnvironmentType)
@@ -215,17 +283,19 @@
                             @foreach ($this->environmentVariablePageRows as $row)
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
-                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType" />
+                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType"
+                                    :selectable="$canBulkEdit" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
                                     :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType"
-                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id" />
+                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id"
+                                    :selectable="$canBulkEdit" />
                             @endif
                             @endforeach
                             </div>
                             <x-table.loading
-                                target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                                target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage,bulkUpdateAvailability"
                                 text="Loading environment variables..." />
                         </div>
                         <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"
