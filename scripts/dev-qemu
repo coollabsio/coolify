@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly storage_path="${DEVELOPMENT_QEMU_STORAGE_PATH:-/var/lib/libvirt/images/coolify-development}"
+readonly network=default
+readonly image="$storage_path/ubuntu-noble-amd64.qcow2"
+readonly image_url=https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+readonly public_key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68'
+
+fail() {
+    printf 'Error: %s\n' "$1" >&2
+    exit 1
+}
+
+step() {
+    printf '==> %s\n' "$1"
+}
+
+install_dependencies() {
+    local commands=(curl docker iptables qemu-img virsh virt-install)
+    local command
+
+    for command in "${commands[@]}"; do
+        if ! command -v "$command" >/dev/null; then
+            command -v apt-get >/dev/null || fail 'Missing QEMU dependencies. Automatic installation currently supports apt-based development hosts.'
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y curl iptables libvirt-clients libvirt-daemon-system qemu-utils qemu-system-x86 virtinst
+            return
+        fi
+    done
+}
+
+configure_host() {
+    step 'Checking host requirements'
+    install_dependencies
+    systemctl is-enabled --quiet libvirtd || systemctl enable libvirtd >/dev/null
+    systemctl is-active --quiet libvirtd || systemctl start libvirtd
+    mkdir -p "$storage_path"
+    chmod 0777 "$storage_path"
+
+    if ! virsh net-info "$network" >/dev/null 2>&1; then
+        cat > "$storage_path/libvirt-network.xml" <<'XML'
+<network>
+  <name>default</name>
+  <forward mode="nat"/>
+  <bridge name="virbr0" stp="on" delay="0"/>
+  <ip address="192.168.122.1" netmask="255.255.255.0">
+    <dhcp><range start="192.168.122.2" end="192.168.122.254"/></dhcp>
+  </ip>
+</network>
+XML
+        virsh net-define "$storage_path/libvirt-network.xml" >/dev/null
+    fi
+
+    local network_info
+    network_info="$(virsh net-info "$network")"
+    if ! grep -Eq '^Active:[[:space:]]+yes$' <<< "$network_info"; then
+        virsh net-start "$network" >/dev/null
+    fi
+    if ! grep -Eq '^Autostart:[[:space:]]+yes$' <<< "$network_info"; then
+        virsh net-autostart "$network" >/dev/null
+    fi
+
+    if [[ "$(sysctl -n net.ipv4.ip_forward)" != 1 ]]; then
+        printf 'net.ipv4.ip_forward=1\n' > /etc/sysctl.d/99-coolify-development-qemu.conf
+        sysctl -q -w net.ipv4.ip_forward=1
+    fi
+    if [[ "$(sysctl -n net.ipv4.conf.virbr0.route_localnet)" != 1 ]]; then
+        printf 'net.ipv4.conf.virbr0.route_localnet=1\n' > /etc/sysctl.d/99-coolify-development-qemu-loopback.conf
+        sysctl -q -w net.ipv4.conf.virbr0.route_localnet=1
+    fi
+
+    local docker_subnet
+    docker_subnet="$(docker network inspect coolify --format '{{(index .IPAM.Config 0).Subnet}}')"
+    [[ -n "$docker_subnet" ]] || fail 'Unable to determine the Coolify Docker network subnet.'
+    iptables -C LIBVIRT_FWI -s "$docker_subnet" -d 192.168.122.0/24 -o virbr0 -j ACCEPT 2>/dev/null || \
+        iptables -I LIBVIRT_FWI 1 -s "$docker_subnet" -d 192.168.122.0/24 -o virbr0 -j ACCEPT
+    iptables -t nat -C PREROUTING -i virbr0 -p tcp --dport 8000 -j DNAT --to-destination 127.0.0.1:8000 2>/dev/null || \
+        iptables -t nat -I PREROUTING 1 -i virbr0 -p tcp --dport 8000 -j DNAT --to-destination 127.0.0.1:8000
+
+    step 'Host networking is ready'
+}
+
+profile_values() {
+    case "$1" in
+        node-worker-a) printf '%s\n' coolify-dev-node-worker-a 192.168.122.50 52:54:00:ca:00:09 ;;
+        node-worker-b) printf '%s\n' coolify-dev-node-worker-b 192.168.122.51 52:54:00:ca:00:0a ;;
+        *) fail "Unknown automatic development QEMU profile: $1" ;;
+    esac
+}
+
+create_worker() {
+    local profile="$1" domain ip mac disk user_data network_config network_xml host_xml
+    mapfile -t values < <(profile_values "$profile")
+    domain="${values[0]}"
+    ip="${values[1]}"
+    mac="${values[2]}"
+    disk="$storage_path/$domain.qcow2"
+    user_data="$storage_path/$domain-user-data.yaml"
+    network_config="$storage_path/$domain-network.yaml"
+
+    step "Preparing $profile ($ip)"
+
+    if virsh dominfo "$domain" >/dev/null 2>&1; then
+        if [[ "$(virsh domstate "$domain")" != running ]]; then
+            virsh start "$domain" >/dev/null
+            step "$profile was stopped and is now running"
+        else
+            step "$profile is already running; continuing its initialization"
+        fi
+        wait_for_worker "$profile" "$ip"
+        return
+    fi
+
+    network_xml="$(virsh net-dumpxml "$network")"
+    if [[ "$network_xml" != *"$mac"* || "$network_xml" != *"$ip"* ]]; then
+        host_xml="<host mac='$mac' name='$domain' ip='$ip'/>"
+        virsh net-update "$network" add-last ip-dhcp-host "$host_xml" --live --config >/dev/null
+    fi
+
+    [[ -f "$image" ]] || curl --fail --location --output "$image" "$image_url"
+    qemu-img create -q -f qcow2 -F qcow2 -b "$image" "$disk" 20G
+    chmod 0644 "$image"
+    chmod 0666 "$disk"
+
+    cat > "$user_data" <<YAML
+#cloud-config
+disable_root: false
+users:
+  - name: root
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - $public_key
+package_update: true
+packages:
+  - openssh-server
+  - podman
+  - podman-docker
+  - wireguard-tools
+  - nftables
+  - iputils-ping
+  - curl
+  - ca-certificates
+  - sudo
+runcmd:
+  - systemctl enable --now ssh
+  - systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '192.168.122.1 coolify-flux\n' >> /etc/hosts
+YAML
+    cat > "$network_config" <<YAML
+version: 2
+ethernets:
+  default:
+    match:
+      macaddress: "$mac"
+    dhcp4: true
+YAML
+
+    virt-install --quiet --connect qemu:///system --name "$domain" --memory 3072 --vcpus 2 --import \
+        --os-variant ubuntu24.04 --disk "path=$disk,format=qcow2,bus=virtio" \
+        --network "network=$network,model=virtio,mac=$mac" \
+        --cloud-init "user-data=$user_data,network-config=$network_config,disable=on" --noautoconsole
+
+    step "$profile virtual machine started"
+    wait_for_worker "$profile" "$ip"
+}
+
+wait_for_worker() {
+    local profile="$1" ip="$2" attempt ready=false
+
+    step "Waiting for SSH and cloud-init on $profile"
+    for attempt in $(seq 1 300); do
+        if docker exec coolify php -r '$socket=@fsockopen($argv[1],22,$code,$message,1); exit(is_resource($socket) ? 0 : 1);' "$ip"; then
+            ready=true
+            break
+        fi
+        sleep 1
+    done
+
+    [[ "$ready" = true ]] || fail "$profile did not make SSH available within 5 minutes. The Docker stack and VM were left running for inspection."
+
+    docker exec coolify ssh -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -i /var/www/html/storage/app/ssh/keys/ssh_key@ssh "root@$ip" cloud-init status --wait >/dev/null
+    step "$profile is ready"
+}
+
+(( $# > 0 )) || fail 'Specify at least one QEMU worker profile.'
+configure_host
+
+index=0
+for profile in "$@"; do
+    create_worker "$profile"
+    seed_options=()
+    (( index > 0 )) && seed_options+=(--keep-others)
+    docker exec coolify php artisan dev:qemu:seed "$profile" "${seed_options[@]}"
+    (( index += 1 ))
+done
+
+step 'Configuring Sentinel, WireGuard, and internal DNS'
+docker exec coolify php artisan dev:qemu:bootstrap-nodes

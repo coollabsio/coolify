@@ -133,8 +133,8 @@ class StartDevelopmentQemuVm
         $sudo = $profile['user'] === 'root' ? '' : "    groups: [{$adminGroup}]\n    sudo: ALL=(ALL) NOPASSWD:ALL\n";
 
         if (($profile['runtime'] ?? 'docker') === 'podman') {
-            $packages = "  - podman\n  - podman-docker\n  - wireguard-tools\n  - nftables\n  - iputils-ping\n  - curl\n  - ca-certificates\n  - sudo";
-            $runtimeSetup = "systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '{$gateway} coolify-flux\\n' >> /etc/hosts";
+            $packages = "  - openssh-server\n  - podman\n  - podman-docker\n  - wireguard-tools\n  - nftables\n  - iputils-ping\n  - curl\n  - ca-certificates\n  - sudo";
+            $runtimeSetup = "systemctl enable --now ssh && systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '{$gateway} coolify-flux\\n' >> /etc/hosts";
         } else {
             [$packages, $startDocker] = match ($profile['provisioner']) {
                 'apk' => ["  - docker\n  - sudo", 'rc-update add docker default && service docker start'],

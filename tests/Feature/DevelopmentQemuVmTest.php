@@ -4,9 +4,15 @@ use App\Actions\Development\ConfigureDevelopmentQemuHost;
 use App\Actions\Development\ManageDevelopmentQemuVm;
 use App\Actions\Development\SeedDevelopmentQemuServer;
 use App\Actions\Development\StartDevelopmentQemuVm;
+use App\Actions\Node\InstallSentinel;
+use App\Actions\Node\ReconcileNodeClusterNetwork;
+use App\Actions\Node\ValidateNode;
+use App\Actions\Sentinel\PingFluxConnection;
+use App\Console\Commands\BootstrapDevelopmentQemuNodesCommand;
 use App\Console\Commands\ManageDevelopmentQemuVmCommand;
 use App\Console\Commands\SeedDevelopmentQemuServerCommand;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\Server;
 use Database\Seeders\PrivateKeySeeder;
 use Database\Seeders\TeamSeeder;
@@ -30,9 +36,11 @@ it('registers the interactive qemu command', function () {
     expect(Artisan::all())
         ->toHaveKey('dev:qemu')
         ->toHaveKey('dev:qemu:seed')
+        ->toHaveKey('dev:qemu:bootstrap-nodes')
         ->and(Artisan::all()['dev:qemu'])->toBeInstanceOf(ManageDevelopmentQemuVmCommand::class)
         ->and(Artisan::all()['dev:qemu']->getDefinition()->getArgument('profiles')->isArray())->toBeTrue()
-        ->and(Artisan::all()['dev:qemu:seed'])->toBeInstanceOf(SeedDevelopmentQemuServerCommand::class);
+        ->and(Artisan::all()['dev:qemu:seed'])->toBeInstanceOf(SeedDevelopmentQemuServerCommand::class)
+        ->and(Artisan::all()['dev:qemu:bootstrap-nodes'])->toBeInstanceOf(BootstrapDevelopmentQemuNodesCommand::class);
 });
 
 it('prevents qemu commands from running outside development', function () {
@@ -82,12 +90,14 @@ it('provisions the node worker with podman and a reachable flux hostname', funct
     $userData = File::get("{$storagePath}/coolify-dev-node-worker-a-user-data.yaml");
 
     expect($userData)
+        ->toContain('  - openssh-server')
         ->toContain('  - podman')
         ->toContain('  - podman-docker')
         ->toContain('  - wireguard-tools')
         ->toContain('  - nftables')
         ->toContain('  - iputils-ping')
         ->toContain('  - curl')
+        ->toContain('systemctl enable --now ssh')
         ->toContain('systemctl enable --now podman.socket')
         ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
         ->toContain('192.168.122.1 coolify-flux')
@@ -170,12 +180,43 @@ it('keeps automatic qemu startup opt in for the development stack', function () 
     expect(File::get(base_path('.env.development.example')))->toContain('DEVELOPMENT_QEMU_AUTO_START=false')
         ->and($jean['scripts']['run'])->toBe('bash scripts/dev-stack')
         ->and($script)->toContain('DEVELOPMENT_QEMU_AUTO_START')
-        ->and($script)->toContain('php artisan dev:qemu node-worker-a node-worker-b')
+        ->and($script)->toContain('scripts/dev-qemu node-worker-a node-worker-b')
+        ->and($script)->not->toContain('php artisan dev:qemu')
         ->and($script)->toContain('compose up --detach --pull missing')
         ->and($script)->toContain('config --environment');
 
     $compose = File::get(base_path('docker-compose.node-dev.yml'));
     expect($compose)->toContain("postgres:\n        condition: service_healthy");
+});
+
+it('manages automatic qemu workers without host php', function () {
+    $script = File::get(base_path('scripts/dev-qemu'));
+
+    expect($script)->toContain('virt-install')
+        ->toContain('virsh')
+        ->toContain('docker exec coolify php artisan dev:qemu:seed')
+        ->toContain('docker exec coolify php artisan dev:qemu:bootstrap-nodes')
+        ->toContain('network_info="$(virsh net-info "$network")"')
+        ->toContain('grep -Eq \'^Active:[[:space:]]+yes$\' <<< "$network_info"')
+        ->toContain('  - openssh-server')
+        ->toContain('systemctl enable --now ssh')
+        ->toContain('virsh dominfo "$domain"')
+        ->toContain('virsh domstate "$domain"')
+        ->toContain('Waiting for SSH and cloud-init')
+        ->toContain('-o LogLevel=ERROR')
+        ->toContain('sysctl -n net.ipv4.ip_forward')
+        ->toContain('iptables -C LIBVIRT_FWI')
+        ->not->toContain('reset_managed_vms')
+        ->not->toContain('php artisan dev:qemu ');
+
+    expect(is_executable(base_path('scripts/dev-qemu')))->toBeTrue();
+});
+
+it('preserves the docker stack when automatic qemu startup fails', function () {
+    $script = File::get(base_path('scripts/dev-stack'));
+
+    expect($script)->not->toContain('trap cleanup EXIT')
+        ->toContain("trap 'cleanup; exit 130' INT TERM");
 });
 
 it('seeds the first node worker as a separate node with the host gateway endpoint', function () {
@@ -207,6 +248,28 @@ it('starts and seeds both node workers together', function () {
     ])->count())->toBe(2);
     Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-worker-a'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-worker-b'));
+});
+
+it('bootstraps seeded development workers into a usable cluster', function () {
+    $first = SeedDevelopmentQemuServer::run('node-worker-a');
+    $second = SeedDevelopmentQemuServer::run('node-worker-b', false);
+
+    InstallSentinel::shouldRun()->twice()->andReturn('');
+    ValidateNode::shouldRun()->twice()->andReturnTrue();
+    PingFluxConnection::shouldRun()->twice()->andReturn([
+        'command_id' => 'command',
+        'nonce' => 'nonce',
+        'sentinel_time_unix_ms' => 1,
+        'sentinel_version' => 'main',
+        'boot_id' => 'boot',
+        'latency_ms' => 1,
+    ]);
+    ReconcileNodeClusterNetwork::shouldRun()->once()->andReturn([]);
+
+    expect(Artisan::call('dev:qemu:bootstrap-nodes'))->toBe(Command::SUCCESS);
+
+    $cluster = NodeCluster::query()->where('name', 'Development QEMU mesh')->sole();
+    expect($cluster->nodes()->pluck('nodes.id')->all())->toContain($first->id, $second->id);
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {

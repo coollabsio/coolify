@@ -1,5 +1,19 @@
 # Lessons
 
+- A fresh development Node bootstrap is not complete when VMs and database
+  rows exist. It must install Sentinel, validate Podman, assign all workers to
+  a mesh, reconcile WireGuard and Corrosion, and verify convergence before it
+  reports the workers as ready.
+- Development VM startup must be resumable and quiet. Reuse a defined VM,
+  continue waiting when it is still initializing, change host sysctl and
+  firewall state only when needed, and replace raw tool output with short
+  progress messages.
+- QEMU cloud-image readiness must not assume SSH is installed or enabled. Add
+  `openssh-server` and start `ssh` explicitly before polling port 22. Preserve
+  the Docker stack when optional VM provisioning fails so logs remain usable.
+- With `set -o pipefail`, do not use `producer | grep -q` for state checks. An
+  early successful grep exit can give the producer SIGPIPE and make the whole
+  pipeline fail. Capture the output first, then inspect it.
 - Reuse Sentinel's existing `PUSH_ENDPOINT` and `TOKEN` for opt-in control-channel discovery and initial authentication. Do not add duplicate control URL or token environment variables unless the existing contract cannot meet a proven requirement.
 - Keep the first Sentinel control-channel slice stateless on disk. Store assignments, credentials, connection state, and read-only command deduplication in memory. Add durable local state only when a mutating command has a proven restart-safety requirement that central reconciliation cannot satisfy.
 - Use the published GHCR `main` images for Sentinel and Flux in the Coolify development stack. Do not require a local Sentinel checkout or add local Sentinel build steps to the Coolify or Jean startup flow.
@@ -48,6 +62,7 @@
 - Internal DNS labels are permanent identifiers: persist them separately from display names, keep the first mesh owner on the plain slug, and suffix only later collisions.
 - When the user defers workload scheduling hardening, return to the agreed Node networking architecture roadmap instead of continuing move-specific work.
 - When the user returns to the networking architecture firewall part, focus on scoped nftables policy, published-port intent, reconciliation, rollback, and verification before service routing work.
+- After the V5 network foundation is complete, keep the roadmap on core networking and user experience. Do not move into workload deployment features such as volumes unless the user asks for them.
 
 ## Check prior fixes before changing a repeated symptom
 - When a reported regression matches a recent fix, inspect that fix and reproduce why it no longer works before adding another workaround.
@@ -149,3 +164,5 @@
 - When replacing a container image for development, inspect both Compose services and every development Dockerfile `FROM` stage.
 - A successful Compose pull does not prove the application build is free of the old image; validate the complete build dependency chain.
 - Do not replace a removed image with a floating `latest` tag. Find the newest stable release tag and pin it consistently in Compose and every Dockerfile stage.
+- When the Clusters page becomes the home for Node infrastructure, move the Nodes collection there instead of showing it on both Clusters and Servers, and use the concise "Clusters" label throughout navigation.
+- For the Clusters sidebar item, use the layered-stack icon instead of the generic network icon; it distinguishes Clusters from both Servers and network settings.

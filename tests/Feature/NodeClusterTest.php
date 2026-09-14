@@ -97,6 +97,22 @@ it('shows only team clusters in the cluster UI', function () {
         ->assertSee($own->name)->assertDontSee('Foreign cluster');
 });
 
+it('uses the standard collection controls on the cluster index', function () {
+    $view = file_get_contents(resource_path('views/livewire/node-cluster/index.blade.php'))
+        .file_get_contents(resource_path('views/livewire/shared/list-search-controls.blade.php'));
+
+    expect($view)
+        ->toContain('<x-slot:title>Clusters | Coolify</x-slot>')
+        ->toContain('>Clusters</h1>')
+        ->toContain('New cluster')
+        ->toContain('Search clusters')
+        ->toContain("viewMode === 'table'")
+        ->toContain("viewMode === 'grid'")
+        ->toContain('control-selected')
+        ->toContain("localStorage.setItem('coolify-node-clusters-view', mode)")
+        ->not->toContain('title="Create cluster"');
+});
+
 it('validates and canonicalizes private cidrs', function (string $cidr) {
     $team = $this->user->teams()->firstOrFail();
 
@@ -228,7 +244,7 @@ it('prevents deletion while nodes are assigned', function () {
 
 it('creates edits assigns removes and deletes through Livewire', function () {
     $team = $this->user->teams()->firstOrFail();
-    Livewire::test(Index::class)->set('name', 'UI cluster')->call('createCluster')->assertDispatched('success');
+    Livewire::test(Index::class)->set('name', 'UI cluster')->call('createCluster')->assertDispatched('closeModal')->assertDispatched('success');
     $cluster = NodeCluster::query()->where('team_id', $team->id)->sole();
     $node = Node::factory()->create(['team_id' => $team->id]);
 
@@ -416,4 +432,15 @@ it('builds an SSH repair script that restores only Coolify network state', funct
         ->toContain('systemctl restart coolify-discovery-dns.service')
         ->toContain('systemctl restart sentinel.service')
         ->not->toContain('flush ruleset');
+});
+
+it('uses the Clusters label and layers icon in the sidebar', function () {
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('title="Clusters"')
+        ->toContain("request()->is('node-clusters*') || request()->is('node/*')")
+        ->toContain('<x-reicon name="layers" class="menu-item-icon" />')
+        ->toContain('>Clusters</span>')
+        ->not->toContain('title="Node clusters"');
 });

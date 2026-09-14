@@ -1,6 +1,7 @@
 <?php
 
-use App\Livewire\Server\Index;
+use App\Livewire\NodeCluster\Index as NodeClusterIndex;
+use App\Livewire\Server\Index as ServerIndex;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\User;
@@ -18,7 +19,7 @@ beforeEach(function () {
     session(['currentTeam' => $this->user->teams()->firstOrFail()]);
 });
 
-it('shows team nodes in the servers view and links to the node page', function () {
+it('shows team nodes in the clusters view and links to the node page', function () {
     $node = Node::factory()->create([
         'team_id' => $this->user->teams()->firstOrFail()->id,
         'name' => 'QEMU worker node',
@@ -27,7 +28,7 @@ it('shows team nodes in the servers view and links to the node page', function (
         'is_usable' => true,
     ]);
 
-    Livewire::test(Index::class)
+    Livewire::test(NodeClusterIndex::class)
         ->assertSee('Nodes')
         ->assertSee('QEMU worker node')
         ->assertSee('Worker')
@@ -41,17 +42,16 @@ it('does not show nodes from another team', function () {
         'name' => 'Private foreign node',
     ]);
 
-    Livewire::test(Index::class)->assertDontSee('Private foreign node');
+    Livewire::test(NodeClusterIndex::class)->assertDontSee('Private foreign node');
 });
 
-it('does not show the development node section when the feature gate is disabled', function () {
+it('keeps nodes out of the servers view', function () {
     Node::factory()->create([
         'team_id' => $this->user->teams()->firstOrFail()->id,
-        'name' => 'Hidden QEMU node',
+        'name' => 'Cluster-only node',
     ]);
-    config()->set('constants.sentinel.host_enabled', false);
 
-    Livewire::test(Index::class)
-        ->assertDontSee('Hidden QEMU node')
-        ->assertDontSee('Nodes');
+    Livewire::test(ServerIndex::class)
+        ->assertDontSee('Cluster-only node')
+        ->assertDontSee('Podman hosts managed by host-native Sentinel and Flux.');
 });
