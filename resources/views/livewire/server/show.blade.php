@@ -283,6 +283,12 @@
                         </x-application.settings-section>
                     @endif
                 </form>
+
+                @if ($server->isBuildServer() && isInstanceAdmin())
+                    <livewire:server.shared-build-teams
+                        :server="$server"
+                        :key="'shared-build-teams-'.$server->id" />
+                @endif
             @endif
         </div>
     </div>
