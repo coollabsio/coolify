@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
+use App\Services\TemplateFingerprint;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -116,6 +117,11 @@ class Create extends Component
                         });
                     }
                     $service->parse(isNew: true);
+
+                    $service->template_reference_hash = TemplateFingerprint::forTemplate(
+                        data_get($services, $oneClickServiceName, [])
+                    );
+                    $service->save();
 
                     // Apply service-specific application prerequisites
                     applyServiceApplicationPrerequisites($service);
