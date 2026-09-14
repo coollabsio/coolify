@@ -150,7 +150,8 @@ services:
     networks:
       - coolify
   minio-init:
-    image: minio/mc:latest
+    # MinIO removed the mc client from Docker Hub; pull it from MinIO's own registry.
+    image: quay.io/minio/mc:latest
     pull_policy: always
     container_name: coolify-minio-init
     restart: no
