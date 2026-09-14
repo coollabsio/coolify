@@ -14,7 +14,9 @@ ARG NGINX_VERSION=1.31.2-r1
 # =================================================================
 # Get MinIO client
 # =================================================================
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+# MinIO removed the mc client from Docker Hub; pull the pinned build from
+# MinIO's own registry (quay.io) instead.
+FROM quay.io/minio/mc:${MINIO_VERSION} AS minio-client
 
 # =================================================================
 # Final Stage: Production image
