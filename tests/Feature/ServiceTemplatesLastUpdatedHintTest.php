@@ -174,3 +174,16 @@ it('preserves one click service key casing when selecting a service template', f
 
     expect($component->type)->toBe('one-click-service-denoKV');
 });
+
+it('formats service website links to preserve repository paths for github and gitlab', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $view = $this->view('livewire.project.new.select', [
+        'current_step' => 'type',
+        'environments' => collect(),
+    ]);
+
+    $view->assertSee("hostname === 'github.com' || hostname === 'www.github.com' || hostname === 'gitlab.com' || hostname === 'www.gitlab.com'", false);
+    $view->assertSee('${url.protocol}//${url.hostname}/${pathSegments[0]}/${pathSegments[1]}', false);
+});
+
