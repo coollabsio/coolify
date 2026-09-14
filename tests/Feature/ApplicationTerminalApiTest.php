@@ -116,8 +116,8 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         $response->assertOk();
         $response->assertJson([
             'exit_code' => 0,
-            'stdout' => "hello\n",
-            'stderr' => "warning\n",
+            'stdout' => 'hello',
+            'stderr' => 'warning',
         ]);
 
         Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'app-container' sh -c 'php artisan about'"));
@@ -157,7 +157,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         $response->assertJson([
             'exit_code' => 124,
             'stdout' => '',
-            'stderr' => "timed out\n",
+            'stderr' => 'timed out',
         ]);
 
         Process::assertRan(fn ($process) => str($process->command)->contains('timeout 3 ssh')

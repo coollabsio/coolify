@@ -24,6 +24,7 @@ test('oversized output does not stop the command before it finishes', function (
         $result = $runner->run($command);
 
         expect($result->exitCode())->toBe(0)
+            ->and(strlen($result->output()))->toBeLessThanOrEqual(65537)
             ->and(file_get_contents($markerPath))->toBe('finished');
     } finally {
         @unlink($markerPath);

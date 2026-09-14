@@ -88,8 +88,8 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         $response->assertOk();
         $response->assertJson([
             'exit_code' => 0,
-            'stdout' => "hello\n",
-            'stderr' => "warning\n",
+            'stdout' => 'hello',
+            'stderr' => 'warning',
         ]);
     });
 
@@ -115,6 +115,21 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             ->and($response->json('stderr'))->toEndWith('[... Output truncated at 65536 bytes ...]');
     });
 
+    test('preserves valid utf-8 when truncating output', function () {
+        Process::fake([
+            '*' => Process::result(output: str_repeat('a', 65493).'€'.str_repeat('b', 100)),
+        ]);
+
+        $response = $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
+                'command' => 'cat unicode-file',
+            ]);
+
+        $response->assertOk();
+        expect(mb_check_encoding($response->json('stdout'), 'UTF-8'))->toBeTrue()
+            ->and($response->json('stdout'))->toEndWith('[... Output truncated at 65536 bytes ...]');
+    });
+
     test('uses the requested timeout for ssh and preserves timeout output', function () {
         Process::fake([
             '*' => Process::result(output: '', errorOutput: "timed out\n", exitCode: 124),
@@ -130,7 +145,7 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         $response->assertJson([
             'exit_code' => 124,
             'stdout' => '',
-            'stderr' => "timed out\n",
+            'stderr' => 'timed out',
         ]);
 
         Process::assertRan(fn ($process) => $process->timeout === 8
@@ -230,10 +245,10 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             '*' => Process::result(output: 'ok', exitCode: 0),
         ]);
 
-        $tokens = collect(range(1, 61))
+        $tokens = collect(range(1, 21))
             ->map(fn () => createServerTerminalApiToken($this->user, $this->team, ['terminal']));
 
-        foreach ($tokens->take(60) as $token) {
+        foreach ($tokens->take(20) as $token) {
             $this->withHeaders(serverTerminalAuthHeaders($token))
                 ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                     'command' => 'whoami',
@@ -246,7 +261,9 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
                 'command' => 'whoami',
             ])
             ->assertStatus(429)
-            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal commands for this server.'));
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal commands for this server.'))
+            ->assertJsonPath('retry_after', fn (int $retryAfter) => $retryAfter > 0);
     });
 
     test('rate limits terminal commands per token and team', function () {
@@ -255,7 +272,7 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         ]);
 
         $servers = collect([$this->server]);
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             $server = Server::factory()->create([
                 'team_id' => $this->team->id,
                 'private_key_id' => $this->privateKey->id,
@@ -269,7 +286,7 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             $servers->push($server);
         }
 
-        foreach ($servers->take(30) as $server) {
+        foreach ($servers->take(10) as $server) {
             $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
                 ->postJson("/api/v1/servers/{$server->uuid}/exec", [
                     'command' => 'whoami',

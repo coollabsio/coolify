@@ -2219,7 +2219,7 @@ class ApplicationsController extends Controller
             'command' => 'required|string|max:20000',
             'timeout' => 'integer|nullable|min:1|max:10',
             'container' => 'string|nullable|max:255',
-            'server_uuid' => 'string|nullable',
+            'server_uuid' => 'string|nullable|max:255',
             'pull_request_id' => 'integer|nullable|min:0',
         ]);
 
