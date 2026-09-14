@@ -150,7 +150,7 @@ services:
     networks:
       - coolify
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z
     pull_policy: always
     container_name: coolify-minio-init
     restart: no

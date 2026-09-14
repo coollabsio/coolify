@@ -137,6 +137,10 @@
     @apply bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white;
 }
 
+@utility view-toggle {
+    @apply flex h-8 items-center rounded-lg border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.06];
+}
+
 @utility loading-indicator {
     @apply text-coollabs dark:text-warning;
 }

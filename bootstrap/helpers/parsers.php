@@ -2546,7 +2546,7 @@ function serviceParser(Service $resource): Collection
             projectName: $resource->project()->name,
             resourceName: $resource->name,
             type: 'service',
-            subType: $isDatabase ? 'database' : 'application',
+            subType: $savedService instanceof ServiceDatabase ? 'database' : 'application',
             subId: $savedService->id,
             subName: $savedService->human_name ?? $savedService->name,
             environment: $resource->environment->name,

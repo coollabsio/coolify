@@ -176,6 +176,7 @@ class PreviewDomains extends Component
             return;
         }
         $oldUrl = $this->domainRows[$this->editingIndex]['url'];
+        $dnsRelevantChange = DomainUrlParts::hasDnsRelevantChange($oldUrl, $domain);
         if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl), $this->domainRows[$this->editingIndex]['service'])) {
             $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
@@ -188,17 +189,75 @@ class PreviewDomains extends Component
             $this->preview->domain_port_overrides = $portOverrides ?: null;
         }
         $this->domainRows[$this->editingIndex]['url'] = $domain;
-        $this->domainRows[$this->editingIndex]['dns_status'] = 'pending';
-        $this->domainRows[$this->editingIndex]['dns_message'] = 'DNS has not been checked yet.';
+        $checkId = $dnsRelevantChange ? new_public_id() : null;
+        if ($dnsRelevantChange) {
+            $this->domainRows[$this->editingIndex]['dns_status'] = 'checking';
+            $this->domainRows[$this->editingIndex]['dns_message'] = 'Checking DNS...';
+            $this->domainRows[$this->editingIndex]['check_id'] = $checkId;
+        }
         $index = $this->editingIndex;
         $this->editingIndex = null;
         if (! $this->persistDomains()) {
             return;
         }
+        $domain = $this->domainRows[$index]['url'];
         $this->forceUseUnknownPort = false;
         $this->dispatch('close-preview-domain-edit', previewId: $this->preview->id);
-        $this->dispatch('success', 'Domain updated.');
-        $this->checkDomainDns($index);
+
+        if (! $dnsRelevantChange) {
+            $this->dispatch('success', 'Domain updated.');
+
+            return;
+        }
+
+        try {
+            $server = $this->preview->application->destination?->server;
+            CheckDomainDnsJob::dispatch(
+                $this->preview,
+                $this->statusKey($domain, $this->domainRows[$index]['service']),
+                $domain,
+                $server,
+                $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+                $checkId,
+                $this->preview->application->additional_servers->count() > 0,
+            );
+            $this->dispatch('success', 'Domain updated. DNS check started.');
+        } catch (\Throwable) {
+            $this->domainRows[$index]['dns_status'] = 'skipped';
+            $this->domainRows[$index]['dns_message'] = 'DNS check could not be started.';
+            $this->domainRows[$index]['check_id'] = null;
+            $this->persistDnsStatuses();
+            $this->dispatch('error', 'Domain updated, but the DNS check could not be started. Try again from the preview domains list.');
+        }
+    }
+
+    public function regenerateEditingDomain(): void
+    {
+        $this->authorize('update', $this->preview->application);
+        if ($this->editingIndex === null || ! isset($this->domainRows[$this->editingIndex])) {
+            return;
+        }
+
+        $server = $this->preview->application->destination?->server;
+        if (! $server) {
+            $this->dispatch('error', 'No server found for this preview.');
+
+            return;
+        }
+
+        $host = parse_url(generateUrl(server: $server, random: new_public_id()), PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return;
+        }
+
+        $this->editingDomainParts['host'] = str_starts_with(strtolower((string) $this->editingDomainParts['host']), 'www.') ? 'www.'.$host : $host;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingIndex = null;
+        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->resetErrorBag('editingDomainParts.host');
     }
 
     public function confirmUseUnknownPort(): void
@@ -263,16 +322,46 @@ class PreviewDomains extends Component
     {
         $this->authorize('update', $this->preview->application);
         foreach (array_keys($this->domainRows) as $index) {
-            $this->applyDnsCheck($index);
+            $this->queueDnsCheck($index);
         }
-        $this->persistDnsStatuses();
     }
 
     public function checkDomainDns(int $index): void
     {
         $this->authorize('update', $this->preview->application);
-        $this->applyDnsCheck($index);
+        $this->queueDnsCheck($index);
+    }
+
+    private function queueDnsCheck(int $index): void
+    {
+        if (! isset($this->domainRows[$index])) {
+            return;
+        }
+
+        $row = $this->domainRows[$index];
+        $checkId = new_public_id();
+        $this->domainRows[$index]['dns_status'] = 'checking';
+        $this->domainRows[$index]['dns_message'] = 'Checking DNS...';
+        $this->domainRows[$index]['check_id'] = $checkId;
         $this->persistDnsStatuses();
+
+        try {
+            $server = $this->preview->application->destination?->server;
+            CheckDomainDnsJob::dispatch(
+                $this->preview,
+                $this->statusKey($row['url'], $row['service']),
+                $row['url'],
+                $server,
+                $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+                $checkId,
+                $this->preview->application->additional_servers->count() > 0,
+            );
+        } catch (\Throwable) {
+            $this->domainRows[$index]['dns_status'] = 'skipped';
+            $this->domainRows[$index]['dns_message'] = 'DNS check could not be started.';
+            $this->domainRows[$index]['check_id'] = null;
+            $this->persistDnsStatuses();
+        }
     }
 
     public function pollDnsChecks(): void
