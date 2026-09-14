@@ -259,6 +259,37 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         expect($ctx->serviceApplication->fresh()->is_force_https_enabled)->toBeFalse();
     });
 
+    test('updates the maximum restart count', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update(['restart_limit_reached' => true]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'max_restart_count' => 0,
+        ])->assertSuccessful()
+            ->assertJsonPath('max_restart_count', 0)
+            ->assertJsonPath('restart_limit_reached', false);
+
+        expect($ctx->serviceApplication->fresh())
+            ->max_restart_count->toBe(0)
+            ->restart_limit_reached->toBeFalse();
+    });
+
+    test('rejects an invalid maximum restart count', function (mixed $value) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'max_restart_count' => $value,
+        ])->assertJsonValidationErrors('max_restart_count');
+    })->with([
+        'negative' => -1,
+        'decimal' => 1.5,
+        'text' => 'unlimited',
+    ]);
+
     test('returns 422 for invalid url scheme', function () {
         $ctx = createServiceWithApplicationForApiTest($this);
 

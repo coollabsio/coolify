@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\S3Storage;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -67,7 +68,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
 });
 
 test('S3Storage connection validation uses short s3 client timeouts', function () {
-    $disk = Mockery::mock();
+    $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->expects('files')->once()->andReturn([]);
 
     Storage::expects('build')
@@ -87,7 +88,7 @@ test('S3Storage connection validation uses short s3 client timeouts', function (
         'region' => 'us-east-1',
         'key' => null,
         'secret' => null,
-        'bucket' => 'test-bucket',
+        'bucket' => 'Test-Bucket',
         'endpoint' => 'https://s3.amazonaws.com',
     ]);
 
@@ -97,7 +98,7 @@ test('S3Storage connection validation uses short s3 client timeouts', function (
 });
 
 test('S3Storage connection validation returns friendly timeout error', function () {
-    $disk = Mockery::mock();
+    $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->expects('files')
         ->once()
         ->andThrow(new RuntimeException('cURL error 28: Operation timed out after 15000 milliseconds'));
@@ -142,5 +143,4 @@ test('S3Storage testConnection rejects invalid bucket before building client', f
     'backticks' => ['lab`id`'],
     'newline' => ["lab\nid"],
     'underscore' => ['lab_bucket'],
-    'uppercase' => ['LabBucket'],
 ]);

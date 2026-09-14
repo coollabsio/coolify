@@ -195,7 +195,7 @@ services:
 
   minio-init:
     profiles: ["minio"]
-    image: minio/mc:latest
+    image: quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z
     pull_policy: always
     restart: "no"
     depends_on:

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Project\Application\PreviewDomains;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -12,10 +13,21 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+it('opens preview domain settings from browser data and shows a dns spinner', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+
+    expect($view)
+        ->not->toContain('wire:click="startEdit(')
+        ->toContain('@click="openEditDomain(')
+        ->toContain('<x-loading compact aria-label="Checking DNS"')
+        ->not->toContain('<x-loading-on-button wire:loading.delay');
+});
 
 beforeEach(function () {
     $this->withoutVite();
@@ -89,6 +101,80 @@ function createPreviewForPortTests(Application $application, int $pullRequestId,
         'pull_request_html_url' => "https://github.com/coollabsio/coolify/pull/{$pullRequestId}",
     ], $attributes));
 }
+
+it('regenerates an existing preview domain only when the modal is saved', function () {
+    $preview = createPreviewForPortTests($this->application, 100, [
+        'fqdn' => 'http://preview.example.com:8080/api',
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->call('regenerateEditingDomain')
+        ->assertSet('editingDomainParts.scheme', 'http')
+        ->assertSet('editingDomainParts.port', '8080')
+        ->assertSet('editingDomainParts.path', '/api');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+
+    expect($preview->fresh()->fqdn)->toBe('http://preview.example.com/api');
+
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    expect($preview->fresh()->fqdn)->toBe("http://{$generatedHost}/api")
+        ->and($preview->fresh()->domain_port_overrides)->toHaveKey("http://{$generatedHost}/api", 8080);
+});
+
+it('runs a dns check after a manually edited preview domain is saved', function () {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 99, [
+        'fqdn' => 'https://old-preview.example.com:81',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '81')
+        ->set('editingDomainParts.host', 'manual-preview.example.com')
+        ->call('updateDomain')
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect(collect($preview->fresh()->domain_dns_statuses)->contains(
+        fn (array $status): bool => ($status['status'] ?? null) === 'checking'
+    ))->toBeTrue();
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://manual-preview.example.com'
+        && $job->statusKey === hash('sha256', 'https://manual-preview.example.com|'));
+});
+
+it('uses the dns badge as progress for single and all preview checks', function (string $action, array $parameters) {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 98, [
+        'fqdn' => 'https://badge-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call($action, ...$parameters)
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->assertSee('Checking DNS...')
+        ->assertSeeHtml('loading-indicator');
+
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
+})->with([
+    'single domain' => ['checkDomainDns', [0]],
+    'all domains' => ['checkAllDns', []],
+]);
+
+it('does not start a dns check when a preview domain address is unchanged', function () {
+    Queue::fake();
+    $preview = createPreviewForPortTests($this->application, 100, [
+        'fqdn' => 'https://unchanged-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertNotPushed(CheckDomainDnsJob::class);
+});
 
 it('saves preview domain port overrides separately from the public FQDN', function () {
     $preview = createPreviewForPortTests($this->application, 101);

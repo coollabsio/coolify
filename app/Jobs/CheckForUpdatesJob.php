@@ -73,6 +73,8 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 // Invalidate cache to ensure fresh data is loaded
                 invalidate_versions_cache();
 
+                CheckTraefikVersionJob::dispatch();
+
                 // Only mark new version available if Coolify version actually increased
                 if (version_compare($latest_version, $current_version, '>')) {
                     // New version available
