@@ -258,6 +258,7 @@ class ServiceApplicationsController extends Controller
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
+                        'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
                     ]
                 )
             )
@@ -331,6 +332,7 @@ class ServiceApplicationsController extends Controller
             'is_gzip_enabled',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
+            'max_restart_count',
         ];
 
         $validationRules = [
@@ -345,6 +347,7 @@ class ServiceApplicationsController extends Controller
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
+            'max_restart_count' => 'sometimes|integer|min:0',
         ];
 
         $validator = Validator::make($payload, $validationRules);
