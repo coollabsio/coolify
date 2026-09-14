@@ -43,7 +43,7 @@ jobs:
       - name: Resolve next version
         id: version
         run: |
-          RC_VERSION=$(jq -r '.coolify.nightly.version' versions.json)
+          RC_VERSION=$(jq -r '.coolify.rc.version' versions.json)
           if [[ ! "${RC_VERSION}" =~ ^[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
             echo "Invalid next RC version: ${RC_VERSION}"
             exit 1

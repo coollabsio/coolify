@@ -48,7 +48,7 @@ class SyncBunny extends Command
     /**
      * Fetch GitHub releases and sync to GitHub repository
      */
-    private function syncReleasesToGitHubRepo(array $files, bool $nightly = false): bool
+    private function syncReleasesToGitHubRepo(array $files, bool $rc = false): bool
     {
         $this->info('Fetching releases from GitHub...');
         try {
@@ -70,10 +70,10 @@ class SyncBunny extends Command
                 return false;
             }
 
-            $files[$releasesFile] = $nightly ? 'json/coolify/nightly/releases.json' : 'json/coolify/releases.json';
+            $files[$releasesFile] = $rc ? 'json/coolify/rc/releases.json' : 'json/coolify/releases.json';
 
             try {
-                return $this->syncFilesToGitHubRepo($files, $nightly);
+                return $this->syncFilesToGitHubRepo($files, $rc);
             } finally {
                 @unlink($releasesFile);
             }
@@ -87,9 +87,9 @@ class SyncBunny extends Command
     /**
      * Sync install.sh, docker-compose, and env files to GitHub repository via PR
      */
-    private function syncFilesToGitHubRepo(array $files, bool $nightly = false): bool
+    private function syncFilesToGitHubRepo(array $files, bool $rc = false): bool
     {
-        $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+        $envLabel = $rc ? 'RELEASE CANDIDATE' : 'PRODUCTION';
         $this->info("Syncing $envLabel files to GitHub repository...");
         try {
             $timestamp = time();
@@ -248,14 +248,14 @@ class SyncBunny extends Command
     {
         $that = $this;
         $only_bunny = $this->option('bunny');
-        $nightly = select(
+        $rc = select(
             label: 'Which environment would you like to sync?',
             options: [
                 'production' => 'Production',
-                'nightly' => 'Nightly',
+                'rc' => 'Release Candidate',
             ],
             default: 'production',
-        ) === 'nightly';
+        ) === 'rc';
         $bunny_cdn = 'https://cdn.coollabs.io';
         $bunny_cdn_path = 'coolify';
         $bunny_cdn_storage_name = 'coolcdn';
@@ -305,19 +305,19 @@ class SyncBunny extends Command
             ]);
         });
         try {
-            if ($nightly) {
-                $bunny_cdn_path = 'coolify-nightly';
+            if ($rc) {
+                $bunny_cdn_path = 'coolify-rc';
 
-                $compose_file_location = "$parent_dir/other/nightly/$compose_file";
-                $compose_file_prod_location = "$parent_dir/other/nightly/$compose_file_prod";
-                $production_env_location = "$parent_dir/other/nightly/$production_env";
-                $upgrade_script_location = "$parent_dir/other/nightly/$upgrade_script";
-                $upgrade_postgres_script_location = "$parent_dir/other/nightly/$upgrade_postgres_script";
-                $install_script_location = "$parent_dir/other/nightly/$install_script";
-                $versions_location = "$parent_dir/other/nightly/$versions";
+                $compose_file_location = "$parent_dir/other/rc/$compose_file";
+                $compose_file_prod_location = "$parent_dir/other/rc/$compose_file_prod";
+                $production_env_location = "$parent_dir/other/rc/$production_env";
+                $upgrade_script_location = "$parent_dir/other/rc/$upgrade_script";
+                $upgrade_postgres_script_location = "$parent_dir/other/rc/$upgrade_postgres_script";
+                $install_script_location = "$parent_dir/other/rc/$install_script";
+                $versions_location = "$parent_dir/other/rc/$versions";
             }
             if ($only_bunny) {
-                $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+                $envLabel = $rc ? 'RELEASE CANDIDATE' : 'PRODUCTION';
                 $this->info("About to sync $envLabel files to BunnyCDN.");
                 $this->newLine();
 
@@ -391,19 +391,19 @@ class SyncBunny extends Command
                 }
             }
             if (! $only_bunny) {
-                $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+                $envLabel = $rc ? 'RELEASE CANDIDATE' : 'PRODUCTION';
                 $this->info("About to sync $envLabel releases, versions, compose, and environment files to GitHub repository.");
 
-                if ($nightly) {
+                if ($rc) {
                     $files = [
-                        $versions_location => 'json/coolify/nightly/versions.json',
-                        $compose_file_location => 'json/coolify/nightly/docker-compose.yml',
-                        $compose_file_prod_location => 'json/coolify/nightly/docker-compose.prod.yml',
-                        $production_env_location => 'json/coolify/nightly/.env.production',
-                        $install_script_location => 'json/coolify/nightly/install.sh',
-                        $upgrade_script_location => 'json/coolify/nightly/upgrade.sh',
-                        $upgrade_postgres_script_location => 'json/coolify/nightly/upgrade-postgres.sh',
-                        $service_template_location => 'json/coolify/nightly/service-templates-latest.json',
+                        $versions_location => 'json/coolify/rc/versions.json',
+                        $compose_file_location => 'json/coolify/rc/docker-compose.yml',
+                        $compose_file_prod_location => 'json/coolify/rc/docker-compose.prod.yml',
+                        $production_env_location => 'json/coolify/rc/.env.production',
+                        $install_script_location => 'json/coolify/rc/install.sh',
+                        $upgrade_script_location => 'json/coolify/rc/upgrade.sh',
+                        $upgrade_postgres_script_location => 'json/coolify/rc/upgrade-postgres.sh',
+                        $service_template_location => 'json/coolify/rc/service-templates-latest.json',
                     ];
                 } else {
                     $files = [
@@ -418,7 +418,7 @@ class SyncBunny extends Command
                     ];
                 }
 
-                $releasesTarget = $nightly ? 'json/coolify/nightly/releases.json' : 'json/coolify/releases.json';
+                $releasesTarget = $rc ? 'json/coolify/rc/releases.json' : 'json/coolify/releases.json';
                 $options = [$releasesTarget, ...array_values($files)];
                 $selectedFiles = multiselect(
                     label: 'Which files would you like to sync?',
@@ -435,9 +435,9 @@ class SyncBunny extends Command
                 );
 
                 if ($includeReleases) {
-                    $this->syncReleasesToGitHubRepo($files, $nightly);
+                    $this->syncReleasesToGitHubRepo($files, $rc);
                 } else {
-                    $this->syncFilesToGitHubRepo($files, $nightly);
+                    $this->syncFilesToGitHubRepo($files, $rc);
                 }
 
                 return;

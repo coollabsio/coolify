@@ -31,6 +31,14 @@ class Updates extends Component
     #[Validate('required|string|in:docker.io,ghcr.io')]
     public string $docker_registry_url;
 
+    #[Validate('required|string|in:stable,rc')]
+    public string $update_channel;
+
+    #[Validate('required|string|in:minor,patch')]
+    public string $auto_update_scope;
+
+    public bool $isWaitingForStable = false;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -45,6 +53,39 @@ class Updates extends Component
         $this->update_check_frequency = $this->settings->update_check_frequency;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->docker_registry_url = $this->settings->docker_registry_url ?: 'docker.io';
+        $this->update_channel = $this->settings->update_channel ?: 'stable';
+        $this->auto_update_scope = $this->settings->auto_update_scope ?: 'minor';
+        $this->refreshWaitingForStableState();
+    }
+
+    public function saveUpdateChannel(): void
+    {
+        $this->authorize('update', $this->settings);
+        $validated = $this->validateOnly('update_channel');
+        $this->settings->update(['update_channel' => $validated['update_channel']]);
+
+        CheckForUpdatesJob::dispatchSync();
+        $this->refreshWaitingForStableState();
+        $this->dispatch('updateAvailable');
+        $this->dispatch('success', 'Update channel saved.');
+    }
+
+    public function saveAutoUpdateScope(): void
+    {
+        $this->authorize('update', $this->settings);
+        $validated = $this->validateOnly('auto_update_scope');
+        $this->settings->update(['auto_update_scope' => $validated['auto_update_scope']]);
+        $this->dispatch('success', 'Automatic update scope saved.');
+    }
+
+    private function refreshWaitingForStableState(): void
+    {
+        $stableVersion = data_get(get_versions_data(), 'coolify.v4.version');
+        $currentVersion = (string) config('constants.coolify.version');
+
+        $this->isWaitingForStable = $this->update_channel === 'stable'
+            && is_string($stableVersion)
+            && version_compare($currentVersion, $stableVersion, '>');
     }
 
     public function instantSave()

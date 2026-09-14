@@ -11,6 +11,8 @@ class InstanceSettings extends Model
 {
     protected $attributes = [
         'is_dashboard_force_https_enabled' => true,
+        'update_channel' => 'stable',
+        'auto_update_scope' => 'minor',
     ];
 
     protected $fillable = [
@@ -23,7 +25,8 @@ class InstanceSettings extends Model
         'is_auto_update_enabled',
         'is_registration_enabled',
         'disable_registration_when_oauth_enabled',
-        'next_channel',
+        'update_channel',
+        'auto_update_scope',
         'smtp_enabled',
         'smtp_from_address',
         'smtp_from_name',
@@ -93,6 +96,8 @@ class InstanceSettings extends Model
         'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
+        'update_channel' => 'string',
+        'auto_update_scope' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',

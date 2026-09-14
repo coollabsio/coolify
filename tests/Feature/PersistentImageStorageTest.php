@@ -9,12 +9,12 @@ it('configures a dedicated private disk for persisted images', function () {
         ]);
 });
 
-it('persists images in stable and nightly production compose files', function (string $composeFile) {
+it('persists images in stable and rc production compose files', function (string $composeFile) {
     expect(file_get_contents(base_path($composeFile)))
         ->toContain('/data/coolify/images:/var/www/html/storage/app/images');
 })->with([
     'stable' => 'docker-compose.prod.yml',
-    'nightly' => 'other/nightly/docker-compose.prod.yml',
+    'rc' => 'other/rc/docker-compose.prod.yml',
 ]);
 
 it('persists images in the Windows compose file', function () {

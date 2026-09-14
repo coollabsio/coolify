@@ -29,6 +29,7 @@ use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\CoolifyVersionSelector;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -647,8 +648,13 @@ function get_latest_version_of_coolify(): string
 {
     try {
         $versions = get_versions_data();
+        $settings = instanceSettings();
 
-        return data_get($versions, 'coolify.v4.version', '0.0.0');
+        return CoolifyVersionSelector::forManual(
+            $versions ?? [],
+            config('constants.coolify.version'),
+            $settings->update_channel ?: 'stable',
+        );
     } catch (Throwable $e) {
 
         return '0.0.0';

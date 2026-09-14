@@ -51,9 +51,9 @@ jobs:
           fi
 
           VERSION="${TAG_NAME#v}"
-          CONFIG_VERSION=$(jq -r '.coolify.nightly.version' versions.json)
+          CONFIG_VERSION=$(jq -r '.coolify.rc.version' versions.json)
           if [[ "${CONFIG_VERSION}" != "${VERSION}" ]]; then
-            echo "RC tag ${VERSION} does not match nightly version ${CONFIG_VERSION}."
+            echo "RC tag ${VERSION} does not match RC version ${CONFIG_VERSION}."
             exit 1
           fi
 

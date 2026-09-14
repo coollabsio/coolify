@@ -5,7 +5,7 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
     $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
-    $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
+    $rcVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/rc/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
@@ -25,8 +25,11 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->and($constants)
         ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.10'")
         ->and($versions['coolify']['v4']['version'])->toBe('4.3.10')
-        ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
-        ->and($nightlyVersions)->toBe($versions);
+        ->and($versions['coolify']['v4']['minors']['4.3'])->toBe('4.3.10')
+        ->and($versions['coolify']['rc']['version'])->toBe('4.4-rc.1')
+        ->and($rcVersions)->toBe($versions)
+        ->and(file_get_contents(dirname(__DIR__, 2).'/other/rc/upgrade.sh'))
+        ->toContain('CDN="https://cdn.coollabs.io/coolify-rc"');
 });
 
 it('orders a maintenance development build before its stable release', function () {
@@ -117,7 +120,7 @@ it('publishes traceable rolling builds from next without creating an exact rc ta
         ->toContain('name: Build Coolify Next')
         ->toContain('branches: [next]')
         ->toContain('group: coolify-next-build')
-        ->toContain("jq -r '.coolify.nightly.version' versions.json")
+        ->toContain("jq -r '.coolify.rc.version' versions.json")
         ->toContain('VERSION="${RC_VERSION}.${SHORT_SHA}"')
         ->toContain('COOLIFY_VERSION=${{ needs.prepare.outputs.version }}')
         ->toContain('--tag "${IMAGE}:sha-${SHA}"')
@@ -136,7 +139,7 @@ it('requires a reviewed draft prerelease before publishing an exact rc', functio
         ->toContain("github.ref != 'refs/heads/next'")
         ->toContain('group: coolify-rc-release')
         ->toContain('^v[0-9]+\\.[0-9]+-rc\\.[0-9]+$')
-        ->toContain("jq -r '.coolify.nightly.version' versions.json")
+        ->toContain("jq -r '.coolify.rc.version' versions.json")
         ->toContain('release.draft')
         ->toContain('!release.prerelease')
         ->toContain('release.body?.trim()')

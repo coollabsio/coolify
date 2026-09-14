@@ -35,6 +35,8 @@ function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): voi
         'is_auto_update_enabled' => true,
         'auto_update_frequency' => '0 0 * * *',
         'update_check_frequency' => '0 * * * *',
+        'update_channel' => 'stable',
+        'auto_update_scope' => 'minor',
     ], $settings));
     Once::flush();
 }
@@ -47,8 +49,8 @@ it('has UpdateCoolify action class', function () {
     expect(class_exists(UpdateCoolify::class))->toBeTrue();
 });
 
-it('validates cache against running version before fallback', function () {
-    updateCoolifyTestCreateRootServerAndSettings();
+it('does not downgrade when cached metadata is older than the running version', function () {
+    updateCoolifyTestCreateRootServerAndSettings(['new_version_available' => true]);
 
     // CDN fails
     Http::fake(['*' => Http::response(null, 500)]);
@@ -61,15 +63,14 @@ it('validates cache against running version before fallback', function () {
 
     $action = new UpdateCoolify;
 
-    // Should throw exception - cache is older than running
-    try {
-        $action->handle(manual_update: false);
-        expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (Exception $e) {
-        expect($e->getMessage())->toContain('cache version');
-        expect($e->getMessage())->toContain('4.0.5');
-        expect($e->getMessage())->toContain('4.0.10');
-    }
+    Log::shouldReceive('warning')
+        ->once()
+        ->with('Failed to fetch fresh version from CDN, using validated cache', Mockery::type('array'));
+
+    $action->handle(manual_update: false);
+
+    expect($action->latestVersion)->toBe('4.0.10')
+        ->and(Activity::query()->count())->toBe(0);
 });
 
 it('uses validated cache when CDN fails and cache is newer', function () {
@@ -96,6 +97,32 @@ it('uses validated cache when CDN fails and cache is newer', function () {
     $action->handle(manual_update: false);
 
     expect($action->latestVersion)->toBe('4.0.10');
+});
+
+it('uses newer cached metadata when a successful CDN response is stale', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.5',
+        'constants.coolify.helper_version' => '1.0.15',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    updateCoolifyTestCreateRootServerAndSettings(['new_version_available' => true]);
+
+    Cache::shouldReceive('remember')->andReturn([
+        'coolify' => ['v4' => ['version' => '4.0.10']],
+    ]);
+    Http::fake(['*' => Http::response([
+        'coolify' => ['v4' => ['version' => '4.0.6']],
+    ])]);
+
+    $action = new UpdateCoolify;
+    $action->handle(manual_update: true);
+
+    expect($action->latestVersion)->toBe('4.0.10')
+        ->and(Activity::query()->latest('id')->first()?->getExtraProperty('command'))
+        ->toContain("'4.0.10'");
 });
 
 it('passes the saved registry URL to the upgrade script command', function () {
@@ -125,6 +152,86 @@ it('passes the saved registry URL to the upgrade script command', function () {
         "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'ghcr.io'"
     );
+});
+
+it('uses the RC version and RC upgrade script for a manual RC update', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.3.10',
+        'constants.coolify.helper_version' => '1.0.15',
+        'constants.coolify.rc_upgrade_script_url' => 'https://cdn.example.com/coolify-rc/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings(['update_channel' => 'rc']);
+
+    Http::fake(['*' => Http::response([
+        'coolify' => [
+            'v4' => ['version' => '4.3.10'],
+            'rc' => ['version' => '4.4-rc.1'],
+        ],
+    ])]);
+
+    (new UpdateCoolify)->handle(manual_update: true);
+
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))
+        ->toContain('https://cdn.example.com/coolify-rc/upgrade.sh')
+        ->toContain("'4.4-rc.1'");
+});
+
+it('never installs an RC during automatic updates', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.3.10',
+        'constants.coolify.helper_version' => '1.0.15',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/coolify/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings(['update_channel' => 'rc']);
+
+    Http::fake(['*' => Http::response([
+        'coolify' => [
+            'v4' => ['version' => '4.3.11'],
+            'rc' => ['version' => '4.4-rc.1'],
+        ],
+    ])]);
+
+    (new UpdateCoolify)->handle();
+
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))
+        ->toContain("'4.3.11'")
+        ->not->toContain('4.4-rc.1');
+});
+
+it('keeps patch-only automatic updates on the installed minor line', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.3.10',
+        'constants.coolify.helper_version' => '1.0.15',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.example.com/coolify/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings(['auto_update_scope' => 'patch']);
+
+    Http::fake(['*' => Http::response([
+        'coolify' => [
+            'v4' => [
+                'version' => '4.4.0',
+                'minors' => ['4.3' => '4.3.11', '4.4' => '4.4.0'],
+            ],
+        ],
+    ])]);
+
+    (new UpdateCoolify)->handle();
+
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))
+        ->toContain("'4.3.11'")
+        ->not->toContain('4.4.0');
 });
 
 it('falls back to docker io for the upgrade script command when no registry is saved', function () {
@@ -174,6 +281,93 @@ it('defaults the registry setting to docker io when no registry is saved', funct
 
     Livewire::test(Updates::class)
         ->assertSet('docker_registry_url', 'docker.io');
+});
+
+it('defaults update preferences to stable and all minor and patch versions', function () {
+    config([
+        'app.env' => 'local',
+        'constants.coolify.self_hosted' => true,
+        'constants.coolify.version' => '4.3.10',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => 0]]);
+
+    Livewire::test(Updates::class)
+        ->assertSet('update_channel', 'stable')
+        ->assertSet('auto_update_scope', 'minor');
+});
+
+it('saves valid update preferences', function () {
+    config([
+        'app.env' => 'local',
+        'constants.coolify.self_hosted' => true,
+        'constants.coolify.version' => '4.3.10',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => 0]]);
+
+    Livewire::test(Updates::class)
+        ->set('update_channel', 'rc')
+        ->call('saveUpdateChannel')
+        ->assertDispatched('updateAvailable')
+        ->set('auto_update_scope', 'patch')
+        ->call('saveAutoUpdateScope');
+
+    $settings = InstanceSettings::findOrFail(0);
+    expect($settings->update_channel)->toBe('rc')
+        ->and($settings->auto_update_scope)->toBe('patch');
+});
+
+it('rejects invalid update preferences', function () {
+    config([
+        'app.env' => 'local',
+        'constants.coolify.self_hosted' => true,
+        'constants.coolify.version' => '4.3.10',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => 0]]);
+
+    Livewire::test(Updates::class)
+        ->set('update_channel', 'nightly')
+        ->call('saveUpdateChannel')
+        ->assertHasErrors(['update_channel' => ['in']])
+        ->set('auto_update_scope', 'major')
+        ->call('saveAutoUpdateScope')
+        ->assertHasErrors(['auto_update_scope' => ['in']]);
+});
+
+it('warns instead of offering a downgrade after switching from RC to stable', function () {
+    config([
+        'app.env' => 'local',
+        'constants.coolify.self_hosted' => true,
+        'constants.coolify.version' => '4.4-rc.1',
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings(['update_channel' => 'stable']);
+    $rootTeam = Team::findOrFail(0);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => 0]]);
+
+    Livewire::test(Updates::class)
+        ->assertSet('isWaitingForStable', true)
+        ->assertSee('Coolify will not downgrade it');
 });
 
 it('uses the database registry for helper images when the configured helper image is default', function () {
@@ -288,7 +482,7 @@ it('appends registry url to env file when the key is missing', function () {
         ->toContain("printf '%s\\n' 'REGISTRY_URL=ghcr.io' >> /data/coolify/source/.env");
 });
 
-it('prevents downgrade even with manual update', function () {
+it('does not run a downgrade even with manual update', function () {
     updateCoolifyTestCreateRootServerAndSettings();
 
     // CDN returns older version
@@ -303,17 +497,8 @@ it('prevents downgrade even with manual update', function () {
 
     $action = new UpdateCoolify;
 
-    Log::shouldReceive('error')
-        ->once()
-        ->with('Downgrade prevented', Mockery::type('array'));
+    $action->handle(manual_update: true);
 
-    // Should throw exception even for manual updates
-    try {
-        $action->handle(manual_update: true);
-        expect(false)->toBeTrue('Expected exception was not thrown');
-    } catch (Exception $e) {
-        expect($e->getMessage())->toContain('Cannot downgrade');
-        expect($e->getMessage())->toContain('4.0.10');
-        expect($e->getMessage())->toContain('4.0.0');
-    }
+    expect($action->latestVersion)->toBe('4.0.10')
+        ->and(Activity::query()->count())->toBe(0);
 });

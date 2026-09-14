@@ -16,7 +16,7 @@ it('only exposes the BunnyCDN legacy sync option', function () {
     expect($definition->hasOption('bunny'))->toBeTrue()
         ->and($definition->hasOption('github-releases'))->toBeFalse()
         ->and($definition->hasOption('release'))->toBeFalse()
-        ->and($definition->hasOption('nightly'))->toBeFalse()
+        ->and($definition->hasOption('rc'))->toBeFalse()
         ->and($definition->hasOption('templates'))->toBeFalse();
 });
 
@@ -87,7 +87,7 @@ SH);
         $this->artisan('sync:bunny --bunny')
             ->expectsChoice('Which environment would you like to sync?', 'production', [
                 'production' => 'Production',
-                'nightly' => 'Nightly',
+                'rc' => 'Release Candidate',
             ])
             ->expectsConfirmation('Are you sure you want to sync?', 'yes')
             ->assertExitCode(0);
@@ -136,8 +136,8 @@ if [ "$1" = "status" ]; then
     printf 'M json/releases.json\n'
 fi
 if [ "$1" = "diff" ]; then
-    if [ -f json/coolify/nightly/releases.json ]; then
-        printf 'json/coolify/nightly/releases.json\n'
+    if [ -f json/coolify/rc/releases.json ]; then
+        printf 'json/coolify/rc/releases.json\n'
     else
         printf 'json/coolify/releases.json\n'
     fi
@@ -167,7 +167,7 @@ SH);
         $this->artisan('sync:bunny')
             ->expectsChoice('Which environment would you like to sync?', $environment, [
                 'production' => 'Production',
-                'nightly' => 'Nightly',
+                'rc' => 'Release Candidate',
             ])
             ->expectsChoice('Which files would you like to sync?', $selectedTargets, $allTargets)
             ->assertExitCode(0);
@@ -199,7 +199,7 @@ SH);
     Http::assertSentCount(1);
 })->with([
     'select production files' => ['json/coolify', 'production', ['releases.json', 'versions.json']],
-    'select nightly with all files selected by default' => ['json/coolify/nightly', 'nightly', [
+    'select rc with all files selected by default' => ['json/coolify/rc', 'rc', [
         'releases.json',
         'versions.json',
         'docker-compose.yml',

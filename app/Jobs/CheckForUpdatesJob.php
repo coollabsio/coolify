@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\CoolifyVersionSelector;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,49 +24,21 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             $settings = instanceSettings();
-            $response = Http::retry(3, 1000)->get(config('constants.coolify.versions_url'));
+            $response = Http::retry(3, 1000)
+                ->connectTimeout(10)
+                ->timeout(10)
+                ->get(config('constants.coolify.versions_url'));
             if ($response->successful()) {
                 $versions = $response->json();
-
-                $latest_version = data_get($versions, 'coolify.v4.version');
                 $current_version = config('constants.coolify.version');
 
                 // Read existing cached version
                 $existingVersions = null;
-                $existingCoolifyVersion = null;
                 if (File::exists(base_path('versions.json'))) {
                     $existingVersions = json_decode(File::get(base_path('versions.json')), true);
-                    $existingCoolifyVersion = data_get($existingVersions, 'coolify.v4.version');
                 }
 
-                // Determine the BEST version to use (CDN, cache, or current)
-                $bestVersion = $latest_version;
-
-                // Check if cache has newer version than CDN
-                if ($existingCoolifyVersion && version_compare($existingCoolifyVersion, $bestVersion, '>')) {
-                    Log::warning('CDN served older Coolify version than cache', [
-                        'cdn_version' => $latest_version,
-                        'cached_version' => $existingCoolifyVersion,
-                        'current_version' => $current_version,
-                    ]);
-                    $bestVersion = $existingCoolifyVersion;
-                }
-
-                // CRITICAL: Never allow bestVersion to be older than currently running version
-                if (version_compare($bestVersion, $current_version, '<')) {
-                    Log::warning('Version downgrade prevented in CheckForUpdatesJob', [
-                        'cdn_version' => $latest_version,
-                        'cached_version' => $existingCoolifyVersion,
-                        'current_version' => $current_version,
-                        'attempted_best' => $bestVersion,
-                        'using' => $current_version,
-                    ]);
-                    $bestVersion = $current_version;
-                }
-
-                // Use data_set() for safe mutation (fixes #3)
-                data_set($versions, 'coolify.v4.version', $bestVersion);
-                $latest_version = $bestVersion;
+                $versions = $this->preserveNewerCachedVersions($versions, $existingVersions, $current_version);
 
                 // ALWAYS write versions.json (for Sentinel, Helper, Traefik updates)
                 File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
@@ -73,16 +46,50 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 // Invalidate cache to ensure fresh data is loaded
                 invalidate_versions_cache();
 
-                // Only mark new version available if Coolify version actually increased
-                if (version_compare($latest_version, $current_version, '>')) {
-                    // New version available
-                    $settings->update(['new_version_available' => true]);
-                } else {
-                    $settings->update(['new_version_available' => false]);
-                }
+                $targetVersion = CoolifyVersionSelector::forManual(
+                    $versions,
+                    $current_version,
+                    $settings->update_channel ?: 'stable',
+                );
+
+                $settings->update([
+                    'new_version_available' => version_compare($targetVersion, $current_version, '>'),
+                ]);
             }
         } catch (\Throwable $e) {
-            // Consider implementing a notification to administrators
+            Log::error('Failed to check for Coolify updates', [
+                'error' => $e->getMessage(),
+            ]);
         }
+    }
+
+    private function preserveNewerCachedVersions(array $versions, ?array $existingVersions, string $currentVersion): array
+    {
+        foreach (['coolify.v4.version', 'coolify.rc.version'] as $path) {
+            $cdnVersion = data_get($versions, $path);
+            $cachedVersion = data_get($existingVersions, $path);
+
+            if (is_string($cachedVersion) && (! is_string($cdnVersion) || version_compare($cachedVersion, $cdnVersion, '>'))) {
+                Log::warning('CDN served older Coolify version than cache', [
+                    'path' => $path,
+                    'cdn_version' => $cdnVersion,
+                    'cached_version' => $cachedVersion,
+                    'current_version' => $currentVersion,
+                ]);
+            }
+        }
+
+        $stableVersion = data_get($versions, 'coolify.v4.version');
+        if (! CoolifyVersionSelector::isReleaseCandidate($currentVersion)
+            && is_string($stableVersion)
+            && version_compare($stableVersion, $currentVersion, '<')) {
+            Log::warning('Version downgrade prevented in CheckForUpdatesJob', [
+                'cdn_version' => $stableVersion,
+                'current_version' => $currentVersion,
+                'using' => $currentVersion,
+            ]);
+        }
+
+        return CoolifyVersionSelector::reconcileMetadata($versions, $existingVersions, $currentVersion);
     }
 }

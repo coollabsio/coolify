@@ -26,7 +26,7 @@ function assertBashSyntaxIsValid(string $path): void
 
 it('ships postgres upgrade scripts with valid bash syntax', function () {
     assertBashSyntaxIsValid('scripts/upgrade-postgres.sh');
-    assertBashSyntaxIsValid('other/nightly/upgrade-postgres.sh');
+    assertBashSyntaxIsValid('other/rc/upgrade-postgres.sh');
 });
 
 it('downloads postgres upgrade script during install and upgrade without auto-running it', function (string $path) {
@@ -39,9 +39,9 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
         ->not->toContain('bash /data/coolify/source/upgrade-postgres.sh');
 })->with([
     'stable install' => 'scripts/install.sh',
-    'nightly install' => 'other/nightly/install.sh',
+    'rc install' => 'other/rc/install.sh',
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('uses the selected registry url when extracting upgrade images', function (string $path) {
@@ -50,7 +50,7 @@ it('uses the selected registry url when extracting upgrade images', function (st
     expect($script)->toContain('IMAGES=$(REGISTRY_URL=${REGISTRY_URL} LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file "$ENV_FILE" $COMPOSE_FILES config --images');
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('persists the selected registry url during upgrades', function (string $path) {
@@ -59,7 +59,7 @@ it('persists the selected registry url during upgrades', function (string $path)
     expect($script)->toContain('set_env_var "REGISTRY_URL" "$REGISTRY_URL"');
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('persists the target image and runtime version before recreating containers', function (string $path) {
@@ -88,7 +88,7 @@ it('persists the target image and runtime version before recreating containers',
         ->and($coolifyVersionPosition)->toBeLessThan($composeUpPosition);
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('uses the existing env registry url when old callers do not pass a registry argument', function (string $path) {
@@ -102,7 +102,7 @@ it('uses the existing env registry url when old callers do not pass a registry a
         ->toContain('REGISTRY_URL="docker.io"');
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('keeps postgres upgrade compose override in future upgrade compose commands', function (string $path) {
@@ -114,7 +114,7 @@ it('keeps postgres upgrade compose override in future upgrade compose commands',
         ->toContain('Using PostgreSQL upgrade compose override');
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
+    'rc upgrade' => 'other/rc/upgrade.sh',
 ]);
 
 it('uses postgres 18 compatible mount path in generated override and restore container', function () {

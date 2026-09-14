@@ -23,6 +23,6 @@ it('uses the rocky linux documented docker install flow in the stable install sc
     expectRockyInstallScriptToUseRhelRepo('scripts/install.sh');
 });
 
-it('uses the rocky linux documented docker install flow in the nightly install script', function () {
-    expectRockyInstallScriptToUseRhelRepo('other/nightly/install.sh');
+it('uses the rocky linux documented docker install flow in the rc install script', function () {
+    expectRockyInstallScriptToUseRhelRepo('other/rc/install.sh');
 });

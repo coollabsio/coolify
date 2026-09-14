@@ -11,5 +11,5 @@ it('allows Coolify enough time to start before counting healthcheck failures', f
         ->retries->toBe(24);
 })->with([
     'stable' => 'docker-compose.prod.yml',
-    'nightly' => 'other/nightly/docker-compose.prod.yml',
+    'rc' => 'other/rc/docker-compose.prod.yml',
 ]);

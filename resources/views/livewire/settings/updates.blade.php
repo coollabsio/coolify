@@ -13,6 +13,29 @@
                 <livewire:upgrade :full-button="true" key="settings-upgrade" />
             </x-application.settings-section>
 
+            <x-application.settings-section title="Update channel">
+                <div class="flex max-w-2xl flex-col gap-4">
+                    <div class="max-w-md">
+                        <x-forms.listbox id="update_channel" label="Manual update channel"
+                            helper="Controls versions offered by manual update checks. Release candidates are never installed automatically."
+                            onChange="saveUpdateChannel" :options="[
+                                ['value' => 'stable', 'label' => 'Stable'],
+                                ['value' => 'rc', 'label' => 'Release candidate'],
+                            ]" />
+                    </div>
+
+                    @if ($update_channel === 'rc')
+                        <x-callout type="warning" title="Release candidate channel">
+                            Release candidates may be unstable and always require a manual upgrade. Automatic updates continue to install stable releases only.
+                        </x-callout>
+                    @elseif ($isWaitingForStable)
+                        <x-callout type="info" title="Waiting for a newer stable release">
+                            This instance is newer than the latest stable release. Coolify will not downgrade it and will wait until a newer stable version is available.
+                        </x-callout>
+                    @endif
+                </div>
+            </x-application.settings-section>
+
             <x-application.settings-section title="Update checks">
                 <x-slot:actions>
                     <x-forms.button type="button" wire:click="checkManually">
@@ -48,6 +71,13 @@
                     @else
                         <x-forms.input label="Update frequency" disabled placeholder="Disabled" />
                     @endif
+
+                    <x-forms.listbox id="auto_update_scope" label="Automatic update scope"
+                        helper="Applies only to stable automatic updates. Manual updates can still offer newer minor versions and release candidates."
+                        onChange="saveAutoUpdateScope" :options="[
+                            ['value' => 'minor', 'label' => 'All minor and patch versions'],
+                            ['value' => 'patch', 'label' => 'Patch versions only'],
+                        ]" />
                 </div>
             </x-application.settings-section>
 
