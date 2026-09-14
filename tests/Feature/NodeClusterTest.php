@@ -337,6 +337,7 @@ it('adds a firewall rule from a Node to a workload', function () {
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->assertSee($node->name)
+        ->assertSee('Nodes allow only required cluster traffic by default.')
         ->set('firewallSourceUuid', 'node:'.$node->uuid)
         ->set('firewallDestinationUuid', $destination->uuid)
         ->set('firewallProtocol', 'icmp')

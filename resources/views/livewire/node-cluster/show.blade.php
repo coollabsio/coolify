@@ -53,7 +53,7 @@
                 </div>
             </x-application.settings-section>
         </div>
-        <x-application.settings-section title="Firewall" helper="Workloads reject mesh and external connections by default. Outbound internet access stays available.">
+        <x-application.settings-section title="Firewall" helper="Nodes allow only required cluster traffic by default. Workloads reject mesh and external connections by default. Outbound internet access stays available.">
             <h3 class="mb-3 text-base font-semibold">Workload traffic</h3>
             @can('update', $cluster)
                 <form wire:submit="addFirewallRule" class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
