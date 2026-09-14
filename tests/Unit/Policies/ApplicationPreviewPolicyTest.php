@@ -76,6 +76,7 @@ it('allows admin user to create application preview', function () {
 it('denies non-admin user from creating application preview', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ApplicationPreviewPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -99,6 +100,7 @@ it('allows team admin to update application preview', function () {
 it('denies team member from updating application preview', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();
@@ -140,6 +142,7 @@ it('allows team admin to delete application preview', function () {
 it('denies team member from deleting application preview', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();
@@ -180,6 +183,7 @@ it('allows team admin to deploy application preview', function () {
 it('denies team member from deploying application preview', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();
@@ -210,6 +214,7 @@ it('allows team admin to manage preview deployments', function () {
 it('denies team member from managing preview deployments', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();

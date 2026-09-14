@@ -52,6 +52,7 @@ it('allows admin to create a project', function () {
 it('denies member to create a project', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ProjectPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -71,6 +72,7 @@ it('allows team admin to update their own team project', function () {
 it('denies team member to update their own team project', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $project = Mockery::mock(Project::class)->makePartial();
     $project->team_id = 1;
@@ -93,6 +95,7 @@ it('allows team admin to delete their own team project', function () {
 it('denies team member to delete their own team project', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $project = Mockery::mock(Project::class)->makePartial();
     $project->team_id = 1;

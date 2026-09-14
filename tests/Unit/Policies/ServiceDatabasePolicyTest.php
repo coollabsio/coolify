@@ -15,6 +15,7 @@ it('allows admin to create service database', function () {
 it('denies member from creating service database', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ServiceDatabasePolicy;
     expect($policy->create($user))->toBeFalse();

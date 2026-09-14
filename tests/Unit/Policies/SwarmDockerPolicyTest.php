@@ -52,6 +52,7 @@ it('allows admin to create swarm docker', function () {
 it('denies non-admin from creating swarm docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new SwarmDockerPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -71,6 +72,7 @@ it('allows team admin to update swarm docker', function () {
 it('denies non-admin from updating swarm docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $swarmDocker = Mockery::mock(SwarmDocker::class)->makePartial();
     $swarmDocker->shouldReceive('getAttribute')->with('server')->andReturn((object) ['team_id' => 1]);
@@ -93,6 +95,7 @@ it('allows team admin to delete swarm docker', function () {
 it('denies non-admin from deleting swarm docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $swarmDocker = Mockery::mock(SwarmDocker::class)->makePartial();
     $swarmDocker->shouldReceive('getAttribute')->with('server')->andReturn((object) ['team_id' => 1]);

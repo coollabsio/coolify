@@ -30,7 +30,7 @@ class ApplicationSettingPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -40,7 +40,7 @@ class ApplicationSettingPolicy
     {
         $teamId = $this->getTeamId($applicationSetting);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -50,7 +50,7 @@ class ApplicationSettingPolicy
     {
         $teamId = $this->getTeamId($applicationSetting);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**

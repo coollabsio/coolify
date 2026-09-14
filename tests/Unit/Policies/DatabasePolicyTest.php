@@ -67,6 +67,7 @@ it('allows admin to create a database', function () {
 it('denies member to create a database', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new DatabasePolicy;
     expect($policy->create($user))->toBeFalse();
@@ -86,6 +87,7 @@ it('allows team admin to update their own team database', function () {
 it('denies team member to update their own team database', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -118,6 +120,7 @@ it('allows team admin to delete their own team database', function () {
 it('denies team member to delete their own team database', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -150,6 +153,7 @@ it('allows team admin to manage their own team database', function () {
 it('denies team member to manage their own team database', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -172,6 +176,7 @@ it('allows team admin to manage backups', function () {
 it('denies team member to manage backups', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -194,6 +199,7 @@ it('allows team admin to manage database environment variables', function () {
 it('denies team member to manage database environment variables', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $database = Mockery::mock(StandalonePostgresql::class)->makePartial();
     $database->shouldReceive('team')->andReturn((object) ['id' => 1]);
