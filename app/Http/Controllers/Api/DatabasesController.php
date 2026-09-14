@@ -1842,7 +1842,7 @@ class DatabasesController extends Controller
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
         ]);
-        if ($validator->failed()) {
+        if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),

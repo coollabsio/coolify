@@ -41,3 +41,11 @@ it('throws ServiceTemplateNotFoundException for an unknown slug', function () {
 
     CreateService::run($placement, 'definitely-not-a-template', null);
 })->throws(ServiceTemplateNotFoundException::class);
+
+it('rejects providing both a template slug and docker compose', function () {
+    Queue::fake();
+    $placement = servicePlacement();
+    $compose = base64_encode("services:\n  app:\n    image: nginx:alpine\n");
+
+    CreateService::run($placement, 'some-slug', $compose);
+})->throws(InvalidArgumentException::class);

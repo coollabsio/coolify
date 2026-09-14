@@ -33,11 +33,7 @@ class Assistant extends Component
     #[Computed]
     public function active(): ?array
     {
-        if (! $this->activeConversationId) {
-            return null;
-        }
-
-        $conversation = AiConversation::find($this->activeConversationId);
+        $conversation = $this->viewableConversation($this->activeConversationId);
         if (! $conversation) {
             return null;
         }
@@ -46,6 +42,29 @@ class Assistant extends Component
             'uuid' => $conversation->uuid,
             'title' => $conversation->title ?: 'New conversation',
         ];
+    }
+
+    /**
+     * Resolve a conversation only when it belongs to the current team and is
+     * visible to the viewer (shared, or their own private thread). Returns null
+     * otherwise so a client-set activeConversationId cannot expose another
+     * team's or member's conversation (IDOR).
+     */
+    private function viewableConversation(?int $id): ?AiConversation
+    {
+        if (! $id) {
+            return null;
+        }
+
+        $userId = auth()->id();
+
+        return AiConversation::where('id', $id)
+            ->where('team_id', currentTeam()->id)
+            ->where(function ($query) use ($userId) {
+                $query->where('visibility', AiConversation::VISIBILITY_TEAM)
+                    ->orWhere('created_by_user_id', $userId);
+            })
+            ->first();
     }
 
     /**
@@ -59,7 +78,7 @@ class Assistant extends Component
         }
 
         if ($this->activeConversationId) {
-            $current = AiConversation::find($this->activeConversationId);
+            $current = $this->viewableConversation($this->activeConversationId);
             if ($current && $current->updated_at?->gt(now()->subHour())) {
                 return;
             }

@@ -23,6 +23,45 @@ beforeEach(function () {
     session(['currentTeam' => ['id' => $this->team->id]]);
 });
 
+test('active() never exposes another member or team conversation (IDOR)', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
+    Once::flush();
+
+    $other = User::factory()->create();
+    $other->teams()->attach($this->team, ['role' => 'member']);
+    $foreignPrivate = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $other->id,
+        'visibility' => AiConversation::VISIBILITY_PRIVATE,
+        'title' => 'Secret plans',
+    ]);
+
+    $otherTeam = Team::factory()->create();
+    $foreignTeam = AiConversation::factory()->for($otherTeam)->create([
+        'created_by_user_id' => $other->id,
+        'visibility' => AiConversation::VISIBILITY_TEAM,
+        'title' => 'Other team thread',
+    ]);
+
+    // Drive active() directly with a client-controlled id: it must resolve nothing
+    // for another member's private thread or another team's conversation, while
+    // still exposing the viewer's own thread.
+    $component = new Assistant;
+
+    $component->activeConversationId = $foreignPrivate->id;
+    expect($component->active())->toBeNull();
+
+    $component->activeConversationId = $foreignTeam->id;
+    expect($component->active())->toBeNull();
+
+    $mine = AiConversation::factory()->for($this->team)->create([
+        'created_by_user_id' => $this->user->id,
+        'visibility' => AiConversation::VISIBILITY_PRIVATE,
+        'title' => 'Mine',
+    ]);
+    $component->activeConversationId = $mine->id;
+    expect($component->active()['title'])->toBe('Mine');
+});
+
 test('the assistant is enabled only when both flags are on', function () {
     InstanceSettings::forceCreate(['id' => 0, 'is_ai_assistant_enabled' => true]);
     Once::flush();

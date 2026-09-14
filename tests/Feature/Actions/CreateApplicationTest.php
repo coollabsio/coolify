@@ -120,6 +120,23 @@ it('dispatches LoadComposeFile for dockercompose without instant deploy', functi
     LoadComposeFile::assertPushed();
 });
 
+it('ignores a mismatched dockercompose build_pack on a non-git application type', function () {
+    Queue::fake();
+    [$placement] = appPlacement();
+
+    // A dockerimage request carrying build_pack=dockercompose must not trigger
+    // compose handling (clearing fqdn / dispatching LoadComposeFile).
+    $app = CreateApplication::run($placement, 'dockerimage', [
+        'docker_registry_image_name' => 'nginx',
+        'docker_registry_image_tag' => 'alpine',
+        'ports_exposes' => '80',
+        'build_pack' => 'dockercompose',
+    ]);
+
+    LoadComposeFile::assertNotPushed();
+    expect($app->build_pack)->toBe('dockerimage');
+});
+
 it('links a private deploy key and rejects unknown keys', function () {
     Queue::fake();
     [$placement, $team] = appPlacement();

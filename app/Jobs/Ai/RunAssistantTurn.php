@@ -122,15 +122,7 @@ class RunAssistantTurn implements ShouldQueue
             }
 
             if ($final?->hasPendingApprovals()) {
-                broadcast(new AssistantApprovalRequested(
-                    $conversation->uuid,
-                    $final->pendingApprovals->map(fn ($a) => [
-                        'id' => $a->id,
-                        'tool' => $a->tool,
-                        'arguments' => $a->arguments,
-                        'reason' => $a->reason,
-                    ])->all(),
-                ));
+                broadcast(new AssistantApprovalRequested($conversation->uuid));
             } else {
                 broadcast(new AssistantTurnCompleted($conversation->uuid, $final?->text ?? $partial));
             }
@@ -145,7 +137,10 @@ class RunAssistantTurn implements ShouldQueue
             // rather than surfacing the raw "This action is unauthorized." string.
             broadcast(new AssistantTurnFailed($conversation->uuid, 'You do not have permission to perform that action.'));
         } catch (Throwable $e) {
-            broadcast(new AssistantTurnFailed($conversation->uuid, $e->getMessage()));
+            // Never forward raw provider/tool/DB error text to the client: it can
+            // carry internal endpoints, ids, or input. Log it, show a safe message.
+            report($e);
+            broadcast(new AssistantTurnFailed($conversation->uuid, 'The assistant hit an error and stopped. Please try again.'));
         } finally {
             AssistantTurn::clear($conversation->uuid);
             $conversation->release();

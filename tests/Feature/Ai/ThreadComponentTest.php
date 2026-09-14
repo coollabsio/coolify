@@ -82,13 +82,42 @@ test('stop requests cancellation for the thread', function () {
 
 test('approving a pending call dispatches a resume job', function () {
     Bus::fake();
-    $this->conversation->update(['sdk_conversation_id' => (string) Str::uuid()]);
+    $sdk = (string) Str::uuid();
+    $this->conversation->update(['sdk_conversation_id' => $sdk]);
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid(),
+        'conversation_id' => $sdk,
+        'agent' => 'coolify',
+        'role' => 'assistant',
+        'content' => 'I need approval.',
+        'attachments' => '[]',
+        'tool_calls' => json_encode([['id' => 'call_1', 'name' => 'create_service', 'arguments' => []]]),
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'approval_state' => json_encode(['pending' => ['call_1' => 'Create service.']]),
+        'author_user_id' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
     Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
         ->call('approve', 'call_1');
 
     Bus::assertDispatched(ResumeAssistantTurn::class, fn ($job) => $job->decisions === ['call_1' => ['action' => 'approve']]
         && $job->approverUserId === $this->user->id);
+});
+
+test('approving a non-pending call does not claim or dispatch', function () {
+    Bus::fake();
+    $this->conversation->update(['sdk_conversation_id' => (string) Str::uuid()]);
+
+    Livewire::test(Thread::class, ['conversationId' => $this->conversation->id])
+        ->call('approve', 'bogus-call');
+
+    Bus::assertNotDispatched(ResumeAssistantTurn::class);
+    expect($this->conversation->fresh()->status)->toBe(AiConversation::STATUS_IDLE)
+        ->and($this->conversation->fresh()->decision_log ?? [])->toBe([]);
 });
 
 test('the composer sends on Enter but not Shift+Enter and grows to a bounded height', function () {

@@ -114,3 +114,19 @@ test('a shared title broadcasts to the team', function () {
         return $channels->contains("private-team.{$this->team->id}");
     });
 });
+
+test('a private conversation owned by the root user (id 0) still broadcasts to its owner', function () {
+    // Regression: empty(0) is true, so a bare truthiness check would drop the
+    // broadcast for the root user (id 0).
+    $event = new AssistantConversationRenamed(
+        teamId: 1,
+        conversationId: 2,
+        title: 'Root thread',
+        visibility: 'private',
+        ownerUserId: 0,
+    );
+
+    $channels = collect($event->broadcastOn())->map(fn (PrivateChannel $c) => $c->name);
+
+    expect($channels)->toContain('private-user.0');
+});

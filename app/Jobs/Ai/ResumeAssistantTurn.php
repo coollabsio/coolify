@@ -131,15 +131,7 @@ class ResumeAssistantTurn implements ShouldQueue
             }
 
             if ($final?->hasPendingApprovals()) {
-                broadcast(new AssistantApprovalRequested(
-                    $conversation->uuid,
-                    $final->pendingApprovals->map(fn ($a) => [
-                        'id' => $a->id,
-                        'tool' => $a->tool,
-                        'arguments' => $a->arguments,
-                        'reason' => $a->reason,
-                    ])->all(),
-                ));
+                broadcast(new AssistantApprovalRequested($conversation->uuid));
             } else {
                 broadcast(new AssistantTurnCompleted($conversation->uuid, $final?->text ?? $partial));
             }
@@ -148,7 +140,9 @@ class ResumeAssistantTurn implements ShouldQueue
         } catch (AuthorizationException $e) {
             broadcast(new AssistantTurnFailed($conversation->uuid, 'You do not have permission to perform that action.'));
         } catch (Throwable $e) {
-            broadcast(new AssistantTurnFailed($conversation->uuid, $e->getMessage()));
+            // Don't leak raw provider/tool/DB error text to the client.
+            report($e);
+            broadcast(new AssistantTurnFailed($conversation->uuid, 'The assistant hit an error and stopped. Please try again.'));
         } finally {
             AssistantTurn::clear($conversation->uuid);
             $conversation->release();

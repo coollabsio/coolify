@@ -27,6 +27,12 @@ class CreateService
         array $data = [],
         bool $instantDeploy = false,
     ): Service {
+        // Exactly one source. Guard the "both" case so a caller can't pass compose
+        // that then silently disappears because the template branch wins.
+        if (filled($templateSlug) && filled($dockerComposeRaw)) {
+            throw new \InvalidArgumentException('Provide either a template slug or docker_compose_raw, not both.');
+        }
+
         $service = $templateSlug
             ? $this->fromTemplate($placement, $templateSlug, $data)
             : $this->fromCompose($placement, (string) $dockerComposeRaw, $data);

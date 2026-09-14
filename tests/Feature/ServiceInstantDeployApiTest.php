@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Service\StartService;
+use App\Jobs\DeleteResourceJob;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -58,7 +59,7 @@ test('instant_deploy queues StartService once creation and url validation succee
     Queue::assertPushed(JobDecorator::class, fn ($job) => isStartServiceJob($job));
 });
 
-test('a url failure deletes the service and never queues a deploy', function () {
+test('a url failure rolls the service back and never queues a deploy', function () {
     $response = $this->withHeaders(instantDeployHeaders($this->bearerToken))
         ->postJson('/api/v1/services', [
             'project_uuid' => $this->project->uuid,
@@ -66,12 +67,15 @@ test('a url failure deletes the service and never queues a deploy', function () 
             'environment_name' => $this->environment->name,
             'docker_compose_raw' => $this->compose,
             'instant_deploy' => true,
-            // A non-http(s) scheme fails URL validation, so the service is deleted
-            // with a 422 before any deploy could run.
-            'urls' => [['name' => 'app', 'url' => 'ftp://bad.example.com']],
+            // Valid URL (passes request validation) but a container name that does
+            // not exist, so applyServiceUrls fails after the service was created —
+            // exercising the rollback path.
+            'urls' => [['name' => 'nonexistent-container', 'url' => 'https://rollback-test.example.com']],
         ]);
 
     $response->assertStatus(422);
     Queue::assertNotPushed(JobDecorator::class, fn ($job) => isStartServiceJob($job));
+    // The rollback cleans up the parsed children instead of orphaning them.
+    Queue::assertPushed(DeleteResourceJob::class);
     expect(Service::count())->toBe(0);
 });

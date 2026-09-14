@@ -413,6 +413,18 @@ class Thread extends Component
             return;
         }
 
+        // Only a currently-pending call may be resolved. Validate before claiming
+        // so a bogus client-supplied id can't hold the claim or write a junk
+        // decision-log entry for a call the SDK will just reject.
+        // Also captures the tool-authored reason before the resumed turn clears it.
+        $pending = collect($this->pendingApprovals())->firstWhere('id', $callId);
+        if (! $pending) {
+            $this->dispatch('assistant-idle');
+
+            return;
+        }
+        $reason = $pending['reason'] ?? null;
+
         if (! $conversation->claim(auth()->user())) {
             $this->dispatch('error', 'This conversation is already responding. Please wait.');
             $this->dispatch('assistant-idle');
@@ -420,11 +432,16 @@ class Thread extends Component
             return;
         }
 
-        // Capture the tool-authored action description before the resumed turn
-        // clears the pending marker, so the transcript note stays informative.
-        $reason = collect($this->pendingApprovals())->firstWhere('id', $callId)['reason'] ?? null;
+        try {
+            ResumeAssistantTurn::dispatch($conversation->id, [$callId => $this->decisionFor($callId, $approved)], auth()->id());
+        } catch (\Throwable $e) {
+            // No job will run to release the claim if the queue push fails.
+            $conversation->release();
+            $this->dispatch('error', 'Could not resume the assistant. Please try again.');
+            $this->dispatch('assistant-idle');
 
-        ResumeAssistantTurn::dispatch($conversation->id, [$callId => $this->decisionFor($callId, $approved)], auth()->id());
+            return;
+        }
 
         // Record the decision durably: hides the card at once and leaves a
         // permanent transcript note of what the viewer approved or cancelled.

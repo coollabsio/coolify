@@ -482,7 +482,19 @@ class ServicesController extends Controller
         if ($request->has('urls') && is_array($request->urls)) {
             $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
             if ($urlResult !== null) {
+                // CreateService already ran parse(isNew:true), which persisted
+                // ServiceApplication/ServiceDatabase rows and generated env vars.
+                // A plain soft-delete would orphan those, so run the same cleanup
+                // the delete endpoint uses. The service was never deployed (deploy
+                // happens only after this block), so skip docker/network cleanup.
                 $service->delete();
+                DeleteResourceJob::dispatch(
+                    resource: $service,
+                    deleteVolumes: true,
+                    deleteConnectedNetworks: false,
+                    deleteConfigurations: true,
+                    dockerCleanup: false,
+                );
                 if (isset($urlResult['errors'])) {
                     return response()->json(['message' => 'Validation failed.', 'errors' => $urlResult['errors']], 422);
                 }

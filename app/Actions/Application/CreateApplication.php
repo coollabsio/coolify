@@ -59,7 +59,11 @@ class CreateApplication
 
         $teamId = (int) $placement->project->team_id;
         $fqdn = $data['domains'] ?? null;
-        $isCompose = ($data['build_pack'] ?? null) === 'dockercompose';
+        // Compose is only valid for the git-based types; guard it so a dockerfile
+        // or dockerimage request carrying build_pack=dockercompose can't trigger
+        // compose-domain handling / LoadComposeFile.
+        $isCompose = in_array($type, ['public', 'private-gh-app', 'private-deploy-key'], true)
+            && ($data['build_pack'] ?? null) === 'dockercompose';
 
         $application = new Application;
         $application->fill(Arr::except($data, [

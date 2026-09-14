@@ -258,10 +258,14 @@
                         this.busy = true;
                         this.thinking = true;
                     }
+                    // Safety net: poll the server whenever a turn is busy, so the
+                    // composer can never stay disabled — whether Echo is absent, is
+                    // down, or drops the terminal completed/failed event mid-turn.
+                    this.$watch('busy', (isBusy) => isBusy ? this.startPolling() : this.stopPolling());
+                    if (this.busy) {
+                        this.startPolling();
+                    }
                     if (! window.Echo) {
-                        // No realtime transport: fall back to polling the server so
-                        // the composer can never stay disabled forever.
-                        this.startPollingFallback();
                         return;
                     }
                     window.Echo.private(channel)
@@ -319,27 +323,36 @@
                     if (window.Echo) {
                         window.Echo.leave(channel);
                     }
-                    if (this.pollTimer) {
-                        clearInterval(this.pollTimer);
-                        this.pollTimer = null;
-                    }
+                    this.stopPolling();
                 },
-                startPollingFallback() {
+                startPolling() {
+                    if (this.pollTimer) {
+                        return;
+                    }
                     this.pollTimer = setInterval(() => {
                         if (! this.busy) {
+                            this.stopPolling();
                             return;
                         }
                         this.$wire.pollStatus().then(({ busy, partial }) => {
-                            if (partial) {
+                            if (! busy) {
+                                this.finish();
+                                return;
+                            }
+                            // Only seed a missed partial; live Echo deltas own it otherwise.
+                            if (partial && ! this.partial) {
                                 this.partial = partial;
                                 this.streaming = true;
                                 this.thinking = false;
                             }
-                            if (! busy) {
-                                this.finish();
-                            }
                         });
-                    }, 3000);
+                    }, 4000);
+                },
+                stopPolling() {
+                    if (this.pollTimer) {
+                        clearInterval(this.pollTimer);
+                        this.pollTimer = null;
+                    }
                 },
                 submit() {
                     this.dispatchMessage(this.draft);
@@ -367,6 +380,7 @@
                     this.$wire.stop();
                 },
                 finish() {
+                    this.stopPolling();
                     this.$wire.$refresh().then(() => {
                         this.pending = [];
                         this.partial = '';

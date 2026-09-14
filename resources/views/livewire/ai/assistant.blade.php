@@ -73,16 +73,20 @@
                                     'What needs my attention right now?',
                                     'Show my recent failed deployments',
                                 ],
-                                submit() {
-                                    const message = this.draft.trim();
+                                start(text) {
+                                    const message = (text ?? '').trim();
                                     if (message === '' || this.sending) { return; }
                                     this.sending = true;
-                                    this.$wire.startConversation(message, window.location.pathname + window.location.search);
+                                    // Always clear `sending`, even on a handled start failure that
+                                    // returns without navigating, so the composer isn't stuck.
+                                    Promise.resolve(this.$wire.startConversation(message, window.location.pathname + window.location.search))
+                                        .finally(() => { this.sending = false; });
+                                },
+                                submit() {
+                                    this.start(this.draft);
                                 },
                                 pick(text) {
-                                    if (this.sending) { return; }
-                                    this.sending = true;
-                                    this.$wire.startConversation(text, window.location.pathname + window.location.search);
+                                    this.start(text);
                                 },
                                 autogrow() {
                                     const el = this.$refs.composer;

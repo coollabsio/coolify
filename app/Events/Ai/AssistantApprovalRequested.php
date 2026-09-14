@@ -12,12 +12,11 @@ class AssistantApprovalRequested implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * @param  array<int, array<string, mixed>>  $approvals
-     */
+    // Pure refresh signal: the client re-fetches pending approvals from the DB on
+    // this event, so we never broadcast raw tool arguments (which can carry
+    // secrets or commands) to conversation viewers.
     public function __construct(
         public string $conversationUuid,
-        public array $approvals,
     ) {}
 
     /**

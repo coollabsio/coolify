@@ -33,7 +33,9 @@ class AssistantConversationRenamed implements ShouldBroadcastNow
             return [new PrivateChannel("team.{$this->teamId}")];
         }
 
-        return $this->ownerUserId
+        // Compare to null, not truthiness: the root user is id 0, and empty(0) is
+        // true — a bare truthiness check would drop the broadcast for that owner.
+        return $this->ownerUserId !== null
             ? [new PrivateChannel("user.{$this->ownerUserId}")]
             : [];
     }

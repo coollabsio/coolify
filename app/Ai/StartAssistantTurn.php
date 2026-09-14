@@ -43,12 +43,20 @@ class StartAssistantTurn
 
         RateLimiter::hit($key, 60);
 
-        RunAssistantTurn::dispatch(
-            $conversation->id,
-            $message,
-            $user->id,
-            $pageContext['block'] ?? null,
-            $pageContext['key'] ?? null,
-        );
+        // If the queue push itself fails, no job will ever run finally()/failed()
+        // to clear the claim, so the conversation would stay "responding" forever.
+        try {
+            RunAssistantTurn::dispatch(
+                $conversation->id,
+                $message,
+                $user->id,
+                $pageContext['block'] ?? null,
+                $pageContext['key'] ?? null,
+            );
+        } catch (\Throwable $e) {
+            $conversation->release();
+
+            throw $e;
+        }
     }
 }
