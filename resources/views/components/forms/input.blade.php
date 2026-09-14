@@ -1,10 +1,16 @@
 @php
     // Copy affordance reads the live Livewire value. The bound property comes
     // either from the `id`-derived modelBinding or from a passthrough
-    // `wire:model` attribute (used by read-only fields like DB URLs).
-    $copyModel = $copyable
-        ? ($modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model'))
-        : null;
+    // `wire:model` attribute (used by read-only fields like DB URLs). Resolve to a
+    // single JS expression here — a directive inside the <x-copy-button> tag would
+    // break Blade's component-tag compiler.
+    $copyResolve = null;
+    if ($copyable) {
+        $copyModel = $modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model');
+        $copyResolve = $copyModel
+            ? "\$wire.get('".$copyModel."')"
+            : (string) \Illuminate\Support\Js::from($value);
+    }
 @endphp
 
 <div @class([
@@ -58,9 +64,7 @@
                 </button>
             @endif
             @if ($copyable)
-                <x-copy-button
-                    @if ($copyModel) resolve="$wire.get('{{ $copyModel }}')" @else :value="$value" @endif
-                    label="Copy to clipboard"
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
                     class="absolute top-1/2 z-10 -translate-y-1/2 {{ $allowToPeak ? 'right-8' : 'right-1' }}" />
             @endif
 
@@ -80,9 +84,7 @@
             placeholder="{{ $attributes->get('placeholder') }}"
             @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
         @if ($copyable)
-                <x-copy-button
-                    @if ($copyModel) resolve="$wire.get('{{ $copyModel }}')" @else :value="$value" @endif
-                    label="Copy to clipboard"
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
                     class="absolute top-1/2 right-1 z-10 -translate-y-1/2" />
             </div>
         @endif

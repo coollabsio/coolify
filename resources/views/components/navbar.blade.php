@@ -105,7 +105,9 @@
                 </li>
             @endcan
             {{-- Infrastructure --}}
-            <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Infrastructure</li>
+            <li class="nav-section mt-3" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Infrastructure</li>
             <li>
                 <a title="Servers" {{ wireNavigate() }}
                     class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
@@ -148,7 +150,9 @@
             </li>
 
             {{-- Manage --}}
-            <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Manage</li>
+            <li class="nav-section mt-3" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Manage</li>
             <li>
                 <a title="Team" {{ wireNavigate() }}
                     class="{{ request()->is('team*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -216,7 +220,9 @@
         @endif
         @if (isCloud() && ! isSubscribed())
             {{-- Unsubscribed cloud has no workspace items — keep these at the top of the list. --}}
-            <li class="nav-section" :class="collapsed && 'lg:hidden'">Account</li>
+            <li class="nav-section" aria-hidden="true"
+                :class="collapsed && 'lg:mx-2.5 lg:my-2 lg:h-0 lg:overflow-hidden lg:border-t lg:border-neutral-200 lg:p-0 lg:text-transparent dark:lg:border-white/10'">
+                Account</li>
             <li>
                 <a title="Subscription" {{ wireNavigate() }}
                     class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"

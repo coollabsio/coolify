@@ -33,6 +33,9 @@
                 <div class="relative flex w-full min-w-0 items-center gap-2">
                     <x-status-summary :status="$application->status" align="right" />
                     <x-applications.links :application="$application" compact />
+                    @if ($this->runningDeploymentUrl)
+                        <x-deploying-indicator :href="$this->runningDeploymentUrl" />
+                    @endif
                 </div>
                 <div class="flex w-full flex-wrap gap-1">
                     <x-application.restart-limit-warning :application="$application" />
@@ -140,6 +143,9 @@
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-1 overflow-visible xl:w-auto xl:justify-end">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($this->runningDeploymentUrl)
+                        <x-deploying-indicator :href="$this->runningDeploymentUrl" class="mr-1" />
+                    @endif
                     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                         <span class="px-2 text-[13px] text-neutral-500 dark:text-fg-dim">Load a Compose file to deploy.</span>
                     @else

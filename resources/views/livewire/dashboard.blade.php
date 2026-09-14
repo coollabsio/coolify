@@ -77,14 +77,14 @@
                             </div>
 
                             <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
-                                <div class="flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
-                                    <span class="inline-flex items-center gap-1"
-                                        title="{{ $project->environments->count() }} {{ str('environment')->plural($project->environments->count()) }}">
+                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                        aria-label="Environments">
                                         <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
                                         {{ $project->environments->count() }}
                                     </span>
-                                    <span class="inline-flex items-center gap-1"
-                                        title="{{ $resourceCount }} {{ str('resource')->plural($resourceCount) }}">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
+                                        aria-label="Resources">
                                         <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
                                         {{ $resourceCount }}
                                     </span>
