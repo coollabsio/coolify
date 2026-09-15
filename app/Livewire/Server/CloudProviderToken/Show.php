@@ -36,13 +36,25 @@ class Show extends Component
     {
         return [
             'tokenAdded.hetzner' => 'handleTokenAdded',
+            'tokenAdded.digitalocean' => 'handleTokenAdded',
+            'tokenAdded.hostinger' => 'handleTokenAdded',
         ];
     }
 
     public function loadTokens()
     {
-        $this->provider = $this->server->vultr_instance_id ? 'vultr' : 'hetzner';
-        $this->providerName = $this->provider === 'vultr' ? 'Vultr' : 'Hetzner';
+        $this->provider = match (true) {
+            filled($this->server->vultr_instance_id) => 'vultr',
+            filled($this->server->digitalocean_droplet_id) => 'digitalocean',
+            filled($this->server->hostinger_virtual_machine_id) => 'hostinger',
+            default => 'hetzner',
+        };
+        $this->providerName = match ($this->provider) {
+            'vultr' => 'Vultr',
+            'digitalocean' => 'DigitalOcean',
+            'hostinger' => 'Hostinger',
+            default => 'Hetzner',
+        };
 
         $this->cloudProviderTokens = CloudProviderToken::ownedByCurrentTeam()
             ->where('provider', $this->provider)
@@ -96,9 +108,7 @@ class Show extends Component
     private function validateTokenForServer(CloudProviderToken $token): array
     {
         try {
-            $endpoint = $token->provider === 'vultr'
-                ? 'https://api.vultr.com/v2/account'
-                : 'https://api.hetzner.cloud/v1/servers';
+            $endpoint = $this->validationEndpoint($token->provider);
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.$token->token,
@@ -137,6 +147,33 @@ class Show extends Component
                 }
             }
 
+            if ($this->server->digitalocean_droplet_id) {
+                $serverResponse = Http::withToken($token->token)
+                    ->timeout(10)
+                    ->get("https://api.digitalocean.com/v2/droplets/{$this->server->digitalocean_droplet_id}");
+
+                if (! $serverResponse->successful()) {
+                    return [
+                        'valid' => false,
+                        'error' => 'This token cannot access this droplet. It may belong to a different DigitalOcean account.',
+                    ];
+                }
+            }
+
+            if ($this->server->hostinger_virtual_machine_id) {
+                $serverResponse = Http::withToken($token->token)
+                    ->acceptJson()
+                    ->timeout(10)
+                    ->get("https://developers.hostinger.com/api/vps/v1/virtual-machines/{$this->server->hostinger_virtual_machine_id}");
+
+                if (! $serverResponse->successful()) {
+                    return [
+                        'valid' => false,
+                        'error' => 'This token cannot access this VPS. It may belong to a different Hostinger account.',
+                    ];
+                }
+            }
+
             return ['valid' => true];
         } catch (\Throwable $e) {
             return [
@@ -156,9 +193,7 @@ class Show extends Component
                 return;
             }
 
-            $endpoint = $token->provider === 'vultr'
-                ? 'https://api.vultr.com/v2/account'
-                : 'https://api.hetzner.cloud/v1/servers';
+            $endpoint = $this->validationEndpoint($token->provider);
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.$token->token,
@@ -182,6 +217,16 @@ class Show extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function validationEndpoint(string $provider): string
+    {
+        return match ($provider) {
+            'vultr' => 'https://api.vultr.com/v2/account',
+            'digitalocean' => 'https://api.digitalocean.com/v2/account',
+            'hostinger' => 'https://developers.hostinger.com/api/vps/v1/virtual-machines',
+            default => 'https://api.hetzner.cloud/v1/servers',
+        };
     }
 
     public function render()
