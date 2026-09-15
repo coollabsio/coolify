@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 // use Illuminate\Support\Facades\Gate;
+use App\Models\AgeKey;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
@@ -41,6 +42,7 @@ use App\Models\Tag;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
+use App\Policies\AgeKeyPolicy;
 use App\Policies\ApiTokenPolicy;
 use App\Policies\ApplicationPolicy;
 use App\Policies\ApplicationPreviewPolicy;
@@ -83,6 +85,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         Server::class => ServerPolicy::class,
         PrivateKey::class => PrivateKeyPolicy::class,
+        AgeKey::class => AgeKeyPolicy::class,
         StandaloneDocker::class => StandaloneDockerPolicy::class,
         SwarmDocker::class => SwarmDockerPolicy::class,
         Application::class => ApplicationPolicy::class,
