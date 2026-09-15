@@ -276,6 +276,7 @@ Route::group([
     Route::get('/applications/{uuid}/destinations', [ApplicationsController::class, 'destinations'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/destinations', [ApplicationsController::class, 'add_destination'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/destinations/{destination_uuid}', [ApplicationsController::class, 'remove_destination'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/destinations/{destination_uuid}/deploy', [ApplicationsController::class, 'deploy_destination'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/stop', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
