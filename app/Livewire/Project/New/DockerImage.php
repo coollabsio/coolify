@@ -3,10 +3,12 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\DockerRegistry;
 use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class DockerImage extends Component
@@ -19,6 +21,10 @@ class DockerImage extends Component
 
     public string $imageSha256 = '';
 
+    public ?int $dockerRegistryId = null;
+
+    public $dockerRegistries;
+
     public array $parameters;
 
     public array $query;
@@ -27,6 +33,7 @@ class DockerImage extends Component
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
+        $this->dockerRegistries = DockerRegistry::ownedByCurrentTeam(['name', 'registry_url'])->get();
     }
 
     /**
@@ -89,6 +96,7 @@ class DockerImage extends Component
             'imageName' => ValidationPatterns::dockerImageNameRules(required: true),
             'imageTag' => ValidationPatterns::dockerImageTagRules(),
             'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
+            'dockerRegistryId' => ['nullable', 'integer', Rule::exists('docker_registries', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         // Validate that either tag or sha256 is provided, but not both
@@ -142,6 +150,7 @@ class DockerImage extends Component
             'ports_exposes' => 80,
             'docker_registry_image_name' => $imageName,
             'docker_registry_image_tag' => $imageTag,
+            'docker_registry_id' => $this->dockerRegistryId,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
