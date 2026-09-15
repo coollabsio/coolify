@@ -108,6 +108,7 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    age \
     openssh-client \
     git \
     git-lfs \

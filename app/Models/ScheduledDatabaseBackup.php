@@ -12,6 +12,7 @@ class ScheduledDatabaseBackup extends BaseModel
     {
         return [
             'dump_all' => 'boolean',
+            'encryption_enabled' => 'boolean',
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
             'missing_backup_notification_days' => 'integer',
@@ -41,6 +42,8 @@ class ScheduledDatabaseBackup extends BaseModel
         'timeout',
         'disable_local_backup',
         'missing_backup_notification_days',
+        'encryption_enabled',
+        'age_key_id',
     ];
 
     public static function ownedByCurrentTeam()
@@ -77,6 +80,11 @@ class ScheduledDatabaseBackup extends BaseModel
     public function s3()
     {
         return $this->belongsTo(S3Storage::class, 's3_storage_id');
+    }
+
+    public function ageKey()
+    {
+        return $this->belongsTo(AgeKey::class, 'age_key_id');
     }
 
     public function get_last_days_backup_status($days = 7)
