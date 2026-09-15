@@ -78,6 +78,7 @@ class Storage extends Component
         $this->activeTab = $this->resolveDefaultTab();
         $this->fileStorage = collect();
         $this->loadFileStorageForActiveTab();
+        $this->name = $this->generateDefaultVolumeName();
     }
 
     public function refreshStoragesFromEvent()
@@ -208,9 +209,7 @@ class Storage extends Component
             $this->validate([
                 'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
-                'host_path' => $this->isSwarm
-                    ? ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN]
-                    : ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
+                'host_path' => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             ], array_merge(ValidationPatterns::volumeNameMessages(), [
                 'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
             ]));
@@ -343,7 +342,7 @@ class Storage extends Component
 
     public function clearForm()
     {
-        $this->name = '';
+        $this->name = $this->generateDefaultVolumeName();
         $this->mount_path = '';
         $this->host_path = null;
         $this->file_storage_path = '';
@@ -374,6 +373,13 @@ class Storage extends Component
         }
 
         throw new \Exception('No valid resource type for file mount storage type!');
+    }
+
+    private function generateDefaultVolumeName(): string
+    {
+        $name = str($this->resource->name)->slug()->value();
+
+        return ($name ?: 'volume').'-data';
     }
 
     public function fileStoragePreviewPath(): string

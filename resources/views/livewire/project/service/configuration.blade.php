@@ -180,6 +180,7 @@
                     <livewire:project.service.domains :service="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
+                    <livewire:project.shared.secret-manager-links :resource="$service" />
                 @elseif ($currentRoute === 'project.service.storages')
                     <div class="space-y-6">
                         <div

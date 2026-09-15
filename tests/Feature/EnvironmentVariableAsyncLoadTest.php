@@ -71,7 +71,7 @@ it('loads environment variables when loadEnvironmentVariables is called', functi
         ->assertSee('Loading environment variables...')
         ->call('loadEnvironmentVariables')
         ->assertSet('readyToLoad', true)
-        ->assertDontSee('Loading environment variables...')
+        ->assertDontSeeText('Loading environment variables...')
         ->assertSee('API_KEY');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())

@@ -112,7 +112,12 @@
                         <p class="text-sm text-neutral-500 dark:text-fg-dim">
                             This value will not be shown again after you leave this page.
                         </p>
-                        <x-forms.copy-button :text="session('token')" />
+                        <div class="relative">
+                            <input type="text" value="{{ session('token') }}" readonly
+                                class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
+                            <x-copy-button :value="session('token')" label="Copy token"
+                                class="absolute top-1/2 right-2 -translate-y-1/2" />
+                        </div>
                     </div>
                 </x-application.settings-section>
             @endif

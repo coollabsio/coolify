@@ -133,6 +133,14 @@
             'visible' => $server->isFunctional(),
         ],
         [
+            'label' => 'Analytics',
+            'route' => 'server.analytics',
+            'active' => $activeMenu === 'analytics',
+            'icon' => 'analytics',
+            'group' => 'Operations',
+            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->isBuildServer(),
+        ],
+        [
             'label' => 'Security',
             'route' => 'server.security.patches',
             'active' => request()->routeIs('server.security.*'),

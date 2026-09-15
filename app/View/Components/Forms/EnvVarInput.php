@@ -35,6 +35,7 @@ class EnvVarInput extends Component
         public mixed $canResource = null,
         public bool $autoDisable = true,
         public array $availableVars = [],
+        public bool $hasVaultSource = false,
         public ?string $projectUuid = null,
         public ?string $environmentUuid = null,
         public ?string $serverUuid = null,
