@@ -220,7 +220,12 @@ it('makes restart limits opt in for new application resources', function () {
     expect($migration)
         ->toContain("['applications', 'application_previews', 'service_applications']")
         ->toContain("integer('max_restart_count')->default(0)->change()")
-        ->not->toContain('->update(');
+        ->toContain('public $withinTransaction = false;')
+        ->toContain("->where('max_restart_count', 10)")
+        ->toContain('->chunkById(5000')
+        ->toContain("->whereIn('id', \$resources->pluck('id'))")
+        ->toContain("'max_restart_count' => 0")
+        ->toContain("'restart_limit_reached' => false");
 
     $applicationSettings = file_get_contents(app_path('Livewire/Project/Application/Advanced.php'));
     $serviceSettings = file_get_contents(app_path('Livewire/Project/Service/Index.php'));
