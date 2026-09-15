@@ -61,3 +61,14 @@ test('onboarding uses the reusable advanced settings component', function () {
         ->and($onboarding)
         ->toContain('<x-forms.collapsible title="Advanced Connection Settings"');
 });
+
+test('watch paths are shown for all git-based applications', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+
+    expect(substr_count($view, 'id="watchPaths"'))->toBe(2);
+
+    expect($view)
+        ->toContain('@if ($this->application->git_based())')
+        ->not->toContain('is_github_based()')
+        ->not->toContain('is_public_repository()');
+});
