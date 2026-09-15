@@ -4234,6 +4234,8 @@ function coolifyHelperImage(): string
 
 function getHelperVersion(): string
 {
+    $configuredHelperVersion = config('constants.coolify.helper_version');
+
     if (isDev()) {
         $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
 
@@ -4242,7 +4244,13 @@ function getHelperVersion(): string
         }
     }
 
-    return config('constants.coolify.helper_version');
+    $fetchedHelperVersion = InstanceSettings::query()->whereKey(0)->value('helper_version');
+
+    if (! empty($fetchedHelperVersion) && version_compare($fetchedHelperVersion, $configuredHelperVersion, '>')) {
+        return $fetchedHelperVersion;
+    }
+
+    return $configuredHelperVersion;
 }
 
 function loggy($message = null, array $context = [])

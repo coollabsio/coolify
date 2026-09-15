@@ -1,102 +1,43 @@
 # Lessons
 
-## Check prior fixes before changing a repeated symptom
-- When a reported regression matches a recent fix, inspect that fix and reproduce why it no longer works before adding another workaround.
-- Do not claim a redirect or lifecycle root cause from an effects assertion alone. Prove the reported HTTP or browser failure first.
-- Preserve SPA navigation when it is a product requirement. Do not replace it with a full-page redirect to mask a deletion race; fix the ordering or state race instead.
+## Prove regressions before changing code
+- Reproduce the reported failure on the unchanged baseline before adding a fix.
+- When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
+- Test old reports against the current branch because later changes can make the report obsolete.
+- Use the same regression test before and after the production change so the result shows the behavior difference.
 
-## Confirm which surface becomes the modal
-- When a user wants two settings pages replaced by a modal, identify the parent page that owns the trigger and confirm that the complete child settings view moves into that modal.
-- Do not make one child page a modal inside the other child page when the user wants both child URLs removed.
-- When the modal itself supplies the title and subtitle, do not repeat page-style section cards inside it. Use a flat input layout and one footer for actions.
-- Put destructive actions on the footer's left. Put conversion and the primary Save action on the right, with Save last.
-- Do not repeat domain-port guidance in a resource settings modal when domain ports have their own input in the domain editor.
-- A flat modal form can still use a bordered summary box for a distinct linked resource, such as the domain count and Manage domains action.
-- For compact modal headers, show the descriptive subtitle as hover text on an underlined title instead of adding a second visible line.
-- Reuse `x-helper` and the plain `underline underline-offset-4` trigger for title help. Do not use a native `title` tooltip or a dotted underline when the project already has a shared title-tooltip pattern.
+## Verify the complete user flow
+- Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
+- Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
+- When the request covers more than one interface or resource type, inventory and verify each supported path.
 
-## Alpine x-transition + tw-animate-css exit animations flash at the end
-- Symptom: a modal/overlay fades out, then flashes fully visible for 1-2 frames before it disappears.
-- Cause: `animate-out` keyframes default to `animation-fill-mode: none`. The element snaps back to its natural state when the keyframe ends. Alpine hides the element (display: none) only after its own timer (read from `transition-duration`), which starts ~2 rAF later than the animation. The gap shows the element at full opacity.
-- Rule: every `x-transition:leave` that uses tw-animate-css `animate-out` MUST also include `fill-mode-forwards`.
-- Rule: when a user reports UI flicker, check ALL layers of the animation stack (state reset timing, spinner flash, keyframe fill mode, focus restore) before you report the fix as complete. My first fix covered state reset and spinner only; the fill-mode snap was the visible one.
+## Preserve product scope
+- Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
+- Do not add billing restrictions, live reconciliation, or fallback behavior unless the request includes them.
+- Treat implementation constraints as details. Do not expand a requested team-level control into a more complex policy model.
 
-## Displayed defaults must not become stored overrides
-- When an edit form shows an inherited or computed default, trace an unchanged save and a related-field edit through persistence.
-- Preserve the inherited state when the displayed value still equals the computed default; store an override only when the user selects a different value.
+## Keep dynamic Livewire identities stable
+- In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.
+- Use targeted refresh events. Do not refresh a parent and a child that the parent can remove or hide during the same operation.
+- Prove lifecycle and redirect causes directly; an effects assertion alone is not sufficient.
 
-## Prove regressions against the unchanged baseline
-- For a bug fix, run the same regression test before and after the production change. Use a stash when requested so the failure and success come from the exact same test.
+## Keep modal structure consistent
+- Identify the parent page that owns a modal trigger and move the complete requested workflow into that modal.
+- Use a flat form layout when the modal already supplies its title and description.
+- Put destructive actions on the footer's left and primary actions last on the right.
+- Use shared section, helper, tooltip, and icon-button components instead of local variants.
+- Keep validation, preview, and save controls in a fixed footer when the body is large.
 
-## Apply shared domain UX to every supported resource type
-- When a user asks for domain-management behavior, inventory every resource that can edit domains before implementation.
-- Do not stop at the resource type named in the original report when the requested UX is meant to be consistent across Coolify.
+## Verify layered UI behavior visually
+- Inspect the real layout with all conditional elements visible, especially compound status badges.
+- For animation flicker, inspect state timing, loading indicators, keyframe fill mode, and focus restoration.
+- Add `fill-mode-forwards` to Alpine leave transitions that use tw-animate-css `animate-out` so the element does not flash before Alpine hides it.
 
-## Verify manual and generated domain paths separately
-- Domain regeneration and manual hostname edits must start the same post-save DNS check.
-- Add explicit regression coverage for both entry paths across every active domain editor.
+## Preserve inherited values and clear API semantics
+- An unchanged displayed default must remain inherited; store an override only when the user selects a different value.
+- Expose named API values for special modes. Keep existing numeric sentinels only as compatibility aliases unless a breaking change is requested.
 
-## Do not treat a runtime restart as behavior verification
-- A healthy restarted container proves only that the process started.
-- For a reported UI failure, verify the exact user flow and inspect the resulting persisted state before claiming the fix works.
-
-## Prove the reported live flow before reporting a UI fix
-- Do not use unit tests or a healthy process as proof for a reported live UI failure.
-- After the user repeats the flow, inspect the exact persisted record, request logs, queue state, and deployed source before stating that it works.
-
-## Start DNS checks only for DNS-relevant edits
-- Compare the previous and saved scheme and hostname before a post-save DNS check.
-- Do not restart DNS checks for indexing, redirect, path, or internal-port-only changes.
-
-## Include automatically added domains in post-save DNS checks
-- Compare the configured domain list before and after Save.
-- Start checks for each newly added counterpart, even when the edited domain itself did not change.
-
-## Use one DNS progress pattern
-- All DNS check entry points must set the domain badge to the same `checking` state.
-- Do not use separate loading feedback on Check all or per-domain action buttons when the badge is the progress indicator.
-- Verify the rendered badge uses the spinner slot instead of the default status dot.
-
-## Confirm whether old reports still apply before changing code
-- For an old issue, first test the current branch and inspect later fixes. Do not assume that the historical reproduction still needs a new code change.
-
-## Compare routing identity, not complete domain URLs
-- Domain-conflict checks must treat `http://host` and `https://host` as the same routing identity.
-- Reproduce reports with the exact stored schemes before stating that duplicate detection works.
-
-## Verify reported fixes against the running development app
-- When a user asks for before-and-after verification, test the unchanged and fixed production code against the same Jean Run environment.
-- Cover each requested interface, such as UI and API, and record the exact URL, response, persisted state, and relevant logs.
-
-## Do not infer that “Pro” means paid
-- When the user calls a setting “Pro,” confirm whether it means advanced-user functionality or a subscription entitlement.
-- Do not add billing or Cloud-only checks unless the user explicitly requests them.
-
-## Verify compound status layouts visually
-- When a status component can render more than one badge, give its root an explicit horizontal flex layout.
-- Inspect the real top-bar layout with every conditional badge visible before calling a UI change complete.
-
-## Keep a requested security control at its stated scope
-- If the user specifies one team-level redaction flag, do not introduce per-secret policy questions.
-- Explain storage constraints as implementation details, then preserve the requested single control.
-
-## Use shared section title helpers in edit modals
-- When modal section descriptions should appear on hover, use `x-application.settings-section` instead of a manual heading and visible paragraph.
-- Keep text labels for direct actions such as Back up now. Use a standard icon button with a tooltip for familiar secondary actions such as settings.
-
-
-## Keep modal actions in the footer
-- When a modal has a large editable body, put preview, validation, and save controls in a fixed footer. Keep the title bar for the title and close action.
-
-## Prefer named API values over numeric sentinels
-- When an API option means an unbounded or special mode, expose a clear named value such as `all`.
-- Keep an existing numeric sentinel such as `-1` only as a compatibility alias unless the user requests a breaking change.
-
-## Do not auto-heal existing deployments without a request
-- When a parser or label fix can apply only after container recreation, keep the change limited to new deployments and later user-initiated redeployments unless the user explicitly asks for live reconciliation.
-- Do not add status lookup fallbacks that alter existing deployment behavior when the requested scope is new deployments only.
-
-## Trace image replacements through build stages
-- When replacing a container image for development, inspect both Compose services and every development Dockerfile `FROM` stage.
-- A successful Compose pull does not prove the application build is free of the old image; validate the complete build dependency chain.
-- Do not replace a removed image with a floating `latest` tag. Find the newest stable release tag and pin it consistently in Compose and every Dockerfile stage.
+## Trace infrastructure changes end to end
+- For container image changes, inspect Compose services and every relevant Dockerfile build stage.
+- Pin a stable release tag instead of using a floating `latest` tag.
+- A successful image pull does not prove that the complete application build no longer uses the old image.
