@@ -1,0 +1,143 @@
+# documentation: https://docs.dograh.com
+# slogan: Dograh is an open-source, self-hostable voice AI platform (an alternative to Vapi/Retell) with a visual workflow builder, MCP support, and telephony integrations.
+# category: ai
+# tags: ai,voice,voice-ai,agent,telephony,ivr,webrtc,stun,turn,coturn,conversational-ai,mcp,vapi-alternative,retell-alternative
+# logo: svgs/dograh.png
+# port: 3010
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-dograh}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-dograh}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    command: >
+      --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - SERVICE_URL_MINIO_9000
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - MINIO_API_CORS_ALLOW_ORIGIN=*
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: dograhai/dograh-api:latest
+    environment:
+      - SERVICE_URL_API_8000
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP:-true}
+      - PUBLIC_BASE_URL=${SERVICE_URL_API}
+      - PUBLIC_HOST=${SERVICE_FQDN_API}
+      - DATABASE_URL=postgresql+asyncpg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-dograh}
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - ENABLE_AWS_S3=${ENABLE_AWS_S3:-false}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_PUBLIC_ENDPOINT=${SERVICE_URL_MINIO_9000}
+      - MINIO_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - MINIO_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_BUCKET=voice-audio
+      - MINIO_SECURE=false
+      - FASTAPI_WORKERS=${FASTAPI_WORKERS:-1}
+      - FORWARDED_ALLOW_IPS=*
+      - OSS_JWT_SECRET=${SERVICE_PASSWORD_64_OSSJWT}
+      - ENABLE_TELEMETRY=${ENABLE_TELEMETRY:-true}
+      - TURN_HOST=${TURN_EXTERNAL_IP:?Set TURN_EXTERNAL_IP to this server's public IPv4 address so coturn (STUN/TURN) works behind NAT}
+      - TURN_PORT=${TURN_PORT:-3478}
+      - TURN_TLS_PORT=${TURN_TLS_PORT:-5349}
+      - TURN_SECRET=${SERVICE_PASSWORD_64_TURN}
+      - FORCE_TURN_RELAY=${FORCE_TURN_RELAY:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health').read()"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  coturn:
+    image: coturn/coturn:4.8.0
+    command:
+      - -n
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --min-port=49152
+      - --max-port=49200
+      - --external-ip=${TURN_EXTERNAL_IP:?Set this server's public IPv4 address so coturn (STUN/TURN) works behind NAT}
+      - --realm=dograh.com
+      - --use-auth-secret
+      - --static-auth-secret=${SERVICE_PASSWORD_64_TURN}
+      - --fingerprint
+      - --no-cli
+      - --no-multicast-peers
+      - --log-file=stdout
+    ports:
+      - 3478:3478/tcp
+      - 3478:3478/udp
+      - 5349:5349/tcp
+      - 5349:5349/udp
+      - 49152-49200:49152-49200/udp
+
+  ui:
+    image: dograhai/dograh-ui:latest
+    environment:
+      - SERVICE_URL_UI_3010
+      - HOSTNAME=0.0.0.0
+      - BACKEND_URL=http://api:8000
+      - NODE_ENV=oss
+      - ENABLE_TELEMETRY=${ENABLE_TELEMETRY:-true}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3010 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
