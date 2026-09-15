@@ -269,6 +269,23 @@ it('does not expose foreign nodes to assignment actions', function () {
         ->toThrow(ModelNotFoundException::class);
 });
 
+it('shows the system-managed core cluster firewall rules', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Core rules mesh');
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->assertSee('Core cluster traffic')
+        ->assertSee('System managed')
+        ->assertSee('WireGuard')
+        ->assertSee('UDP / 51820')
+        ->assertSee('Corrosion gossip')
+        ->assertSee('UDP / 8787')
+        ->assertSee('Corrosion local API')
+        ->assertSee('TCP / 8080')
+        ->assertSee('Workload DNS')
+        ->assertSee('TCP + UDP / 53')
+        ->assertSee('Established connections');
+});
+
 it('adds and removes scoped workload firewall rules', function () {
     Queue::fake();
     $team = $this->user->teams()->firstOrFail();

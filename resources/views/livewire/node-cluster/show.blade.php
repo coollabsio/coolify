@@ -54,6 +54,38 @@
             </x-application.settings-section>
         </div>
         <x-application.settings-section title="Firewall" helper="Nodes allow only required cluster traffic by default. Workloads reject mesh and external connections by default. Outbound internet access stays available.">
+            <div class="mb-6">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h3 class="text-base font-semibold">Core cluster traffic</h3>
+                    <span class="table-badge shrink-0">System managed</span>
+                </div>
+                <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">WireGuard</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">UDP / {{ $cluster->wireguard_port }}</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Encrypted mesh transport on the configured Node endpoint.</p>
+                    </div>
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">Corrosion gossip</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">UDP / 8787</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Cluster membership and discovery synchronization between Nodes.</p>
+                    </div>
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">Corrosion local API</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">TCP / 8080</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Local-only endpoint synchronization. Other Nodes cannot access this port.</p>
+                    </div>
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">Workload DNS</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">TCP + UDP / 53</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Internal service discovery from managed workloads.</p>
+                    </div>
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">Established connections</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">Stateful</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Response traffic for connections that the firewall already allowed.</p>
+                    </div>
+                    <div class="rounded-xl border border-neutral-200 p-3 dark:border-white/[0.08]">
+                        <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">Other mesh traffic</p><p class="font-mono text-xs text-neutral-500 uppercase dark:text-fg-dim">Denied</p></div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">Node-to-Node traffic that does not match a core rule is blocked.</p>
+                    </div>
+                </div>
+            </div>
             <h3 class="mb-3 text-base font-semibold">Workload traffic</h3>
             @can('update', $cluster)
                 <form wire:submit="addFirewallRule" class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
