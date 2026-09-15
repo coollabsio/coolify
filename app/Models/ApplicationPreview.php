@@ -13,6 +13,10 @@ class ApplicationPreview extends BaseModel
 {
     use HasRestartLimit, SoftDeletes;
 
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
+
     protected $fillable = [
         'uuid',
         'application_id',

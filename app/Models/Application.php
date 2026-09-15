@@ -135,6 +135,10 @@ class Application extends BaseModel
 
     private static $parserVersion = '5';
 
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
+
     protected $fillable = [
         'name',
         'description',
