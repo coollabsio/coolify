@@ -38,7 +38,7 @@ class DockerCompose extends Component
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);
-            $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $this->dockerComposeRaw = Yaml::dump(parseDockerComposeYaml($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
             validateDockerComposeForInjection($this->dockerComposeRaw);

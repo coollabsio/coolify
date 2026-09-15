@@ -14,7 +14,91 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+
+/** Parse Docker Compose YAML with compatibility for document markers and anchors. */
+function parseDockerComposeYaml(string $composeYaml): mixed
+{
+    try {
+        return Yaml::parse($composeYaml);
+    } catch (ParseException) {
+        $composeYaml = removeLeadingDockerComposeDocumentMarker($composeYaml);
+    }
+
+    while (true) {
+        try {
+            return Yaml::parse($composeYaml);
+        } catch (ParseException $exception) {
+            $normalizedYaml = moveStandaloneDockerComposeAnchor($composeYaml, $exception->getParsedLine());
+            if ($normalizedYaml === $composeYaml) {
+                throw $exception;
+            }
+            $composeYaml = $normalizedYaml;
+        }
+    }
+}
+
+function removeLeadingDockerComposeDocumentMarker(string $composeYaml): string
+{
+    $lines = preg_split('/\r\n|\r|\n/', $composeYaml);
+    if ($lines === false) {
+        return $composeYaml;
+    }
+
+    $markerIndexes = [];
+    foreach ($lines as $index => $line) {
+        if (rtrim($line, " \t") === '---') {
+            $markerIndexes[] = $index;
+        }
+    }
+
+    if (count($markerIndexes) !== 1) {
+        return $composeYaml;
+    }
+
+    $markerIndex = $markerIndexes[0];
+    for ($index = 0; $index < $markerIndex; $index++) {
+        $line = trim($lines[$index]);
+        if ($line !== '' && ! str_starts_with($line, '#')) {
+            return $composeYaml;
+        }
+    }
+
+    unset($lines[$markerIndex]);
+
+    return implode("\n", $lines);
+}
+
+function moveStandaloneDockerComposeAnchor(string $composeYaml, int $parsedLine): string
+{
+    $lines = preg_split('/\r\n|\r|\n/', $composeYaml);
+    $anchorIndex = $parsedLine - 1;
+    $mappingIndex = $anchorIndex - 1;
+
+    if ($lines === false || ! isset($lines[$anchorIndex], $lines[$mappingIndex])) {
+        return $composeYaml;
+    }
+
+    $mappingKey = rtrim($lines[$mappingIndex]);
+    $anchorLine = $lines[$anchorIndex];
+    $anchor = trim($anchorLine);
+    $mappingIndent = strspn($mappingKey, " \t");
+    $anchorIndent = strspn($anchorLine, " \t");
+
+    if ($anchorIndent <= $mappingIndent || ! str_ends_with($mappingKey, ':')) {
+        return $composeYaml;
+    }
+
+    if (preg_match('/^&[A-Za-z0-9_-]+$/', $anchor) !== 1) {
+        return $composeYaml;
+    }
+
+    $lines[$mappingIndex] = $mappingKey.' '.$anchor;
+    unset($lines[$anchorIndex]);
+
+    return implode("\n", $lines);
+}
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
