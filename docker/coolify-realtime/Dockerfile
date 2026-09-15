@@ -12,9 +12,11 @@ ARG CLOUDFLARED_VERSION
 WORKDIR /terminal
 RUN apk upgrade --no-cache && \
     apk add --no-cache openssh-client make g++ python3 curl
-COPY docker/coolify-realtime/package*.json ./
-RUN npm ci
-RUN npm rebuild node-pty --update-binary
+COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
+COPY docker/coolify-realtime/package.json docker/coolify-realtime/bun.lock ./
+# node-pty is a trusted dependency (see package.json) so its native addon is
+# compiled from source against the image's Node runtime during install.
+RUN bun install --frozen-lockfile
 COPY docker/coolify-realtime/soketi-entrypoint.sh /soketi-entrypoint.sh
 COPY docker/coolify-realtime/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-realtime/terminal-utils.js /terminal/terminal-utils.js
