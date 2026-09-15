@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
@@ -311,7 +312,7 @@ class Show extends Component
             // Only refresh display-only state; never re-sync text-input properties
             // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
-            $this->dispatch('success', 'Sentinel has been restarted successfully.');
+            $this->dispatch('info', 'Sentinel restarted. Waiting for a health report.');
         }
     }
 
@@ -381,8 +382,14 @@ class Show extends Component
         try {
             $this->authorize('manageSentinel', $this->server);
             $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
-            $this->server->restartSentinel($customImage);
-            $this->dispatch('info', 'Restarting Sentinel.');
+            $previousUrl = $this->server->settings->sentinel_custom_url;
+            StartSentinel::run($this->server, true, null, $customImage);
+            $this->server->refresh();
+            if ($this->sentinelCustomUrl === $previousUrl) {
+                $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+            }
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+            $this->dispatch('info', 'Sentinel restarted. Waiting for a health report.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

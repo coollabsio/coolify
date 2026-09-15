@@ -50,6 +50,8 @@ class StartSentinel
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
         $dockerCommand = "docker run -d $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
+        $server->sentinelHeartbeat(isReset: true);
+
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
@@ -60,7 +62,15 @@ class StartSentinel
 
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
-        $server->sentinelHeartbeat();
+
+        $healthUrl = escapeshellarg(rtrim($endpoint, '/').'/api/health');
+        $response = instant_remote_process([
+            "docker exec coolify-sentinel curl --fail --silent --show-error --connect-timeout 5 --max-time 10 $healthUrl",
+        ], $server, false, timeout: 15);
+
+        if ($response !== 'OK') {
+            throw new \RuntimeException('Sentinel cannot reach this Coolify instance. Check the Coolify URL in Sentinel settings, DNS, TLS certificates, and firewall access from the Sentinel container. Check Sentinel logs if health reports still do not arrive.');
+        }
 
         // Dispatch event to notify UI components
         SentinelRestarted::dispatch($server, $version);
