@@ -236,7 +236,7 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
-        if (blank($url)) {
+        if (blank($url) || ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000')) {
             $url = $this->generateSentinelUrl(ignoreEvent: true);
         }
 
@@ -251,10 +251,10 @@ class ServerSetting extends Model
     {
         $domain = null;
         $settings = InstanceSettings::get();
-        if ($this->server->isLocalhost()) {
-            $domain = 'http://host.docker.internal:8000';
-        } elseif ($settings->fqdn) {
+        if ($settings->fqdn) {
             $domain = $settings->fqdn;
+        } elseif ($this->server->isLocalhost()) {
+            $domain = 'http://host.docker.internal:'.config('app.port');
         } elseif ($settings->public_ipv4) {
             $domain = 'http://'.$settings->public_ipv4.':8000';
         } elseif ($settings->public_ipv6) {
