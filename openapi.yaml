@@ -3446,6 +3446,56 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/destinations/{destination_uuid}/deploy':
+    post:
+      tags:
+        - Applications
+      summary: 'Deploy to Destination'
+      description: 'Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.'
+      operationId: deploy-application-destination
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: destination_uuid
+          in: path
+          description: 'UUID of the destination.'
+          required: true
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          description: 'Force rebuild.'
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Deployment queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Deployment request queued.', description: Message. }
+                  deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /cloud-init-scripts:
     get:
       tags:
