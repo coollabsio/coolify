@@ -68,6 +68,52 @@ function isValidDomainUrl(string $url): bool
     return filter_var($urlToValidate, FILTER_VALIDATE_URL) !== false;
 }
 
+function domainConflictKey(string $domain): string
+{
+    $domain = str($domain)->endsWith('/')
+        ? str($domain)->beforeLast('/')->toString()
+        : $domain;
+
+    return preg_replace('#^https?://#i', '', $domain) ?? $domain;
+}
+
+/**
+ * @return Collection<int, array{domain: string, service_name: ?string}>
+ */
+function applicationDomainEntries(Application $application): Collection
+{
+    $entries = collect(explode(',', (string) $application->fqdn))
+        ->filter(fn ($domain) => $domain !== '')
+        ->map(fn ($domain) => [
+            'domain' => str($domain)->finish('/')->beforeLast('/')->toString(),
+            'service_name' => null,
+        ]);
+
+    if ($application->build_pack !== 'dockercompose' || empty($application->docker_compose_domains)) {
+        return $entries->values();
+    }
+
+    $composeDomains = json_decode($application->docker_compose_domains, true);
+    if (! is_array($composeDomains)) {
+        return $entries->values();
+    }
+
+    foreach ($composeDomains as $serviceName => $domainConfig) {
+        foreach (explode(',', (string) data_get($domainConfig, 'domain')) as $domain) {
+            if ($domain === '') {
+                continue;
+            }
+
+            $entries->push([
+                'domain' => str($domain)->finish('/')->beforeLast('/')->toString(),
+                'service_name' => (string) $serviceName,
+            ]);
+        }
+    }
+
+    return $entries->values();
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];
@@ -80,8 +126,7 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
 
     if ($resource) {
         if ($resource->getMorphClass() === Application::class && $resource->build_pack === 'dockercompose') {
-            $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
-            $domains = collect($domains);
+            $domains = applicationDomainEntries($resource)->pluck('domain');
         } else {
             $domains = collect($resource->fqdns);
         }
@@ -96,7 +141,7 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
             $domain = str($domain)->beforeLast('/');
         }
 
-        return str($domain);
+        return domainConflictKey((string) $domain);
     });
 
     // Filter applications by team if we have a current team
@@ -108,13 +153,9 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
     }
     $apps = $appsQuery->get();
     foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
+        foreach (applicationDomainEntries($app) as $domainEntry) {
+            $naked_domain = $domainEntry['domain'];
+            if ($domains->contains(domainConflictKey($naked_domain))) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
                         $conflicts[] = [
@@ -122,16 +163,18 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
                             'resource_name' => $app->name,
                             'resource_link' => $app->link(),
                             'resource_type' => 'application',
-                            'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
+                            'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                            ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
                         ];
                     }
-                } elseif ($domain) {
+                } else {
                     $conflicts[] = [
                         'domain' => $naked_domain,
                         'resource_name' => $app->name,
                         'resource_link' => $app->link(),
                         'resource_type' => 'application',
-                        'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
+                        'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                        ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
                     ];
                 }
             }
@@ -153,7 +196,7 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
                 $domain = str($domain)->beforeLast('/');
             }
             $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
+            if ($domains->contains(domainConflictKey($naked_domain))) {
                 if (data_get($resource, 'uuid')) {
                     if ($resource->uuid !== $app->uuid) {
                         $conflicts[] = [
@@ -185,7 +228,7 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
                 $domain = str($domain)->beforeLast('/');
             }
             $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
+            if ($domains->contains(domainConflictKey($naked_domain))) {
                 $conflicts[] = [
                     'domain' => $naked_domain,
                     'resource_name' => 'Coolify Instance',
@@ -219,7 +262,7 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
             $domain = str($domain)->beforeLast('/');
         }
 
-        return str($domain);
+        return domainConflictKey((string) $domain);
     });
 
     $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack']);
@@ -231,51 +274,17 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
     }
 
     foreach ($applications as $app) {
-        if (! is_null($app->fqdn)) {
-            $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-            foreach ($list_of_domains as $domain) {
-                if (str($domain)->endsWith('/')) {
-                    $domain = str($domain)->beforeLast('/');
-                }
-                $naked_domain = str($domain)->value();
-                if ($domains->contains($naked_domain)) {
-                    $conflicts[] = [
-                        'domain' => $naked_domain,
-                        'resource_name' => $app->name,
-                        'resource_uuid' => $app->uuid,
-                        'resource_type' => 'application',
-                        'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
-                    ];
-                }
-            }
-        }
-
-        if ($app->build_pack === 'dockercompose' && ! empty($app->docker_compose_domains)) {
-            $dockerComposeDomains = json_decode($app->docker_compose_domains, true);
-            if (is_array($dockerComposeDomains)) {
-                foreach ($dockerComposeDomains as $serviceName => $domainConfig) {
-                    $domainValue = data_get($domainConfig, 'domain');
-                    if (empty($domainValue)) {
-                        continue;
-                    }
-                    $list_of_domains = collect(explode(',', $domainValue))->filter(fn ($fqdn) => $fqdn !== '');
-                    foreach ($list_of_domains as $domain) {
-                        if (str($domain)->endsWith('/')) {
-                            $domain = str($domain)->beforeLast('/');
-                        }
-                        $naked_domain = str($domain)->value();
-                        if ($domains->contains($naked_domain)) {
-                            $conflicts[] = [
-                                'domain' => $naked_domain,
-                                'resource_name' => $app->name,
-                                'resource_uuid' => $app->uuid,
-                                'resource_type' => 'application',
-                                'service_name' => $serviceName,
-                                'message' => "Domain $naked_domain is already in use by application '{$app->name}' (service: {$serviceName})",
-                            ];
-                        }
-                    }
-                }
+        foreach (applicationDomainEntries($app) as $domainEntry) {
+            $naked_domain = $domainEntry['domain'];
+            if ($domains->contains(domainConflictKey($naked_domain))) {
+                $conflicts[] = [
+                    'domain' => $naked_domain,
+                    'resource_name' => $app->name,
+                    'resource_uuid' => $app->uuid,
+                    'resource_type' => 'application',
+                    'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                    ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
+                ];
             }
         }
     }
@@ -290,7 +299,7 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
                 $domain = str($domain)->beforeLast('/');
             }
             $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
+            if ($domains->contains(domainConflictKey($naked_domain))) {
                 $conflicts[] = [
                     'domain' => $naked_domain,
                     'resource_name' => $app->service->name ?? 'Unknown Service',
@@ -310,7 +319,7 @@ function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $te
             $domain = str($domain)->beforeLast('/');
         }
         $naked_domain = str($domain)->value();
-        if ($domains->contains($naked_domain)) {
+        if ($domains->contains(domainConflictKey($naked_domain))) {
             $conflicts[] = [
                 'domain' => $naked_domain,
                 'resource_name' => 'Coolify Instance',

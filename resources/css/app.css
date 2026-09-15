@@ -4751,42 +4751,14 @@ a.command-palette-item:focus-visible {
     }
 
     .data-table-row.service-domains-overview-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
-    }
-
-    .data-table-row.service-domains-overview-grid > :first-child {
-        grid-column: 1 / -1;
-    }
-
-    .service-domain-detail {
-        justify-content: space-between;
-        gap: 0.5rem;
-    }
-
-    .service-domain-detail-label {
-        display: inline;
-        color: var(--coollabs-fg-dim);
-    }
-}
-
-@container service-domains (max-width: 600px) {
-    .data-table-row.service-domains-overview-grid {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-areas: "domain dns actions" "summary summary summary";
         gap: 0.625rem 0.75rem;
-        padding: 0.875rem;
+        padding: 0.75rem;
     }
 
     .data-table-row.service-domains-overview-grid > :first-child {
-        grid-column: 1 / -1;
-    }
-
-    .data-table-row.service-domains-overview-grid > :first-child a,
-    .data-table-row.service-domains-overview-grid > :first-child span[title] {
-        overflow: visible;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        line-height: 1.35;
+        grid-area: domain;
     }
 
     .service-domain-detail,
@@ -4796,7 +4768,7 @@ a.command-palette-item:focus-visible {
 
     .service-domain-mobile-summary {
         display: flex;
-        grid-column: 1 / -1;
+        grid-area: summary;
         flex-wrap: wrap;
         align-items: center;
         gap: 0.375rem 0.75rem;
@@ -4812,10 +4784,43 @@ a.command-palette-item:focus-visible {
     }
 
     .service-domain-dns {
+        grid-area: dns;
+        justify-self: end;
+    }
+
+    .service-domain-actions {
+        grid-area: actions;
+        justify-self: end;
+    }
+}
+
+@container service-domains (max-width: 600px) {
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "domain domain" "summary summary" "dns actions";
+        gap: 0.625rem 0.75rem;
+        padding: 0.875rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-area: domain;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child a,
+    .data-table-row.service-domains-overview-grid > :first-child span[title] {
+        overflow: visible;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+
+    .service-domain-dns {
+        grid-area: dns;
         justify-self: start;
     }
 
     .service-domain-actions {
+        grid-area: actions;
         justify-self: end;
     }
 

@@ -1540,10 +1540,17 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int|string
 {
+    if ($lines === 'all') {
+        return 'all';
+    }
+
     $lines = filter_var($lines, FILTER_VALIDATE_INT);
-    if ($lines === false || $lines <= 0) {
+    if ($lines === -1) {
+        return 'all';
+    }
+    if ($lines === false || $lines < -1) {
         return $default;
     }
 
@@ -1555,7 +1562,7 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
     return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 }
 
-function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $command = "docker logs -n {$lines}";
     if ($server->isSwarm()) {
@@ -1569,7 +1576,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int $li
     return "{$command} ".escapeshellarg($container_id).' 2>&1';
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);

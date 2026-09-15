@@ -10658,6 +10658,10 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                max_restart_count:
+                  description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
+                  type: [integer, 'null']
+                  minimum: 0
               type: object
       responses:
         '200':

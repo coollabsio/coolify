@@ -9,7 +9,8 @@ it('uses the large modal treatment for the compose editor', function () {
     expect($view)
         ->toContain('title="Docker Compose"')
         ->toContain(':isLarge="true"')
-        ->toContain('<x-slot:headerActions>')
+        ->toContain('<x-slot:footer>')
+        ->not->toContain('<x-slot:headerActions>')
         ->toContain("\$dispatch('compose-preview-toggle')")
         ->toContain("\$dispatch('compose-save')")
         ->toContain('@compose-save-finished.window="saving = false"')
@@ -57,12 +58,12 @@ it('keeps the compose modal usable on mobile screens', function () {
         ->toContain('justify-center p-2')
         ->toContain('sm:p-4')
         ->toContain('flex-wrap! sm:flex-nowrap!')
-        ->toContain('order-3 w-full sm:order-none sm:w-auto')
-        ->toContain('order-2 sm:order-none')
-        ->toContain("'mt-2 sm:mt-0' => isset(\$headerActions)");
+        ->toContain('@isset($footer)')
+        ->toContain('justify-end gap-2 border-t')
+        ->toContain('order-2 sm:order-none');
 
     expect($stackForm)
-        ->toContain('w-full items-center gap-2 overflow-x-auto sm:w-auto');
+        ->toContain('flex-wrap items-center justify-end gap-2');
 
     expect($editor)
         ->toContain('flex-col items-stretch')

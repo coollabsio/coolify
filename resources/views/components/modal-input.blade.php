@@ -1,5 +1,6 @@
 @props([
     'title' => 'Are you sure?',
+    'subtitle' => null,
     'buttonTitle' => 'Open Modal',
     'isErrorButton' => false,
     'isHighlightedButton' => false,
@@ -60,7 +61,19 @@
                     ])
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                     <header class="flex-wrap! sm:flex-nowrap!">
-                        <h3 class="min-w-0 flex-1 truncate">{{ $title }}</h3>
+                        <div class="min-w-0 flex-1 py-0.5">
+                            @if ($subtitle)
+                                <h3>
+                                    <x-helper :helper="$subtitle" :label="'More information about '.$title">
+                                        <x-slot:trigger>
+                                            <span class="underline underline-offset-4">{{ $title }}</span>
+                                        </x-slot:trigger>
+                                    </x-helper>
+                                </h3>
+                            @else
+                                <h3 class="truncate">{{ $title }}</h3>
+                            @endif
+                        </div>
                         @isset($headerActions)
                             <div class="order-3 w-full sm:order-none sm:w-auto flex shrink-0 items-center gap-2">
                                 {{ $headerActions }}
@@ -78,6 +91,12 @@
                         style="-webkit-overflow-scrolling: touch;">
                         {{ $slot }}
                     </div>
+                    @isset($footer)
+                        <footer
+                            class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+                            {{ $footer }}
+                        </footer>
+                    @endisset
                 </div>
             </div>
         </div>

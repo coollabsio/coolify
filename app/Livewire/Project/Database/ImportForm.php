@@ -582,7 +582,7 @@ EOD;
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return;
             }
@@ -664,7 +664,7 @@ EOD;
 
             // Validate bucket name to prevent command injection
             if (! $this->validateBucketName($bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return true;
             }

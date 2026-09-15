@@ -57,6 +57,23 @@ describe('GitLab source setup view', function () {
             ->assertSet('apiUrl', 'https://gitlab.example.com/api/v4');
     });
 
+    test('redirects without rendering an error after the gitlab app is deleted', function () {
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->call('delete')
+            ->assertRedirect(route('source.all'));
+
+        $this->assertModelMissing($this->gitlabApp);
+    });
+
+    test('uses the persisted name for the title during a post-delete update', function () {
+        $view = file_get_contents(resource_path('views/livewire/source/gitlab/change.blade.php'));
+
+        expect($view)
+            ->toContain("{{ \$name ?: 'GitLab App' }} | Sources | Coolify")
+            ->not->toContain("{{ \$gitlab_app->name ?: 'GitLab App' }} | Sources | Coolify");
+    });
+
     test('saves and reloads the application secret after refresh', function () {
         Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
             ->test(Change::class)
