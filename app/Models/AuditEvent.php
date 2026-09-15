@@ -33,6 +33,7 @@ class AuditEvent extends Model
         'resource_name',
         'description',
         'metadata',
+        'changes',
         'ip_address',
         'user_agent',
         'created_at',
@@ -42,6 +43,7 @@ class AuditEvent extends Model
     {
         return [
             'metadata' => 'array',
+            'changes' => 'encrypted:array',
             'created_at' => 'datetime',
         ];
     }
@@ -85,8 +87,26 @@ class AuditEvent extends Model
      */
     public static function record(string $event, array $context = []): void
     {
+        self::recordWithChanges($event, $context);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>  $changes
+     */
+    public static function recordModelMutation(string $event, array $context, array $changes): void
+    {
+        self::recordWithChanges($event, $context, $changes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>|null  $changes
+     */
+    private static function recordWithChanges(string $event, array $context, ?array $changes = null): void
+    {
         try {
-            $attributes = self::attributesFor($event, $context);
+            $attributes = self::attributesFor($event, $context, $changes);
 
             DB::afterCommit(function () use ($attributes): void {
                 defer(function () use ($attributes): void {
@@ -112,7 +132,7 @@ class AuditEvent extends Model
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private static function attributesFor(string $event, array $context): array
+    private static function attributesFor(string $event, array $context, ?array $changes): array
     {
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
             ?? data_get($context, 'team_id')
@@ -150,7 +170,8 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact($context),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
+            'changes' => $changes,
             'ip_address' => app()->bound('request') ? request()->ip() : null,
             'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
         ];
@@ -192,7 +213,7 @@ class AuditEvent extends Model
         return $key ? data_get($context, $key) : null;
     }
 
-    private static function redact(mixed $value, ?string $key = null): mixed
+    public static function redact(mixed $value, ?string $key = null): mixed
     {
         if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie/i', $key)) {
             return '[REDACTED]';
