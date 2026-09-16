@@ -9,6 +9,9 @@ class SentinelMetricsClient
 {
     private string $base = 'http://localhost:8888/api';
 
+    /** Cap on points per trend series after downsampling raw Sentinel samples. */
+    private const MAX_SERIES_POINTS = 300;
+
     public function __construct(protected Server $server) {}
 
     public static function rangeFrom(string $range): string
@@ -126,10 +129,18 @@ class SentinelMetricsClient
             return [];
         }
 
-        return array_values(array_map(
+        $series = array_values(array_map(
             fn ($r) => [(int) ($r['time'] ?? 0), (float) ($r[$field] ?? 0)],
             $rows
         ));
+
+        // Sentinel returns raw samples (thousands of points over 24h). Cap the series so
+        // the chart payload stays small enough to embed and morph cheaply.
+        if (count($series) > self::MAX_SERIES_POINTS) {
+            $series = downsampleLTTB($series, self::MAX_SERIES_POINTS);
+        }
+
+        return $series;
     }
 
     /**

@@ -104,3 +104,15 @@ it('maps cpu history to [time, value] pairs', function () {
 
     expect($client->history('cpu', 'from'))->toBe([[1000, 10.0], [2000, 20.0]]);
 });
+
+it('downsamples long history series so the chart payload stays small', function () {
+    $rows = [];
+    for ($i = 0; $i < 5000; $i++) {
+        $rows[] = ['time' => $i, 'percent' => (string) ($i % 100)];
+    }
+
+    $client = fakeMetricsClient();
+    $client->bodies = ['/cpu/history' => json_encode($rows)];
+
+    expect(count($client->history('cpu', 'from')))->toBe(300);
+});

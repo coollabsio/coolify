@@ -35,11 +35,16 @@ class Metrics extends Component
     #[Url(as: 'cmetric')]
     public string $containerMetric = 'cpu';
 
+    public bool $live = false;
+
     /** @var array<string, mixed> */
     public array $kpis = [];
 
     /** @var array<int, array<string, mixed>> */
     public array $serverRows = [];
+
+    /** @var array<int, array<string, mixed>> All fetched containers, kept so the metric toggle re-ranks without re-fetching. */
+    public array $containersRaw = [];
 
     /** @var array<int, array<string, mixed>> */
     public array $topContainers = [];
@@ -78,13 +83,19 @@ class Metrics extends Component
 
     public function updatedContainerMetric(): void
     {
-        $this->loadData();
+        // Re-rank the already-fetched containers; no need to re-hit Sentinel.
+        $this->topContainers = FleetMetricsAggregator::rankContainers($this->containersRaw, $this->containerMetric);
     }
 
     public function setRange(string $range): void
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
         $this->loadData();
+    }
+
+    public function isLivePollable(): bool
+    {
+        return $this->live && $this->range === '24h';
     }
 
     /**
@@ -147,6 +158,7 @@ class Metrics extends Component
 
         $this->serverRows = $rows;
         $this->kpis = FleetMetricsAggregator::fleetKpis($rows);
+        $this->containersRaw = $containers;
         $this->topContainers = FleetMetricsAggregator::rankContainers($containers, $this->containerMetric);
         $this->chartData = $this->buildChartPayload($series);
 

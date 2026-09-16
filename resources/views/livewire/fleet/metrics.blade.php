@@ -30,6 +30,28 @@ $serverListboxOptions = array_merge(
                 </div>
 
                 <div class="flex items-center gap-2 sm:ml-auto">
+                    @if ($range === '24h')
+                        <div x-data="{ live: $wire.entangle('live').live }"
+                            x-init="
+                                const stored = localStorage.getItem('metrics-live');
+                                if (stored === '0') { live = false; }
+                                if (stored === '1') { live = true; }
+                                $watch('live', value => localStorage.setItem('metrics-live', value ? '1' : '0'));
+                            ">
+                            <button type="button" @click="live = !live" :aria-pressed="live ? 'true' : 'false'"
+                                title="Toggle realtime refresh (updates every 60s)"
+                                class="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium ring-1 transition-colors"
+                                :class="live
+                                    ? 'bg-white text-black shadow-sm ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
+                                    : 'text-neutral-500 ring-neutral-200 hover:text-black dark:text-fg-faint dark:ring-white/[0.08] dark:hover:text-fg'">
+                                <span class="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
+                                    <span x-show="live" class="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 motion-safe:animate-ping"></span>
+                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full" :class="live ? 'bg-emerald-500' : 'bg-neutral-400 dark:bg-white/40'"></span>
+                                </span>
+                                <span>Live Refresh</span>
+                            </button>
+                        </div>
+                    @endif
                     <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
                         @foreach (['24h' => '24 hours', '7d' => '7 days', '30d' => '30 days'] as $value => $label)
                             <button type="button" wire:click="setRange('{{ $value }}')"
@@ -43,6 +65,10 @@ $serverListboxOptions = array_merge(
             </div>
         @endif
     </div>
+
+    @if ($this->isLivePollable())
+        <div wire:poll.60s="loadData" class="hidden"></div>
+    @endif
 
     @if ($servers->isEmpty())
         <x-empty size="sm" title="No server metrics yet"

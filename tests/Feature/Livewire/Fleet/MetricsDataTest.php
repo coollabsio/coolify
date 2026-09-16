@@ -134,6 +134,25 @@ it('shows the KPI tiles, a stale badge for offline servers, and the container to
         ->assertSee('Offline');
 });
 
+it('re-ranks containers on metric switch without re-fetching', function () {
+    $s = metricsServer($this->team, $this->privateKey);
+
+    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$s->uuid => [
+        ['id' => 'a', 'cpu' => 5.0, 'memUsed' => 900, 'memPercent' => 9.0, 'diskBytes' => 1, 'net' => 0.0],
+        ['id' => 'b', 'cpu' => 90.0, 'memUsed' => 100, 'memPercent' => 1.0, 'diskBytes' => 9, 'net' => 0.0],
+    ]];
+
+    $component = Livewire::test(TestableMetrics::class);
+    expect(array_column($component->get('topContainers'), 'id')[0])->toBe('b'); // cpu
+
+    // Empty the stub so a re-fetch would change nothing/ break; the re-rank must use cached rows.
+    StubMetricsClient::$containers = [];
+    $component->set('containerMetric', 'memory');
+
+    expect(array_column($component->get('topContainers'), 'id')[0])->toBe('a'); // memory, still ranked
+});
+
 it('cannot see another team’s servers', function () {
     $otherTeam = Team::factory()->create();
     // Reuse the existing key id: the factory's private key is hardcoded, so a second
