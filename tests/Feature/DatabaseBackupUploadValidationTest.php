@@ -220,16 +220,16 @@ test('file scanner allows ordinary gzipped dumps', function () {
     expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($gzClean))->toBeFalse();
 });
 
-test('file scanner detects program execution payloads inside custom format archives', function () {
+test('file scanner defers custom format archives to pg_restore inspection', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload");
 
-    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
 });
 
-test('file scanner detects program execution payloads inside gzipped custom format archives', function () {
+test('file scanner defers gzipped custom format archives to pg_restore inspection', function () {
     $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload", gzip: true);
 
-    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeTrue();
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
 });
 
 test('file scanner allows custom format archives without program execution', function () {

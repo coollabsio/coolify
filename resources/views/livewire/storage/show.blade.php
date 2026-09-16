@@ -102,7 +102,7 @@
                                                     shortConfirmationLabel="Storage Name" :confirmWithPassword="false"
                                                     step2ButtonText="Permanently Delete" />
                                             @else
-                                                <x-forms.button disabled tooltip="You do not have permission to delete this storage.">
+                                                <x-forms.button isError disabled tooltip="You do not have permission to delete this storage.">
                                                     Delete
                                                 </x-forms.button>
                                             @endcan

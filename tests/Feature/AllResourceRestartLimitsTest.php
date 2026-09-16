@@ -1,5 +1,9 @@
 <?php
 
+use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Service\StopServiceApplication;
+use App\Jobs\PushServerUpdateJob;
+use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -14,9 +18,10 @@ use App\Models\StandaloneRedis;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Schema;
 
-it('gives every independently runnable non-application resource restart limit state', function (string $modelClass) {
+it('gives independently runnable application resources restart limit state', function (string $modelClass) {
     expect(class_uses_recursive($modelClass))->toContain(HasRestartLimit::class);
 
     $resource = new $modelClass;
@@ -34,17 +39,8 @@ it('gives every independently runnable non-application resource restart limit st
         'last_restart_at' => 'datetime',
     ]);
 })->with([
-    ApplicationPreview::class,
-    ServiceApplication::class,
-    ServiceDatabase::class,
-    StandaloneClickhouse::class,
-    StandaloneDragonfly::class,
-    StandaloneKeydb::class,
-    StandaloneMariadb::class,
-    StandaloneMongodb::class,
-    StandaloneMysql::class,
-    StandalonePostgresql::class,
-    StandaloneRedis::class,
+    [ApplicationPreview::class],
+    [ServiceApplication::class],
 ]);
 
 it('collects restart counts for preview and service containers from both status sources', function () {
@@ -157,7 +153,7 @@ it('imports the application model used when claiming a restart limit', function 
         ->toContain('Application::query()');
 });
 
-it('adds restart limit columns to previews services and standalone databases', function () {
+it('limits restarts only for applications', function () {
     $migrations = collect(glob(database_path('migrations/*.php')))
         ->map(fn (string $path): string => file_get_contents($path))
         ->implode("\n");
@@ -165,19 +161,94 @@ it('adds restart limit columns to previews services and standalone databases', f
     expect($migrations)
         ->toContain("'application_previews'")
         ->toContain("'service_applications'")
-        ->toContain("'service_databases'")
         ->toContain("'max_restart_count'")
-        ->toContain("'restart_limit_reached'");
+        ->toContain("'restart_limit_reached'")
+        ->toContain("dropColumn(['max_restart_count', 'restart_limit_reached'])");
 
-    $restartLimitMigrations = collect(glob(database_path('migrations/*_add_restart_limit_to_*.php')));
+    $databaseModels = [
+        ServiceDatabase::class,
+        StandalonePostgresql::class,
+        StandaloneRedis::class,
+        StandaloneMongodb::class,
+        StandaloneMysql::class,
+        StandaloneMariadb::class,
+        StandaloneKeydb::class,
+        StandaloneDragonfly::class,
+        StandaloneClickhouse::class,
+    ];
 
-    expect($restartLimitMigrations)->toHaveCount(11);
-    expect($restartLimitMigrations->map(
-        fn (string $path): string => substr(basename($path), 0, 17)
-    )->unique())->toHaveCount(11);
-    $restartLimitMigrations->each(function (string $path): void {
-        expect(file_get_contents($path))->not->toContain('foreach (');
-    });
+    foreach ($databaseModels as $databaseModel) {
+        expect(class_uses_recursive($databaseModel))->not->toContain(HasRestartLimit::class);
+    }
+
+    foreach ([
+        'service_databases',
+        'standalone_postgresqls',
+        'standalone_redis',
+        'standalone_mongodbs',
+        'standalone_mysqls',
+        'standalone_mariadbs',
+        'standalone_keydbs',
+        'standalone_dragonflies',
+        'standalone_clickhouses',
+    ] as $databaseTable) {
+        expect(Schema::hasColumn($databaseTable, 'max_restart_count'))->toBeFalse()
+            ->and(Schema::hasColumn($databaseTable, 'restart_limit_reached'))->toBeFalse();
+    }
+
+    foreach ([GetContainersStatus::class, PushServerUpdateJob::class] as $statusUpdater) {
+        $source = file_get_contents((new ReflectionClass($statusUpdater))->getFileName());
+
+        expect($source)
+            ->not->toContain('$database->trackRestartCount')
+            ->not->toContain('$database->stoppedAfterRestartLimit()');
+    }
+
+    $stopServiceResource = file_get_contents((new ReflectionClass(StopServiceApplication::class))->getFileName());
+
+    expect($stopServiceResource)
+        ->toContain('$resetRestartCount && $serviceApplication instanceof ServiceApplication');
+});
+
+it('makes restart limits opt in for new application resources', function () {
+    $migrationPaths = glob(database_path('migrations/*_make_restart_limits_opt_in.php'));
+
+    expect($migrationPaths)->toHaveCount(1);
+
+    $migration = file_get_contents($migrationPaths[0]);
+
+    expect($migration)
+        ->toContain("['applications', 'application_previews', 'service_applications']")
+        ->toContain("integer('max_restart_count')->default(0)->change()")
+        ->toContain('public $withinTransaction = false;')
+        ->toContain("->where('max_restart_count', 10)")
+        ->toContain('->chunkById(5000')
+        ->toContain("->whereIn('id', \$resources->pluck('id'))")
+        ->toContain("'max_restart_count' => 0")
+        ->toContain("'restart_limit_reached' => false");
+
+    $applicationSettings = file_get_contents(app_path('Livewire/Project/Application/Advanced.php'));
+    $serviceSettings = file_get_contents(app_path('Livewire/Project/Service/Index.php'));
+
+    expect($applicationSettings)
+        ->toContain('public int $maxRestartCount = 0;')
+        ->toContain('$this->application->max_restart_count ?? 0')
+        ->and($serviceSettings)
+        ->toContain('public mixed $maxRestartCount = 0;')
+        ->toContain('$this->serviceApplication->max_restart_count ?? 0');
+
+    foreach ([Application::class, ApplicationPreview::class, ServiceApplication::class] as $modelClass) {
+        expect((new $modelClass)->max_restart_count)->toBe(0);
+    }
+});
+
+it('does not render restart limit warnings for service databases', function () {
+    $html = Blade::render(
+        '<x-application.restart-limit-warning :application="$database" />',
+        ['database' => new ServiceDatabase],
+    );
+
+    expect(trim($html))->toBeEmpty();
 });
 
 it('atomically claims a resource restart limit once and can reset it', function () {

@@ -120,7 +120,7 @@ class FileStorage extends Component
             : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             if ($this->fileStorage->is_too_large) {
@@ -308,10 +308,10 @@ class FileStorage extends Component
     {
         return view('livewire.project.service.file-storage', [
             'directoryDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permantely deleted form the server.'],
+                ['id' => 'permanently_delete', 'label' => 'The selected directory and all its contents will be permanently deleted from the server.'],
             ],
             'fileDeletionCheckboxes' => [
-                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted form the server.'],
+                ['id' => 'permanently_delete', 'label' => 'The selected file will be permanently deleted from the server.'],
             ],
             'hostFileDeletionCheckboxes' => [
                 ['id' => 'permanently_delete', 'label' => 'Only the mount configuration will be removed. The host file will not be deleted.'],

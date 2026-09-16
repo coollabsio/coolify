@@ -23,9 +23,11 @@ use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\DockerImageParser;
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -1454,9 +1456,17 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
-            $repository_url_parsed = Url::fromString($request->git_repository);
+            $gitRepository = $application->git_repository;
+            $httpsRepository = scpStyleGitUrlToHttps($gitRepository);
+            if (is_string($httpsRepository)) {
+                $gitRepository = $httpsRepository;
+                $application->git_repository = $httpsRepository;
+            }
+            $repository_url_parsed = Url::fromString($gitRepository);
             $git_host = $repository_url_parsed->getHost();
             if ($git_host === 'github.com') {
                 $application->source_type = GithubApp::class;
@@ -1618,11 +1628,7 @@ class ApplicationsController extends Controller
                 return response()->json(['message' => 'Failed to generate Github App token.'], 400);
             }
 
-            $gitRepository = $request->git_repository;
-            if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
-                $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
-            }
-            $gitRepository = str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+            $gitRepository = gitRepositorySlug($request->git_repository);
 
             // Use direct API call to verify repository access instead of loading all repositories
             // This is much faster and avoids timeouts for GitHub Apps with many repositories
@@ -1718,7 +1724,9 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->git_repository = str($gitRepository)->trim()->toString();
@@ -1949,7 +1957,9 @@ class ApplicationsController extends Controller
                 $request->offsetUnset('docker_compose_domains');
             }
             if ($dockerComposeDomainsJson->count() > 0) {
+                [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts($dockerComposeDomainsJson);
                 $application->docker_compose_domains = json_encode($dockerComposeDomainsJson);
+                $application->domain_port_overrides = $domainPortOverrides;
             }
             $application->fqdn = $fqdn;
             $application->private_key_id = $privateKey->id;
@@ -2400,13 +2410,12 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -2484,6 +2493,256 @@ class ApplicationsController extends Controller
 
         return response()->json([
             'logs' => $logs,
+        ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Update Preview Domains',
+        description: 'Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.',
+        path: '/applications/{uuid}/previews/{pull_request_id}',
+        operationId: 'update-preview-domains-by-pull-request-id',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'pull_request_id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'domains', type: 'string', nullable: true, example: 'https://pr.example.com:3000'),
+                new OA\Property(
+                    property: 'docker_compose_domains',
+                    type: 'array',
+                    nullable: true,
+                    items: new OA\Items(properties: [
+                        new OA\Property(property: 'name', type: 'string'),
+                        new OA\Property(property: 'domain', type: 'string', nullable: true),
+                        new OA\Property(property: 'redirect', type: 'string', nullable: true, enum: ['www', 'non-www', 'both']),
+                    ], type: 'object'),
+                ),
+                new OA\Property(property: 'force_domain_override', type: 'boolean', default: false),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'Preview domains updated.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, ref: '#/components/responses/403'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Domain conflict.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update_preview_by_pull_request_id(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('update', $application);
+
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+            return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+        }
+
+        $preview = ApplicationPreview::where('application_id', $application->id)
+            ->where('pull_request_id', (int) $pullRequestIdRaw)
+            ->first();
+        if (! $preview) {
+            return response()->json(['message' => 'Preview not found.'], 404);
+        }
+
+        $isCompose = $application->build_pack === BuildPackTypes::DOCKERCOMPOSE->value;
+        $validationRules = ['force_domain_override' => 'boolean'];
+        if ($isCompose) {
+            $validationRules = array_merge($validationRules, [
+                'domains' => 'missing',
+                'docker_compose_domains' => 'present|array',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
+                'docker_compose_domains.*.name' => 'required|string|distinct',
+                'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
+            ]);
+        } else {
+            $validationRules['domains'] = ['present', ...ValidationPatterns::applicationDomainRules()];
+            $validationRules['docker_compose_domains'] = 'missing';
+        }
+
+        $validator = Validator::make($request->all(), $validationRules);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        $dockerComposeDomains = null;
+        $dockerComposeDomainsResponse = null;
+        if ($isCompose) {
+            try {
+                $compose = Yaml::parse($application->docker_compose_raw ?? '');
+            } catch (\Throwable) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'The Docker Compose configuration could not be parsed.'],
+                ], 422);
+            }
+
+            $services = data_get($compose, 'services');
+            if (! is_array($services) || $services === []) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'The Docker Compose configuration must define at least one service.'],
+                ], 422);
+            }
+
+            $composeServices = collect($services)
+                ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
+                ->keys()
+                ->map(fn (mixed $name): string => (string) $name)
+                ->values();
+            $requestedServices = collect($request->input('docker_compose_domains'))->pluck('name');
+            if ($requestedServices->diff($composeServices)->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['docker_compose_domains' => 'One or more Docker Compose services are invalid.'],
+                ], 422);
+            }
+
+            $existingComposeDomains = json_decode($preview->docker_compose_domains ?? '[]', true) ?: [];
+            $dockerComposeDomains = $composeServices
+                ->mapWithKeys(function (string $service) use ($existingComposeDomains): array {
+                    $entry = ['domain' => ''];
+                    $redirect = $existingComposeDomains[$service]['redirect'] ?? null;
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+
+                    return [$service => $entry];
+                })
+                ->all();
+            foreach ($request->input('docker_compose_domains') as $item) {
+                $entry = ['domain' => ValidationPatterns::normalizeApplicationDomains(data_get($item, 'domain')) ?? ''];
+                $redirect = array_key_exists('redirect', $item)
+                    ? data_get($item, 'redirect')
+                    : ($existingComposeDomains[data_get($item, 'name')]['redirect'] ?? null);
+                if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                    $entry['redirect'] = $redirect;
+                }
+                $dockerComposeDomains[data_get($item, 'name')] = $entry;
+            }
+            $domains = collect($dockerComposeDomains)
+                ->pluck('domain')
+                ->filter()
+                ->implode(',') ?: null;
+        } else {
+            $domains = ValidationPatterns::normalizeApplicationDomains($request->input('domains'));
+        }
+
+        $submittedUrls = collect(ValidationPatterns::applicationDomainList($domains))
+            ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain));
+        if ($submittedUrls->duplicates()->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    $isCompose ? 'docker_compose_domains' : 'domains' => 'The same domain cannot be configured more than once.',
+                ],
+            ], 422);
+        }
+
+        $normalized = DomainPortOverrides::normalize($domains, null);
+        $portlessDomains = $normalized['fqdn'];
+        if ($isCompose) {
+            foreach ($dockerComposeDomains as $service => $entry) {
+                $dockerComposeDomains[$service]['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain']))
+                    ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                    ->implode(',');
+            }
+            $dockerComposeDomainsResponse = collect($dockerComposeDomains)
+                ->map(fn (array $entry, string $name): array => ['name' => $name, ...$entry])
+                ->values()
+                ->all();
+        }
+        $urls = collect(ValidationPatterns::applicationDomainList($portlessDomains));
+        $conflicts = checkIfDomainIsAlreadyUsedViaAPI($urls, $teamId);
+        if (isset($conflicts['error'])) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [$isCompose ? 'docker_compose_domains' : 'domains' => $conflicts['error']],
+            ], 422);
+        }
+        if ($conflicts['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+            return response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => $conflicts['conflicts'],
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ], 409);
+        }
+
+        $hostCandidates = $urls
+            ->map(fn (string $url): string => (string) parse_url($url, PHP_URL_HOST))
+            ->filter();
+        $conflictingPreview = null;
+        if ($hostCandidates->isNotEmpty()) {
+            $conflictingPreview = ApplicationPreview::query()
+                ->whereIn('application_id', Application::ownedByCurrentTeamAPI($teamId)
+                    ->withoutGlobalScope('withRelations')
+                    ->reorder()
+                    ->select('applications.id'))
+                ->whereKeyNot($preview->id)
+                ->whereNotNull('fqdn')
+                ->where(function ($query) use ($hostCandidates): void {
+                    foreach ($hostCandidates as $host) {
+                        $query->orWhere('fqdn', 'like', '%'.$host.'%');
+                    }
+                })
+                ->get(['uuid', 'pull_request_id', 'fqdn'])
+                ->first(fn (ApplicationPreview $otherPreview): bool => collect(ValidationPatterns::applicationDomainList($otherPreview->fqdn))
+                    ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                    ->intersect($urls)
+                    ->isNotEmpty());
+        }
+
+        if ($conflictingPreview && ! $request->boolean('force_domain_override')) {
+            return response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => [[
+                    'domain' => collect(ValidationPatterns::applicationDomainList($conflictingPreview->fqdn))
+                        ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                        ->intersect($urls)
+                        ->first(),
+                    'resource_name' => 'Preview deployment #'.$conflictingPreview->pull_request_id,
+                    'resource_uuid' => $conflictingPreview->uuid,
+                    'resource_type' => 'application',
+                    'message' => 'Domain is already in use by another preview deployment.',
+                ]],
+                'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+            ], 409);
+        }
+
+        $preview->domain_port_overrides = $normalized['overrides'];
+        $preview->fqdn = $portlessDomains;
+        if ($isCompose) {
+            $preview->docker_compose_domains = json_encode($dockerComposeDomains);
+        }
+        $preview->save();
+
+        auditLog('api.application.preview_updated', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'pull_request_id' => $preview->pull_request_id,
+            'changed_fields' => [$isCompose ? 'docker_compose_domains' : 'domains'],
+        ]);
+
+        return response()->json([
+            'uuid' => $preview->uuid,
+            'pull_request_id' => $preview->pull_request_id,
+            'domains' => $preview->fqdn,
+            'docker_compose_domains' => $dockerComposeDomainsResponse,
+            'domain_port_overrides' => $preview->domain_port_overrides,
         ]);
     }
 
@@ -2818,6 +3077,7 @@ class ApplicationsController extends Controller
             'http_basic_auth_username' => 'string',
             'http_basic_auth_password' => 'string',
             'include_source_commit_in_build' => 'boolean',
+            'ports_exposes' => 'nullable|string|regex:/^(\d+)(,\d+)*$/',
         ];
         $validationRules = array_merge(sharedDataApplications(), $validationRules);
         $validationMessages = [
@@ -2826,10 +3086,10 @@ class ApplicationsController extends Controller
         $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
         // Validate ports_exposes
-        if ($request->has('ports_exposes')) {
+        if ($request->filled('ports_exposes')) {
             $ports = explode(',', $request->ports_exposes);
             foreach ($ports as $port) {
-                if (! is_numeric($port)) {
+                if (! is_numeric($port) || (int) $port < 1 || (int) $port > 65535) {
                     return response()->json([
                         'message' => 'Validation failed.',
                         'errors' => [
@@ -3117,7 +3377,12 @@ class ApplicationsController extends Controller
         }
 
         if ($dockerComposeDomainsJson->count() > 0) {
+            [$dockerComposeDomainsJson, $domainPortOverrides] = $this->normalizeDockerComposeDomainPorts(
+                $dockerComposeDomainsJson,
+                $application->domain_port_overrides,
+            );
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
+            data_set($data, 'domain_port_overrides', $domainPortOverrides);
         }
         $requestHasNoindexDomains = $request->has('noindex_domains');
         data_forget($data, 'noindex_domains');
@@ -4607,7 +4872,6 @@ class ApplicationsController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -4669,11 +4933,10 @@ class ApplicationsController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4715,7 +4978,7 @@ class ApplicationsController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -4753,9 +5016,6 @@ class ApplicationsController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {
@@ -4811,7 +5071,6 @@ class ApplicationsController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -4856,14 +5115,13 @@ class ApplicationsController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4899,7 +5157,6 @@ class ApplicationsController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $application->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $application->id,
                 'resource_type' => $application->getMorphClass(),
             ]);
@@ -5152,7 +5409,7 @@ class ApplicationsController extends Controller
         $this->authorize('delete', $application);
 
         $pullRequestIdRaw = $request->route('pull_request_id');
-        if (! is_numeric($pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
             return response()->json(['message' => 'Invalid pull_request_id.'], 422);
         }
         $pullRequestId = (int) $pullRequestIdRaw;
@@ -5863,5 +6120,29 @@ class ApplicationsController extends Controller
         ]);
 
         return response()->json(['message' => 'Destination detached.']);
+    }
+
+    /**
+     * @param  Collection<string, array{domain: ?string, redirect?: string}>  $domains
+     * @param  array<string, int|string>|null  $existingOverrides
+     * @return array{Collection<string, array{domain: ?string, redirect?: string}>, ?array<string, int>}
+     */
+    private function normalizeDockerComposeDomainPorts(Collection $domains, ?array $existingOverrides = null): array
+    {
+        $allDomains = $domains
+            ->pluck('domain')
+            ->filter()
+            ->implode(',');
+        $normalized = DomainPortOverrides::normalize($allDomains, $existingOverrides);
+
+        $domains = $domains->map(function (array $entry): array {
+            $entry['domain'] = collect(ValidationPatterns::applicationDomainList($entry['domain'] ?? null))
+                ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                ->implode(',');
+
+            return $entry;
+        });
+
+        return [$domains, $normalized['overrides']];
     }
 }

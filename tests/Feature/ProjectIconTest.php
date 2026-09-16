@@ -61,7 +61,8 @@ it('serves a project icon only to a member of its team', function () {
 
     $this->withoutMiddleware()->get(route('project.icon', ['project_uuid' => $this->project->uuid]))
         ->assertSuccessful()
-        ->assertHeader('content-type', 'image/jpeg');
+        ->assertHeader('content-type', 'image/jpeg')
+        ->assertHeader('cache-control', 'immutable, max-age=31536000, private');
 
     $otherUser = User::factory()->create();
     $otherTeam = Team::factory()->create();
@@ -104,7 +105,9 @@ it('exposes the icon URL on the projects index', function () {
 });
 
 it('loads an S3 project icon from the configured CDN', function () {
-    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com/media/');
+    InstanceSettings::findOrFail(0)->update([
+        'image_cdn_url' => 'https://avatars.example.com/media',
+    ]);
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -127,7 +130,6 @@ it('loads an S3 project icon from the configured CDN', function () {
 });
 
 it('loads an S3 project icon directly from S3 when the CDN is not configured', function () {
-    config()->set('constants.coolify.avatar_cdn_url');
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,
@@ -149,7 +151,6 @@ it('loads an S3 project icon directly from S3 when the CDN is not configured', f
 });
 
 it('does not use an unusable S3 storage URL for a project icon', function () {
-    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com');
     Team::factory()->create(['id' => 0]);
     $storage = S3Storage::query()->create([
         'team_id' => 0,

@@ -12,7 +12,6 @@ use OpenApi\Attributes as OA;
 class ServerSentinelController extends Controller
 {
     private const ALLOWED_FIELDS = [
-        'is_sentinel_enabled',
         'is_metrics_enabled',
         'is_sentinel_debug_enabled',
         'sentinel_token',
@@ -36,7 +35,7 @@ class ServerSentinelController extends Controller
     {
         $settings = $server->settings;
         $payload = [
-            'is_sentinel_enabled' => (bool) $settings->is_sentinel_enabled,
+            'is_sentinel_enabled' => $server->isSentinelEnabled(),
             'is_metrics_enabled' => (bool) $settings->is_metrics_enabled,
             'is_sentinel_debug_enabled' => (bool) $settings->is_sentinel_debug_enabled,
             'sentinel_metrics_refresh_rate_seconds' => (int) $settings->sentinel_metrics_refresh_rate_seconds,
@@ -69,7 +68,7 @@ class ServerSentinelController extends Controller
                 description: 'Sentinel settings.',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'is_sentinel_enabled', type: 'boolean'),
+                        new OA\Property(property: 'is_sentinel_enabled', type: 'boolean', readOnly: true, description: 'Sentinel is mandatory on regular managed servers.'),
                         new OA\Property(property: 'is_metrics_enabled', type: 'boolean'),
                         new OA\Property(property: 'is_sentinel_debug_enabled', type: 'boolean'),
                         new OA\Property(property: 'sentinel_token', type: 'string', description: 'Only present with read:sensitive.'),
@@ -118,7 +117,6 @@ class ServerSentinelController extends Controller
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'is_sentinel_enabled', type: 'boolean'),
                     new OA\Property(property: 'is_metrics_enabled', type: 'boolean'),
                     new OA\Property(property: 'is_sentinel_debug_enabled', type: 'boolean'),
                     new OA\Property(property: 'sentinel_token', type: 'string'),
@@ -158,7 +156,6 @@ class ServerSentinelController extends Controller
         $this->authorize('update', $server);
 
         $validator = customApiValidator($request->all(), [
-            'is_sentinel_enabled' => 'boolean',
             'is_metrics_enabled' => 'boolean',
             'is_sentinel_debug_enabled' => 'boolean',
             'sentinel_token' => ['string', 'max:500', 'regex:/\A[a-zA-Z0-9._\-+=\/]+\z/'],
@@ -189,27 +186,10 @@ class ServerSentinelController extends Controller
         }
 
         $settings = $server->settings;
-        $enablingSentinel = $request->has('is_sentinel_enabled')
-            && $request->boolean('is_sentinel_enabled')
-            && ! $settings->is_sentinel_enabled;
-
-        if ($enablingSentinel && $server->isBuildServer()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['is_sentinel_enabled' => ['Sentinel cannot be enabled on build servers.']],
-            ], 422);
-        }
-
         foreach (self::ALLOWED_FIELDS as $field) {
             if ($request->has($field)) {
                 $settings->{$field} = $request->input($field);
             }
-        }
-
-        // Disabling Sentinel also clears related toggles (matches Livewire toggleSentinel).
-        if ($request->has('is_sentinel_enabled') && ! $request->boolean('is_sentinel_enabled')) {
-            $settings->is_metrics_enabled = false;
-            $settings->is_sentinel_debug_enabled = false;
         }
 
         $settings->save();

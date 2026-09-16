@@ -28,12 +28,6 @@ class Advanced extends Component
     public bool $isGitShallowCloneEnabled = false;
 
     #[Validate(['boolean'])]
-    public bool $isPreviewDeploymentsEnabled = false;
-
-    #[Validate(['boolean'])]
-    public bool $isPrDeploymentsPublicEnabled = false;
-
-    #[Validate(['boolean'])]
     public bool $isAutoDeployEnabled = true;
 
     #[Validate(['boolean'])]
@@ -88,7 +82,7 @@ class Advanced extends Component
     public bool $isConnectToDockerNetworkEnabled = false;
 
     #[Validate(['integer', 'min:0'])]
-    public int $maxRestartCount = 10;
+    public int $maxRestartCount = 0;
 
     public function mount()
     {
@@ -99,7 +93,7 @@ class Advanced extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -107,8 +101,6 @@ class Advanced extends Component
             $this->application->settings->is_git_submodules_enabled = $this->isGitSubmodulesEnabled;
             $this->application->settings->is_git_lfs_enabled = $this->isGitLfsEnabled;
             $this->application->settings->is_git_shallow_clone_enabled = $this->isGitShallowCloneEnabled;
-            $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
-            $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
             $this->application->settings->is_auto_deploy_enabled = $this->isAutoDeployEnabled;
             $this->application->settings->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->application->settings->is_gpu_enabled = $this->isGpuEnabled;
@@ -136,8 +128,6 @@ class Advanced extends Component
             $this->isGitSubmodulesEnabled = $this->application->settings->is_git_submodules_enabled;
             $this->isGitLfsEnabled = $this->application->settings->is_git_lfs_enabled;
             $this->isGitShallowCloneEnabled = $this->application->settings->is_git_shallow_clone_enabled ?? false;
-            $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
-            $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
             $this->isAutoDeployEnabled = $this->application->settings->is_auto_deploy_enabled;
             $this->isGpuEnabled = $this->application->settings->is_gpu_enabled;
             $this->gpuDriver = $this->application->settings->gpu_driver;
@@ -152,7 +142,7 @@ class Advanced extends Component
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
-            $this->maxRestartCount = $this->application->max_restart_count ?? 10;
+            $this->maxRestartCount = $this->application->max_restart_count ?? 0;
         }
 
         // Load stop_grace_period separately since it has its own save handler

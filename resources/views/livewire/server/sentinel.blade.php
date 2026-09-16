@@ -1,60 +1,80 @@
-<div class="application-settings-form flex w-full flex-col gap-6">
+@php
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'restarting' => 'Restarting',
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
+    $sentinelStatusType = match ($sentinelStatus) {
+        'in_sync' => 'success',
+        'out_of_sync' => 'warning',
+        default => 'neutral',
+    };
+@endphp
+
+<div class="application-settings-form flex w-full flex-col gap-6" wire:poll.10s="refreshSentinelStatus">
     <form wire:submit.prevent="submit" class="contents">
-        @if ($isSentinelEnabled)
-            {{-- Scope dirty tracking to savable form fields only. Without wire:target,
-                 Livewire compares the entire component snapshot — so dev-only x-init
-                 `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
-                 flashes this bar on every page open. --}}
-            <x-unsaved-bar action="submit"
-                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
-        @endif
+        {{-- Scope dirty tracking to savable form fields only. Without wire:target,
+             Livewire compares the entire component snapshot — so dev-only x-init
+             `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
+             flashes this bar on every page open. --}}
+        <x-unsaved-bar action="submit"
+            targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
             <x-slot:actions>
                 <div class="flex items-center gap-2">
-                    @if (!$isSentinelEnabled)
-                        <x-forms.button canGate="update" :canResource="$server" isHighlighted
-                            wire:click="toggleSentinel">
-                            Enable Sentinel
-                        </x-forms.button>
-                    @else
-                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                            :type="$server->isSentinelLive() ? 'success' : 'warning'" />
-                        <x-forms.button wire:click="restartSentinel" canGate="update"
-                            :canResource="$server">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            {{ $server->isSentinelLive() ? 'Restart' : 'Sync' }}
-                        </x-forms.button>
-                        <x-forms.button canGate="update" :canResource="$server"
-                            wire:click="toggleSentinel">
-                            Disable
-                        </x-forms.button>
-                    @endif
+                    <x-status-badge :status="$sentinelStatusLabel" :type="$sentinelStatusType" />
+                    <x-forms.button wire:click="restartSentinel" canGate="update"
+                        :canResource="$server">
+                        <x-reicon name="refresh" class="size-3.5" />
+                        {{ $sentinelStatus === 'in_sync' ? 'Restart' : 'Sync' }}
+                    </x-forms.button>
                 </div>
             </x-slot:actions>
 
-            @if ($isSentinelEnabled && !$server->isSentinelLive())
+            @if ($sentinelStatus === 'out_of_sync')
                 <x-callout type="warning" title="Sentinel is out of sync">
-                    Sync Sentinel to apply its current configuration and restore health reporting.
+                    <div class="space-y-3">
+                        <p>Sentinel has not reported within the expected interval. Check these items before syncing again:</p>
+                        <ul class="list-disc space-y-1 pl-4">
+                            <li>Confirm that the <code>coolify-sentinel</code> container is running.</li>
+                            <li>
+                                <a class="font-medium underline underline-offset-2"
+                                    href="{{ route('server.sentinel.logs', ['server_uuid' => $server->uuid]) }}"
+                                    wire:navigate>Open Sentinel logs</a>
+                                and review recent connection or push errors.
+                            </li>
+                            <li>Confirm that the Coolify URL and Sentinel token match this configuration.</li>
+                        </ul>
+
+                        @if ($server->isLocalhost())
+                            <p>Sync Sentinel to recreate it on the Coolify Docker network.</p>
+                        @else
+                            <div class="space-y-2">
+                                <p>The remote server needs outbound access to this Coolify URL. Sentinel reporting does not require an inbound listening port.</p>
+                                @if (filled($sentinelCustomUrl))
+                                    <p>
+                                        From the remote server, test
+                                        <code class="break-all">curl -fsS {{ escapeshellarg(rtrim($sentinelCustomUrl, '/') . '/api/health') }}</code>.
+                                    </p>
+                                @else
+                                    <p>Set a reachable Coolify URL before syncing Sentinel.</p>
+                                @endif
+                                <p>Check DNS, TLS certificates, outbound firewall rules, and proxy settings.</p>
+                            </div>
+                        @endif
+                    </div>
                 </x-callout>
-            @elseif ($isSentinelEnabled)
-                <div class="flex items-start gap-3">
-                    <div
-                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
-                        <x-reicon name="dashboard" class="size-4" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-neutral-950 dark:text-fg">Health reporting active</p>
-                        <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                            Sentinel is connected and reporting server health to this Coolify instance.
-                        </p>
-                    </div>
-                </div>
+            @elseif ($sentinelStatus === 'in_sync')
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                    Sentinel is connected and reporting server health to this Coolify instance.
+                </p>
+            @elseif ($sentinelStatus === 'restarting')
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">Sentinel is restarting.</p>
             @else
-                <x-empty size="sm" title="Sentinel is disabled"
-                    description="Enable Sentinel to collect metrics and monitor server and container health."
-                    icon-name="dashboard" />
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">Sentinel started and is waiting for its first authenticated report.</p>
             @endif
         </x-application.settings-section>
 
@@ -62,10 +82,24 @@
             <x-application.settings-section id="server-sentinel-connection-section" title="Connection"
                 helper="Configure how Sentinel authenticates with and reports to Coolify.">
                 <x-slot:actions>
-                    <x-forms.button canGate="update" :canResource="$server"
-                        wire:click="regenerateSentinelToken">
-                        Regenerate token
-                    </x-forms.button>
+                    <div class="flex items-center gap-2">
+                        @can('manageSentinel', $server)
+                            <x-modal-confirmation title="Restore default Sentinel configuration?"
+                                buttonTitle="Restore defaults" submitAction="restoreDefaultConfiguration"
+                                :actions="[
+                                    'Restore the generated Coolify URL and default collection settings.',
+                                    'Clear debug logging and the development image override.',
+                                    'The Sentinel token and metrics setting will be preserved.',
+                                    'Restart Sentinel to apply the restored configuration.',
+                                ]" warningMessage="Your custom Sentinel configuration will be replaced with Coolify defaults."
+                                :confirmWithText="false" :confirmWithPassword="false"
+                                step2ButtonText="Restore defaults" />
+                        @endcan
+                        <x-forms.button canGate="update" :canResource="$server"
+                            wire:click="regenerateSentinelToken">
+                            Regenerate token
+                        </x-forms.button>
+                    </div>
                 </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
@@ -109,6 +143,7 @@
                                 $wire.set('sentinelCustomDockerImage', this.customImage || null);
                             }
                         }"
+                            @sentinel-defaults-restored.window="localStorage.removeItem('sentinel_custom_docker_image_{{ $server->uuid }}'); customImage = ''"
                             {{-- Only hydrate Livewire when a real override exists. Unconditional
                                  $wire.set('', null→'') on every open marks the component dirty and
                                  flashes the unsaved bar until the round-trip completes. --}}

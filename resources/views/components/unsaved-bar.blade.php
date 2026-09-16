@@ -5,6 +5,8 @@
     // appears when those fields differ from the last server snapshot — not on
     // incidental component state (e.g. $wire.set from x-init, display-only props).
     'targets' => null,
+    // Optional Alpine expression for drafts that survive unrelated server requests.
+    'dirty' => null,
 ])
 
 {{-- Floating "unsaved changes" pill (bottom center). Reveals itself via
@@ -40,7 +42,8 @@
         window.visualViewport?.removeEventListener('scroll', this.updateKeyboardInset);
         window.removeEventListener('resize', this.updateKeyboardInset);
     },
-}" x-bind:style="`--keyboard-inset: ${keyboardInset}px`" wire:dirty.class="is-dirty"
+}" x-bind:style="`--keyboard-inset: ${keyboardInset}px`"
+    @if ($dirty) x-bind:class="{ 'is-dirty': {{ $dirty }} }" @else wire:dirty.class="is-dirty" @endif
     wire:loading.class="is-saving"
     @keydown.enter.window="
         if ($el.classList.contains('is-dirty') &&

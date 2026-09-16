@@ -65,7 +65,7 @@ class Source extends Component
         $this->gitCommitSha = trim($this->gitCommitSha);
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();

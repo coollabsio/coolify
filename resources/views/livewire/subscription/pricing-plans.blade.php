@@ -23,7 +23,7 @@
 
         <div class="grid gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
             <div
-                class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Base price</p>
                 <div class="mt-2 flex items-end gap-1.5">
                     <span x-show="selected === 'monthly'" x-cloak

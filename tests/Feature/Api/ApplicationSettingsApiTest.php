@@ -138,6 +138,88 @@ test('proxy settings regenerate managed labels', function () {
     expect(base64_decode($this->application->fresh()->custom_labels))->not->toContain('sentinel-label=true');
 });
 
+test('changing a domain port regenerates managed labels with the requested port', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'ports_exposes' => '80',
+        'domain_port_overrides' => [
+            'https://app.example.com' => 3000,
+        ],
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://app.example.com:8080',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->fqdn)->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 8080,
+        ])
+        ->and($labels)->toContain('loadbalancer.server.port=8080')
+        ->and($labels)->not->toContain('loadbalancer.server.port=3000');
+});
+
+test('compose domain ports are stored as overrides when updating through the API', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx\n  frontend:\n    image: nginx\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [
+                ['name' => 'api', 'domain' => 'https://api.example.com'],
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
+test('compose domain ports are stored as overrides when creating through the API', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/compose-domain-port-test',
+            'git_branch' => 'main',
+            'build_pack' => 'dockercompose',
+            'autogenerate_domain' => false,
+            'docker_compose_domains' => [
+                ['name' => 'frontend', 'domain' => 'https://app.example.com:80'],
+            ],
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'frontend.domain'))->toBe('https://app.example.com')
+        ->and($application->domain_port_overrides)->toBe([
+            'https://app.example.com' => 80,
+        ]);
+});
+
 test('http basic auth updates regenerate managed labels', function () {
     $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
     $this->application->update([
@@ -278,6 +360,34 @@ test('PATCH /api/v1/applications/{uuid} updates preview_url_template and max_res
     expect($application->preview_url_template)->toBe('{{pr_id}}.preview.example.com')
         ->and($application->max_restart_count)->toBe(5);
 });
+
+test('PATCH /api/v1/applications/{uuid} clears ports_exposes with null or an empty string', function (mixed $portsExposes) {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->ports_exposes)->toBeNull();
+})->with([
+    'null' => null,
+    'empty string' => '',
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects invalid exposed ports', function (string $portsExposes) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'ports_exposes' => $portsExposes,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('ports_exposes');
+})->with([
+    'not numeric' => '80,abc',
+    'zero' => '0',
+    'above TCP range' => '65536',
+]);
 
 test('GET /api/v1/applications/{uuid} includes advanced settings', function () {
     $this->application->settings->update(advancedApplicationSettingsPayload());

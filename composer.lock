@@ -3644,16 +3644,16 @@
         },
         {
             "name": "livewire/livewire",
-            "version": "v3.8.3",
+            "version": "v3.8.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/livewire.git",
-                "reference": "ab9c2ac9305008aa9ab0f1beecec8ed6c3a591b2"
+                "reference": "ff019f8f6f48b7a2315922e45a70ad8fd75d1934"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/livewire/zipball/ab9c2ac9305008aa9ab0f1beecec8ed6c3a591b2",
-                "reference": "ab9c2ac9305008aa9ab0f1beecec8ed6c3a591b2",
+                "url": "https://api.github.com/repos/livewire/livewire/zipball/ff019f8f6f48b7a2315922e45a70ad8fd75d1934",
+                "reference": "ff019f8f6f48b7a2315922e45a70ad8fd75d1934",
                 "shasum": ""
             },
             "require": {
@@ -3708,7 +3708,7 @@
             "description": "A front-end framework for Laravel.",
             "support": {
                 "issues": "https://github.com/livewire/livewire/issues",
-                "source": "https://github.com/livewire/livewire/tree/v3.8.3"
+                "source": "https://github.com/livewire/livewire/tree/v3.8.7"
             },
             "funding": [
                 {
@@ -3716,7 +3716,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-31T00:08:18+00:00"
+            "time": "2026-08-31T15:40:46+00:00"
         },
         {
             "name": "log1x/laravel-webfonts",

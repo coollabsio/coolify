@@ -10,15 +10,21 @@
             <x-application.settings-section title="Sentinel logs"
                 helper="Search, filter, follow, copy, or download recent output from the Sentinel container."
                 flush class="logs-settings-section">
-                <x-slot:actions>
-                    <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                        :type="$server->isSentinelLive() ? 'success' : 'warning'"
-                        class="logs-section-status-badge" />
-                </x-slot:actions>
-                <div class="settings-log-panel">
-                    <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel"
-                        displayName="Sentinel" :collapsible="false" />
-                </div>
+                @if ($server->isSentinelEnabled())
+                    <x-slot:actions>
+                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                            :type="$server->isSentinelLive() ? 'success' : 'warning'"
+                            class="logs-section-status-badge" />
+                    </x-slot:actions>
+                    <div class="settings-log-panel">
+                        <livewire:project.shared.get-logs :server="$server" container="coolify-sentinel"
+                            displayName="Sentinel" :collapsible="false" />
+                    </div>
+                @else
+                    <x-empty size="sm" title="Sentinel is unavailable"
+                        description="Sentinel does not run on build or Swarm servers."
+                        icon-name="dashboard" />
+                @endif
             </x-application.settings-section>
         </div>
     </div>

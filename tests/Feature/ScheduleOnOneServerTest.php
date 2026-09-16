@@ -59,7 +59,7 @@ it('does not schedule Stripe subscription reconciliation automatically', functio
     expect($event)->toBeNull();
 });
 
-it('schedules stuck resource cleanup once per day on one server', function () {
+it('schedules stuck resource cleanup in the background once per day', function () {
     $schedule = app(Schedule::class);
 
     $event = collect($schedule->events())->first(
@@ -67,6 +67,8 @@ it('schedules stuck resource cleanup once per day on one server', function () {
     );
 
     expect($event)->not->toBeNull()
-        ->and($event->expression)->toBe('0 0 * * *')
-        ->and($event->onOneServer)->toBeTrue();
+        ->and($event->expression)->toBe('17 3 * * *')
+        ->and($event->onOneServer)->toBeTrue()
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->runInBackground)->toBeTrue();
 });

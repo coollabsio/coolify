@@ -9,7 +9,8 @@ it('uses the large modal treatment for the compose editor', function () {
     expect($view)
         ->toContain('title="Docker Compose"')
         ->toContain(':isLarge="true"')
-        ->toContain('<x-slot:headerActions>')
+        ->toContain('<x-slot:footer>')
+        ->not->toContain('<x-slot:headerActions>')
         ->toContain("\$dispatch('compose-preview-toggle')")
         ->toContain("\$dispatch('compose-save')")
         ->toContain('@compose-save-finished.window="saving = false"')
@@ -46,6 +47,27 @@ it('renders the compose editor with clear guidance settings and actions', functi
         ->not->toContain('Cancel')
         ->not->toContain('Show Normal Textarea')
         ->not->toContain('Show Deployable Compose');
+});
+
+it('keeps the compose modal usable on mobile screens', function () {
+    $stackForm = file_get_contents(resource_path('views/livewire/project/service/stack-form.blade.php'));
+    $editor = file_get_contents(resource_path('views/livewire/project/service/edit-compose.blade.php'));
+    $modal = file_get_contents(resource_path('views/components/modal-input.blade.php'));
+
+    expect($modal)
+        ->toContain('justify-center p-2')
+        ->toContain('sm:p-4')
+        ->toContain('flex-wrap! sm:flex-nowrap!')
+        ->toContain('@isset($footer)')
+        ->toContain('justify-end gap-2 border-t')
+        ->toContain('order-2 sm:order-none');
+
+    expect($stackForm)
+        ->toContain('flex-wrap items-center justify-end gap-2');
+
+    expect($editor)
+        ->toContain('flex-col items-stretch')
+        ->toContain('sm:flex-row sm:flex-wrap sm:items-center');
 });
 
 it('keeps the save button loading until the parent compose save finishes', function () {

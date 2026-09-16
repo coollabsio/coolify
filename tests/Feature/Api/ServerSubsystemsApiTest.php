@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config([
+        'app.maintenance.store' => 'array',
+        'cache.default' => 'array',
+        'cache.stores.redis.driver' => 'array',
+    ]);
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
@@ -232,6 +237,17 @@ describe('Sentinel API', function () {
         $settings = $this->server->settings->fresh();
         expect((bool) $settings->is_metrics_enabled)->toBeTrue()
             ->and((bool) $settings->is_sentinel_debug_enabled)->toBeTrue();
+    });
+
+    test('PATCH rejects disabling mandatory Sentinel', function () {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_sentinel_enabled' => false,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_sentinel_enabled');
+
+        expect($this->server->fresh()->isSentinelEnabled())->toBeTrue();
     });
 
     test('other-team sentinel endpoints return 404', function () {

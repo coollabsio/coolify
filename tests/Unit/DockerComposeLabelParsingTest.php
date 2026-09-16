@@ -29,6 +29,14 @@ it('ensures label parsing converts array values to strings', function () {
         ->toContain('$removedLabel = (string) collect($removedLabel)->first();');
 });
 
+it('falls back to the template port for service application proxy labels', function () {
+    $sharedFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/shared.php');
+
+    expect($sharedFile)->toContain(
+        '? ($savedService->getRequiredPort() ?? $predefinedPort)'
+    );
+});
+
 it('verifies label parsing array check occurs before preg_match', function () {
     // Read the parseDockerComposeFile function from shared.php
     $sharedFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/shared.php');

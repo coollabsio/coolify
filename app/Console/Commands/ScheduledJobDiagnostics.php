@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class ScheduledJobDiagnostics extends Command
@@ -203,7 +204,6 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKeys = [
-                "sentinel-restart:{$server->id}" => '0 0 * * *',
                 "server-patch-check:{$server->id}" => '0 0 * * 0',
                 "server-check:{$server->id}" => isCloud() ? '*/5 * * * *' : '* * * * *',
                 "server-storage-check:{$server->id}" => data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *'),
@@ -235,7 +235,7 @@ class ScheduledJobDiagnostics extends Command
         $this->newLine();
     }
 
-    private function getServers(?string $serverFilter): \Illuminate\Support\Collection
+    private function getServers(?string $serverFilter): Collection
     {
         $query = Server::with('settings')->where('ip', '!=', '1.2.3.4');
 

@@ -57,3 +57,15 @@ it('spaces instance backup settings sections', function () {
     expect($edit)
         ->toStartWith('<div class="flex flex-col gap-6">');
 });
+
+it('shows database backup section descriptions from the shared title helper', function () {
+    $general = file_get_contents(resource_path('views/livewire/project/database/backup-edit/general.blade.php'));
+    $retention = file_get_contents(resource_path('views/livewire/project/database/backup-edit/retention.blade.php'));
+
+    expect($general)
+        ->toContain('<x-application.settings-section title="Backup schedule"')
+        ->not->toContain('<h2>Backup schedule</h2>')
+        ->and($retention)
+        ->toContain('<x-application.settings-section title="Retention"')
+        ->not->toContain('<h2>Retention</h2>');
+});

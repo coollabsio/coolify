@@ -751,7 +751,7 @@
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="{{ $createModalShell }}"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown)">
                         <header class="flex-nowrap!">
                             <h3 class="min-w-0 flex-1 truncate">New project</h3>
                             <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
@@ -794,7 +794,7 @@
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="{{ $createModalShell }}"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown)">
                         <header class="flex-nowrap!">
                             <h3 class="min-w-0 flex-1 truncate">New team</h3>
                             <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
@@ -837,7 +837,7 @@
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="{{ $createModalShell }}"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown)">
                         <header class="flex-nowrap!">
                             <h3 class="min-w-0 flex-1 truncate">New S3 storage</h3>
                             <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
@@ -880,7 +880,7 @@
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="{{ $createModalShell }}"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown)">
                         <header class="flex-nowrap!">
                             <h3 class="min-w-0 flex-1 truncate">New private key</h3>
                             <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
@@ -923,7 +923,7 @@
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                         class="{{ $createModalShell }}"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-dropdown)">
                         <header class="flex-nowrap!">
                             <h3 class="min-w-0 flex-1 truncate">New GitHub app</h3>
                             <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">

@@ -1,12 +1,16 @@
 <?php
 
 use App\Enums\ProxyTypes;
+use App\Events\ProxyStatusChangedUI;
 use App\Jobs\CheckTraefikVersionForServerJob;
+use App\Jobs\CheckTraefikVersionJob;
 use App\Livewire\Server\Proxy;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
@@ -185,7 +189,7 @@ it('marks matching Traefik outdated information as a current warning', function 
     expect($server->hasCurrentTraefikOutdatedInfo())->toBeTrue();
 });
 
-it('clears stale outdated information before detecting the current version', function () {
+it('clears stale Traefik version state before detecting the current version', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,
@@ -204,6 +208,80 @@ it('clears stale outdated information before detecting the current version', fun
 
     $server->refresh();
 
-    expect($server->detected_traefik_version)->toBe('3.6.23')
+    expect($server->detected_traefik_version)->toBeNull()
         ->and($server->traefik_outdated_info)->toBeNull();
+});
+
+it('clears Traefik version state when the proxy changes', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => [
+            'type' => ProxyTypes::TRAEFIK->value,
+            'status' => 'running',
+        ],
+        'detected_traefik_version' => '3.6.23',
+        'traefik_outdated_info' => [
+            'current' => '3.6.23',
+            'latest' => '3.7.8',
+            'type' => 'minor_upgrade',
+        ],
+    ]);
+
+    $server->changeProxy(ProxyTypes::NONE->value);
+
+    expect($server->refresh()->detected_traefik_version)->toBeNull()
+        ->and($server->traefik_outdated_info)->toBeNull();
+});
+
+it('cleans stale Traefik version state while selecting servers to check', function () {
+    Bus::fake();
+    Cache::put('coolify:versions:all', [
+        'traefik' => ['v3.7' => '3.7.8'],
+    ]);
+
+    $team = Team::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => [
+            'type' => ProxyTypes::NONE->value,
+            'status' => 'exited',
+        ],
+        'detected_traefik_version' => '3.6.23',
+        'traefik_outdated_info' => [
+            'current' => '3.6.23',
+            'latest' => '3.7.8',
+            'type' => 'minor_upgrade',
+        ],
+    ]);
+
+    (new CheckTraefikVersionJob)->handle();
+
+    expect($server->refresh()->detected_traefik_version)->toBeNull()
+        ->and($server->traefik_outdated_info)->toBeNull();
+});
+
+it('does not inspect a server after its Traefik proxy has been disabled', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => [
+            'type' => ProxyTypes::NONE->value,
+            'status' => 'exited',
+        ],
+        'detected_traefik_version' => '3.6.23',
+        'traefik_outdated_info' => [
+            'current' => '3.6.23',
+            'latest' => '3.7.8',
+            'type' => 'minor_upgrade',
+        ],
+    ]);
+    Event::fake();
+
+    (new CheckTraefikVersionForServerJob($server, ['v3.7' => '3.7.8']))->handle();
+
+    expect($server->refresh()->detected_traefik_version)->toBeNull()
+        ->and($server->traefik_outdated_info)->toBeNull();
+
+    Event::assertNotDispatched(ProxyStatusChangedUI::class);
 });

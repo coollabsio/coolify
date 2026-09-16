@@ -123,7 +123,8 @@
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
-        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
+        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()"
+        @scroll.window.capture="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" @if ($tooltip) :title="current" @endif>
@@ -134,33 +135,35 @@
             </svg>
         </button>
         @if ($portal)
-            <div id="{{ $panelId }}" class="listbox-panel"
-                style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
-                x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
-                x-transition:enter="transition ease-out duration-100"
-                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                x-transition:leave="transition ease-in duration-75"
-                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
-                x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
-                <div x-show="options.length === 0"
-                    class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
-                    {{ $emptyText }}
+            <template x-teleport="body">
+                <div id="{{ $panelId }}" class="listbox-panel"
+                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
+                    x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+                    x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
+                    <div x-show="options.length === 0"
+                        class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
+                        {{ $emptyText }}
+                    </div>
+                    <template x-for="option in options" :key="String(option.value)">
+                        <button type="button" class="listbox-option" role="option"
+                            :class="{ 'listbox-option-disabled': option.disabled }"
+                            :aria-selected="String(option.value) === String(value)" @click="choose(option)">
+                            <span class="truncate" x-text="option.label"></span>
+                            <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                class="size-3.5 shrink-0">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                        </button>
+                    </template>
                 </div>
-                <template x-for="option in options" :key="String(option.value)">
-                    <button type="button" class="listbox-option" role="option"
-                        :class="{ 'listbox-option-disabled': option.disabled }"
-                        :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                        <span class="truncate" x-text="option.label"></span>
-                        <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                            class="size-3.5 shrink-0">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                    </button>
-                </template>
-            </div>
+            </template>
         @else
             <div x-ref="panel" class="listbox-panel" x-show="open" x-cloak
                 x-transition:enter="transition ease-out duration-100"

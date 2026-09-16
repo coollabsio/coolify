@@ -74,7 +74,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                     }
-                    Subscription::updateOrCreate(
+                    $subscription = Subscription::updateOrCreate(
                         ['team_id' => $teamId],
                         [
                             'stripe_subscription_id' => $subscriptionId,
@@ -83,6 +83,12 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_past_due' => false,
                         ]
                     );
+                    logger()->info('Stripe subscription checkout completed.', [
+                        'team_id' => $team->id,
+                        'stripe_customer_id' => $customerId,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                        'stripe_subscription_id' => $subscription->stripe_subscription_id,
+                    ]);
                     break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
@@ -218,7 +224,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                     }
-                    Subscription::updateOrCreate(
+                    $subscription = Subscription::firstOrCreate(
                         ['team_id' => $teamId],
                         [
                             'stripe_subscription_id' => $subscriptionId,
@@ -226,6 +232,11 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                             'stripe_invoice_paid' => false,
                         ]
                     );
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_customer_id === $customerId) {
+                        $subscription->update(['stripe_subscription_id' => $subscriptionId]);
+                    } elseif ($subscription->stripe_customer_id !== $customerId) {
+                        throw new \RuntimeException("Stripe customer ID mismatch for team {$teamId}: stored {$subscription->stripe_customer_id}, event {$customerId}.");
+                    }
                     break;
                 case 'customer.subscription.updated':
                     $teamId = data_get($data, 'metadata.team_id');

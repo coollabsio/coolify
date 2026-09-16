@@ -132,12 +132,11 @@ class Email extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
             $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
-            $this->authorize('update', $this->settings);
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
             $this->settings->smtp_from_name = $this->smtpFromName;
@@ -224,6 +223,8 @@ class Email extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         $this->dispatch('success', 'Email notifications settings updated.');
     }

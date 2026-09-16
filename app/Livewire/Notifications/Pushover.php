@@ -89,11 +89,10 @@ class Pushover extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->pushover_enabled = $this->pushoverEnabled;
             $this->settings->pushover_user_key = $this->pushoverUserKey;
             $this->settings->pushover_api_token = $this->pushoverApiToken;
@@ -167,6 +166,7 @@ class Pushover extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -179,6 +179,7 @@ class Pushover extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -188,6 +189,8 @@ class Pushover extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');

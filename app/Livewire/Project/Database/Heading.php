@@ -35,6 +35,12 @@ class Heading extends Component
 
     public function activityFinished()
     {
+        if (auth()->user()->cannot('update', $this->database)) {
+            $this->dispatch('refresh');
+
+            return;
+        }
+
         try {
             // Only set started_at if database is actually running
             if ($this->database->isRunning()) {

@@ -19,7 +19,7 @@ it('can be instantiated with correct properties', function () {
         ->and($notification->errorMessage)->toBe('Hetzner API error: Server not found');
 });
 
-it('uses hetzner_deletion_failed event for channels', function () {
+it('uses the always-send hetzner_deletion_failure event for channels', function () {
     $notification = new HetznerDeletionFailed(
         hetznerServerId: 12345,
         teamId: 1,
@@ -28,7 +28,7 @@ it('uses hetzner_deletion_failed event for channels', function () {
 
     $mockNotifiable = Mockery::mock();
     $mockNotifiable->shouldReceive('getEnabledChannels')
-        ->with('hetzner_deletion_failed')
+        ->with('hetzner_deletion_failure')
         ->once()
         ->andReturn([]);
 

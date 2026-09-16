@@ -21,11 +21,17 @@
 
     <x-application.settings-section title="Executions"
         helper="Review backup runs across every database and storage target in this service." flush>
+        @if ($executions->total() > 10)
+            <x-slot:actions>
+                <x-page-size-select model="perPage" livewire />
+            </x-slot:actions>
+        @endif
         @if ($executions->isEmpty())
             <x-empty size="sm" title="No backup executions"
                 description="Execution history appears here after a backup schedule runs." icon-name="browser-terminal" />
         @else
-            <div class="data-table w-full overflow-x-auto">
+            <div class="data-table relative w-full overflow-x-auto">
+                <x-table.loading target="previousPage,nextPage,setPage,perPage" text="Loading executions..." />
                 <div class="data-table-header grid min-w-[820px] grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_110px_90px_48px]">
                     <span>Target</span><span>Type</span><span>Schedule</span><span>Status</span><span>Started</span><span>Size</span><span class="text-right">Actions</span>
                 </div>
@@ -42,7 +48,13 @@
                         wire:click="openExecution('{{ $execution['uuid'] }}')"
                         wire:keydown.enter="openExecution('{{ $execution['uuid'] }}')" role="button" tabindex="0"
                         class="data-table-row grid min-w-[820px] cursor-pointer grid-cols-[minmax(150px,1.4fr)_100px_100px_110px_110px_90px_48px] text-left text-[13px] text-neutral-700 dark:text-fg-dim">
-                        <span class="truncate font-medium text-neutral-950 dark:text-fg" title="{{ $execution['target'] }}">{{ $execution['target'] }}</span>
+                        <span class="flex min-w-0 items-center gap-2 font-medium text-neutral-950 dark:text-fg">
+                            <span class="truncate" title="{{ $execution['target'] }}">{{ $execution['target'] }}</span>
+                            <span tabindex="0" data-tooltip="{{ $execution['s3_tooltip'] }}"
+                                aria-label="{{ $execution['s3_tooltip'] }}" class="shrink-0 text-neutral-500 dark:text-fg-dim">
+                                <x-reicon name="cloud" class="size-3.5" aria-hidden="true" />
+                            </span>
+                        </span>
                         <span>{{ $execution['type'] }}</span><span>{{ $execution['schedule'] }}</span>
                         <span><x-status-badge :status="str($execution['status'])->headline()" :type="$statusType" /></span>
                         <span>{{ $execution['started_at']->diffForHumans() }}</span>
@@ -58,6 +70,12 @@
                         </span>
                     </div>
                 @endforeach
+                @if ($executions->hasPages())
+                    <x-table-pagination :from="$executions->firstItem()" :to="$executions->lastItem()"
+                        :total="$executions->total()" :current-page="$executions->currentPage()" :last-page="$executions->lastPage()"
+                        wire-target="previousPage,nextPage,setPage,perPage"
+                        previous-action="previousPage('executionsPage')" next-action="nextPage('executionsPage')" />
+                @endif
             </div>
         @endif
     </x-application.settings-section>

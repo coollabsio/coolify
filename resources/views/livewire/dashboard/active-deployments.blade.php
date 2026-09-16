@@ -24,24 +24,15 @@
     $hasAnyDeployments = $hasActiveDeployments || $hasRecentDeployments;
 @endphp
 
-<div wire:poll.3000ms="refreshDeployments" @class(['mb-0! min-w-0' => $hasAnyDeployments])>
+<div wire:poll.3000ms="refreshDeployments" @class(['mb-0! min-w-0' => $hasAnyDeployments, 'hidden' => ! $hasAnyDeployments])>
     @if ($hasAnyDeployments)
         <section class="mb-0! min-w-0">
-            <div class="mb-3">
-                <div>
-                    <h2 class="text-[14px]! leading-5! font-semibold! text-black dark:text-fg">
-                        Deployments
-                    </h2>
-                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
-                        Active and recent deployment activity
-                    </p>
-                </div>
-            </div>
+            <x-section-heading title="Deployments" subtitle="Active and recent deployment activity" />
 
             <div class="flex min-w-0 flex-col gap-4">
                 @if ($hasActiveDeployments)
                     <div
-                        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
                             <h3 class="text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
                                 Active
@@ -52,7 +43,7 @@
                         </div>
 
                         <div
-                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>
                             <span>Environment</span>
                             <span>Server</span>
@@ -110,7 +101,7 @@
 
                 @if ($hasRecentDeployments)
                     <div
-                        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
                             <h3 class="text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
                                 Recent
@@ -121,7 +112,7 @@
                         </div>
 
                         <div
-                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                            class="dashboard-deployment-table-grid hidden items-center gap-4 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:grid dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <span>Application</span>
                             <span>Environment</span>
                             <span>Server</span>

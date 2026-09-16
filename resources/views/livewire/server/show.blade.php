@@ -146,7 +146,7 @@
                                         Link provider
                                     </button>
                                     <div x-cloak x-show="open" x-transition.origin.top.right
-                                        class="absolute top-9 right-0 z-50 w-56 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                                        class="absolute top-9 right-0 z-50 w-56 rounded-lg border border-neutral-200 bg-white p-1 shadow-dropdown dark:border-white/[0.1] dark:bg-raised">
                                         @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                                             <x-server.provider-link-modal :server="$server" provider="hetzner"
                                                 providerLabel="Hetzner" tokenModel="selectedHetznerTokenId"

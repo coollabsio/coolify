@@ -769,6 +769,7 @@ class DatabasesController extends Controller
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Number of days to retain backups in S3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage (GB) for S3 backups'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+                        'missing_backup_notification_days' => ['type' => 'integer', 'description' => 'Alert after this many days without an execution; 0 disables alerts', 'minimum' => 0, 'maximum' => 365, 'default' => 0],
                     ],
                 ),
             )
@@ -805,7 +806,7 @@ class DatabasesController extends Controller
     )]
     public function create_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -833,6 +834,7 @@ class DatabasesController extends Controller
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
 
         if ($validator->fails()) {
@@ -1025,6 +1027,7 @@ class DatabasesController extends Controller
                         'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
                         'database_backup_retention_max_storage_s3' => ['type' => 'number', 'description' => 'Max storage of the backup in S3'],
                         'timeout' => ['type' => 'integer', 'description' => 'Backup job timeout in seconds (min: 60, max: 36000)', 'default' => 3600],
+                        'missing_backup_notification_days' => ['type' => 'integer', 'description' => 'Alert after this many days without an execution; 0 disables alerts', 'minimum' => 0, 'maximum' => 365],
                     ],
                 ),
             )
@@ -1054,7 +1057,7 @@ class DatabasesController extends Controller
     )]
     public function update_backup(Request $request)
     {
-        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout'];
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_uuid', 'timeout', 'missing_backup_notification_days'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1080,6 +1083,7 @@ class DatabasesController extends Controller
             'database_backup_retention_days_s3' => 'integer|min:0',
             'database_backup_retention_max_storage_s3' => 'numeric|min:0',
             'timeout' => 'integer|min:60|max:36000',
+            'missing_backup_notification_days' => 'integer|min:0|max:365',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -2429,13 +2433,12 @@ class DatabasesController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -4061,7 +4064,6 @@ class DatabasesController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -4106,14 +4108,13 @@ class DatabasesController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4149,7 +4150,6 @@ class DatabasesController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $database->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
             ]);
@@ -4301,7 +4301,6 @@ class DatabasesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -4360,11 +4359,10 @@ class DatabasesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4406,7 +4404,7 @@ class DatabasesController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -4444,9 +4442,6 @@ class DatabasesController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {
@@ -4885,6 +4880,8 @@ class DatabasesController extends Controller
                 'id',
                 'created_at',
                 'updated_at',
+                'last_execution_at',
+                'missing_backup_notification_sent_at',
             ])->fill([
                 'uuid' => new_public_id(),
                 'database_id' => $newDatabase->id,

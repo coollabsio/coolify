@@ -808,6 +808,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
 
+        $this->pull_docker_compose_images();
+
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
@@ -909,6 +911,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    private function pull_docker_compose_images(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
+
+        if ($this->use_build_server) {
+            $this->write_deployment_configurations();
+            $this->server = $this->mainServer;
+            $workdir = $this->application->workdir();
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+        } else {
+            $workdir = $this->workdir;
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+        }
+
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+        ]);
     }
 
     private function deploy_dockerfile_buildpack()
@@ -2414,12 +2436,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 destination: $destination,
                 no_questions_asked: true,
             );
-            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
-                'project_uuid' => data_get($this->application, 'environment.project.uuid'),
-                'application_uuid' => data_get($this->application, 'uuid'),
-                'deployment_uuid' => $deployment_uuid,
-                'environment_uuid' => data_get($this->application, 'environment.uuid'),
-            ]));
+            $deployment_url = base_url().'/project/'.data_get($this->application, 'environment.project.uuid').'/environment/'.data_get($this->application, 'environment.uuid').'/application/'.data_get($this->application, 'uuid')."/deployment/{$deployment_uuid}";
+            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: {$deployment_url}");
         }
     }
 
@@ -2437,15 +2455,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $domains = str($fqdn)->explode(',')->map(fn (string $domain) => trim($domain))->filter();
-            $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
-            $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
-            if ((int) $this->application->compose_parsing_version >= 3) {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
-            } else {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+            $domains = str($fqdn)->explode(',')
+                ->map(fn (string $domain) => trim($domain))
+                ->filter()
+                ->filter(fn (string $domain) => isValidDomainUrl($domain));
+            if ($domains->isNotEmpty()) {
+                $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
+                $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
+                } else {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+                }
             }
         }
         if (isset($this->application->git_branch)) {
@@ -4659,7 +4682,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
 
-        $modified ??= false;
+        $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
             $trimmed = ltrim($line);
 

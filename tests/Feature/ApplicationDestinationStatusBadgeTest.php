@@ -5,7 +5,7 @@ it('uses the shared status summary in the primary application server card', func
     $applicationSection = str($view)->before('@else')->value();
 
     expect($applicationSection)
-        ->toContain('<x-status-summary :status="$resource->status" />')
+        ->toContain('<x-status-summary :status="$resource->status" align="right" />')
         ->not->toContain('<x-status :resource="$resource"');
 });
 

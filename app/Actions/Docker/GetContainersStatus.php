@@ -5,7 +5,6 @@ namespace App\Actions\Docker;
 use App\Actions\Application\StopApplication;
 use App\Actions\Application\StopApplicationPreview;
 use App\Actions\Database\StartDatabaseProxy;
-use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
@@ -249,9 +248,12 @@ class GetContainersStatus
 
                             $database->update($updateData);
 
-                            if ($database->trackRestartCount((int) $restartCount)) {
-                                StopDatabase::dispatch($database, false, false, false);
-                                $database->team()?->notify(new ApplicationRestartLimitReached($database));
+                            if ($restartCount > ($database->restart_count ?? 0)) {
+                                $database->update([
+                                    'restart_count' => (int) $restartCount,
+                                    'last_restart_at' => now(),
+                                    'last_restart_type' => 'crash',
+                                ]);
                             }
 
                             if ($isPublic) {
@@ -357,7 +359,9 @@ class GetContainersStatus
                 continue;
             }
 
-            if (! $exitedService->stoppedAfterRestartLimit()) {
+            if ($exitedService instanceof ServiceDatabase) {
+                $exitedService->update(['status' => 'exited']);
+            } elseif (! $exitedService->stoppedAfterRestartLimit()) {
                 $exitedService->update([
                     'status' => 'exited',
                     'restart_count' => 0,
@@ -424,9 +428,6 @@ class GetContainersStatus
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
         foreach ($notRunningDatabases as $database) {
             $database = $databases->where('id', $database)->first();
-            if ($database->stoppedAfterRestartLimit()) {
-                continue;
-            }
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
@@ -442,7 +443,6 @@ class GetContainersStatus
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,
-                'restart_limit_reached' => false,
             ]);
 
             // Stop proxy if database was public
@@ -582,7 +582,7 @@ class GetContainersStatus
             $restartCount = isset($this->serviceContainerRestartCounts)
                 ? ($this->serviceContainerRestartCounts->get($key)?->max() ?? 0)
                 : 0;
-            if ($subResource->trackRestartCount($restartCount)) {
+            if (! $subResource instanceof ServiceDatabase && $subResource->trackRestartCount($restartCount)) {
                 StopServiceApplication::dispatch($subResource, false, false);
                 $subResource->team()?->notify(new ApplicationRestartLimitReached($subResource));
 

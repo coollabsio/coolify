@@ -87,11 +87,10 @@ class Slack extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->slack_enabled = $this->slackEnabled;
             $this->settings->slack_webhook_url = $this->slackWebhookUrl;
 
@@ -158,6 +157,7 @@ class Slack extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -170,6 +170,7 @@ class Slack extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -179,6 +180,8 @@ class Slack extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');

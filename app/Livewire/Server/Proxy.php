@@ -106,6 +106,8 @@ class Proxy extends Component
         try {
             $this->authorize('update', $this->server);
             $this->server->proxy = null;
+            $this->server->detected_traefik_version = null;
+            $this->server->traefik_outdated_info = null;
             $this->server->save();
 
             $this->dispatch('reloadWindow');

@@ -121,3 +121,69 @@ it('is idempotent when loadEnvironmentVariables is called twice', function () {
     expect($component->instance()->environmentVariables->pluck('key')->all())
         ->toContain('API_KEY');
 });
+
+it('preserves generated compose variables during bulk replacement', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'build_pack' => 'dockercompose',
+        'docker_compose' => <<<'YAML'
+services:
+  api:
+    image: nginx:alpine
+    environment:
+      SERVICE_URL_API: /api
+YAML,
+    ]);
+
+    foreach ([
+        'SERVICE_URL_API' => 'https://api.example.com/api',
+        'SERVICE_FQDN_API' => 'api.example.com/api',
+        'OLD_VARIABLE' => 'remove-me',
+    ] as $key => $value) {
+        EnvironmentVariable::create([
+            'key' => $key,
+            'value' => $value,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+        ]);
+    }
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set('variables', 'NEW_VARIABLE=keep-me')
+        ->call('submit')
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
+
+    expect($application->environment_variables()->pluck('value', 'key')->all())
+        ->toBe([
+            'SERVICE_URL_API' => 'https://api.example.com/api',
+            'SERVICE_FQDN_API' => 'api.example.com/api',
+            'NEW_VARIABLE' => 'keep-me',
+        ]);
+});
+
+it('hides generated compose variables from developer view', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'build_pack' => 'dockercompose',
+    ]);
+
+    foreach ([
+        'SERVICE_URL_API' => 'https://api.example.com',
+        'SERVICE_FQDN_API' => 'api.example.com',
+        'API_URL' => '$SERVICE_URL_API',
+    ] as $key => $value) {
+        EnvironmentVariable::create([
+            'key' => $key,
+            'value' => $value,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $application->id,
+        ]);
+    }
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('switch');
+
+    expect($component->get('variables'))
+        ->toBe('API_URL=$SERVICE_URL_API');
+});

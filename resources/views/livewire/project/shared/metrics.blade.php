@@ -25,7 +25,7 @@
                 </a>
             </x-slot:actions>
             <x-callout type="info" title="Metrics are not enabled">
-                Enable Sentinel and metrics for this server before collecting application usage data.
+                Enable metrics for this server before collecting application usage data.
             </x-callout>
         </x-application.settings-section>
     @elseif (!str($resource->status)->contains('running'))

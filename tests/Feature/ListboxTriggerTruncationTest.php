@@ -78,6 +78,13 @@ test('portaled listboxes measure content without inheriting the viewport width',
         ->toContain('Math.max(triggerRect.width, panel.offsetWidth)');
 });
 
+test('portaled listboxes stay anchored when a scroll container moves', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain('@scroll.window.capture="open && positionPanel()"');
+});
+
 test('searchable listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.searchable-listbox id="tz" label="Timezone"

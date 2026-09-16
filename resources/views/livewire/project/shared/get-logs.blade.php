@@ -295,7 +295,7 @@
         @if ($streamLogs)
             <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
-        <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
+        <div x-show="expanded" {{ $collapsible ? 'x-collapse.duration.200ms' : '' }}
             :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
             <div class="runtime-log-panel"
@@ -484,9 +484,11 @@
                             <div class="logs-viewer-meta">
                                 <form wire:submit="getLogs(true)" class="logs-viewer-lines">
                                     <span class="logs-viewer-lines-label">Lines</span>
-                                    <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
-                                        title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
+                                    <input type="number" wire:model="numberOfLines" placeholder="100" min="-1" max="50000"
+                                        title="Number of lines (max 50,000; use -1 for all)" {{ $streamLogs ? 'readonly' : '' }}
                                         class="input logs-viewer-lines-input" />
+                                    <button type="button" wire:click="showAllLogs" title="Show all logs"
+                                        class="runtime-log-icon-button" {{ $streamLogs ? 'disabled' : '' }}>All</button>
                                 </form>
                                 <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                                     class="text-xs text-gray-500 whitespace-nowrap dark:text-gray-400"></span>

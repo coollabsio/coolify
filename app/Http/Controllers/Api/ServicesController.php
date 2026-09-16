@@ -386,7 +386,7 @@ class ServicesController extends Controller
             'urls' => 'array|nullable',
             'urls.*' => 'array:name,url',
             'urls.*.name' => 'string|required',
-            'urls.*.url' => 'string|nullable',
+            'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
             'tags' => 'array|nullable',
@@ -602,7 +602,7 @@ class ServicesController extends Controller
                 'urls' => 'array|nullable',
                 'urls.*' => 'array:name,url',
                 'urls.*.name' => 'string|required',
-                'urls.*.url' => 'string|nullable',
+                'urls.*.url' => ValidationPatterns::applicationDomainRules(),
                 'force_domain_override' => 'boolean',
                 'is_container_label_escape_enabled' => 'boolean',
                 'tags' => 'array|nullable',
@@ -869,13 +869,12 @@ class ServicesController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -1187,7 +1186,7 @@ class ServicesController extends Controller
             'urls' => 'array|nullable',
             'urls.*' => 'array:name,url',
             'urls.*.name' => 'string|required',
-            'urls.*.url' => 'string|nullable',
+            'urls.*.url' => ValidationPatterns::applicationDomainRules(),
             'force_domain_override' => 'boolean',
             'is_container_label_escape_enabled' => 'boolean',
         ];
@@ -2422,7 +2421,6 @@ class ServicesController extends Controller
                             'resource_uuid' => ['type' => 'string', 'description' => 'UUID of the service application or database sub-resource.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -2468,14 +2466,13 @@ class ServicesController extends Controller
             'resource_uuid' => 'required|string',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2519,7 +2516,6 @@ class ServicesController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $subResource->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $subResource->id,
                 'resource_type' => $subResource->getMorphClass(),
             ]);
@@ -2671,7 +2667,6 @@ class ServicesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -2733,11 +2728,10 @@ class ServicesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2806,7 +2800,7 @@ class ServicesController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -2844,9 +2838,6 @@ class ServicesController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {

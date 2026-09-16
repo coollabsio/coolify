@@ -145,7 +145,9 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'fqdn' => isset($this->application) && $this->fqdn === $this->application->fqdn
+                ? ['nullable']
+                : ValidationPatterns::applicationDomainRules(),
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
@@ -330,7 +332,7 @@ class General extends Component
         $this->syncData();
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -484,6 +486,9 @@ class General extends Component
             }
             if ($this->isContainerLabelReadonlyEnabled) {
                 $this->resetDefaultLabels(false);
+            }
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
             }
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
@@ -651,6 +656,8 @@ class General extends Component
 
     public function resetDefaultLabels($manualReset = false)
     {
+        $this->authorize('update', $this->application);
+
         try {
             if (! $this->isContainerLabelReadonlyEnabled && ! $manualReset) {
                 return;
@@ -755,8 +762,11 @@ class General extends Component
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
             $oldBaseDirectory = $this->application->base_directory;
 
-            // Process FQDN with intermediate variable to avoid Collection/string confusion
-            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            $fqdnChanged = $this->fqdn !== $this->application->fqdn;
+            if ($fqdnChanged) {
+                $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
+            }
+
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
@@ -878,6 +888,9 @@ class General extends Component
             $this->application->save();
             $this->application->refresh();
             $this->syncData();
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
+            }
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $this->application->refresh();

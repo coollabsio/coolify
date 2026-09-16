@@ -28,7 +28,11 @@ class StartDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
-        $database->resetRestartLimit();
+        $database->update([
+            'restart_count' => 0,
+            'last_restart_at' => null,
+            'last_restart_type' => null,
+        ]);
         switch ($database->getMorphClass()) {
             case StandalonePostgresql::class:
                 $activity = StartPostgresql::run($database);

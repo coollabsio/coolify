@@ -36,7 +36,13 @@
     </div>
 
     <div x-ref="panel" x-show="open" x-cloak :style="panelStyle"
-        class="listbox-panel fixed! right-auto! bottom-auto! z-[90]! mt-0! {{ $panelClass }}" role="{{ $role }}"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+        x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
+        class="listbox-panel origin-top fixed! right-auto! bottom-auto! z-[90]! mt-0! {{ $panelClass }}" role="{{ $role }}"
         @if ($multiselectable) aria-multiselectable="true" @endif>
         {{ $slot }}
     </div>

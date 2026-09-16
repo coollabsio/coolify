@@ -134,11 +134,10 @@ class Telegram extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->telegram_enabled = $this->telegramEnabled;
             $this->settings->telegram_token = $this->telegramToken;
             $this->settings->telegram_chat_id = $this->telegramChatId;
@@ -223,6 +222,7 @@ class Telegram extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -235,6 +235,7 @@ class Telegram extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -264,6 +265,8 @@ class Telegram extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');

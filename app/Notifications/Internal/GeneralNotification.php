@@ -58,4 +58,14 @@ class GeneralNotification extends Notification implements ShouldQueue
             color: SlackMessage::infoColor(),
         );
     }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => true,
+            'message' => $this->message,
+            'event' => 'general',
+            'url' => base_url(),
+        ];
+    }
 }

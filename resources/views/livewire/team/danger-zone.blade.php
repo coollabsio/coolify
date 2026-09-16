@@ -88,7 +88,7 @@
                                     step2ButtonText="Permanently Delete" canGate="delete"
                                     :canResource="$team" />
                             @else
-                                <x-forms.button disabled tooltip="Resolve the requirements shown before deleting this team.">
+                                <x-forms.button isError disabled tooltip="Resolve the requirements shown before deleting this team.">
                                     Delete team
                                 </x-forms.button>
                             @endif

@@ -25,7 +25,7 @@
             @if ($executionCount > 0)
                 <div class="data-table w-full overflow-x-auto">
                     <div
-                        class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <span>Status</span>
                         <span>Archive</span>
                         <span>Time</span>
@@ -129,7 +129,7 @@
 
                             @if ($execution->message)
                                 <pre
-                                    class="volume-backup-execution-message col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="volume-backup-execution-message col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

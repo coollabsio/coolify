@@ -14,7 +14,7 @@
     </button>
 
     <div x-cloak x-show="themeOpen" x-transition.origin.top.right
-        class="console-theme-selector absolute top-11 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)] dark:border-white/[0.1] dark:bg-[#111113] dark:shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
+        class="console-theme-selector absolute top-11 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-[var(--shadow-dropdown)] dark:border-white/[0.1] dark:bg-[#111113]">
         @foreach ($themes as $theme)
             <button type="button"
                 class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 dark:text-white/65 dark:hover:bg-white/[0.07] dark:hover:text-white"

@@ -232,3 +232,55 @@ describe('Caddy noindex header', function () {
         )->all())->toBeEmpty();
     });
 });
+
+test('fqdnLabelsForCaddy routes each portless domain to its override port', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://one.example.com', 'https://two.example.com']),
+        onlyPort: 80,
+        is_force_https_enabled: true,
+        domainPortOverrides: [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://one.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}')
+        ->toContain('caddy_1=https://two.example.com')
+        ->toContain('caddy_1.handle_path.1_reverse_proxy={{upstreams 8080}}')
+        ->not->toContain('caddy_0=https://one.example.com:3000')
+        ->not->toContain('caddy_1=https://two.example.com:8080');
+});
+
+test('fqdnLabelsForCaddy uses onlyPort when a portless domain has no override', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://plain.example.com']),
+        onlyPort: 4000,
+        is_force_https_enabled: true,
+        domainPortOverrides: [],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://plain.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 4000}}');
+});
+
+test('fqdnLabelsForCaddy keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $labels = fqdnLabelsForCaddy(
+        network: 'testnetwork',
+        uuid: 'appuuid',
+        domains: collect(['https://legacy.example.com:9090']),
+        onlyPort: 80,
+        is_force_https_enabled: true,
+        domainPortOverrides: [],
+    )->values()->all();
+
+    expect($labels)
+        ->toContain('caddy_0=https://legacy.example.com')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
+});

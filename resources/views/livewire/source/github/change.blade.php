@@ -200,7 +200,7 @@
                                                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                                                         step2ButtonText="Permanently Delete" />
                                                 @else
-                                                    <x-forms.button disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                    <x-forms.button isError disabled tooltip="You do not have permission to delete this GitHub App.">
                                                         Delete
                                                     </x-forms.button>
                                                 @endcan
@@ -300,7 +300,7 @@
                             @endif
 
                             <div
-                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
                                 <p class="font-medium text-black dark:text-fg">Mandatory permissions</p>
                                 <p class="mt-1">Contents: read · Metadata: read · Email: read</p>
                             </div>

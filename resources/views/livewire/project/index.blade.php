@@ -76,7 +76,7 @@
                     </x-table.dropdown>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
+                        class="view-toggle">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
@@ -103,7 +103,7 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <template x-for="project in paginatedProjects" :key="project.uuid">
                         <article
-                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <a :href="project.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
                                 :aria-label="`Open ${project.name}`"></a>
                             <div class="flex items-start gap-3">
@@ -121,7 +121,7 @@
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                        x-text="project.description || 'No description'"></p>
+                                        x-text="project.description || ''"></p>
                                 </div>
                             </div>
 
@@ -151,15 +151,15 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="viewMode === 'table'"
-                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Project</div>
                     <div>Environments</div>
                     <div>Resources</div>
@@ -212,7 +212,7 @@
             </div>
 
             <div x-show="filteredProjects.length === 0"
-                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
                 <p class="text-[13px] font-medium">No matching projects</p>
                 <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">

@@ -33,8 +33,7 @@
                     {{ $tag->name }}
                 </span>
                 @can('update', $resource)
-                    <x-forms.button wire:click="deleteTag('{{ $tag->id }}')"
-                        class="h-7! text-neutral-500 dark:text-fg-dim">
+                    <x-forms.button isError wire:click="deleteTag('{{ $tag->id }}')" class="h-7!">
                         Remove
                     </x-forms.button>
                 @endcan

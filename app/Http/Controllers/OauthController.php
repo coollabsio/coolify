@@ -38,6 +38,14 @@ class OauthController extends Controller
             }
             Auth::login($user);
 
+            $team = $user->resolveStoredTeam();
+            if (! $team && $user->teams()->count() === 0) {
+                $team = $user->recreate_personal_team();
+            }
+            if ($team) {
+                session(['currentTeam' => $user->currentTeam = $team]);
+            }
+
             return redirect('/');
         } catch (\Exception $e) {
             $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';

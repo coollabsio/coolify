@@ -97,10 +97,9 @@ class DockerCleanup extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->force_docker_cleanup = $this->forceDockerCleanup;
             $this->server->settings->docker_cleanup_frequency = $this->dockerCleanupFrequency;
@@ -122,6 +121,7 @@ class DockerCleanup extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
@@ -147,6 +147,7 @@ class DockerCleanup extends Component
                 $this->dockerCleanupFrequency = $this->server->settings->getOriginal('docker_cleanup_frequency');
                 throw new \Exception('Invalid Cron / Human expression for Docker Cleanup Frequency.');
             }
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {

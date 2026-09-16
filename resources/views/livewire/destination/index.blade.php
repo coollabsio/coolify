@@ -62,7 +62,7 @@
 
         <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($destinations as $destination)
-                <a x-show="matches(@js([$destination->name, $destination->server->name, $destination->getMorphClass() === 'App\\Models\\SwarmDocker' ? 'Docker Swarm' : 'Standalone Docker']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                <a x-show="matches(@js([$destination->name, $destination->server->name, $destination->getMorphClass() === 'App\\Models\\SwarmDocker' ? 'Docker Swarm' : 'Standalone Docker']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     {{ wireNavigate() }}
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                     <div class="flex items-start gap-3">
@@ -90,8 +90,8 @@
                 </a>
             @endforeach
         </div>
-        <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
-            <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_10rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+        <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_10rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                 <div>Destination</div><div>Server</div><div>Type</div>
             </div>
             @foreach ($destinations as $destination)

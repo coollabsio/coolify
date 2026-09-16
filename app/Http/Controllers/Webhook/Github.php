@@ -83,7 +83,10 @@ class Github extends Controller
                 }
             }
             if ($x_github_event === 'pull_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if ($action !== 'closed') {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
                 }
@@ -334,7 +337,10 @@ class Github extends Controller
                 }
             }
             if ($x_github_event === 'pull_request') {
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                if ($action !== 'closed') {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $applications->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$base_branch'.");
                 }

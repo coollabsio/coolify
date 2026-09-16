@@ -264,6 +264,7 @@ class Server extends BaseModel
         'unreachable_notification_sent' => 'boolean',
         'is_build_server' => 'boolean',
         'force_disabled' => 'boolean',
+        'sentinel_waiting_since' => 'datetime',
     ];
 
     /**
@@ -967,22 +968,41 @@ $siteAddress {
         return $wait;
     }
 
+    public function firstSentinelReportTimeoutSeconds(): int
+    {
+        return max(30, $this->settings->sentinel_push_interval_seconds + 30);
+    }
+
     public function isSentinelLive()
     {
         return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
     }
 
-    public function isSentinelEnabled()
+    public function sentinelStatus(): string
     {
-        return ($this->isMetricsEnabled() || $this->isServerApiEnabled()) && ! $this->isBuildServer();
+        if ($this->sentinel_waiting_since !== null) {
+            return $this->sentinel_waiting_since->isAfter(now()->subSeconds($this->firstSentinelReportTimeoutSeconds()))
+                ? 'waiting'
+                : 'out_of_sync';
+        }
+
+        return $this->isSentinelLive() ? 'in_sync' : 'out_of_sync';
     }
 
-    public function isMetricsEnabled()
+    public function isSentinelEnabled(): bool
+    {
+        return ! $this->isBuildServer()
+            && ! $this->isSwarm()
+            && ! $this->isForceDisabled()
+            && ! $this->isTransferredAway();
+    }
+
+    public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
     }
 
-    public function isServerApiEnabled()
+    public function isServerApiEnabled(): bool
     {
         return $this->settings->is_sentinel_enabled;
     }
@@ -1812,6 +1832,8 @@ $siteAddress {
             $this->proxy->set('last_saved_proxy_configuration', null);
             $this->proxy->set('last_saved_settings', null);
             $this->proxy->set('last_applied_settings', null);
+            $this->detected_traefik_version = null;
+            $this->traefik_outdated_info = null;
             $this->save();
             if ($this->proxySet()) {
                 if ($async) {
