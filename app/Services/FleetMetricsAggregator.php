@@ -62,6 +62,50 @@ class FleetMetricsAggregator
     }
 
     /**
+     * @param  array<int, array<int, array{0: int, 1: float}>>  $seriesPerServer
+     * @return array<int, array{0: int, 1: float}>
+     */
+    public static function sumSeriesByBucket(array $seriesPerServer, string $mode): array
+    {
+        $totals = [];
+        $counts = [];
+
+        foreach ($seriesPerServer as $series) {
+            foreach ($series as [$ts, $value]) {
+                $totals[$ts] = ($totals[$ts] ?? 0.0) + (float) $value;
+                $counts[$ts] = ($counts[$ts] ?? 0) + 1;
+            }
+        }
+
+        ksort($totals);
+
+        $out = [];
+        foreach ($totals as $ts => $sum) {
+            $out[] = [(int) $ts, $mode === 'avg' ? round($sum / $counts[$ts], 2) : round($sum, 2)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $containers
+     * @return array<int, array<string, mixed>>
+     */
+    public static function rankContainers(array $containers, string $metric, int $limit = 20): array
+    {
+        $key = match ($metric) {
+            'memory' => 'memUsed',
+            'disk' => 'diskBytes',
+            'network' => 'net',
+            default => 'cpu',
+        };
+
+        usort($containers, fn ($a, $b) => ($b[$key] ?? 0) <=> ($a[$key] ?? 0));
+
+        return array_slice($containers, 0, $limit);
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<int, float>
      */
