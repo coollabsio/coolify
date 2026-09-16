@@ -249,6 +249,18 @@ it('renders volume actions and PR suffix controls as valid markup', function () 
         ->and($xpath->query("//template[@x-teleport='body']/*[@role='listbox']"))->toHaveCount(2);
 });
 
+it('keeps editable volume actions on one line', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toMatch('/volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1\.5[\s\S]*?Update[\s\S]*?Backup[\s\S]*?Delete/');
+
+    expect($css)
+        ->toMatch('/\.volumes-table-grid\s*\{[^}]*grid-template-columns:[^;}]*15rem;/')
+        ->toMatch('/\.volumes-table-grid-with-pr\s*\{[^}]*grid-template-columns:[^;}]*15rem;/');
+});
+
 it('declares explicit authorization on the changed storage controls', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
 

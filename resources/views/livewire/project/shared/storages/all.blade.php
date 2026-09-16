@@ -108,7 +108,7 @@
 
                             @if ($showBackupAction)
                                 <div
-                                    class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                    class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
@@ -210,7 +210,7 @@
                             </div>
 
                             <div
-                                class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                 <x-forms.button type="submit" class="!px-2.5 !text-xs">
                                     Update
                                 </x-forms.button>
