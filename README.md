@@ -1,52 +1,66 @@
 <div align="center">
 
+<img src="./public/coolify-logo.svg" alt="Coolify logo" width="120" />
+
 # Coolify
-An open-source & self-hostable Heroku / Netlify / Vercel alternative. 
+
+**An open-source platform to deploy applications, databases, and services on your own servers.**
+
+Open source & free forever, backed by our [philosophy](https://coolify.io/philosophy).
 
 ![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
 )
+
+[Website](https://coolify.io) · [Documentation](https://coolify.io/docs) · [Cloud](https://app.coolify.io) · [Discord](https://coollabs.io/discord) · [Community](https://github.com/coollabsio/coolify/discussions)
+
 </div>
 
-## About the Project
+## What is Coolify?
 
-Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc.
+Coolify is an open-source and self-hostable alternative to Heroku, Netlify, and Vercel. It helps you manage servers, applications, and databases on your own hardware. You only need an SSH connection.
 
-It helps you manage your servers, applications, and databases on your own hardware; you only need an SSH connection. You can manage VPS, Bare Metal, Raspberry PIs, and anything else.
+You can use a VPS, a bare-metal server, a Raspberry Pi, or any other server that accepts SSH connections. Coolify gives you the convenience of a cloud platform while you keep control of your infrastructure.
 
-Imagine having the ease of a cloud but with your own servers. That is **Coolify**.
+Your configurations stay on your servers. If you stop using Coolify, your running resources continue to work and remain manageable.
 
-No vendor lock-in, which means that all the configurations for your applications/databases/etc are saved to your server. So, if you decide to stop using Coolify (oh nooo), you could still manage your running resources. You lose the automations and all the magic. 🪄️
+## What can Coolify do?
 
-For more information, take a look at our landing page at [coolify.io](https://coolify.io).
+- **Deploy any application:** Build from GitHub, GitLab, Bitbucket, or Gitea with Nixpacks, Railpack, Dockerfile, Docker Compose, or a prebuilt Docker image.
+- **Run databases and services:** Deploy managed databases and more than 300 one-click services with persistent storage and generated credentials.
+- **Automate deployments:** Deploy on every Git push, create pull-request previews, call deployment webhooks, and roll back to retained application images.
+- **Manage networking:** Configure custom domains, automatic HTTPS certificates, reverse proxies, health checks, and container networks.
+- **Operate your infrastructure:** Manage multiple servers, inspect deployment and runtime logs, open container terminals, and monitor resource status.
+- **Protect your workloads:** Configure database and storage backups, scheduled tasks, environment variables, secrets, and notifications.
+- **Integrate with your workflow:** Manage resources through the dashboard, API, CLI, MCP, and team-based access controls.
 
-## Installation
+## Quick start
+
+Install Coolify on a supported server with one command:
 
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
-You can find the installation script source [here](./scripts/install.sh).
 
-> [!NOTE]
-> Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
+Read the [installation guide](https://coolify.io/docs/installation) for requirements and detailed instructions. You can also review the [installation script](./scripts/install.sh) before you run it.
 
-## Support
+## Self-hosted or Cloud
 
-Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).
+| Self-hosted | Coolify Cloud |
+| --- | --- |
+| Install Coolify on your own server. | Use a Coolify instance that we maintain. |
+| Control and maintain the complete platform. | Get high availability and less maintenance. |
+| Free and open source. | Paid service with email notifications and additional support. |
 
-## Cloud
+The recommended self-hosted setup uses one server for Coolify and one or more servers for deployed resources. If you do not want to maintain the Coolify server, use [Coolify Cloud](https://app.coolify.io). See [coolify.io](https://coolify.io) for current pricing.
 
-If you do not want to self-host Coolify, there is a paid cloud version available: [app.coolify.io](https://app.coolify.io)
+## Community and support
 
-For more information & pricing, take a look at our landing page [coolify.io](https://coolify.io).
-
-## Why should I use the Cloud version?
-The recommended way to use Coolify is to have one server for Coolify and one (or more) for the resources you are deploying. A server is around 4-5$/month.
-
-By subscribing to the cloud version, you get the Coolify server for the same price, but with:
-- High-availability
-- Free email notifications
-- Better support
-- Less maintenance for you
+- Read the [documentation](https://coolify.io/docs).
+- Join the community on [Discord](https://coollabs.io/discord).
+- Ask questions in [GitHub Discussions](https://github.com/coollabsio/coolify/discussions).
+- Read the [contribution guide](./CONTRIBUTING.md) before you submit a change.
+- Review the [code of conduct](./CODE_OF_CONDUCT.md).
+- Contact the team through the [support page](https://coolify.io/docs/contact).
 
 ## Donations
 To stay completely free and open-source, with no feature behind the paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the project's future development.
@@ -156,33 +170,6 @@ Thank you so much!
 <a href="https://hosthavoc.com"><img width="60px" alt="Host Havoc" src="https://cdn.coollabs.io/sponsors/hosthavoc.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
-
-## Recognitions
-
-<p>
-<a href="https://news.ycombinator.com/item?id=26624341">
-  <img
-    style="width: 250px; height: 54px;" width="250" height="54"
-    alt="Featured on Hacker News"
-    src="https://hackernews-badge.vercel.app/api?id=26624341"
-  />
-</a>
-</p>
-
-<a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-
-<a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-## Core Maintainers
-
-| Andras Bacsai | 🏔️ Peak |
-|------------|------------|
-| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="peaklabs-dev" /> |
-| <a href="https://github.com/andrasbacsai"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/heyandras"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/heyandras.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> | <a href="https://github.com/peaklabs-dev"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/peaklabs_dev"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/peaklabs.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> |
-
-## Repo Activity
-
-![Alt](https://repobeats.axiom.co/api/embed/eab1c8066f9c59d0ad37b76c23ebb5ccac4278ae.svg "Repobeats analytics image")
 
 ## Star History
 
