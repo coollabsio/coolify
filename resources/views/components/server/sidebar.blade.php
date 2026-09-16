@@ -31,7 +31,7 @@
             'active' => $activeMenu === 'cloud-provider-token',
             'icon' => 'subscription',
             'group' => 'Settings',
-            'visible' => (bool) ($server->hetzner_server_id || $server->vultr_instance_id),
+            'visible' => (bool) ($server->hetzner_server_id || $server->vultr_instance_id || $server->digitalocean_droplet_id || $server->hostinger_virtual_machine_id),
         ],
         [
             'label' => 'CA Certificate',
