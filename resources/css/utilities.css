@@ -249,6 +249,11 @@
     @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
 }
 
+/* Collapsible group header (accordion) for the resource settings sidebar. */
+@utility nav-section-toggle {
+    @apply w-full items-center justify-between gap-2 px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none rounded-md transition-colors cursor-pointer hover:text-nav-active;
+}
+
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
     /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
