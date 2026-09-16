@@ -251,6 +251,25 @@ $serverListboxOptions = array_merge(
                 };
                 const fmtRate = v => `${fmtBytes(v)}/s`;
 
+                const fmtLocalTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZoneName: 'short' });
+                const fmtUtcTime = ts => new Date(ts).toLocaleString(undefined, { hour12: false, timeZone: 'UTC', timeZoneName: 'short' });
+
+                // The app strips the default ApexCharts tooltip background (utilities.css), so
+                // every chart must render its own `apexcharts-tooltip-custom` markup.
+                const customTooltip = formatter => ({ series, dataPointIndex, w }) => {
+                    const timestamp = w.globals.seriesX[0]?.[dataPointIndex];
+                    let rows = '';
+                    series.forEach((s, i) => {
+                        const value = s[dataPointIndex];
+                        if (value === null || value === undefined) { return; }
+                        rows += `<div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames[i]}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>`;
+                    });
+                    return `<div class="apexcharts-tooltip-custom">${rows}
+                        <div class="apexcharts-tooltip-custom-title">Your time: ${fmtLocalTime(timestamp)}</div>
+                        <div class="apexcharts-tooltip-custom-title">UTC: ${fmtUtcTime(timestamp)}</div>
+                    </div>`;
+                };
+
                 const baseOptions = (series, colors, formatter) => ({
                     chart: { height: 240, type: 'area', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', animations: { enabled: true } },
                     series,
@@ -263,7 +282,7 @@ $serverListboxOptions = array_merge(
                     xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: axisColor } } },
                     yaxis: { min: 0, max: max => max > 0 ? max * 1.2 : 1, forceNiceScale: true, tickAmount: 4, labels: { style: { colors: axisColor }, formatter } },
                     noData: { text: 'No data for this range', style: { color: axisColor } },
-                    tooltip: { x: { format: 'yyyy-MM-dd HH:mm' } },
+                    tooltip: { shared: true, intersect: false, marker: { show: false }, custom: customTooltip(formatter) },
                 });
 
                 const initial = @js($chartData);
