@@ -35,8 +35,6 @@ class Metrics extends Component
     #[Url(as: 'cmetric')]
     public string $containerMetric = 'cpu';
 
-    public bool $live = false;
-
     /** @var array<string, mixed> */
     public array $kpis = [];
 
@@ -48,8 +46,6 @@ class Metrics extends Component
 
     /** @var array<string, mixed> Trend series for the charts, also embedded for first paint. */
     public array $chartData = [];
-
-    public ?string $lastUpdatedAt = null;
 
     /** @var array<string, array{name: string, link: ?string}> */
     protected array $containerMetaCache = [];
@@ -88,21 +84,6 @@ class Metrics extends Component
     public function setRange(string $range): void
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
-        $this->loadData();
-    }
-
-    public function isLivePollable(): bool
-    {
-        return $this->live && $this->range === '24h';
-    }
-
-    /**
-     * Re-pull within the 60s cache TTL. The TTL bounds staleness, so a refresh is a
-     * cheap cache-hit reload rather than a global cache flush (matches the Analytics
-     * live toggle, which also relies on the TTL).
-     */
-    public function refresh(): void
-    {
         $this->loadData();
     }
 
@@ -168,7 +149,6 @@ class Metrics extends Component
         $this->kpis = FleetMetricsAggregator::fleetKpis($rows);
         $this->topContainers = FleetMetricsAggregator::rankContainers($containers, $this->containerMetric);
         $this->chartData = $this->buildChartPayload($series);
-        $this->lastUpdatedAt = now()->toIso8601String();
 
         $this->dispatch("refreshChartData-{$this->chartId}", $this->chartData);
     }

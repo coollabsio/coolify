@@ -1,79 +1,104 @@
-<div class="flex flex-col gap-6">
-    {{-- Header + controls --}}
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div class="flex flex-col gap-1">
-            <h1 class="text-2xl font-semibold text-black dark:text-fg">Metrics</h1>
-            <p class="text-[13px] text-neutral-500 dark:text-fg-dim">Resource usage across your servers.</p>
+<?php
+$tabButtonBase = 'relative inline-flex h-7 items-center justify-center rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+$tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
+$tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
+
+$serverListboxOptions = array_merge(
+    [['value' => '', 'label' => 'All servers']],
+    collect($serverOptions)->map(fn ($name, $uuid) => ['value' => $uuid, 'label' => $name])->values()->all(),
+);
+?>
+<div class="flex w-full min-w-0 flex-col gap-6">
+    <x-slot:title>
+        Metrics | Coolify
+    </x-slot>
+
+    {{-- Header --}}
+    <div class="flex flex-col gap-4">
+        <div class="min-w-0">
+            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Metrics</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                Resource usage across every server, reported by Sentinel.
+            </p>
         </div>
+
         @if ($servers->isNotEmpty())
-            <div class="flex items-center gap-2">
-                @if ($lastUpdatedAt)
-                    <span class="hidden text-[11px] text-neutral-400 sm:inline dark:text-fg-dim">
-                        Updated {{ \Illuminate\Support\Carbon::parse($lastUpdatedAt)->diffForHumans() }}
-                    </span>
-                @endif
-                <x-forms.listbox id="serverUuid" :live="true" :options="array_merge(
-                    [['value' => '', 'label' => 'All servers']],
-                    collect($serverOptions)->map(fn ($name, $uuid) => ['value' => $uuid, 'label' => $name])->values()->all()
-                )" />
-                <div class="flex rounded-md bg-[var(--coollabs-recessed)] p-0.5">
-                    @foreach (['24h', '7d', '30d'] as $r)
-                        <button type="button" wire:click="setRange('{{ $r }}')"
-                            class="{{ $range === $r ? 'bg-[var(--coollabs-base)] text-black shadow-sm dark:text-fg' : 'text-neutral-500 hover:text-black dark:hover:text-fg' }} rounded px-2.5 py-1 text-[12px] font-medium transition-colors">{{ $r }}</button>
-                    @endforeach
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="relative w-full transition-opacity sm:w-52"
+                    wire:loading.class="pointer-events-none opacity-60" wire:target="serverUuid">
+                    <x-forms.listbox id="serverUuid" live :options="$serverListboxOptions" placeholder="All servers" />
                 </div>
-                <button type="button" wire:click="refresh" title="Refresh"
-                    class="flex size-8 items-center justify-center rounded-md bg-[var(--coollabs-recessed)] text-neutral-500 transition-colors hover:text-black dark:hover:text-fg">
-                    <x-reicon name="refresh" class="size-4" wire:loading.class="animate-spin" wire:target="refresh" />
-                </button>
+
+                <div class="flex items-center gap-2 sm:ml-auto">
+                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        @foreach (['24h' => '24 hours', '7d' => '7 days', '30d' => '30 days'] as $value => $label)
+                            <button type="button" wire:click="setRange('{{ $value }}')"
+                                wire:loading.attr="disabled" wire:target="setRange"
+                                @class([$tabButtonBase, $range === $value ? $tabButtonActive : $tabButtonInactive])>
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
             </div>
         @endif
     </div>
 
     @if ($servers->isEmpty())
-        <x-empty title="No server metrics yet" description="Enable metrics on a server to see fleet resource usage here.">
-            <x-slot:icon>
-                <x-reicon name="graph" class="size-8" />
-            </x-slot:icon>
+        <x-empty size="sm" title="No server metrics yet"
+            description="Enable metrics on a server to see fleet resource usage here."
+            icon-name="graph">
+            <x-slot:contents>
+                <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
+                    View servers
+                </a>
+            </x-slot:contents>
         </x-empty>
     @else
-        {{-- KPI tiles --}}
-        <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-6 dark:bg-white/[0.07]">
-            <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Servers online</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ $kpis['serversOnline'] ?? 0 }}/{{ $kpis['serversTotal'] ?? 0 }}</span>
-                @if (($kpis['needsAttention'] ?? 0) > 0)
-                    <span class="mt-auto pt-3 text-[11px] font-medium text-orange-500 dark:text-warning">{{ $kpis['needsAttention'] }} need attention</span>
-                @else
-                    <span class="mt-auto pt-3 text-[11px] text-emerald-600 dark:text-emerald-400">All healthy</span>
-                @endif
+        {{-- Overview KPIs --}}
+        <x-application.settings-section id="metrics-overview-section" title="Overview"
+            helper="Current resource usage across the selected servers.">
+            <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-6 dark:bg-white/[0.07]">
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
+                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Servers online</span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ $kpis['serversOnline'] ?? 0 }}<span class="text-neutral-400 dark:text-fg-faint">/{{ $kpis['serversTotal'] ?? 0 }}</span></span>
+                    @if (($kpis['needsAttention'] ?? 0) > 0)
+                        <span class="mt-auto pt-3 text-[11px] font-medium text-orange-500 dark:text-warning">{{ $kpis['needsAttention'] }} need attention</span>
+                    @endif
+                </div>
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
+                    <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
+                        Fleet CPU
+                        @if ($kpis['cpuApproximate'] ?? false)
+                            <span class="ml-1.5 cursor-help text-neutral-400 dark:text-fg-faint" title="Averaged across servers; not core-weighted">~</span>
+                        @endif
+                    </span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['cpuAvg'] ?? 0) }}%</span>
+                    @if ($kpis['cpuBusiest'] ?? null)
+                        <span class="mt-auto truncate pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">Busiest {{ $kpis['cpuBusiest']['name'] }} {{ round($kpis['cpuBusiest']['percent']) }}%</span>
+                    @endif
+                </div>
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
+                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet memory</span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['memPercent'] ?? 0) }}%</span>
+                    <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($kpis['memUsed'] ?? 0) }} / {{ formatBytes($kpis['memTotal'] ?? 0) }}</span>
+                </div>
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
+                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet disk</span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['diskPercent'] ?? 0) }}%</span>
+                    <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($kpis['diskUsed'] ?? 0) }} / {{ formatBytes($kpis['diskTotal'] ?? 0) }}</span>
+                </div>
+                <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
+                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet network</span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ formatBytes(($kpis['netRx'] ?? 0) + ($kpis['netTx'] ?? 0)) }}/s</span>
+                    <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">&darr;{{ formatBytes($kpis['netRx'] ?? 0) }} &uarr;{{ formatBytes($kpis['netTx'] ?? 0) }}</span>
+                </div>
+                <div class="col-span-2 flex flex-col bg-[var(--coollabs-base)] px-4 py-3 sm:col-span-1">
+                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Containers</span>
+                    <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ compactNumber($kpis['containers'] ?? 0) }}</span>
+                </div>
             </div>
-            <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet CPU @if ($kpis['cpuApproximate'] ?? false)<span class="cursor-help" title="Averaged across servers; not core-weighted">~</span>@endif</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['cpuAvg'] ?? 0) }}%</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">@if ($kpis['cpuBusiest'] ?? null)Busiest: {{ $kpis['cpuBusiest']['name'] }} {{ round($kpis['cpuBusiest']['percent']) }}%@endif</span>
-            </div>
-            <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet memory</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['memPercent'] ?? 0) }}%</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($kpis['memUsed'] ?? 0) }} / {{ formatBytes($kpis['memTotal'] ?? 0) }}</span>
-            </div>
-            <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet disk</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['diskPercent'] ?? 0) }}%</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($kpis['diskUsed'] ?? 0) }} / {{ formatBytes($kpis['diskTotal'] ?? 0) }}</span>
-            </div>
-            <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet network</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ formatBytes(($kpis['netRx'] ?? 0) + ($kpis['netTx'] ?? 0)) }}/s</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">rx {{ formatBytes($kpis['netRx'] ?? 0) }}/s · tx {{ formatBytes($kpis['netTx'] ?? 0) }}/s</span>
-            </div>
-            <div class="col-span-2 flex flex-col bg-[var(--coollabs-base)] px-4 py-3 sm:col-span-1">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Containers</span>
-                <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ compactNumber($kpis['containers'] ?? 0) }}</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">running</span>
-            </div>
-        </div>
+        </x-application.settings-section>
 
         {{-- Trend charts --}}
         <div class="grid gap-6 lg:grid-cols-2">
@@ -87,7 +112,8 @@
         </div>
 
         {{-- Servers table --}}
-        <x-application.settings-section title="Servers" flush>
+        <x-application.settings-section title="Servers" flush
+            helper="Per-server resource pressure. Sorted by CPU, highest first.">
             <div class="data-table">
                 <div class="data-table-header fleet-servers-table-grid">
                     <span>Server</span>
@@ -119,25 +145,29 @@
         </x-application.settings-section>
 
         {{-- Hottest containers --}}
-        <x-application.settings-section title="Hottest containers" flush>
+        <x-application.settings-section title="Hottest containers" flush
+            helper="Top containers across the fleet by the selected metric.">
             <x-slot:actions>
-                <div class="flex rounded-md bg-[var(--coollabs-recessed)] p-0.5">
+                <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
                     @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
                         <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
-                            class="{{ $containerMetric === $m ? 'bg-[var(--coollabs-base)] text-black shadow-sm dark:text-fg' : 'text-neutral-500 hover:text-black dark:hover:text-fg' }} rounded px-2.5 py-1 text-[12px] font-medium transition-colors">{{ $mlabel }}</button>
+                            @class([$tabButtonBase, $containerMetric === $m ? $tabButtonActive : $tabButtonInactive])>
+                            {{ $mlabel }}
+                        </button>
                     @endforeach
                 </div>
             </x-slot:actions>
             @if (empty($topContainers))
                 <div class="p-4">
-                    <x-empty size="sm" title="No container metrics" description="Container metrics need a Sentinel build with the bulk endpoints." />
+                    <x-empty size="sm" title="No container metrics"
+                        description="Container metrics need a Sentinel build with the bulk endpoints." />
                 </div>
             @else
                 <div class="data-table">
                     <div class="data-table-header fleet-containers-table-grid">
                         <span>Container</span>
                         <span>Server</span>
-                        <span class="text-right">{{ ucfirst($containerMetric) }}</span>
+                        <span class="text-right">{{ ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric] }}</span>
                     </div>
                     @foreach ($topContainers as $c)
                         <div class="data-table-row fleet-containers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
