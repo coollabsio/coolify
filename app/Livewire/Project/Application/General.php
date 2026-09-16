@@ -487,6 +487,9 @@ class General extends Component
             if ($this->isContainerLabelReadonlyEnabled) {
                 $this->resetDefaultLabels(false);
             }
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
+            }
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -885,6 +888,9 @@ class General extends Component
             $this->application->save();
             $this->application->refresh();
             $this->syncData();
+            if ($oldPortsExposes !== $this->portsExposes) {
+                $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);
+            }
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $this->application->refresh();

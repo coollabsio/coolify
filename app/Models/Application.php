@@ -131,7 +131,13 @@ class Application extends BaseModel
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
+    public const MAX_DOCKER_COMPOSE_COLLECTION_ALIASES = 256;
+
     private static $parserVersion = '5';
+
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
 
     protected $fillable = [
         'name',
@@ -2068,7 +2074,10 @@ class Application extends BaseModel
     public function oldRawParser()
     {
         try {
-            $yaml = Yaml::parse($this->docker_compose_raw);
+            $yaml = Yaml::parse(
+                $this->docker_compose_raw,
+                maxAliasesForCollections: self::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES,
+            );
         } catch (\Exception $e) {
             throw new RuntimeException($e->getMessage());
         }

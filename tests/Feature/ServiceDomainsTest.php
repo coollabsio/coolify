@@ -204,14 +204,15 @@ it('opens address fields and service-wide redirects in the same settings dialog 
         $html = $component->call('startEdit', $index)
             ->assertSet('editingDomain', $domain)
             ->assertSee('Domain settings')
-            ->assertSee('Save changes')
+            ->assertSee('Save')
+            ->assertSee('Regenerate hostname')
             ->assertDontSee('Save address')
             ->assertSee('Search engine indexing')
             ->assertSee('www redirect')
             ->assertDontSee('Edit address and port')
             ->html();
 
-        expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(1);
+        expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(0);
     }
 });
 
@@ -222,6 +223,16 @@ it('uses segmented fields when adding and editing service domains', function () 
         ->toContain('<x-forms.domain-input id="newDomainParts"')
         ->toContain('<x-forms.domain-input id="editingDomainParts"')
         ->not->toContain('placeholder="https://app.example.com"');
+});
+
+it('matches the application domains toolbar heading and top spacing', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)
+        ->toContain('<div class="flex flex-wrap items-center gap-2">')
+        ->toContain('<h2 id="domains-section">Domains</h2>')
+        ->not->toContain('<div class="mt-2 flex flex-wrap items-center gap-2">')
+        ->not->toContain('<h3>Domains</h3>');
 });
 
 it('resets the add domain dns gate when segmented domain fields change', function () {
@@ -345,7 +356,7 @@ it('saves the explicitly selected service redirect value', function () {
         ->call('updateServiceRedirect', $this->webApp->id, 'www')
         ->assertDispatched('success')
         ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->contains('https://www.web.example.com'))
-        ->assertSet('domainRows', fn (array $rows): bool => filled(collect($rows)->firstWhere('url', 'https://www.web.example.com')['checked_at'] ?? null))
+        ->assertSet('domainRows', fn (array $rows): bool => (collect($rows)->firstWhere('url', 'https://www.web.example.com')['dns_status'] ?? null) === 'checking')
         ->assertSee('https://www.web.example.com');
 
     expect($this->webApp->fresh()->redirect)->toBe('www');
@@ -862,13 +873,10 @@ it('updates search engine indexing from the service domains view', function () {
         ->assertSee('Indexable')
         ->assertSee('Search engine indexing')
         ->assertSee('www redirect')
-        ->assertSee('toggleNoindexDomain', false)
-        ->assertSee('updateServiceRedirect', false)
-        ->assertSee('wire:ignore', false)
-        ->assertDontSee('x-model="localIndexing"', false)
-        ->assertDontSee('x-model="localDirection"', false)
-        ->assertDontSee('@js(', false)
-        ->call('toggleNoindexDomain', $this->apiApp->id, 'https://api.example.com', 'noindex')
+        ->assertSee('editingIndexing', false)
+        ->assertDontSee('toggleNoindexDomain', false)
+        ->set('editingIndexing', 'noindex')
+        ->call('updateDomain')
         ->assertDispatched('configurationChanged')
         ->assertDispatched('success')
         ->assertSet('service', fn (Service $service): bool => $service->applications
@@ -880,6 +888,70 @@ it('updates search engine indexing from the service domains view', function () {
 
     expect(file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php')))
         ->not->toContain('<select');
+});
+
+it('regenerates a service application domain only when the modal is saved', function () {
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingIndexing', 'noindex')
+        ->call('regenerateEditingDomain');
+
+    $generatedHost = $component->get('editingDomainParts')['host'];
+
+    expect($generatedHost)->not->toBe('api.example.com')
+        ->and($this->apiApp->fresh()->fqdn)->toBe('https://api.example.com');
+
+    $component->call('updateDomain')->assertHasNoErrors();
+
+    expect($this->apiApp->fresh()->fqdn)->toBe("https://{$generatedHost}")
+        ->and($this->apiApp->fresh()->noindexDomains()->all())->toBe(["https://{$generatedHost}"]);
+});
+
+it('starts a dns check after a manually edited service domain is saved', function () {
+    Queue::fake();
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = true;
+    $settings->save();
+    $this->apiApp->update(['fqdn' => 'https://api.example.com:81']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '81')
+        ->set('editingDomainParts.host', 'manual-service.example.com')
+        ->call('updateDomain')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->contains(
+            fn (array $row): bool => $row['url'] === 'https://manual-service.example.com' && $row['dns_status'] === 'checking'
+        ));
+
+    expect($this->apiApp->fresh()->domain_dns_statuses['https://manual-service.example.com']['status'] ?? null)->toBe('checking');
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://manual-service.example.com'
+        && $job->statusKey === 'https://manual-service.example.com');
+});
+
+it('does not start a dns check when only service domain settings change', function () {
+    Queue::fake();
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingIndexing', 'noindex')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    Queue::assertNotPushed(CheckDomainDnsJob::class);
+});
+
+it('checks the counterpart added by a service domain redirect change', function () {
+    Queue::fake();
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingRedirect', 'www')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    expect(explode(',', (string) $this->apiApp->fresh()->fqdn))->toContain('https://www.api.example.com');
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->url === 'https://www.api.example.com');
 });
 
 it('keeps noindex domains when normalizing a custom service domain port', function () {
@@ -907,9 +979,18 @@ it('shows an inherited internal port badge from the coolify service env port', f
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet('domainRows.0.internal_port', 3000)
         ->assertSet('domainRows.0.has_port_override', false)
+        ->set('dnsValidationEnabled', false)
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '3000')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
         ->assertSee('Internal port 3000')
         ->assertSee('Inherited from the Coolify service port', false)
         ->assertDontSee('No internal port');
+
+    expect($this->apiApp->fresh())
+        ->fqdn->toBe('https://api.example.com')
+        ->domain_port_overrides->toBeNull();
 });
 
 it('shows a custom internal port badge for a service domain override', function () {
@@ -952,7 +1033,7 @@ it('prioritizes public addresses and moves domain configuration behind settings'
         ->assertSee('Add domain')
         ->assertSee('Domain settings')
         ->call('startEdit', 0)
-        ->assertSee('Indexing and redirect changes save automatically.')
+        ->assertDontSee('Indexing and redirect changes save automatically.')
         ->assertSee('Internal port 8080')
         ->assertSee('Both www and non-www')
         ->assertSee('Search indexing allowed')
@@ -1021,14 +1102,39 @@ it('uses the shared mobile domain summary layout', function () {
         ->toContain('Noindex');
 });
 
-it('reuses the floating save bar for pending domain address edits', function () {
+it('uses explicit modal actions for pending domain edits', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
-    expect($view)->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('dirty="hasAddressChanges"')
-        ->toContain('<template x-if="modalOpen">')
-        ->not->toContain('Save address');
+    expect($view)->not->toContain('<x-unsaved-bar action="updateDomain"')
+        ->toContain('wire:click="regenerateEditingDomain"')
+        ->toContain('wire:click="updateDomain"')
+        ->toContain('Save');
 });
+
+it('opens service domain settings from browser data and shows a dns spinner', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect($view)
+        ->not->toContain('wire:click="startEdit(')
+        ->toContain('@click="openEditDomain(')
+        ->toContain('<x-loading compact aria-label="Checking DNS"')
+        ->not->toContain('<x-loading-on-button wire:loading.delay');
+});
+
+it('uses the dns badge as progress for single and all service checks', function (string $action, array $parameters) {
+    Queue::fake();
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call($action, ...$parameters)
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->assertSee('Checking DNS...')
+        ->assertSeeHtml('loading-indicator');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
+})->with([
+    'single domain' => ['checkDomainDns', [0]],
+    'all domains' => ['checkAllDns', []],
+]);
 
 it('inherits the counterpart internal port when enabling redirects without a port warning', function (?int $override, string $redirect) {
     $this->service->update([
@@ -1138,5 +1244,5 @@ it('renders each service domain group as a separate card', function () {
 it('lays out the domain settings dropdowns in responsive columns', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
     expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
-        ->toContain('class="sm:col-span-2 text-[12px]');
+        ->toContain('flex flex-wrap items-center justify-between gap-2');
 });

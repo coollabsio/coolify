@@ -180,7 +180,8 @@ class BackupEdit extends Component
 
     public function delete($password, $selectedActions = [])
     {
-        $this->authorize('manageBackups', $this->backup->database);
+        $database = $this->backup->database;
+        $this->authorize('manageBackups', $database);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -188,10 +189,10 @@ class BackupEdit extends Component
 
         try {
             $server = null;
-            if ($this->backup->database instanceof ServiceDatabase) {
-                $server = $this->backup->database->service->destination->server;
-            } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
-                $server = $this->backup->database->destination->server;
+            if ($database instanceof ServiceDatabase) {
+                $server = $database->service->destination->server;
+            } elseif ($database->destination && $database->destination->server) {
+                $server = $database->destination->server;
             }
 
             $filenames = $this->backup->executions()
@@ -213,15 +214,14 @@ class BackupEdit extends Component
             }
 
             $this->backup->delete();
+            $this->skipRender();
 
-            if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
-                $serviceDatabase = $this->backup->database;
-
+            if ($database instanceof ServiceDatabase) {
                 return redirectRoute($this, 'project.service.database.backups', [
-                    'project_uuid' => $this->parameters['project_uuid'],
-                    'environment_uuid' => $this->parameters['environment_uuid'],
-                    'service_uuid' => $serviceDatabase->service->uuid,
-                    'stack_service_uuid' => $serviceDatabase->uuid,
+                    'project_uuid' => $database->service->project()->uuid,
+                    'environment_uuid' => $database->service->environment->uuid,
+                    'service_uuid' => $database->service->uuid,
+                    'stack_service_uuid' => $database->uuid,
                 ]);
             } else {
                 return redirectRoute($this, 'project.database.backup.index', [

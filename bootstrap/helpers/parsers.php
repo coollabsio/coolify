@@ -1257,7 +1257,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 if ($docker_compose_domains->count() > 0) {
                     $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                     if ($found_fqdn) {
-                        $fqdns = collect($found_fqdn);
+                        $fqdns = str($found_fqdn)->explode(',')->map(fn ($fqdn) => trim($fqdn))->filter();
                     } else {
                         $fqdns = collect([]);
                     }
@@ -2546,7 +2546,7 @@ function serviceParser(Service $resource): Collection
             projectName: $resource->project()->name,
             resourceName: $resource->name,
             type: 'service',
-            subType: $isDatabase ? 'database' : 'application',
+            subType: $savedService instanceof ServiceDatabase ? 'database' : 'application',
             subId: $savedService->id,
             subName: $savedService->human_name ?? $savedService->name,
             environment: $resource->environment->name,

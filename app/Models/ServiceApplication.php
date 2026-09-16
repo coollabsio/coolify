@@ -54,6 +54,7 @@ class ServiceApplication extends BaseModel
 
     protected $attributes = [
         'is_force_https_enabled' => true,
+        'max_restart_count' => 0,
     ];
 
     protected function casts(): array

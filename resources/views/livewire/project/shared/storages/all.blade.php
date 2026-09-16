@@ -18,7 +18,6 @@
         <div class="data-table w-full">
             <div class="data-table-header {{ $gridClass }}">
                 <span>Volume Name</span>
-                <span class="volumes-col-source">Source Path</span>
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
                     <div class="volumes-col-pr flex items-center gap-1.5">
@@ -44,7 +43,6 @@
                     $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
-                    $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
                 @endphp
 
                 @if ($inputsReadonly)
@@ -57,12 +55,6 @@
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
-                            </div>
-
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate text-[13px]"
-                                    title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
                             </div>
 
                             <div class="volumes-cell-dest min-w-0">
@@ -108,7 +100,7 @@
 
                             @if ($showBackupAction)
                                 <div
-                                    class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                    class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
@@ -161,11 +153,6 @@
                                 </div>
                             </div>
 
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <x-forms.input id="forms.{{ $id }}.hostPath" placeholder="Host path (optional)" />
-                            </div>
-
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
                                 <x-forms.input id="forms.{{ $id }}.mountPath" required
@@ -210,7 +197,7 @@
                             </div>
 
                             <div
-                                class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                 <x-forms.button type="submit" class="!px-2.5 !text-xs">
                                     Update
                                 </x-forms.button>

@@ -43,6 +43,7 @@ it('keeps nested storage component keys stable when mounts are added or deleted'
         ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
 });
 
+use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -147,7 +148,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('volumes-table-grid')
         ->toContain('volumes-table-grid-readonly')
         ->toContain('Volume Name')
-        ->toContain('Source Path')
+        ->not->toContain('Source Path')
         ->toContain('Destination Path')
         ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
@@ -222,6 +223,43 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
 });
 
+it('keeps source paths out of the Docker volume creation form', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+
+    expect($view)
+        ->not->toContain('id="host_path"')
+        ->not->toContain('label="Source Path"')
+        ->not->toContain('Swarm Mode detected');
+});
+
+it('creates named Docker volumes without a source path in swarm mode', function () {
+    [$application] = createApplicationWithVolume();
+    $application->persistentStorages()->delete();
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->set('isSwarm', true)
+        ->set('name', 'storage-app-data')
+        ->set('mount_path', '/data')
+        ->call('submitPersistentVolume')
+        ->assertHasNoErrors();
+
+    expect($application->persistentStorages()->first()->host_path)->toBeNull();
+});
+
+it('removes the source path column from Docker volume views', function () {
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
+
+    expect($allView)
+        ->not->toContain('Source Path')
+        ->not->toContain('volumes-col-source')
+        ->not->toContain('forms.{{ $id }}.hostPath')
+        ->and($showView)
+        ->not->toContain('Source Path')
+        ->not->toContain('volumes-col-source')
+        ->not->toContain('id="hostPath"');
+});
+
 it('renders volume actions and PR suffix controls as valid markup', function () {
     [$application] = createApplicationWithVolume();
     LocalPersistentVolume::create([
@@ -247,6 +285,18 @@ it('renders volume actions and PR suffix controls as valid markup', function () 
         ->and($xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' volumes-col-actions ')]//button[normalize-space(.)='Backup']//svg"))->toHaveCount(0)
         ->and($xpath->query("//button[@aria-label='More information']/following-sibling::*[@role='tooltip'][contains(normalize-space(.), '{$helperText}')]"))->toHaveCount(3)
         ->and($xpath->query("//template[@x-teleport='body']/*[@role='listbox']"))->toHaveCount(2);
+});
+
+it('keeps editable volume actions on one line', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toMatch('/volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1\.5[\s\S]*?Update[\s\S]*?Backup[\s\S]*?Delete/');
+
+    expect($css)
+        ->toMatch('/\.volumes-table-grid\s*\{[^}]*grid-template-columns:[^;}]*15rem;/')
+        ->toMatch('/\.volumes-table-grid-with-pr\s*\{[^}]*grid-template-columns:[^;}]*15rem;/');
 });
 
 it('declares explicit authorization on the changed storage controls', function () {

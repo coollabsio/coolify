@@ -26,16 +26,29 @@
                 && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
                 && !$wire.showPortWarningModal && !$wire.showDomainConflictModal;
         },
-        openEditDomain() {
+        openEditDomain(index, domain, parts, serviceApplicationId, serviceLabel, indexing, redirect) {
+            if (index !== undefined) {
+                $wire.set('editingIndex', index, false);
+                $wire.set('editingDomain', domain, false);
+                $wire.set('editingDomainParts', parts, false);
+                $wire.set('editingDomainPartsChanged', false, false);
+                $wire.set('editingServiceApplicationId', serviceApplicationId, false);
+                $wire.set('editingIndexing', indexing, false);
+                $wire.set('editingRedirect', redirect, false);
+                $wire.set('editingOriginalRedirect', redirect, false);
+                $wire.set('editingDomainWasRegenerated', false, false);
+                $wire.set('editingGeneratedHost', null, false);
+            }
             this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
-            this.editingServiceLabel = $wire.serviceApps.find(app => app.id === $wire.editingServiceApplicationId)?.name || '';
+            this.editingServiceLabel = serviceLabel ?? $wire.serviceApps.find(app => app.id === $wire.editingServiceApplicationId)?.name ?? '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainParts-host')?.focus?.());
         },
-        closeEditDomain() {
+        closeEditDomain(discardDraft = true) {
             this.modalOpen = false;
             this.editingDomainBaseline = null;
             this.editingServiceLabel = '';
+            if (discardDraft) this.$wire.cancelEdit();
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -45,7 +58,7 @@
         },
     }"
     @open-edit-domain.window="openEditDomain()"
-    @edit-domain-saved.window="closeEditDomain()">
+    @edit-domain-saved.window="closeEditDomain(false)">
     @if ($hasDnsChecksInProgress)
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
     @endif
@@ -56,9 +69,9 @@
     @endcannot
 
     {{-- Toolbar --}}
-    <div class="mt-2 flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
         <div class="min-w-0 flex-1">
-            <h3>Domains</h3>
+            <h2 id="domains-section">Domains</h2>
             <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
                 {{ $configuredCount }} domain{{ $configuredCount === 1 ? '' : 's' }} across {{ $domainGroups->count() }} service{{ $domainGroups->count() === 1 ? '' : 's' }}
                 @if ($suggestedCount > 0)
@@ -77,7 +90,7 @@
             @endif
             @can('update', $service)
                 @if ($configuredCount > 0)
-                    <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled"
+                    <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled"
                         wire:target="checkAllDns,checkDomainDns">
                         <x-reicon name="refresh" class="size-3.5" />
                         Check all DNS
@@ -239,10 +252,6 @@
                         <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
                             style="-webkit-overflow-scrolling: touch;">
                             <form wire:submit="updateDomain" class="flex flex-col gap-4">
-                                <template x-if="modalOpen">
-                                    <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges"
-                                        targets="updateDomain,confirmUpdateDomainDespiteDns" />
-                                </template>
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service application</label>
@@ -274,41 +283,32 @@
                                     </div>
                                 @endif
                             </form>
-                            @php
-                                $editingRow = $editingIndex !== null ? ($domainRows[$editingIndex] ?? null) : null;
-                            @endphp
-                            @if ($editingRow)
-                                @can('update', $service)
-                                    @php
-                                        $editingAppId = (int) $editingRow['service_application_id'];
-                                        $editingDomainKey = hash('sha256', $editingRow['url'].'|'.$editingAppId);
-                                        $editingNoindex = $service->applications->firstWhere('id', $editingAppId)?->isDomainNoindexed($editingRow['url']);
-                                    @endphp
-                                    <div wire:key="editing-domain-settings-{{ $editingDomainKey }}"
+                            @can('update', $service)
+                                    <div
                                         class="mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
-                                        <p class="sm:col-span-2 text-[12px] text-neutral-500 dark:text-fg-dim">Indexing and redirect changes save automatically.</p>
-                                        <x-forms.listbox id="service-domain-indexing-{{ $editingAppId }}-{{ $editingDomainKey }}"
-                                            label="Search engine indexing" :wire="false" preserveValue
-                                            :value="$editingNoindex ? 'noindex' : 'index'"
-                                            onChange="toggleNoindexDomain"
-                                            :onChangeArgs="[$editingAppId, $editingRow['url']]" portal
+                                        <x-forms.listbox id="editingIndexing" htmlId="service-domain-indexing"
+                                            label="Search engine indexing" portal
                                             :options="[
                                                 ['value' => 'index', 'label' => 'Indexable'],
                                                 ['value' => 'noindex', 'label' => 'Noindex'],
                                             ]" />
-                                        <x-forms.listbox id="service-domain-direction-{{ $editingAppId }}-{{ $editingDomainKey }}"
-                                            label="www redirect" :wire="false" :value="$serviceRedirects[$editingAppId] ?? 'both'" preserveValue
-                                            x-effect="value = $wire.serviceRedirects[{{ $editingAppId }}] ?? 'both'"
+                                        <x-forms.listbox id="editingRedirect" htmlId="service-domain-direction"
+                                            label="www redirect"
                                             helper="Applies to all domains for this service application."
-                                            onChange="updateServiceRedirect" :onChangeArgs="[$editingAppId]" portal
+                                            portal
                                             :options="[
                                                 ['value' => 'both', 'label' => 'No redirect'],
                                                 ['value' => 'www', 'label' => 'Redirect to www'],
                                                 ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                             ]" />
                                     </div>
-                                @endcan
-                            @endif
+                                    <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                        <x-forms.button type="button" wire:click="regenerateEditingDomain">Regenerate hostname</x-forms.button>
+                                        @unless ($editDomainDnsFailed)
+                                            <x-forms.button type="button" wire:click="updateDomain" isHighlighted>Save</x-forms.button>
+                                        @endunless
+                                    </div>
+                            @endcan
 
                         </div>
                     </div>

@@ -55,7 +55,7 @@
             return [
                 'uuid' => $server->uuid,
                 'name' => $server->name,
-                'description' => $server->description ?: 'No description',
+                'description' => $server->description,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
@@ -104,7 +104,7 @@
                         <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
                     </span>
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="view-toggle">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'

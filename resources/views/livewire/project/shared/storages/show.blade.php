@@ -7,7 +7,6 @@
     };
     $canUpdate = auth()->user()?->can('update', $resource) ?? false;
     $inputsReadonly = $isReadOnly || ! $canUpdate;
-    $displayHostPath = filled($hostPath) ? $hostPath : '—';
 @endphp
 
 @if ($inputsReadonly)
@@ -33,13 +32,6 @@
                         @endif
                     @endif
                 </div>
-            </div>
-
-            <div class="volumes-col-source min-w-0">
-                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                <span class="block min-w-0 truncate text-[13px]" title="{{ $hostPath }}">
-                    {{ $displayHostPath }}
-                </span>
             </div>
 
             <div class="volumes-cell-dest min-w-0">
@@ -101,11 +93,6 @@
                         @endif
                     @endif
                 </div>
-            </div>
-
-            <div class="volumes-col-source min-w-0">
-                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                <x-forms.input id="hostPath" placeholder="Host path (optional)" />
             </div>
 
             <div class="volumes-cell-dest min-w-0">
