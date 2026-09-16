@@ -746,10 +746,14 @@ Charts follow the application metrics implementation:
 - downsample long time ranges before rendering.
 
 Only add a metric if Sentinel exposes historical data for it. Current Sentinel
-history endpoints store CPU and memory. Root filesystem usage is included in
-the periodic push payload for threshold notifications, but it is not stored as
-a historical Sentinel metric and has no history endpoint, so it cannot power a
-disk-usage graph yet.
+history endpoints store CPU, memory, disk, network throughput, and load average
+(Sentinel PR #47 added disk, network, and load). Bulk snapshot endpoints
+(`/api/summary`, `/api/containers/current`) return the latest host and
+per-container values in one call for fleet-wide views.
+
+The fleet Metrics page (`/metrics`, top-level sidebar) aggregates these across
+every team server: KPI tiles, per-metric trend cards, a threshold-colored
+servers table, and a fleet-wide hottest-containers list.
 
 ---
 
@@ -769,6 +773,7 @@ Use these as implementation references:
 | Dense environment table and footer | `resources/views/livewire/project/shared/environment-variable/all.blade.php` |
 | Standard table toolbar controls | `resources/views/components/table/*` |
 | Application metrics charts | `resources/views/livewire/project/shared/metrics.blade.php` |
+| Fleet metrics page | `resources/views/livewire/fleet/metrics.blade.php` |
 | Browser terminal workspace | `resources/views/livewire/terminal/index.blade.php` |
 | Layer card | `resources/views/components/application/settings-section.blade.php` |
 | Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
