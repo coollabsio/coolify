@@ -84,7 +84,7 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
-    public mixed $maxRestartCount = 10;
+    public mixed $maxRestartCount = 0;
 
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
 
@@ -432,7 +432,7 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
-            $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 10;
+            $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
     }
 

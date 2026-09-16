@@ -2400,7 +2400,7 @@ function get_public_ips()
     }
 }
 
-function isAnyDeploymentInprogress()
+function isAnyDeploymentInprogress(bool $showAll = false)
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
 
@@ -2417,34 +2417,31 @@ function isAnyDeploymentInprogress()
         if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
             $horizonJobIds[] = $runningJob->horizon_job_id;
 
-            // Get application and team information
-            $application = Application::find($runningJob->application_id);
-            $teamMembers = [];
-            $deploymentUrl = '';
+            if ($showAll) {
+                $application = Application::find($runningJob->application_id);
+                $teamMembers = [];
+                $deploymentUrl = '';
 
-            if ($application) {
-                // Get team members through the application's project
-                $team = $application->team();
-                if ($team) {
-                    $teamMembers = $team->members()->pluck('email')->toArray();
+                if ($application) {
+                    $team = $application->team();
+                    if ($team) {
+                        $teamMembers = $team->members()->pluck('email')->toArray();
+                    }
+
+                    if ($runningJob->deployment_url) {
+                        $deploymentUrl = base_url().$runningJob->deployment_url;
+                    }
                 }
 
-                // Construct the full deployment URL
-                if ($runningJob->deployment_url) {
-                    $baseUrl = base_url();
-                    $deploymentUrl = $baseUrl.$runningJob->deployment_url;
-                }
+                $deploymentDetails[] = [
+                    'application_name' => $runningJob->application_name ?? 'Unknown',
+                    'server_name' => $runningJob->server_name ?? 'Unknown',
+                    'deployment_url' => $deploymentUrl,
+                    'team_members' => $teamMembers,
+                    'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
+                    'horizon_job_id' => $runningJob->horizon_job_id,
+                ];
             }
-
-            $deploymentDetails[] = [
-                'id' => $runningJob->id,
-                'application_name' => $runningJob->application_name ?? 'Unknown',
-                'server_name' => $runningJob->server_name ?? 'Unknown',
-                'deployment_url' => $deploymentUrl,
-                'team_members' => $teamMembers,
-                'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
-                'horizon_job_id' => $runningJob->horizon_job_id,
-            ];
         }
     }
 
@@ -2453,28 +2450,39 @@ function isAnyDeploymentInprogress()
         exit(0);
     }
 
-    // Display enhanced deployment information
-    echo "\n=== Running Deployments ===\n";
-    echo 'Total active deployments: '.count($horizonJobIds)."\n\n";
-
-    foreach ($deploymentDetails as $index => $deployment) {
-        echo 'Deployment #'.($index + 1).":\n";
-        echo '  Application: '.$deployment['application_name']."\n";
-        echo '  Server: '.$deployment['server_name']."\n";
-        echo '  Started: '.$deployment['created_at']."\n";
-        if ($deployment['deployment_url']) {
-            echo '  URL: '.$deployment['deployment_url']."\n";
-        }
-        if (! empty($deployment['team_members'])) {
-            echo '  Team members: '.implode(', ', $deployment['team_members'])."\n";
-        } else {
-            echo "  Team members: No team members found\n";
-        }
-        echo '  Horizon Job ID: '.$deployment['horizon_job_id']."\n";
-        echo "\n";
-    }
+    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll);
 
     exit(1);
+}
+
+function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false): string
+{
+    $output = "\n=== Running Deployments ===\n";
+    $output .= 'Total active deployments: '.$activeDeploymentCount."\n";
+
+    if (! $showAll) {
+        return $output;
+    }
+
+    $output .= "\n";
+
+    foreach ($deploymentDetails as $index => $deployment) {
+        $output .= 'Deployment #'.($index + 1).":\n";
+        $output .= '  Application: '.$deployment['application_name']."\n";
+        $output .= '  Server: '.$deployment['server_name']."\n";
+        $output .= '  Started: '.$deployment['created_at']."\n";
+        if ($deployment['deployment_url']) {
+            $output .= '  URL: '.$deployment['deployment_url']."\n";
+        }
+        if (! empty($deployment['team_members'])) {
+            $output .= '  Team members: '.implode(', ', $deployment['team_members'])."\n";
+        } else {
+            $output .= "  Team members: No team members found\n";
+        }
+        $output .= '  Horizon Job ID: '.$deployment['horizon_job_id']."\n\n";
+    }
+
+    return $output;
 }
 
 function isBase64Encoded($strValue)
@@ -4234,6 +4242,8 @@ function coolifyHelperImage(): string
 
 function getHelperVersion(): string
 {
+    $configuredHelperVersion = config('constants.coolify.helper_version');
+
     if (isDev()) {
         $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
 
@@ -4242,7 +4252,13 @@ function getHelperVersion(): string
         }
     }
 
-    return config('constants.coolify.helper_version');
+    $fetchedHelperVersion = InstanceSettings::query()->whereKey(0)->value('helper_version');
+
+    if (! empty($fetchedHelperVersion) && version_compare($fetchedHelperVersion, $configuredHelperVersion, '>')) {
+        return $fetchedHelperVersion;
+    }
+
+    return $configuredHelperVersion;
 }
 
 function loggy($message = null, array $context = [])
