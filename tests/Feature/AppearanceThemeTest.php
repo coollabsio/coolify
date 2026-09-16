@@ -103,6 +103,10 @@ test('custom color theme is available and applied across theme controls', functi
         ->toContain('html[data-theme="custom"] .application-console-shell[data-console-theme="system"]')
         ->toContain('--console-theme-background: var(--color-log);')
         ->toContain('--console-theme-border: var(--coollabs-line);');
+
+    // A closed picker must not be able to persist a custom theme: both color
+    // field handlers bail out while the popover is closed (#11813).
+    expect(substr_count($layout, 'if (!this.pickerOpen)'))->toBe(2);
 });
 
 test('navigation colors meet WCAG AA contrast requirements', function () {
