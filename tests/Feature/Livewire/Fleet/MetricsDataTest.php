@@ -115,6 +115,25 @@ it('ranks containers across servers by the selected metric', function () {
     expect(array_column($component->get('topContainers'), 'id')[0])->toBe('high');
 });
 
+it('shows the KPI tiles, a stale badge for offline servers, and the container toggle', function () {
+    $ok = metricsServer($this->team, $this->privateKey);
+    $ok->update(['name' => 'web-1']);
+    $dead = metricsServer($this->team, $this->privateKey);
+    $dead->update(['name' => 'web-2']);
+
+    StubMetricsClient::$summaries = [
+        $ok->uuid => onlineSummary(['cpu' => 95.0, 'diskPercent' => 95.0]),
+        $dead->uuid => null,
+    ];
+
+    Livewire::test(TestableMetrics::class)
+        ->assertSee('web-1')
+        ->assertSee('web-2')
+        ->assertSee('Fleet CPU')
+        ->assertSee('needs attention')
+        ->assertSee('Offline');
+});
+
 it('cannot see another team’s servers', function () {
     $otherTeam = Team::factory()->create();
     // Reuse the existing key id: the factory's private key is hardcoded, so a second
