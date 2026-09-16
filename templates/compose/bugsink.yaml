@@ -1,31 +1,11 @@
 # documentation: https://www.bugsink.com/docs/
 # slogan: Self-hosted Error Tracking.
 # category: monitoring
-# tags: python, error-tracking, django, mysql
+# tags: python, error-tracking, django, postgresql
 # logo: svgs/bugsink.svg
 # port: 8000
 
 services:
-  mysql:
-    image: 'mysql:latest'
-    restart: unless-stopped
-    environment:
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-bugsink}
-      - MYSQL_USER=${SERVICE_USER_BUGSINK}
-      - MYSQL_PASSWORD=${SERVICE_PASSWORD_BUGSINK}
-    volumes:
-      - my-datavolume:/var/lib/mysql
-    healthcheck:
-      test:
-        - CMD
-        - mysqladmin
-        - ping
-        - '-h'
-        - 127.0.0.1
-      interval: 5s
-      timeout: 20s
-      retries: 10
   web:
     image: bugsink/bugsink
     restart: unless-stopped
@@ -34,13 +14,38 @@ services:
       - CREATE_SUPERUSER=admin:$SERVICE_PASSWORD_BUGSINK
       - SERVICE_URL_BUGSINK_8000
       - BASE_URL=$SERVICE_URL_BUGSINK
-      - DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}
+      - DATABASE_URL=postgresql://${SERVICE_USER_BUGSINK}:${SERVICE_PASSWORD_BUGSINK}@db:5432/bugsink
       - BEHIND_HTTPS_PROXY=True
+      - SNAPPEA_NUM_WORKERS=2
     depends_on:
-      mysql:
+      db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/\").raise_for_status()'"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+      test:
+        - CMD-SHELL
+        - 'python -c ''import requests; r=requests.get("http://localhost:8000/", allow_redirects=False); assert r.status_code < 500'''
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SERVICE_USER_BUGSINK}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_BUGSINK}
+      POSTGRES_DB: bugsink
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${SERVICE_USER_BUGSINK} -d bugsink
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  pg-data: null
+
