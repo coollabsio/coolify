@@ -18,7 +18,6 @@
         <div class="data-table w-full">
             <div class="data-table-header {{ $gridClass }}">
                 <span>Volume Name</span>
-                <span class="volumes-col-source">Source Path</span>
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
                     <div class="volumes-col-pr flex items-center gap-1.5">
@@ -44,7 +43,6 @@
                     $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
-                    $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
                 @endphp
 
                 @if ($inputsReadonly)
@@ -57,12 +55,6 @@
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
-                            </div>
-
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate text-[13px]"
-                                    title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
                             </div>
 
                             <div class="volumes-cell-dest min-w-0">
@@ -159,11 +151,6 @@
                                         <x-forms.input id="forms.{{ $id }}.name" required />
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <x-forms.input id="forms.{{ $id }}.hostPath" placeholder="Host path (optional)" />
                             </div>
 
                             <div class="volumes-cell-dest min-w-0">

@@ -4345,11 +4345,6 @@
                                         "type": "string",
                                         "description": "The container mount path."
                                     },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, optional)."
-                                    },
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
@@ -4455,11 +4450,6 @@
                                     "mount_path": {
                                         "type": "string",
                                         "description": "The container mount path (not allowed for read-only storages)."
-                                    },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, not allowed for read-only storages)."
                                     },
                                     "content": {
                                         "type": "string",
@@ -8769,11 +8759,6 @@
                                         "type": "string",
                                         "description": "The container mount path."
                                     },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, optional)."
-                                    },
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
@@ -8879,11 +8864,6 @@
                                     "mount_path": {
                                         "type": "string",
                                         "description": "The container mount path (not allowed for read-only storages)."
-                                    },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, not allowed for read-only storages)."
                                     },
                                     "content": {
                                         "type": "string",
@@ -19156,11 +19136,6 @@
                                         "type": "string",
                                         "description": "The container mount path."
                                     },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, optional)."
-                                    },
                                     "content": {
                                         "type": "string",
                                         "nullable": true,
@@ -19266,11 +19241,6 @@
                                     "mount_path": {
                                         "type": "string",
                                         "description": "The container mount path (not allowed for read-only storages)."
-                                    },
-                                    "host_path": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "description": "The host path (persistent only, not allowed for read-only storages)."
                                     },
                                     "content": {
                                         "type": "string",

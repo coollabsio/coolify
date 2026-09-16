@@ -12,6 +12,7 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
     InstanceSettings::query()->where('id', 0)->delete();
     InstanceSettings::query()->delete();
     $settings = new InstanceSettings(['is_mcp_server_enabled' => true]);
@@ -123,6 +124,7 @@ test('MCP endpoint lists tools for an authenticated token', function () {
     $response->assertOk();
 
     $toolNames = collect($response->json('result.tools'))->pluck('name')->all();
+    expect(json_encode($response->json('result.tools')))->not->toContain('host_path');
     expect($toolNames)->toContain(
         'get_infrastructure_overview',
         'list_servers',
@@ -139,7 +141,11 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_logs',
         'list_env_keys',
     );
-    expect($toolNames)->not->toContain('get_resource_status');
+    expect($toolNames)->not->toContain(
+        'get_resource_status',
+        'create_storage',
+        'update_storage',
+    );
     expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
 });
 
