@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Fleet;
 
+use App\Livewire\Concerns\BuildsMetricsChartPayload;
 use App\Models\Application;
 use App\Models\Server;
 use App\Services\FleetMetricsAggregator;
@@ -15,6 +16,8 @@ use Livewire\Component;
 #[Lazy]
 class Metrics extends Component
 {
+    use BuildsMetricsChartPayload;
+
     public string $chartId = 'fleet-metrics';
 
     /** Metrics-enabled servers owned by the current team. */
@@ -103,6 +106,8 @@ class Metrics extends Component
 
         $rows = [];
         $containers = [];
+        $series = ['cpu' => [], 'memory' => [], 'disk' => [], 'load' => [], 'networkRx' => [], 'networkTx' => []];
+        $from = SentinelMetricsClient::rangeFrom($this->range);
 
         foreach ($this->targetServers() as $server) {
             $client = $this->metricsClient($server);
@@ -129,13 +134,21 @@ class Metrics extends Component
                 $meta = $this->resolveContainer($server, $c['id']);
                 $containers[] = array_merge($c, ['server' => $server->name, 'name' => $meta['name'], 'link' => $meta['link']]);
             }
+
+            $series['cpu'][] = $client->history('cpu', $from);
+            $series['memory'][] = $client->history('memory', $from);
+            $series['disk'][] = $client->history('disk', $from);
+            $series['load'][] = $client->history('load', $from);
+            $net = $client->networkHistory($from);
+            $series['networkRx'][] = $net['rx'];
+            $series['networkTx'][] = $net['tx'];
         }
 
         $this->serverRows = $rows;
         $this->kpis = FleetMetricsAggregator::fleetKpis($rows);
         $this->topContainers = FleetMetricsAggregator::rankContainers($containers, $this->containerMetric);
 
-        $this->dispatch("refreshChartData-{$this->chartId}", $this->chartPayload());
+        $this->dispatch("refreshChartData-{$this->chartId}", $this->buildChartPayload($series));
     }
 
     /**
@@ -184,14 +197,6 @@ class Metrics extends Component
             'name' => $app?->name ?? $id,
             'link' => $link,
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function chartPayload(): array
-    {
-        return ['range' => $this->range];
     }
 
     public function placeholder(): View
