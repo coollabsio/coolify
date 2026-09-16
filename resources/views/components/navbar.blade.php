@@ -99,7 +99,7 @@
                 <a title="Metrics" {{ wireNavigate() }}
                     class="{{ request()->is('metrics') ? 'menu-item menu-item-active' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('metrics') }}">
-                    <x-reicon name="cpu" class="menu-item-icon" />
+                    <x-reicon name="graph" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Metrics</span>
                 </a>
             </li>

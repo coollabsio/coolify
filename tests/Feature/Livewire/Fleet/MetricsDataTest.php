@@ -130,7 +130,7 @@ it('shows the KPI tiles, a stale badge for offline servers, and the container to
         ->assertSee('web-1')
         ->assertSee('web-2')
         ->assertSee('Fleet CPU')
-        ->assertSee('needs attention')
+        ->assertSee('need attention')
         ->assertSee('Offline');
 });
 

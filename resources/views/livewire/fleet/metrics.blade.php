@@ -19,12 +19,12 @@
                 <div class="flex rounded-md bg-[var(--coollabs-recessed)] p-0.5">
                     @foreach (['24h', '7d', '30d'] as $r)
                         <button type="button" wire:click="setRange('{{ $r }}')"
-                            class="{{ $range === $r ? 'bg-[var(--coollabs-base)] text-black dark:text-fg' : 'text-neutral-500' }} rounded px-2.5 py-1 text-[12px] font-medium">{{ $r }}</button>
+                            class="{{ $range === $r ? 'bg-[var(--coollabs-base)] text-black shadow-sm dark:text-fg' : 'text-neutral-500 hover:text-black dark:hover:text-fg' }} rounded px-2.5 py-1 text-[12px] font-medium transition-colors">{{ $r }}</button>
                     @endforeach
                 </div>
                 <button type="button" wire:click="refresh" title="Refresh"
-                    class="flex size-8 items-center justify-center rounded-md bg-[var(--coollabs-recessed)] text-neutral-500 hover:text-black dark:hover:text-fg">
-                    <x-reicon name="refresh" class="size-4" />
+                    class="flex size-8 items-center justify-center rounded-md bg-[var(--coollabs-recessed)] text-neutral-500 transition-colors hover:text-black dark:hover:text-fg">
+                    <x-reicon name="refresh" class="size-4" wire:loading.class="animate-spin" wire:target="refresh" />
                 </button>
             </div>
         @endif
@@ -33,7 +33,7 @@
     @if ($servers->isEmpty())
         <x-empty title="No server metrics yet" description="Enable metrics on a server to see fleet resource usage here.">
             <x-slot:icon>
-                <x-reicon name="cpu" class="size-8" />
+                <x-reicon name="graph" class="size-8" />
             </x-slot:icon>
         </x-empty>
     @else
@@ -43,13 +43,15 @@
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Servers online</span>
                 <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ $kpis['serversOnline'] ?? 0 }}/{{ $kpis['serversTotal'] ?? 0 }}</span>
                 @if (($kpis['needsAttention'] ?? 0) > 0)
-                    <span class="mt-auto pt-3 text-[11px] text-orange-500 dark:text-warning">{{ $kpis['needsAttention'] }} needs attention</span>
+                    <span class="mt-auto pt-3 text-[11px] font-medium text-orange-500 dark:text-warning">{{ $kpis['needsAttention'] }} need attention</span>
+                @else
+                    <span class="mt-auto pt-3 text-[11px] text-emerald-600 dark:text-emerald-400">All healthy</span>
                 @endif
             </div>
             <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet CPU @if ($kpis['cpuApproximate'] ?? false)<span title="Averaged across servers; not core-weighted">~</span>@endif</span>
+                <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet CPU @if ($kpis['cpuApproximate'] ?? false)<span class="cursor-help" title="Averaged across servers; not core-weighted">~</span>@endif</span>
                 <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ round($kpis['cpuAvg'] ?? 0) }}%</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">@if ($kpis['cpuBusiest'] ?? null){{ $kpis['cpuBusiest']['name'] }}: {{ round($kpis['cpuBusiest']['percent']) }}%@endif</span>
+                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">@if ($kpis['cpuBusiest'] ?? null)Busiest: {{ $kpis['cpuBusiest']['name'] }} {{ round($kpis['cpuBusiest']['percent']) }}%@endif</span>
             </div>
             <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet memory</span>
@@ -64,20 +66,21 @@
             <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Fleet network</span>
                 <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ formatBytes(($kpis['netRx'] ?? 0) + ($kpis['netTx'] ?? 0)) }}/s</span>
-                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">rx {{ formatBytes($kpis['netRx'] ?? 0) }}/s tx {{ formatBytes($kpis['netTx'] ?? 0) }}/s</span>
+                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">rx {{ formatBytes($kpis['netRx'] ?? 0) }}/s · tx {{ formatBytes($kpis['netTx'] ?? 0) }}/s</span>
             </div>
             <div class="col-span-2 flex flex-col bg-[var(--coollabs-base)] px-4 py-3 sm:col-span-1">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Containers</span>
                 <span class="mt-1 text-xl font-semibold tabular-nums text-black dark:text-fg">{{ compactNumber($kpis['containers'] ?? 0) }}</span>
+                <span class="mt-auto pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">running</span>
             </div>
         </div>
 
         {{-- Trend charts --}}
         <div class="grid gap-6 lg:grid-cols-2">
-            @foreach (['cpu' => 'CPU %', 'memory' => 'Memory used', 'network' => 'Network', 'load' => 'Load average', 'disk' => 'Disk %'] as $key => $label)
+            @foreach (['cpu' => 'CPU', 'memory' => 'Memory used', 'network' => 'Network throughput', 'load' => 'Load average', 'disk' => 'Disk usage'] as $key => $label)
                 <x-application.settings-section :title="$label">
                     <div wire:ignore>
-                        <div id="fleet-chart-{{ $key }}" class="min-h-[240px]"></div>
+                        <div id="fleet-chart-{{ $key }}" class="min-h-[240px] w-full"></div>
                     </div>
                 </x-application.settings-section>
             @endforeach
@@ -85,31 +88,34 @@
 
         {{-- Servers table --}}
         <x-application.settings-section title="Servers" flush>
-            <table class="data-table">
-                <thead>
-                    <tr class="data-table-header">
-                        <th>Server</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Load</th><th>Network</th><th>Containers</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (collect($serverRows)->sortByDesc('cpu') as $row)
-                        <tr class="data-table-row">
-                            <td>
-                                <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}" class="hover:underline">{{ $row['name'] }}</a>
-                                @unless ($row['online'])
-                                    <x-status-badge status="Offline" type="warning" />
-                                @endunless
-                            </td>
-                            <td>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</td>
-                            <td>@include('livewire.fleet._usage-cell', ['percent' => ($row['memTotal'] ?? 0) ? round($row['memUsed'] / $row['memTotal'] * 100, 1) : null, 'kind' => 'memory'])</td>
-                            <td>@include('livewire.fleet._usage-cell', ['percent' => $row['diskPercent'], 'kind' => 'disk'])</td>
-                            <td class="tabular-nums">{{ $row['load1'] === null ? '-' : number_format($row['load1'], 2) }}</td>
-                            <td class="tabular-nums">{{ $row['netRx'] === null ? '-' : formatBytes($row['netRx'] + $row['netTx']).'/s' }}</td>
-                            <td class="tabular-nums">{{ $row['containers'] ?? '-' }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+            <div class="data-table">
+                <div class="data-table-header fleet-servers-table-grid">
+                    <span>Server</span>
+                    <span>CPU</span>
+                    <span>Memory</span>
+                    <span>Disk</span>
+                    <span>Load</span>
+                    <span>Network</span>
+                    <span class="text-right">Containers</span>
+                </div>
+                @foreach (collect($serverRows)->sortByDesc(fn ($r) => $r['cpu'] ?? -1) as $row)
+                    <div class="data-table-row fleet-servers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <a href="{{ route('server.metrics', ['server_uuid' => $row['uuid']]) }}"
+                                class="min-w-0 truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $row['name'] }}</a>
+                            @unless ($row['online'])
+                                <span class="table-badge table-badge-warning shrink-0">Offline</span>
+                            @endunless
+                        </div>
+                        <div>@include('livewire.fleet._usage-cell', ['percent' => $row['cpu'], 'kind' => 'cpu'])</div>
+                        <div>@include('livewire.fleet._usage-cell', ['percent' => ($row['memTotal'] ?? 0) ? round($row['memUsed'] / $row['memTotal'] * 100, 1) : null, 'kind' => 'memory'])</div>
+                        <div>@include('livewire.fleet._usage-cell', ['percent' => $row['diskPercent'], 'kind' => 'disk'])</div>
+                        <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['load1'] === null ? '-' : number_format($row['load1'], 2) }}</div>
+                        <div class="text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['netRx'] === null ? '-' : formatBytes($row['netRx'] + $row['netTx']).'/s' }}</div>
+                        <div class="text-right text-[13px] tabular-nums text-neutral-600 dark:text-fg-dim">{{ $row['containers'] ?? '-' }}</div>
+                    </div>
+                @endforeach
+            </div>
         </x-application.settings-section>
 
         {{-- Hottest containers --}}
@@ -118,32 +124,42 @@
                 <div class="flex rounded-md bg-[var(--coollabs-recessed)] p-0.5">
                     @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
                         <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
-                            class="{{ $containerMetric === $m ? 'bg-[var(--coollabs-base)] text-black dark:text-fg' : 'text-neutral-500' }} rounded px-2.5 py-1 text-[12px] font-medium">{{ $mlabel }}</button>
+                            class="{{ $containerMetric === $m ? 'bg-[var(--coollabs-base)] text-black shadow-sm dark:text-fg' : 'text-neutral-500 hover:text-black dark:hover:text-fg' }} rounded px-2.5 py-1 text-[12px] font-medium transition-colors">{{ $mlabel }}</button>
                     @endforeach
                 </div>
             </x-slot:actions>
             @if (empty($topContainers))
-                <x-empty size="sm" title="No container metrics" description="Container metrics need a Sentinel build with the bulk endpoints." />
+                <div class="p-4">
+                    <x-empty size="sm" title="No container metrics" description="Container metrics need a Sentinel build with the bulk endpoints." />
+                </div>
             @else
-                <table class="data-table">
-                    <thead><tr class="data-table-header"><th>Container</th><th>Server</th><th>{{ ucfirst($containerMetric) }}</th></tr></thead>
-                    <tbody>
-                        @foreach ($topContainers as $c)
-                            <tr class="data-table-row">
-                                <td>@if ($c['link'])<a href="{{ $c['link'] }}" class="hover:underline">{{ $c['name'] }}</a>@else{{ $c['name'] }}@endif</td>
-                                <td class="text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</td>
-                                <td class="tabular-nums">
-                                    @switch($containerMetric)
-                                        @case('memory'){{ formatBytes($c['memUsed'] ?? 0) }}@break
-                                        @case('disk'){{ formatBytes($c['diskBytes'] ?? 0) }}@break
-                                        @case('network'){{ formatBytes($c['net'] ?? 0) }}/s@break
-                                        @default{{ round($c['cpu'] ?? 0) }}%
-                                    @endswitch
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                <div class="data-table">
+                    <div class="data-table-header fleet-containers-table-grid">
+                        <span>Container</span>
+                        <span>Server</span>
+                        <span class="text-right">{{ ucfirst($containerMetric) }}</span>
+                    </div>
+                    @foreach ($topContainers as $c)
+                        <div class="data-table-row fleet-containers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
+                            <div class="min-w-0 truncate text-[13px] font-medium text-black dark:text-fg">
+                                @if ($c['link'])
+                                    <a href="{{ $c['link'] }}" class="hover:underline" {{ wireNavigate() }}>{{ $c['name'] }}</a>
+                                @else
+                                    {{ $c['name'] }}
+                                @endif
+                            </div>
+                            <div class="min-w-0 truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
+                            <div class="text-right text-[13px] tabular-nums text-black dark:text-fg">
+                                @switch($containerMetric)
+                                    @case('memory'){{ formatBytes($c['memUsed'] ?? 0) }}@break
+                                    @case('disk'){{ formatBytes($c['diskBytes'] ?? 0) }}@break
+                                    @case('network'){{ formatBytes($c['net'] ?? 0) }}/s@break
+                                    @default{{ round($c['cpu'] ?? 0) }}%
+                                @endswitch
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             @endif
         </x-application.settings-section>
     @endif
@@ -156,7 +172,7 @@
                 const axisColor = (typeof textColor !== 'undefined') ? textColor : 'rgba(128,128,128,0.7)';
 
                 const fmtPercent = v => `${Number(Number(v).toFixed(1))}%`;
-                const fmtNumber = v => Number(v).toLocaleString();
+                const fmtNumber = v => Number(Number(v).toFixed(2)).toLocaleString();
                 const fmtBytes = v => {
                     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
                     let amount = Number(v) || 0;
@@ -166,34 +182,37 @@
                 };
                 const fmtRate = v => `${fmtBytes(v)}/s`;
 
-                const baseOptions = (colors, formatter) => ({
-                    chart: { height: 240, type: 'area', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent' },
-                    series: [],
+                const baseOptions = (series, colors, formatter) => ({
+                    chart: { height: 240, type: 'area', toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', animations: { enabled: true } },
+                    series,
                     colors,
                     stroke: { curve: 'smooth', width: 2 },
                     fill: { type: 'gradient', gradient: { opacityFrom: 0.28, opacityTo: 0.02, stops: [0, 90, 100] } },
                     dataLabels: { enabled: false },
                     grid: { borderColor: 'rgba(128, 128, 128, 0.14)', strokeDashArray: 4 },
-                    legend: { show: false },
+                    legend: { show: series.length > 1, labels: { colors: axisColor } },
                     xaxis: { type: 'datetime', labels: { datetimeUTC: true, style: { colors: axisColor } } },
                     yaxis: { min: 0, max: max => max > 0 ? max * 1.2 : 1, forceNiceScale: true, tickAmount: 4, labels: { style: { colors: axisColor }, formatter } },
                     noData: { text: 'No data for this range', style: { color: axisColor } },
                     tooltip: { x: { format: 'yyyy-MM-dd HH:mm' } },
                 });
 
-                const specs = {
-                    cpu: { colors: ['#3b82f6'], formatter: fmtPercent },
-                    memory: { colors: ['#8b5cf6'], formatter: fmtBytes },
-                    network: { colors: ['#10b981', '#f59e0b'], formatter: fmtRate },
-                    load: { colors: ['#14b8a6'], formatter: fmtNumber },
-                    disk: { colors: ['#ef4444'], formatter: fmtPercent },
-                };
+                const initial = @js($chartData);
+
+                const build = data => ({
+                    cpu: { series: [{ name: 'CPU %', data: data.cpu || [] }], colors: ['#3b82f6'], formatter: fmtPercent },
+                    memory: { series: [{ name: 'Memory', data: data.memory || [] }], colors: ['#8b5cf6'], formatter: fmtBytes },
+                    network: { series: [{ name: 'RX', data: data.networkRx || [] }, { name: 'TX', data: data.networkTx || [] }], colors: ['#10b981', '#f59e0b'], formatter: fmtRate },
+                    load: { series: [{ name: 'Load', data: data.load || [] }], colors: ['#14b8a6'], formatter: fmtNumber },
+                    disk: { series: [{ name: 'Disk %', data: data.disk || [] }], colors: ['#ef4444'], formatter: fmtPercent },
+                });
 
                 const charts = {};
+                const specs = build(initial || {});
                 for (const [key, spec] of Object.entries(specs)) {
                     const el = document.getElementById(`fleet-chart-${key}`);
                     if (! el) { continue; }
-                    const chart = new ApexCharts(el, baseOptions(spec.colors, spec.formatter));
+                    const chart = new ApexCharts(el, baseOptions(spec.series, spec.colors, spec.formatter));
                     chart.render();
                     charts[key] = chart;
                 }
@@ -202,15 +221,10 @@
                     if (typeof checkTheme === 'function') { checkTheme(); }
                     const data = Array.isArray(payload) ? payload[0] : payload;
                     if (! data) { return; }
-
-                    charts.cpu?.updateSeries([{ name: 'CPU', data: data.cpu || [] }]);
-                    charts.memory?.updateSeries([{ name: 'Memory', data: data.memory || [] }]);
-                    charts.disk?.updateSeries([{ name: 'Disk', data: data.disk || [] }]);
-                    charts.load?.updateSeries([{ name: 'Load', data: data.load || [] }]);
-                    charts.network?.updateSeries([
-                        { name: 'RX', data: data.networkRx || [] },
-                        { name: 'TX', data: data.networkTx || [] },
-                    ]);
+                    const next = build(data);
+                    for (const [key, chart] of Object.entries(charts)) {
+                        chart.updateSeries(next[key].series);
+                    }
                 });
             })();
         </script>

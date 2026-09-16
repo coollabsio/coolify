@@ -3183,6 +3183,14 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
 }
 
+.fleet-servers-table-grid {
+    grid-template-columns: minmax(9rem, 1.4fr) 8rem 8rem 8rem 5rem 8rem 5.5rem;
+}
+
+.fleet-containers-table-grid {
+    grid-template-columns: minmax(10rem, 1.6fr) minmax(8rem, 1fr) 7rem;
+}
+
 .scheduled-executions-table-grid {
     grid-template-columns: 5.5rem minmax(9rem, 1fr) minmax(7rem, 0.7fr) 8.5rem 5rem minmax(12rem, 1.5fr);
 }

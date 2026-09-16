@@ -46,6 +46,9 @@ class Metrics extends Component
     /** @var array<int, array<string, mixed>> */
     public array $topContainers = [];
 
+    /** @var array<string, mixed> Trend series for the charts, also embedded for first paint. */
+    public array $chartData = [];
+
     public ?string $lastUpdatedAt = null;
 
     /** @var array<string, array{name: string, link: ?string}> */
@@ -164,9 +167,10 @@ class Metrics extends Component
         $this->serverRows = $rows;
         $this->kpis = FleetMetricsAggregator::fleetKpis($rows);
         $this->topContainers = FleetMetricsAggregator::rankContainers($containers, $this->containerMetric);
+        $this->chartData = $this->buildChartPayload($series);
         $this->lastUpdatedAt = now()->toIso8601String();
 
-        $this->dispatch("refreshChartData-{$this->chartId}", $this->buildChartPayload($series));
+        $this->dispatch("refreshChartData-{$this->chartId}", $this->chartData);
     }
 
     /**
