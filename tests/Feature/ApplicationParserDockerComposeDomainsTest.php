@@ -616,6 +616,49 @@ YAML,
     'web and database' => "  database:\n    image: postgres:16-alpine",
 ])->with([false, true]);
 
+test('compose preview labels split multiple domains for one service', function (int $parserVersion) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => $parserVersion,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: httpd:2.4-alpine
+YAML,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com,https://api.example.com'],
+        ]),
+    ]));
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7915,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/7915',
+        'fqdn' => 'https://7915.app.example.com,https://7915.api.example.com',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://7915.app.example.com,https://7915.api.example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = $application->fresh()->parse(
+        pull_request_id: $preview->pull_request_id,
+        preview_id: $preview->id,
+    );
+    $labels = collect(data_get($parsedCompose, 'services'))
+        ->flatMap(fn ($service) => data_get($service, 'labels', []));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, 'rule=Host(`7915.app.example.com`) && PathPrefix(`/`)')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_ends_with($label, 'rule=Host(`7915.api.example.com`) && PathPrefix(`/`)')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'PathPrefix(`//')))
+        ->toBeFalse();
+})->with([2, 3]);
+
 test('applicationParser compose labels prefer the service exposed port over application ports_exposes', function (string $portConfiguration) {
     $application = disableExactProxyLabels(Application::factory()->create([
         'environment_id' => $this->environment->id,
