@@ -174,13 +174,18 @@ $serverListboxOptions = array_merge(
         <x-application.settings-section title="Hottest containers" flush
             helper="Top containers across the fleet by the selected metric.">
             <x-slot:actions>
-                <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                    @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
-                        <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
-                            @class([$tabButtonBase, $containerMetric === $m ? $tabButtonActive : $tabButtonInactive])>
-                            {{ $mlabel }}
-                        </button>
-                    @endforeach
+                <div class="flex items-center gap-2">
+                    <x-loading compact class="text-neutral-400 dark:text-fg-faint"
+                        wire:loading.flex wire:target="containerMetric" />
+                    <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        @foreach (['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'] as $m => $mlabel)
+                            <button type="button" wire:click="$set('containerMetric', '{{ $m }}')"
+                                wire:loading.attr="disabled" wire:target="containerMetric"
+                                @class([$tabButtonBase, $containerMetric === $m ? $tabButtonActive : $tabButtonInactive])>
+                                {{ $mlabel }}
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
             </x-slot:actions>
             @if (empty($topContainers))
@@ -189,23 +194,28 @@ $serverListboxOptions = array_merge(
                         description="Container metrics need a Sentinel build with the bulk endpoints." />
                 </div>
             @else
-                <div class="data-table">
+                <div class="data-table transition-opacity" wire:loading.class="pointer-events-none opacity-50"
+                    wire:target="containerMetric">
                     <div class="data-table-header fleet-containers-table-grid">
                         <span>Container</span>
                         <span>Server</span>
                         <span class="text-right">{{ ['cpu' => 'CPU', 'memory' => 'Memory', 'disk' => 'Disk', 'network' => 'Network'][$containerMetric] }}</span>
                     </div>
                     @foreach ($topContainers as $c)
+                        @php $meta = $this->containerMeta($c['id']); @endphp
                         <div class="data-table-row fleet-containers-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
-                            <div class="min-w-0 truncate text-[13px] font-medium text-black dark:text-fg">
-                                @if ($c['link'])
-                                    <a href="{{ $c['link'] }}" class="hover:underline" {{ wireNavigate() }}>{{ $c['name'] }}</a>
+                            <div class="flex min-w-0 flex-col">
+                                @if ($meta['link'])
+                                    <a href="{{ $meta['link'] }}" class="truncate text-[13px] font-medium text-black hover:underline dark:text-fg" {{ wireNavigate() }}>{{ $meta['name'] }}</a>
                                 @else
-                                    {{ $c['name'] }}
+                                    <span class="truncate text-[13px] font-medium text-black dark:text-fg">{{ $meta['name'] }}</span>
+                                @endif
+                                @if ($meta['image'])
+                                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-fg-faint">{{ $meta['image'] }}</span>
                                 @endif
                             </div>
-                            <div class="min-w-0 truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
-                            <div class="text-right text-[13px] tabular-nums text-black dark:text-fg">
+                            <div class="min-w-0 self-center truncate text-[12px] text-neutral-500 dark:text-fg-dim">{{ $c['server'] }}</div>
+                            <div class="self-center text-right text-[13px] tabular-nums text-black dark:text-fg">
                                 @switch($containerMetric)
                                     @case('memory'){{ formatBytes($c['memUsed'] ?? 0) }}@break
                                     @case('disk'){{ formatBytes($c['diskBytes'] ?? 0) }}@break
@@ -223,6 +233,9 @@ $serverListboxOptions = array_merge(
     @script
         <script>
             (() => {
+                // Defer to the next frame so the wire:ignore chart containers are laid out
+                // before ApexCharts measures them (a zero-size container renders blank).
+                requestAnimationFrame(() => {
                 if (typeof ApexCharts === 'undefined') { return; }
                 if (typeof checkTheme === 'function') { checkTheme(); }
                 const axisColor = (typeof textColor !== 'undefined') ? textColor : 'rgba(128,128,128,0.7)';
@@ -281,6 +294,7 @@ $serverListboxOptions = array_merge(
                     for (const [key, chart] of Object.entries(charts)) {
                         chart.updateSeries(next[key].series);
                     }
+                });
                 });
             })();
         </script>

@@ -143,8 +143,9 @@ class Metrics extends Component
             );
 
             foreach ($current as $c) {
-                $meta = $this->resolveContainer($server, $c['id']);
-                $containers[] = array_merge($c, ['server' => $server->name, 'name' => $meta['name'], 'link' => $meta['link']]);
+                // Names/images are resolved lazily for the displayed rows only (containerMeta),
+                // so a server with many containers doesn't trigger a resolve storm here.
+                $containers[] = array_merge($c, ['server' => $server->name]);
             }
 
             $series['cpu'][] = $client->history('cpu', $from);
@@ -185,30 +186,38 @@ class Metrics extends Component
 
     /**
      * Resolve a Sentinel container id (the resource uuid Sentinel keys by) to a
-     * team-owned resource name + metrics link, memoized. Shows the raw id when no
-     * team-owned resource matches, so a Sentinel id never discloses another team's name.
+     * team-owned resource name, docker image, and metrics link, memoized. Shows the raw
+     * id and no image when no team-owned resource matches, so a Sentinel id never
+     * discloses another team's resource.
      *
-     * @return array{name: string, link: ?string}
+     * @return array{name: string, image: ?string, link: ?string}
      */
-    protected function resolveContainer(Server $server, string $id): array
+    public function containerMeta(string $id): array
     {
         if (isset($this->containerMetaCache[$id])) {
             return $this->containerMetaCache[$id];
         }
 
-        $app = Application::ownedByCurrentTeam()->with('environment.project')->whereUuid($id)->first();
+        $teamId = currentTeam()?->id;
+        $resource = $teamId ? getResourceByUuid($id, $teamId) : null;
 
+        $image = null;
         $link = null;
-        if ($app && data_get($app, 'environment.project.uuid')) {
-            $link = route('project.application.metrics', [
-                'project_uuid' => $app->environment->project->uuid,
-                'environment_uuid' => $app->environment->uuid,
-                'application_uuid' => $app->uuid,
-            ]);
+        if ($resource) {
+            $image = data_get($resource, 'docker_registry_image_name') ?: data_get($resource, 'image');
+
+            if ($resource instanceof Application && data_get($resource, 'environment.project.uuid')) {
+                $link = route('project.application.metrics', [
+                    'project_uuid' => $resource->environment->project->uuid,
+                    'environment_uuid' => $resource->environment->uuid,
+                    'application_uuid' => $resource->uuid,
+                ]);
+            }
         }
 
         return $this->containerMetaCache[$id] = [
-            'name' => $app?->name ?? $id,
+            'name' => $resource?->name ?? $id,
+            'image' => $image ?: null,
             'link' => $link,
         ];
     }
