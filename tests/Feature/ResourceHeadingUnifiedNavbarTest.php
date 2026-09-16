@@ -441,14 +441,14 @@ it('centers the rollback image loading state across the card', function () {
         ->toContain('flex items-center justify-center');
 });
 
-it('shows pull request loading feedback only on the action button', function () {
+it('shows pull request loading feedback in the modal body', function () {
     $previews = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
 
     expect($previews)
         ->toContain('wire:click="load_prs"')
-        ->not->toContain('wire:loading.remove wire:target="load_prs"')
-        ->not->toContain('wire:loading wire:target="load_prs"')
-        ->not->toContain('Loading pull requests…');
+        ->toContain('wire:loading.remove wire:target="load_prs"')
+        ->toContain('wire:loading wire:target="load_prs"')
+        ->toContain('Loading pull requests…');
 });
 
 it('shows loading feedback while a service deployment starts', function () {

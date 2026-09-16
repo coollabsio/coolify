@@ -57,7 +57,9 @@ Thank you so much!
 
 ### Huge Sponsors
 
+* [CubePath](https://cubepath.com/coolify) - Premium dedicated servers and cloud VPS hosting
 * [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
+* [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
 * [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
 * [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
 * [ScreenshotOne](https://screenshotone.com) - Screenshot API for devs
@@ -67,6 +69,7 @@ Thank you so much!
 
 ### Big Sponsors
 
+* [Vanaways](https://www.vanaways.co.uk) - New vans for sale and lease across the UK
 * [Cloudways](https://www.cloudways.com/en/?id=2125302) - Managed cloud hosting platform by DigitalOcean
 * [ByteBase](https://www.bytebase.com) - Database CI/CD and Security at Scale
 * [Ramnode](https://ramnode.com/) - High Performance Cloud VPS Hosting
@@ -105,6 +108,9 @@ Thank you so much!
 
 ### Small Sponsors
 
+<a href="https://darkvps.pro"><img width="60px" alt="DarkVPS" src="https://cdn.coollabs.io/sponsors/darkvps.png"/></a>
+<a href="https://www.opensourcealternatives.to"><img width="60px" alt="Open Source Alternatives" src="https://cdn.coollabs.io/sponsors/opensourcealternatives.png"/></a>
+<a href="https://onserva.com/"><img width="60px" alt="Onserva" src="https://onserva.com/icon.svg"/></a>
 <a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://cdn.coollabs.io/sponsors/movavi.png"/></a>
 <a href="https://usefoil.com/"><img width="60px" alt="ABXY" src="https://usefoil.com/favicon.svg"/></a>
 <a href="https://www.launchfa.st/?utm_source=coolify.io"><img width="60px" alt="LaunchFast Boilerplates" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
@@ -133,6 +139,8 @@ Thank you so much!
 <a href="https://cirun.io/?utm_source=coolify.io"><img width="60px" alt="Cirun" src="https://cdn.coollabs.io/sponsors/cirun-logo.png"/></a>
 <a href="https://github.com/puls-digital-group"><img width="60px" alt="Puls Digital Group" src="https://github.com/puls-digital-group.png"/></a>
 <a href="https://github.com/jonathanprl"><img width="60px" alt="Jonathan Pereira" src="https://github.com/jonathanprl.png"/></a>
+<a href="https://outboundgateway.com/"><img width="60px" alt="OutboundGateway" src="https://github.com/OutboundGateway.png"/></a>
+<a href="https://github.com/t4dt"><img width="60px" alt="T4DT GmbH" src="https://github.com/t4dt.png"/></a>
 <a href="https://internetgarden.co/?utm_source=coolify.io"><img width="60px" alt="Internet Garden" src="https://cdn.coollabs.io/sponsors/internetgarden.ico"/></a>
 <a href="https://evercam.io/?utm_source=coolify.io"><img width="60px" alt="Evercam" src="https://github.com/evercam.png"/></a>
 <a href="https://web3.career/?utm_source=coolify.io"><img width="60px" alt="Web3 Jobs" src="https://cdn.coollabs.io/sponsors/web3jobs.png"/></a>
