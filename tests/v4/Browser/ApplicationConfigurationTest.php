@@ -116,6 +116,11 @@ it('saves application name description and ports from the general form', functio
     submitLivewireForm($page);
 
     $page->assertValue('name', $updatedName)
+        ->assertScript(<<<'JS'
+            () => [...document.querySelectorAll('#internal-access-section label')]
+                .find((label) => label.textContent.trim() === 'Exposed ports')
+                ?.parentElement.querySelector('input')?.value === '8080'
+            JS)
         ->screenshot(filename: 'application-general-after-save');
 
     $this->application->refresh();

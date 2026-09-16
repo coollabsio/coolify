@@ -10,6 +10,7 @@ use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class Navbar extends Component
@@ -34,14 +35,18 @@ class Navbar extends Component
 
     public array $serverSwitcherOptions = [];
 
+    public ?bool $sentinelWarningOverride = null;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
             'refreshServerShow' => 'refreshServer',
+            'sentinel-restart-requested' => 'hideSentinelWarning',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
             "echo-private:team.{$teamId},SentinelRestarted" => 'refreshSentinelStatus',
+            "echo-private:team.{$teamId},SentinelSynchronized" => 'refreshSentinelStatus',
         ];
     }
 
@@ -247,6 +252,31 @@ class Navbar extends Component
         }
 
         $this->refreshServer();
+        $this->sentinelWarningOverride = null;
+        $sentinelStatus = $this->server->sentinelStatus();
+        $sentinelStatusStartedAt = $this->server->sentinel_waiting_since ?? Carbon::parse($this->server->sentinel_updated_at);
+        $sentinelTimeoutSeconds = $this->server->sentinel_waiting_since !== null
+            ? $this->server->firstSentinelReportTimeoutSeconds()
+            : $this->server->waitBeforeDoingSshCheck();
+        $expiresInMilliseconds = max(
+            0,
+            ($sentinelStatusStartedAt->copy()->addSeconds($sentinelTimeoutSeconds)->timestamp - now()->timestamp) * 1000
+        );
+        $this->dispatch(
+            'sentinel-status-changed',
+            outOfSync: $this->server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
+            expiresInMilliseconds: $expiresInMilliseconds,
+        );
+    }
+
+    public function hideSentinelWarning(): void
+    {
+        $this->sentinelWarningOverride = false;
+    }
+
+    public function refreshAgentStatus(): void
+    {
+        $this->refreshSentinelStatus();
     }
 
     /**

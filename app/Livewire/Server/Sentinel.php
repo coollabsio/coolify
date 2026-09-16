@@ -20,6 +20,10 @@ class Sentinel extends Component
 
     public ?string $sentinelUpdatedAt = null;
 
+    public string $sentinelStatus = 'out_of_sync';
+
+    public ?int $sentinelRestartRequestedAt = null;
+
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $sentinelMetricsRefreshRateSeconds;
 
@@ -42,6 +46,7 @@ class Sentinel extends Component
 
         return [
             "echo-private:team.{$teamId},SentinelRestarted" => 'handleSentinelRestarted',
+            "echo-private:team.{$teamId},SentinelSynchronized" => 'handleSentinelSynchronized',
         ];
     }
 
@@ -71,6 +76,7 @@ class Sentinel extends Component
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+            $this->sentinelStatus = $this->server->sentinelStatus();
         }
     }
 
@@ -81,14 +87,52 @@ class Sentinel extends Component
             // Only refresh display-only state; never re-sync text-input properties
             // (would clobber any unsaved typing — see coolify#6062 / #6354 / #9695).
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+            $this->sentinelStatus = $this->server->sentinelStatus();
+            $this->sentinelRestartRequestedAt = null;
             $this->dispatch('success', 'Sentinel has been restarted successfully.');
         }
+    }
+
+    public function handleSentinelSynchronized($event): void
+    {
+        if ($event['serverUuid'] === $this->server->uuid) {
+            $this->server->refresh();
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+            $this->sentinelStatus = 'in_sync';
+            $this->sentinelRestartRequestedAt = null;
+        }
+    }
+
+    public function refreshSentinelStatus(): void
+    {
+        if ($this->sentinelStatus === 'restarting'
+            && $this->sentinelRestartRequestedAt !== null
+            && $this->sentinelRestartRequestedAt > now()->subSeconds($this->server->firstSentinelReportTimeoutSeconds())->timestamp) {
+            return;
+        }
+
+        $this->server->refresh();
+        $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+        $this->sentinelStatus = $this->server->sentinelStatus();
+    }
+
+    private function setSentinelRestarting(): void
+    {
+        $this->sentinelStatus = 'restarting';
+        $this->sentinelRestartRequestedAt = now()->timestamp;
+        $this->dispatch(
+            'sentinel-status-changed',
+            outOfSync: false,
+            expiresInMilliseconds: $this->server->firstSentinelReportTimeoutSeconds() * 1000,
+        );
+        $this->dispatch('sentinel-restart-requested');
     }
 
     public function restartSentinel()
     {
         try {
             $this->authorize('manageSentinel', $this->server);
+            $this->setSentinelRestarting();
             $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
             $this->server->restartSentinel($customImage);
             $this->dispatch('info', 'Restarting Sentinel.');
@@ -101,6 +145,7 @@ class Sentinel extends Component
     {
         try {
             $this->authorize('manageSentinel', $this->server);
+            $this->setSentinelRestarting();
             $this->server->settings->generateSentinelToken();
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
@@ -108,10 +153,29 @@ class Sentinel extends Component
         }
     }
 
+    public function restoreDefaultConfiguration(?string $password = null): void
+    {
+        try {
+            $this->authorize('manageSentinel', $this->server);
+
+            $this->server->settings->restoreDefaultSentinelConfiguration();
+
+            $this->sentinelCustomDockerImage = null;
+            $this->syncData();
+            $this->dispatch('sentinel-defaults-restored');
+            $this->setSentinelRestarting();
+            $this->server->restartSentinel();
+            $this->dispatch('success', 'Default Sentinel configuration restored. Restarting Sentinel.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->server);
+            $this->setSentinelRestarting();
             $this->syncData(true);
             $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
