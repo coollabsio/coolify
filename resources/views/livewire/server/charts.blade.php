@@ -59,30 +59,34 @@
                     </x-application.settings-section>
                 </form>
 
-                <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage"
-                    helper="Percentage of available CPU capacity used by this server.">
-                    <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                {{-- CPU is the primary signal, so it spans full width; the other four
+                     charts fall into a 2x2 below (mirrors the fleet /metrics layout). --}}
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <x-application.settings-section id="server-cpu-metrics-section" title="CPU usage" class="lg:col-span-2"
+                        helper="Percentage of available CPU capacity used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
 
-                <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
-                    helper="Percentage of physical memory currently used by this server.">
-                    <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-memory-metrics-section" title="Memory usage"
+                        helper="Percentage of physical memory currently used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
 
-                <x-application.settings-section id="server-disk-metrics-section" title="Disk usage"
-                    helper="Percentage of the root filesystem used by this server.">
-                    <div wire:ignore id="{!! $chartId !!}-disk" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-network-metrics-section" title="Network throughput"
+                        helper="Receive and transmit rate across the server's network interfaces.">
+                        <div wire:ignore id="{!! $chartId !!}-network" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
 
-                <x-application.settings-section id="server-network-metrics-section" title="Network throughput"
-                    helper="Receive and transmit rate across the server's network interfaces.">
-                    <div wire:ignore id="{!! $chartId !!}-network" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-load-metrics-section" title="Load average"
+                        helper="One minute load average reported by the server.">
+                        <div wire:ignore id="{!! $chartId !!}-load" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
 
-                <x-application.settings-section id="server-load-metrics-section" title="Load average"
-                    helper="One minute load average reported by the server.">
-                    <div wire:ignore id="{!! $chartId !!}-load" class="min-h-[240px] w-full"></div>
-                </x-application.settings-section>
+                    <x-application.settings-section id="server-disk-metrics-section" title="Disk usage"
+                        helper="Percentage of the root filesystem used by this server.">
+                        <div wire:ignore id="{!! $chartId !!}-disk" class="min-h-[240px] w-full"></div>
+                    </x-application.settings-section>
+                </div>
 
                 @script
                     <script>
@@ -239,11 +243,15 @@
                                 chartOptions('Load', '#14b8a6', 'Loading load metrics…', formatNumber),
                             );
 
-                            cpuChart.render();
-                            memoryChart.render();
-                            diskChart.render();
-                            networkChart.render();
-                            loadChart.render();
+                            // Defer to the next frame so the 2x2 grid cells are laid out
+                            // before ApexCharts measures them (a zero-width cell renders blank).
+                            requestAnimationFrame(() => {
+                                cpuChart.render();
+                                memoryChart.render();
+                                diskChart.render();
+                                networkChart.render();
+                                loadChart.render();
+                            });
 
                             Livewire.on('refreshChartData-{!! $chartId !!}-metrics', chartData => {
                                 checkTheme();

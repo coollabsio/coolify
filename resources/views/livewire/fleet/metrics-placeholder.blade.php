@@ -22,7 +22,7 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
         @foreach (['CPU', 'Memory used', 'Network throughput', 'Load average', 'Disk usage'] as $label)
-            <x-application.settings-section :title="$label">
+            <x-application.settings-section :title="$label" @class(['lg:col-span-2' => $label === 'CPU'])>
                 <x-skeleton class="h-[240px] w-full rounded-lg" />
             </x-application.settings-section>
         @endforeach

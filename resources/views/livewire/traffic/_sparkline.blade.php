@@ -20,10 +20,11 @@
 @php
     $initial = $initial ?? [];
     $colorVar = $colorVar ?? '--chart-status-3xx';
+    $color = $color ?? '';
     $event = $event ?? '';
     $key = $key ?? '';
     $initialCategories = array_column($series ?? [], 'bucket');
-    $label = match ($key) {
+    $label = $label ?? match ($key) {
         'requestsSpark' => 'Requests',
         'uniquesSpark' => 'Visitors',
         'bandwidthSpark' => 'Bandwidth',
@@ -31,12 +32,17 @@
         'latencySpark' => 'p95 latency',
         default => 'Value',
     };
+    $format = $format ?? match ($key) {
+        'bandwidthSpark' => 'bytes',
+        'latencySpark' => 'ms',
+        default => 'number',
+    };
 @endphp
 <div wire:ignore id="{!! $id !!}" class="h-9 w-full [&_.apexcharts-svg]:overflow-visible!"
     x-data="{
         chart: null,
         refreshCleanup: null,
-        accent() { return getComputedStyle(document.documentElement).getPropertyValue('{{ $colorVar }}').trim() || '#3b82f6'; },
+        accent() { const c = @js($color); if (c) { return c; } return getComputedStyle(document.documentElement).getPropertyValue('{{ $colorVar }}').trim() || '#3b82f6'; },
         muted() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-geo-empty').trim() || 'rgba(128,128,128,0.45)'; },
         isFlat(a) { return !Array.isArray(a) || a.length === 0 || a.every(v => !Number(v)); },
         points(values, categories) {
@@ -68,14 +74,16 @@
                 timeZoneName: 'short',
             });
             const formatValue = value => {
-                if (@js($key) === 'bandwidthSpark') {
+                const fmt = @js($format);
+                if (fmt === 'bytes') {
                     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
                     let amount = Number(value) || 0;
                     let unit = 0;
                     while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit++; }
                     return `${Number(amount.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
                 }
-                if (@js($key) === 'latencySpark') { return `${Number(value).toLocaleString()} ms`; }
+                if (fmt === 'ms') { return `${Number(value).toLocaleString()} ms`; }
+                if (fmt === 'percent') { return `${Number(Number(value).toFixed(1)).toLocaleString()}%`; }
                 return Number(value).toLocaleString();
             };
             this.chart = new ApexCharts($el, {

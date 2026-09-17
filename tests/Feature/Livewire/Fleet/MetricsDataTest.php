@@ -130,7 +130,8 @@ it('shows the KPI tiles, a stale badge for offline servers, and the container to
         ->assertSee('web-1')
         ->assertSee('web-2')
         ->assertSee('Fleet CPU')
-        ->assertSee('need attention')
+        ->assertSee('healthy')
+        ->assertSee('attention')
         ->assertSee('Offline');
 });
 
@@ -163,4 +164,28 @@ it('cannot see another team’s servers', function () {
     $component = Livewire::test(TestableMetrics::class);
 
     expect($component->get('serverRows'))->toHaveCount(0);
+});
+
+it('drops the "Fleet" tile prefix when scoped to a single server', function () {
+    $s = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
+
+    Livewire::test(TestableMetrics::class)
+        ->assertSee('Fleet CPU')
+        ->set('serverUuid', $s->uuid)
+        ->assertDontSee('Fleet')
+        ->assertSee('for the selected server');
+});
+
+it('renders container metric values without leaking a blade directive', function () {
+    $s = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$s->uuid => [
+        ['id' => 'a', 'cpu' => 5.0, 'memUsed' => 900, 'memPercent' => 9.0, 'diskBytes' => 1, 'net' => 2048.0],
+    ]];
+
+    Livewire::test(TestableMetrics::class)
+        ->set('containerMetric', 'network')
+        ->assertDontSee('@break')
+        ->assertSee('/s');
 });
