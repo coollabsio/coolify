@@ -33,7 +33,7 @@
                     {{ $tag->name }}
                 </span>
                 @can('update', $resource)
-                    <x-forms.button isError wire:click="deleteTag('{{ $tag->id }}')" class="h-7!">
+                    <x-forms.button isError wire:click="deleteTag(@js($tag->id))" class="h-7!">
                         Remove
                     </x-forms.button>
                 @endcan
@@ -52,7 +52,7 @@
                 <div class="flex flex-wrap gap-2">
                     @foreach ($filteredTags as $tag)
                         <x-forms.button wire:key="available-tag-{{ $tag->id }}"
-                            wire:click="addTag('{{ $tag->id }}', '{{ $tag->name }}')">
+                            wire:click="addTag(@js($tag->id), @js($tag->name))">
                             <x-reicon name="plus" class="size-3.5 text-coollabs dark:text-warning" />
                             {{ $tag->name }}
                         </x-forms.button>
