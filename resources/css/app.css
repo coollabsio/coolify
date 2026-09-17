@@ -3150,59 +3150,8 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .volume-backup-executions-grid {
-    grid-template-columns: 7.5rem minmax(0, 1fr) 8.5rem 7rem 9rem minmax(9rem, 0.7fr);
-}
-
-.volume-backup-execution-label {
-    display: none;
-}
-
-.volume-backup-execution-message {
-    grid-column: 1 / -1;
-}
-
-@media (max-width: 768px) {
-    .data-table-header.volume-backup-executions-grid {
-        display: none;
-    }
-
-    .data-table-row.volume-backup-executions-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        min-height: 0;
-        align-items: start;
-        gap: 0.875rem 1rem;
-        padding: 1rem;
-    }
-
-    .volume-backup-execution-archive,
-    .volume-backup-execution-availability,
-    .volume-backup-execution-message {
-        grid-column: 1 / -1;
-    }
-
-    .volume-backup-execution-status,
-    .volume-backup-execution-archive,
-    .volume-backup-execution-time,
-    .volume-backup-execution-size,
-    .volume-backup-execution-availability,
-    .volume-backup-execution-actions {
-        display: flex;
-        min-width: 0;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-
-    .volume-backup-execution-label {
-        display: block;
-        font-size: 12px;
-        font-weight: 500;
-        line-height: 1rem;
-        color: var(--coollabs-subtle);
-    }
-
-    .volume-backup-execution-actions > span:last-child {
-        justify-content: flex-start;
-    }
+    grid-template-columns: 7.5rem minmax(14rem, 1fr) 8.5rem 7rem 9rem minmax(9rem, 0.7fr);
+    min-width: 50rem;
 }
 
 .clone-destinations-table-grid {

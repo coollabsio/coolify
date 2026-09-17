@@ -23,7 +23,7 @@
             </x-slot:actions>
 
             @if ($executionCount > 0)
-                <div class="data-table w-full">
+                <div class="data-table w-full overflow-x-auto">
                     <div
                         class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.05]">
                         <span>Status</span>
@@ -66,88 +66,70 @@
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
                             class="data-table-row volume-backup-executions-grid min-h-16 items-center gap-x-3 border-b border-neutral-200 text-[12px] last:border-b-0 dark:border-white/[0.07]">
-                            <div class="volume-backup-execution-status min-w-0">
-                                <span class="volume-backup-execution-label">Status</span>
+                            <span>
                                 <x-status-badge :status="$statusLabel" :type="$statusType" />
-                            </div>
+                            </span>
 
-                            <div class="volume-backup-execution-archive min-w-0">
-                                <span class="volume-backup-execution-label">Archive</span>
-                                <div class="flex min-w-0 items-center gap-1">
-                                    <code class="select-all break-all font-mono text-[11px] text-neutral-600 md:truncate dark:text-fg-dim"
-                                        title="Backup path: {{ $execution->filename ?? 'No archive name' }}">{{ $execution->filename ?? 'No archive name' }}</code>
-                                    <x-copy-button :value="$execution->filename ?? ''" label="Copy backup path" />
-                                </div>
-                            </div>
+                            <span class="min-w-0">
+                                <x-forms.copy-button :text="$execution->filename ?? 'No archive name'" />
+                            </span>
 
-                            <div class="volume-backup-execution-time min-w-0">
-                                <span class="volume-backup-execution-label">Time</span>
-                                <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    @if ($execution->status === 'running')
-                                        Running for {{ calculateDuration($execution->created_at, now()) }}
-                                    @else
-                                        {{ $finishedAt->diffForHumans() }}<br>
-                                        {{ calculateDuration($execution->created_at, $finishedAt) }}
-                                    @endif
-                                </span>
-                            </div>
+                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                                @if ($execution->status === 'running')
+                                    Running for {{ calculateDuration($execution->created_at, now()) }}
+                                @else
+                                    {{ $finishedAt->diffForHumans() }}<br>
+                                    {{ calculateDuration($execution->created_at, $finishedAt) }}
+                                @endif
+                            </span>
 
-                            <div class="volume-backup-execution-size min-w-0">
-                                <span class="volume-backup-execution-label">Size</span>
-                                <span class="tabular-nums text-neutral-500 dark:text-fg-dim">
-                                    {{ $execution->size > 0 ? formatBytes($execution->size) : '-' }}
-                                </span>
-                            </div>
+                            <span class="tabular-nums text-neutral-500 dark:text-fg-dim">
+                                {{ $execution->size > 0 ? formatBytes($execution->size) : '-' }}
+                            </span>
 
-                            <div class="volume-backup-execution-availability min-w-0">
-                                <span class="volume-backup-execution-label">Availability</span>
-                                <span class="flex flex-wrap gap-1">
-                                    <x-status-badge :status="$execution->local_storage_deleted ? 'Local deleted' : 'Local'"
-                                        :type="$execution->local_storage_deleted ? 'neutral' : 'success'" />
-                                    @if ($execution->s3_uploaded !== null)
-                                        <x-status-badge
-                                            :status="$execution->s3_storage_deleted
-                                                ? 'S3 deleted'
-                                                : ($execution->s3_uploaded ? 'S3' : 'S3 failed')"
-                                            :type="$execution->s3_storage_deleted
-                                                ? 'neutral'
-                                                : ($execution->s3_uploaded ? 'success' : 'error')" />
-                                    @endif
-                                </span>
-                            </div>
+                            <span class="flex flex-wrap gap-1">
+                                <x-status-badge :status="$execution->local_storage_deleted ? 'Local deleted' : 'Local'"
+                                    :type="$execution->local_storage_deleted ? 'neutral' : 'success'" />
+                                @if ($execution->s3_uploaded !== null)
+                                    <x-status-badge
+                                        :status="$execution->s3_storage_deleted
+                                            ? 'S3 deleted'
+                                            : ($execution->s3_uploaded ? 'S3' : 'S3 failed')"
+                                        :type="$execution->s3_storage_deleted
+                                            ? 'neutral'
+                                            : ($execution->s3_uploaded ? 'success' : 'error')" />
+                                @endif
+                            </span>
 
-                            <div class="volume-backup-execution-actions min-w-0">
-                                <span class="volume-backup-execution-label">Actions</span>
-                                <span class="flex items-center justify-end gap-1">
-                                    @if ($execution->status === 'success' && ! $execution->local_storage_deleted)
-                                        <button type="button" class="icon-button shrink-0"
-                                            x-on:click="download_volume_backup_file('{{ $execution->id }}')"
-                                            title="Download backup" aria-label="Download backup">
-                                            <x-reicon name="upload" class="size-3.5 rotate-180" />
-                                        </button>
-                                    @endif
-                                    @if ($execution->status !== 'running')
-                                        <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
-                                            submitAction="deleteBackup({{ $execution->id }})"
-                                            :checkboxes="$executionCheckboxes" :actions="$deleteActions"
-                                            confirmationText="{{ $execution->filename }}"
-                                            confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
-                                            shortConfirmationLabel="Backup Filename">
-                                            <x-slot:trigger>
-                                                <button type="button"
-                                                    class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                                                    title="Delete backup" aria-label="Delete backup">
-                                                    <x-reicon name="trash" class="size-3.5" />
-                                                </button>
-                                            </x-slot:trigger>
-                                        </x-modal-confirmation>
-                                    @endif
-                                </span>
-                            </div>
+                            <span class="flex items-center justify-end gap-1">
+                                @if ($execution->status === 'success' && ! $execution->local_storage_deleted)
+                                    <button type="button" class="icon-button shrink-0"
+                                        x-on:click="download_volume_backup_file('{{ $execution->id }}')"
+                                        title="Download backup" aria-label="Download backup">
+                                        <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                    </button>
+                                @endif
+                                @if ($execution->status !== 'running')
+                                    <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
+                                        submitAction="deleteBackup({{ $execution->id }})"
+                                        :checkboxes="$executionCheckboxes" :actions="$deleteActions"
+                                        confirmationText="{{ $execution->filename }}"
+                                        confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
+                                        shortConfirmationLabel="Backup Filename">
+                                        <x-slot:trigger>
+                                            <button type="button"
+                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                title="Delete backup" aria-label="Delete backup">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </button>
+                                        </x-slot:trigger>
+                                    </x-modal-confirmation>
+                                @endif
+                            </span>
 
                             @if ($execution->message)
                                 <pre
-                                    class="volume-backup-execution-message mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="volume-backup-execution-message col-span-6 min-w-0 max-w-full max-h-20 overflow-y-auto overflow-x-hidden bg-transparent py-2 text-[11px] break-words whitespace-pre-wrap text-neutral-600 dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

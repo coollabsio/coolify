@@ -69,6 +69,10 @@ class VolumeBackups extends Component
 
     public bool $delete_backup_s3 = false;
 
+    public bool $delete_associated_backups_locally = false;
+
+    public bool $delete_associated_backups_s3 = false;
+
     public Collection $availableS3Storages;
 
     protected function rules(): array
@@ -226,14 +230,18 @@ class VolumeBackups extends Component
         }
 
         try {
-            DeleteScheduledVolumeBackup::run($this->backup);
+            DeleteScheduledVolumeBackup::run(
+                $this->backup,
+                deleteLocalArchives: in_array('delete_associated_backups_locally', $selectedActions, true),
+                deleteS3Archives: in_array('delete_associated_backups_s3', $selectedActions, true),
+            );
             $this->backup = null;
-            $this->dispatch('success', 'Storage backup schedule and archives deleted.');
+            $this->dispatch('success', 'Storage backup schedule deleted.');
             $this->redirectRoute($this->routeName('index'), $this->routeParameters(includeBackup: false), navigate: true);
 
             return true;
         } catch (Throwable $exception) {
-            $this->dispatch('error', 'Could not delete the backup archives: '.$exception->getMessage());
+            $this->dispatch('error', 'Could not delete the backup schedule: '.$exception->getMessage());
 
             return false;
         }
@@ -334,6 +342,10 @@ class VolumeBackups extends Component
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),
             'latestExecution' => $this->backup?->executions()->first(),
+            'deleteScheduleCheckboxes' => [
+                ['id' => 'delete_associated_backups_locally', 'label' => 'Delete all local archives created by this schedule.'],
+                ['id' => 'delete_associated_backups_s3', 'label' => 'Delete all S3 archives created by this schedule.'],
+            ],
         ]);
     }
 
