@@ -240,7 +240,7 @@
 
             @if ($backups->isNotEmpty() || $databaseBackups->isNotEmpty())
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
-                    <div class="min-w-[64rem]">
+                    <div class="flex min-w-[64rem] flex-col">
                     <div class="data-table-header backup-table-grid service-backup-table-grid">
                         <span>Target</span>
                         <span>Type</span>
