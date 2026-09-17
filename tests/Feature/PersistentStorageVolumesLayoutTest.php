@@ -1,16 +1,23 @@
 <?php
 
-it('keeps the volume backup executions table horizontally scrollable on mobile', function () {
+it('stacks volume backup executions and keeps archive paths visible on mobile', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
     expect($view)
         ->toContain('volume-backup-executions-grid')
-        ->toContain('data-table w-full overflow-x-auto')
+        ->toContain('volume-backup-execution-archive')
+        ->toContain('volume-backup-execution-label')
+        ->toContain('select-all break-all')
+        ->toContain('x-copy-button')
+        ->not->toContain('data-table w-full overflow-x-auto')
+        ->not->toContain('x-forms.copy-button')
         ->and($css)
         ->toContain('.volume-backup-executions-grid')
-        ->toContain('min-width: 50rem;')
-        ->not->toContain('.data-table-header.volume-backup-executions-grid');
+        ->toContain('.data-table-header.volume-backup-executions-grid')
+        ->toContain('.volume-backup-execution-archive')
+        ->toContain('grid-column: 1 / -1;')
+        ->not->toMatch('/\.volume-backup-executions-grid\s*\{[^}]*min-width:/');
 });
 
 it('uses compact icon actions for volume backup executions', function () {
@@ -194,8 +201,8 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toMatch('/<x-callout[^>]*title="File-level consistency"[\s\S]*id="stopDuringBackup"[\s\S]*<\/x-callout>/');
     expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php')))
         ->toContain('<span>Time</span>')
-        ->toContain('x-forms.copy-button')
-        ->toContain('col-span-6');
+        ->toContain('x-copy-button')
+        ->toContain('volume-backup-execution-message');
 
     $css = file_get_contents(resource_path('css/app.css'));
 
