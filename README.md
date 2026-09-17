@@ -112,7 +112,6 @@ Thank you so much!
 * [JuxtDigital](https://juxtdigital.com) - Digital PR & AI Authority Building Agency
 * [SaasyKit](https://saasykit.com) - Complete SaaS starter kit for developers
 * [American Cloud](https://americancloud.com) - US-based cloud infrastructure services
-* [LiquidWeb](https://liquidweb.com) - Premium managed hosting solutions
 * [Greptile](https://www.greptile.com) - The AI Code Reviewer
 * [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
 * [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
