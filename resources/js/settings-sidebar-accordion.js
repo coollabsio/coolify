@@ -34,12 +34,16 @@ export function initializeSettingsSidebarAccordionComponent() {
             this.groups = stored && typeof stored === 'object' ? stored : {};
         },
         isOpen(group) {
-            // Explicit user choice wins (so the active group can be collapsed too);
-            // otherwise only the active group is open by default.
+            // The current page must stay visible, even when this group was
+            // previously stored as collapsed on another page.
+            if (group === this.activeGroup) {
+                return true;
+            }
+
             if (Object.prototype.hasOwnProperty.call(this.groups, group)) {
                 return this.groups[group];
             }
-            return group === this.activeGroup;
+            return false;
         },
         toggle(group) {
             this.groups = { ...this.groups, [group]: !this.isOpen(group) };

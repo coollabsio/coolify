@@ -58,3 +58,11 @@ it('registers the accordion Alpine provider', function () {
     expect(file_get_contents(base_path('resources/js/settings-sidebar-accordion.js')))
         ->toContain("Alpine.data('settingsSidebarAccordion'");
 });
+
+it('keeps the group for the active page open', function () {
+    $accordion = file_get_contents(base_path('resources/js/settings-sidebar-accordion.js'));
+
+    expect($accordion)
+        ->toContain('if (group === this.activeGroup)')
+        ->toContain('return true;');
+});
