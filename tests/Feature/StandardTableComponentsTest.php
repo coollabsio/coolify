@@ -110,3 +110,19 @@ it('does not use legacy floating sort or filter panels', function () {
     expect($views)
         ->not->toMatch('/x-show="(?:sortOpen|filterOpen|filtersOpen)"/');
 });
+
+it('lets dropdown option slots close the panel with close()', function () {
+    $dropdown = file_get_contents(resource_path('views/components/table/dropdown.blade.php'));
+
+    // Consumers (sort/filter option buttons, x-table.filter reset) call close() from
+    // inside the slot; without this method Alpine falls back to window.close().
+    expect($dropdown)->toContain("close() {\n        this.open = false;\n    },");
+
+    foreach ([
+        'views/livewire/project/application/backup/index.blade.php',
+        'views/livewire/project/service/volume-backup/index.blade.php',
+        'views/components/table/filter.blade.php',
+    ] as $consumer) {
+        expect(file_get_contents(resource_path($consumer)))->toContain('close()');
+    }
+});
