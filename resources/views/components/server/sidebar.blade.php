@@ -186,6 +186,13 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
+
+    // Group that holds the current page (item or nested child) — the only one
+    // expanded by default.
+    $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
+        fn ($item) => ($item['active'] ?? false)
+            || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)
+    ));
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start"
@@ -211,13 +218,23 @@
         scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
     ">
     <nav aria-label="Server configuration sections"
+        x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.server' })"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
-            <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
+            <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
+                :aria-expanded="isOpen(@js($groupLabel))">
+                <span>{{ $groupLabel }}</span>
+                <svg class="size-3 shrink-0 opacity-60 transition-transform"
+                    :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+            </button>
+            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
             @foreach ($groupItems as $menuItem)
                 <a wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
                     @class([
@@ -254,6 +271,7 @@
                     </div>
                 @endif
             @endforeach
+            </div>
         @endforeach
     </nav>
 </aside>

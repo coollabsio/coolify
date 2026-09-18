@@ -11,7 +11,8 @@
                 description="Send JSON event payloads to your own HTTP endpoint.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$webhookEnabled" enabledProperty="webhookEnabled"
-                        toggleMethod="instantSaveWebhookEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveWebhookEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

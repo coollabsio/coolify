@@ -522,6 +522,11 @@ tr td:first-child {
     padding-right: 2.5rem;
 }
 
+/* Room for both the peek eye and the copy button on maskable read-only fields. */
+.input.input-with-copy-and-peek {
+    padding-right: 4.25rem;
+}
+
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
@@ -1956,6 +1961,11 @@ html[data-theme="custom"] textarea:disabled {
 .application-settings-form .input[type="password"],
 .application-settings-form .input.input-with-copy-button {
     padding-right: 2.5rem;
+}
+
+.application-settings-workspace .input.input-with-copy-and-peek,
+.application-settings-form .input.input-with-copy-and-peek {
+    padding-right: 4.25rem;
 }
 
 .application-settings-workspace .input:focus-visible,
@@ -4340,11 +4350,11 @@ html[data-theme="custom"] .runtime-log-columns {
 .projects-table-grid {
     display: grid;
     grid-template-columns:
-        minmax(220px, 1.7fr)
-        minmax(100px, 0.65fr)
-        minmax(90px, 0.6fr)
-        minmax(220px, 1.5fr)
-        6rem;
+        minmax(200px, 1.7fr)
+        8rem
+        7rem
+        minmax(200px, 1.6fr)
+        5rem;
     column-gap: 1rem;
 }
 
@@ -4391,7 +4401,7 @@ html[data-theme="custom"] .runtime-log-columns {
 
 @media (max-width: 1050px) {
     .projects-table-grid {
-        grid-template-columns: minmax(220px, 1fr) 7rem 6rem 6rem;
+        grid-template-columns: minmax(200px, 1fr) 8rem 7rem 5rem;
     }
 
     .projects-table-grid .project-description {
