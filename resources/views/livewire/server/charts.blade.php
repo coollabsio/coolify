@@ -209,7 +209,7 @@
                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
 
                                         return `<div class="apexcharts-tooltip-custom">
-                                            <div class="apexcharts-tooltip-custom-value">${name}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>
+                                            <div class="apexcharts-tooltip-custom-value">${w.globals.seriesNames?.[seriesIndex] ?? name}: <span class="apexcharts-tooltip-value-bold">${formatter(value)}</span></div>
                                             <div class="apexcharts-tooltip-custom-title">Your time: ${formatLocalTimestamp(timestamp)}</div>
                                             <div class="apexcharts-tooltip-custom-title">UTC: ${formatUtcTimestamp(timestamp)}</div>
                                         </div>`;

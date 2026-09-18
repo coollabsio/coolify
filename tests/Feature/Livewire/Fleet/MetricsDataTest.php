@@ -30,12 +30,12 @@ class StubMetricsClient extends SentinelMetricsClient
         return self::$containers[$this->server->uuid] ?? [];
     }
 
-    public function history(string $metric, string $from): array
+    public function history(string $metric, string $range): array
     {
         return [];
     }
 
-    public function networkHistory(string $from): array
+    public function networkHistory(string $range): array
     {
         return ['rx' => [], 'tx' => []];
     }
@@ -188,4 +188,42 @@ it('renders container metric values without leaking a blade directive', function
         ->set('containerMetric', 'network')
         ->assertDontSee('@break')
         ->assertSee('/s');
+});
+
+it('falls back to cpu for an unknown container metric', function () {
+    $s = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$s->uuid => [
+        ['id' => 'a', 'cpu' => 5.0, 'memUsed' => 900, 'memPercent' => 9.0, 'diskBytes' => 1, 'net' => 0.0],
+    ]];
+
+    Livewire::withQueryParams(['cmetric' => 'foo'])
+        ->test(TestableMetrics::class)
+        ->assertOk()
+        ->assertSet('containerMetric', 'cpu')
+        ->set('containerMetric', 'bar')
+        ->assertSet('containerMetric', 'cpu');
+});
+
+it('keys container rows by server so shared container ids do not collide', function () {
+    $one = metricsServer($this->team, $this->privateKey);
+    $two = metricsServer($this->team, $this->privateKey);
+    $proxy = ['id' => 'coolify-proxy', 'cpu' => 1.0, 'memUsed' => 10, 'memPercent' => 1.0, 'diskBytes' => 1, 'net' => 0.0];
+
+    StubMetricsClient::$summaries = [$one->uuid => onlineSummary(), $two->uuid => onlineSummary()];
+    StubMetricsClient::$containers = [$one->uuid => [$proxy], $two->uuid => [$proxy]];
+
+    Livewire::test(TestableMetrics::class)
+        ->assertSeeHtml('wire:key="fleet-container-'.$one->uuid.'-coolify-proxy"')
+        ->assertSeeHtml('wire:key="fleet-container-'.$two->uuid.'-coolify-proxy"');
+});
+
+it('passes the spark time axis to the KPI sparklines on first paint', function () {
+    $s = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
+
+    $component = Livewire::test(TestableMetrics::class);
+    $component->set('chartData', ['sparkCategories' => [1700000100000], 'cpuSpark' => [12.5]]);
+
+    $component->assertSeeHtml('1700000100000');
 });

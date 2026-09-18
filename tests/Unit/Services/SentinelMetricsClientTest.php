@@ -2,6 +2,7 @@
 
 use App\Models\Server;
 use App\Services\SentinelMetricsClient;
+use Illuminate\Support\Carbon;
 
 class FakeMetricsClient extends SentinelMetricsClient
 {
@@ -93,26 +94,61 @@ it('returns an empty container list when the endpoint 404s', function () {
     expect($client->containersCurrent())->toBe([]);
 });
 
-it('maps cpu history to [time, value] pairs', function () {
+it('averages cpu history into range-aligned buckets', function () {
     $client = fakeMetricsClient();
     $client->bodies = [
         '/cpu/history' => json_encode([
-            ['time' => 1000, 'percent' => '10'],
-            ['time' => 2000, 'percent' => '20'],
+            ['time' => '1700000000000', 'percent' => '10'],
+            ['time' => '1700000060000', 'percent' => '20'],
+            ['time' => '1700000300000', 'percent' => '40'],
         ]),
     ];
 
-    expect($client->history('cpu', 'from'))->toBe([[1000, 10.0], [2000, 20.0]]);
+    // 24h range → 5-minute buckets floored to absolute epoch boundaries.
+    expect($client->history('cpu', '24h'))->toBe([[1699999800000, 15.0], [1700000100000, 40.0]]);
 });
 
-it('downsamples long history series so the chart payload stays small', function () {
+it('aligns buckets across servers whose samples have different timestamps', function () {
+    $a = fakeMetricsClient();
+    $a->bodies = ['/cpu/history' => json_encode([['time' => 1700000001234, 'percent' => '10']])];
+    $b = fakeMetricsClient();
+    $b->bodies = ['/cpu/history' => json_encode([['time' => 1700000047890, 'percent' => '30']])];
+
+    expect(array_column($a->history('cpu', '24h'), 0))->toBe(array_column($b->history('cpu', '24h'), 0));
+});
+
+it('keeps long history series small', function () {
     $rows = [];
-    for ($i = 0; $i < 5000; $i++) {
-        $rows[] = ['time' => $i, 'percent' => (string) ($i % 100)];
+    // 24h of raw 20-second samples.
+    for ($i = 0; $i < 4320; $i++) {
+        $rows[] = ['time' => 1700000000000 + $i * 20_000, 'percent' => (string) ($i % 100)];
     }
 
     $client = fakeMetricsClient();
     $client->bodies = ['/cpu/history' => json_encode($rows)];
 
-    expect(count($client->history('cpu', 'from')))->toBe(300);
+    expect(count($client->history('cpu', '24h')))->toBeLessThanOrEqual(300);
+});
+
+it('keeps only the root mount in disk history', function () {
+    $client = fakeMetricsClient();
+    $client->bodies = [
+        '/disk/history' => json_encode([
+            ['time' => 1700000000000, 'mount' => '/', 'usedPercent' => 85],
+            ['time' => 1700000000000, 'mount' => '/boot', 'usedPercent' => 20],
+        ]),
+    ];
+
+    expect($client->history('disk', '24h'))->toBe([[1699999800000, 85.0]]);
+});
+
+it('rounds the range start to the minute so history responses are cacheable', function () {
+    Carbon::setTestNow('2026-01-01 12:30:05');
+    $first = SentinelMetricsClient::rangeFrom('24h');
+
+    Carbon::setTestNow('2026-01-01 12:30:45');
+
+    expect(SentinelMetricsClient::rangeFrom('24h'))->toBe($first)->toBe('2025-12-31T12:30:00Z');
+
+    Carbon::setTestNow();
 });

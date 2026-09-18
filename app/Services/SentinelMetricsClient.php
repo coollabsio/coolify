@@ -9,20 +9,30 @@ class SentinelMetricsClient
 {
     private string $base = 'http://localhost:8888/api';
 
-    /** Cap on points per trend series after downsampling raw Sentinel samples. */
-    private const MAX_SERIES_POINTS = 300;
-
     public function __construct(protected Server $server) {}
 
+    /** Rounded to the minute so the history URL (and its cache key) is stable within a minute. */
     public static function rangeFrom(string $range): string
     {
+        $now = now()->startOfMinute();
+
         $from = match ($range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
+            '7d' => $now->subDays(7),
+            '30d' => $now->subDays(30),
+            default => $now->subDay(),
         };
 
         return $from->toIso8601ZuluString();
+    }
+
+    /** Bucket width per range, kept at roughly 300 points per series. */
+    public static function bucketMs(string $range): int
+    {
+        return match ($range) {
+            '7d' => 30 * 60_000,
+            '30d' => 2 * 60 * 60_000,
+            default => 5 * 60_000,
+        };
     }
 
     /**
@@ -89,7 +99,7 @@ class SentinelMetricsClient
     /**
      * @return array<int, array{0: int, 1: float}>
      */
-    public function history(string $metric, string $from): array
+    public function history(string $metric, string $range): array
     {
         [$path, $field] = match ($metric) {
             'memory' => ['/memory/history', 'used'],
@@ -98,26 +108,26 @@ class SentinelMetricsClient
             default => ['/cpu/history', 'percent'],
         };
 
-        return $this->seriesRows($this->url($path, ['from' => $from]), $field);
+        return $this->seriesRows($this->url($path, ['from' => self::rangeFrom($range)]), $field, $range);
     }
 
     /**
      * @return array{rx: array<int, array{0: int, 1: float}>, tx: array<int, array{0: int, 1: float}>}
      */
-    public function networkHistory(string $from): array
+    public function networkHistory(string $range): array
     {
-        $url = $this->url('/network/history', ['from' => $from]);
+        $url = $this->url('/network/history', ['from' => self::rangeFrom($range)]);
 
         return [
-            'rx' => $this->seriesRows($url, 'rxBytesPerSec'),
-            'tx' => $this->seriesRows($url, 'txBytesPerSec'),
+            'rx' => $this->seriesRows($url, 'rxBytesPerSec', $range),
+            'tx' => $this->seriesRows($url, 'txBytesPerSec', $range),
         ];
     }
 
     /**
      * @return array<int, array{0: int, 1: float}>
      */
-    private function seriesRows(string $url, string $field): array
+    private function seriesRows(string $url, string $field, string $range): array
     {
         try {
             $rows = json_decode($this->raw($url), true);
@@ -129,18 +139,25 @@ class SentinelMetricsClient
             return [];
         }
 
-        $series = array_values(array_map(
-            fn ($r) => [(int) ($r['time'] ?? 0), (float) ($r[$field] ?? 0)],
-            $rows
-        ));
-
-        // Sentinel returns raw samples (thousands of points over 24h). Cap the series so
-        // the chart payload stays small enough to embed and morph cheaply.
-        if (count($series) > self::MAX_SERIES_POINTS) {
-            $series = downsampleLTTB($series, self::MAX_SERIES_POINTS);
+        // Disk history interleaves every mount; keep the root filesystem only.
+        $root = array_filter($rows, fn ($r) => ($r['mount'] ?? null) === '/');
+        if ($root !== []) {
+            $rows = $root;
         }
 
-        return $series;
+        // Average raw samples into epoch-aligned buckets so every server shares the same
+        // timestamps and the fleet aggregator can sum them point by point.
+        $bucketMs = self::bucketMs($range);
+        $sums = [];
+        $counts = [];
+        foreach ($rows as $r) {
+            $bucket = intdiv((int) ($r['time'] ?? 0), $bucketMs) * $bucketMs;
+            $sums[$bucket] = ($sums[$bucket] ?? 0.0) + (float) ($r[$field] ?? 0);
+            $counts[$bucket] = ($counts[$bucket] ?? 0) + 1;
+        }
+        ksort($sums);
+
+        return array_map(fn ($bucket) => [$bucket, round($sums[$bucket] / $counts[$bucket], 2)], array_keys($sums));
     }
 
     /**
@@ -187,7 +204,7 @@ class SentinelMetricsClient
         $token = $this->server->settings->ensureValidSentinelToken();
 
         return instant_remote_process(
-            ["docker exec coolify-sentinel sh -c 'curl -s -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
+            ["docker exec coolify-sentinel sh -c 'curl -s --max-time 10 -H \"Authorization: Bearer {$token}\" \"{$url}\"'"],
             $this->server,
             false
         );

@@ -16,6 +16,7 @@
     @param string   $colorVar  CSS custom property for the line color (e.g. --chart-status-3xx)
     @param ?string  $event     Livewire event to listen on for updates (optional)
     @param ?string  $key       payload key holding the numeric array (required with $event)
+    @param ?array   $categories initial x-axis timestamps (defaults to $series buckets)
 --}}
 @php
     $initial = $initial ?? [];
@@ -23,7 +24,7 @@
     $color = $color ?? '';
     $event = $event ?? '';
     $key = $key ?? '';
-    $initialCategories = array_column($series ?? [], 'bucket');
+    $initialCategories = $categories ?? array_column($series ?? [], 'bucket');
     $label = $label ?? match ($key) {
         'requestsSpark' => 'Requests',
         'uniquesSpark' => 'Visitors',
@@ -74,6 +75,7 @@
                 timeZoneName: 'short',
             });
             const formatValue = value => {
+                if (value === null || value === undefined) { return '—'; }
                 const fmt = @js($format);
                 if (fmt === 'bytes') {
                     const units = ['B', 'KB', 'MB', 'GB', 'TB'];

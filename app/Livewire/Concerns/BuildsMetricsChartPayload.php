@@ -55,8 +55,8 @@ trait BuildsMetricsChartPayload
      * evenly-spaced indices (first and last always kept), so the series stay aligned.
      *
      * @param  array<int, int>  $categories
-     * @param  array<string, array<int, float|int>>  $sparks
-     * @return array{0: array<int, int>, 1: array<string, array<int, float|int>>}
+     * @param  array<string, array<int, float|int|null>>  $sparks
+     * @return array{0: array<int, int>, 1: array<string, array<int, float|int|null>>}
      */
     private function capSparks(array $categories, array $sparks, int $max): array
     {
@@ -117,11 +117,11 @@ trait BuildsMetricsChartPayload
     }
 
     /**
-     * Project a [ts, value] series onto the shared category axis, filling gaps with 0.
+     * Project a [ts, value] series onto the shared category axis, leaving gaps as null.
      *
      * @param  array<int, array{0: int, 1: float}>  $series
      * @param  array<int, int>  $categories
-     * @return array<int, float|int>
+     * @return array<int, float|int|null>
      */
     private function alignSpark(array $series, array $categories): array
     {
@@ -130,6 +130,6 @@ trait BuildsMetricsChartPayload
             $map[(int) $ts] = $value;
         }
 
-        return array_map(fn ($ts) => $map[$ts] ?? 0, $categories);
+        return array_map(fn ($ts) => $map[$ts] ?? null, $categories);
     }
 }

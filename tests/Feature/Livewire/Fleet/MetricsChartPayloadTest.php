@@ -25,12 +25,12 @@ class ChartStubClient extends SentinelMetricsClient
         return [];
     }
 
-    public function history(string $metric, string $from): array
+    public function history(string $metric, string $range): array
     {
         return [[1000, 10.0], [2000, 20.0]];
     }
 
-    public function networkHistory(string $from): array
+    public function networkHistory(string $range): array
     {
         return ['rx' => [[1000, 5.0]], 'tx' => [[1000, 1.0]]];
     }
@@ -46,7 +46,7 @@ class ChartTestableMetrics extends Metrics
 
 class DenseChartStubClient extends ChartStubClient
 {
-    public function history(string $metric, string $from): array
+    public function history(string $metric, string $range): array
     {
         // 300 points, like a downsampled 24h host series.
         return array_map(fn ($i) => [$i * 1000, (float) $i], range(1, 300));
@@ -99,12 +99,12 @@ it('includes KPI-tile spark series aligned to one shared time axis', function ()
             $payload = $params[0];
 
             // Union of every series' buckets, sorted; each spark projects onto it,
-            // filling gaps with 0 (network only has the 1000 bucket → tail is 0).
+            // leaving gaps as null (network only has the 1000 bucket → tail is null).
             return $payload['sparkCategories'] == [1000, 2000]
                 && $payload['cpuSpark'] == [10, 20]
                 && $payload['memSpark'] == [10, 20]
                 && $payload['diskSpark'] == [10, 20]
-                && $payload['netSpark'] == [6, 0];
+                && $payload['netSpark'] === [6, null];
         });
 });
 

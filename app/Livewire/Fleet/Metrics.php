@@ -35,6 +35,8 @@ class Metrics extends Component
     #[Url(as: 'cmetric')]
     public string $containerMetric = 'cpu';
 
+    private const CONTAINER_METRICS = ['cpu', 'memory', 'disk', 'network'];
+
     public bool $live = false;
 
     /** @var array<string, mixed> */
@@ -71,6 +73,8 @@ class Metrics extends Component
             $this->serverUuid = '';
         }
 
+        $this->normalizeContainerMetric();
+
         if ($this->servers->isNotEmpty()) {
             $this->loadData();
         }
@@ -83,8 +87,17 @@ class Metrics extends Component
 
     public function updatedContainerMetric(): void
     {
+        $this->normalizeContainerMetric();
+
         // Re-rank the already-fetched containers; no need to re-hit Sentinel.
         $this->topContainers = FleetMetricsAggregator::rankContainers($this->containersRaw, $this->containerMetric);
+    }
+
+    private function normalizeContainerMetric(): void
+    {
+        if (! in_array($this->containerMetric, self::CONTAINER_METRICS, true)) {
+            $this->containerMetric = 'cpu';
+        }
     }
 
     public function setRange(string $range): void
@@ -119,7 +132,6 @@ class Metrics extends Component
         $rows = [];
         $containers = [];
         $series = ['cpu' => [], 'memory' => [], 'disk' => [], 'load' => [], 'networkRx' => [], 'networkTx' => []];
-        $from = SentinelMetricsClient::rangeFrom($this->range);
 
         foreach ($this->targetServers() as $server) {
             $client = $this->metricsClient($server);
@@ -145,14 +157,14 @@ class Metrics extends Component
             foreach ($current as $c) {
                 // Names/images are resolved lazily for the displayed rows only (containerMeta),
                 // so a server with many containers doesn't trigger a resolve storm here.
-                $containers[] = array_merge($c, ['server' => $server->name]);
+                $containers[] = array_merge($c, ['server' => $server->name, 'serverUuid' => $server->uuid]);
             }
 
-            $series['cpu'][] = $client->history('cpu', $from);
-            $series['memory'][] = $client->history('memory', $from);
-            $series['disk'][] = $client->history('disk', $from);
-            $series['load'][] = $client->history('load', $from);
-            $net = $client->networkHistory($from);
+            $series['cpu'][] = $client->history('cpu', $this->range);
+            $series['memory'][] = $client->history('memory', $this->range);
+            $series['disk'][] = $client->history('disk', $this->range);
+            $series['load'][] = $client->history('load', $this->range);
+            $net = $client->networkHistory($this->range);
             $series['networkRx'][] = $net['rx'];
             $series['networkTx'][] = $net['tx'];
         }
