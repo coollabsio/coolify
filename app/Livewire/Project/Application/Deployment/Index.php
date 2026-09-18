@@ -261,13 +261,15 @@ class Index extends Component
             ->where('application_id', $this->application->id)
             ->where('pull_request_id', '>', 0)
             ->distinct()
-            ->orderByDesc('pull_request_id')
             ->pluck('pull_request_id')
+            ->merge($this->application->previews()->pluck('pull_request_id'))
             ->map(fn ($pullRequestId) => (string) $pullRequestId)
+            ->unique()
+            ->sortByDesc(fn (string $pullRequestId) => (int) $pullRequestId)
             ->values();
 
         if ($this->pull_request_id && ! $pullRequestIds->contains($this->pull_request_id)) {
-            $this->pull_request_id = null;
+            $pullRequestIds->prepend($this->pull_request_id);
         }
 
         $this->pullRequestOptions = collect([

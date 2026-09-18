@@ -82,14 +82,22 @@ it('places mobile status badges on a separate row below the server title', funct
         ->and($titlePos)->toBeLessThan($badgesRowPos);
 });
 
-it('listens for sentinel restarted broadcasts', function () {
+it('listens for sentinel status broadcasts', function () {
     [$server, , $team] = makeNavbarServer(isFunctional: true);
 
     Livewire::test('server.navbar', ['server' => $server])
         ->assertSet('server.uuid', $server->uuid);
 
     expect(app(Navbar::class)->getListeners())
-        ->toHaveKey("echo-private:team.{$team->id},SentinelRestarted", 'refreshSentinelStatus');
+        ->toHaveKey('sentinel-restart-requested', 'hideSentinelWarning')
+        ->toHaveKey("echo-private:team.{$team->id},SentinelRestarted", 'refreshSentinelStatus')
+        ->toHaveKey("echo-private:team.{$team->id},SentinelSynchronized", 'refreshSentinelStatus');
+});
+
+it('polls heartbeat state so the sidebar deadline stays current', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    expect($navbar)->toContain('wire:poll.30s="refreshAgentStatus"');
 });
 
 it('refreshes sentinel status when sentinel restarts for the server', function () {
@@ -107,5 +115,6 @@ it('refreshes sentinel status when sentinel restarts for the server', function (
     $component
         ->call('refreshSentinelStatus', ['serverUuid' => $server->uuid])
         ->assertSee('In sync')
-        ->assertDontSee('Out of sync');
+        ->assertDontSee('Out of sync')
+        ->assertDispatched('sentinel-status-changed');
 });

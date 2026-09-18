@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.3.21',
+        'version' => env('COOLIFY_VERSION') ?: '4.3.22',
         'helper_version' => '1.0.17',
         'realtime_version' => '1.0.19',
         'railpack_version' => '0.23.0',

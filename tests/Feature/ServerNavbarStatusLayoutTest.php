@@ -38,6 +38,8 @@ it('uses the branded input focus state for the server filter', function () {
     expect($navbarView)
         ->toContain('placeholder="Filter servers…"')
         ->toContain('class="input h-7!')
+        ->toContain('M8 9l4-4 4 4M8 15l4 4 4-4')
+        ->not->toContain('<x-reicon name="chevron-down" class="size-3 shrink-0 text-neutral-400 dark:text-fg-faint" />')
         ->toContain('<x-reicon name="check-circle"')
         ->not->toContain('<x-reicon name="check"');
 });

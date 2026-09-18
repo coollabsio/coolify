@@ -18,13 +18,15 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('php bootstrap/getVersion.php')
         ->toContain('version=${BASE_VERSION}-dev.${GITHUB_SHA::9}')
         ->toContain('COOLIFY_VERSION=${{ steps.version.outputs.version }}')
+        ->toContain('sarisia/actions-status-discord@v1')
+        ->toContain('webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}')
         ->not->toContain('IMAGE_NAME }}:latest')
         ->and($dockerfile)
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.21'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.21')
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.22'")
+        ->and($versions['coolify']['v4']['version'])->toBe('4.3.22')
         ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
         ->and($nightlyVersions)->toBe($versions);
 });
@@ -124,6 +126,8 @@ it('publishes traceable rolling builds from next without creating an exact rc ta
         ->toContain('--tag "${IMAGE}:sha-${SHA}"')
         ->toContain('--tag "${IMAGE}:${VERSION}"')
         ->toContain('--tag "${IMAGE}:next"')
+        ->toContain('sarisia/actions-status-discord@v1')
+        ->toContain('webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}')
         ->not->toContain('--tag "${IMAGE}:${RC_VERSION}"')
         ->not->toContain('--tag "${IMAGE}:latest"');
 });

@@ -150,3 +150,8 @@ jobs:
             --tag "${IMAGE}:sha-${SHA}" \
             --tag "${IMAGE}:${VERSION}" \
             --tag "${IMAGE}:next"
+
+      - uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
