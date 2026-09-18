@@ -167,13 +167,13 @@ class GetLogs extends Component
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
-                    $command = "timeout -k 5 20 docker service logs -n {$logTail} -t {$this->container}";
+                    $command = "timeout -k 5s 20s docker service logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "timeout -k 5 20 docker logs -n {$logTail} -t {$this->container}";
+                    $command = "timeout -k 5s 20s docker logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
@@ -181,13 +181,13 @@ class GetLogs extends Component
                 }
             } else {
                 if ($this->server->isSwarm()) {
-                    $command = "timeout -k 5 20 docker service logs -n {$logTail} {$this->container}";
+                    $command = "timeout -k 5s 20s docker service logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "timeout -k 5 20 docker logs -n {$logTail} {$this->container}";
+                    $command = "timeout -k 5s 20s docker logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
@@ -259,15 +259,15 @@ class GetLogs extends Component
 
         if ($this->showTimeStamps) {
             if ($this->server->isSwarm()) {
-                $command = "timeout -k 5 30 docker service logs -t {$this->container}";
+                $command = "timeout -k 5s 30s docker service logs -t {$this->container}";
             } else {
-                $command = "timeout -k 5 30 docker logs -t {$this->container}";
+                $command = "timeout -k 5s 30s docker logs -t {$this->container}";
             }
         } else {
             if ($this->server->isSwarm()) {
-                $command = "timeout -k 5 30 docker service logs {$this->container}";
+                $command = "timeout -k 5s 30s docker service logs {$this->container}";
             } else {
-                $command = "timeout -k 5 30 docker logs {$this->container}";
+                $command = "timeout -k 5s 30s docker logs {$this->container}";
             }
         }
 

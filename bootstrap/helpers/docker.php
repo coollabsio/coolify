@@ -1566,9 +1566,9 @@ function buildContainerLogsCommand(Server $server, string $container_id, int|str
 {
     // Bound the remote process so a dropped SSH mux cannot leave `docker logs`
     // polling a deleted json-file forever (Docker 29 busy-polls *-json.log).
-    $command = "timeout -k 5 20 docker logs -n {$lines}";
+    $command = "timeout -k 5s 20s docker logs -n {$lines}";
     if ($server->isSwarm()) {
-        $command = "timeout -k 5 20 docker service logs -n {$lines}";
+        $command = "timeout -k 5s 20s docker service logs -n {$lines}";
     }
 
     if ($showTimestamps) {
