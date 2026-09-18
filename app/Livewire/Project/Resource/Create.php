@@ -33,7 +33,16 @@ class Create extends Component
             return redirect()->route('dashboard');
         }
         if (isset($type) && isset($destination_uuid)) {
-            $destination = find_resource_destination_for_current_team($destination_uuid);
+            $destination = is_shared_deployment_application_type(
+                $type->value()
+            )
+                ? find_deployable_resource_destination_for_current_team(
+                    $destination_uuid
+                )
+                : find_resource_destination_for_current_team(
+                    $destination_uuid
+                );
+
             if (! $destination) {
                 return redirect()->route('dashboard');
             }

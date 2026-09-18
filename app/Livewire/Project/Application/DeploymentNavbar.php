@@ -106,7 +106,8 @@ class DeploymentNavbar extends Component
         ]);
         try {
             if ($this->application->settings->is_build_server_enabled) {
-                $server = Server::ownedByCurrentTeam()->find($build_server_id);
+                $server = Server::accessibleDeploymentExecutionServersForTeam(currentTeam()->id)
+                    ->find($build_server_id);
             } else {
                 $server = Server::ownedByCurrentTeam()->find($server_id);
             }

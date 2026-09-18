@@ -360,6 +360,13 @@ class Select extends Component
         }
         $this->loading = true;
         $this->type = $type;
+
+        if (in_array($type, shared_deployment_application_types(), true)) {
+            $this->servers = Server::usableDeploymentServersForTeam(
+                currentTeam()->id
+            )->get()->sortBy('name');
+        }
+
         switch ($type) {
             case 'postgresql':
             case 'mysql':
@@ -395,21 +402,37 @@ class Select extends Component
         if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
-                $this->setServer($server);
+                $this->setServer($server->id);
             }
         }
         if (! is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
-                return $this->setServer($foundServer);
+                return $this->setServer($foundServer->id);
             }
         }
         $this->current_step = 'servers';
     }
 
-    public function setServer(Server $server)
+    public function setServer(int $serverId)
     {
-        $this->server_id = $server->id;
+        $query = in_array(
+            $this->type,
+            shared_deployment_application_types(),
+            true
+        )
+            ? Server::usableDeploymentServersForTeam(currentTeam()->id)
+            : Server::isUsable();
+
+        if (! $this->includeSwarm) {
+            $query
+                ->whereRelation('settings', 'is_swarm_worker', false)
+                ->whereRelation('settings', 'is_swarm_manager', false);
+        }
+
+        $server = $query->findOrFail($serverId);
+
+        $this->server_id = (string) $server->id;
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
         $this->swarmDockers = $server->swarmDockers;

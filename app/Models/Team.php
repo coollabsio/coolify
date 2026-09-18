@@ -307,6 +307,13 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(Server::class);
     }
 
+    public function sharedServers()
+    {
+        return $this->belongsToMany(Server::class)
+            ->withPivot(['can_build', 'can_deploy'])
+            ->withTimestamps();
+    }
+
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);

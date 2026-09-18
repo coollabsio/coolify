@@ -71,6 +71,14 @@ class SwarmDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
+    public static function deployableByTeam(int $teamId)
+    {
+        return static::whereHas(
+            'server',
+            fn ($query) => $query->deployableByTeam($teamId)
+        );
+    }
+
     public static function ownedByCurrentTeam()
     {
         return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
