@@ -38,8 +38,8 @@
                                 :database="$serviceDatabase" />
                         @else
                             <livewire:project.database.backup-edit :backup="$backup"
-                                :available-s3-storages="$s3s" :status="data_get($serviceDatabase, 'status')"
-                                :section="$section"
+                                :available-s3-storages="$s3s" :available-age-keys="$ageKeys"
+                                :status="data_get($serviceDatabase, 'status')" :section="$section"
                                 wire:key="service-database-backup-{{ $backup->uuid }}-{{ $section }}" />
                         @endif
                     </div>

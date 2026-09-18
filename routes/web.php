@@ -47,6 +47,8 @@ use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
+use App\Livewire\Security\AgeKey\Index as SecurityAgeKeyIndex;
+use App\Livewire\Security\AgeKey\Show as SecurityAgeKeyShow;
 use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenShow;
 use App\Livewire\Security\CloudTokens;
@@ -401,6 +403,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key', SecurityPrivateKeyIndex::class)->name('security.private-key.index');
     // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
+
+    Route::get('/security/age-key', SecurityAgeKeyIndex::class)->name('security.age-key.index');
+    Route::get('/security/age-key/{age_key_uuid}', SecurityAgeKeyShow::class)->name('security.age-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
     Route::get('/security/integration-tokens', IntegrationTokens::class)->name('security.integration-tokens');

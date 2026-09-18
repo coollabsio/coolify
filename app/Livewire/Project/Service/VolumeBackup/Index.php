@@ -35,6 +35,8 @@ class Index extends Component
 
     public ?Collection $s3s = null;
 
+    public ?Collection $ageKeys = null;
+
     public function getListeners(): array
     {
         $teamId = currentTeam()->id;
@@ -64,6 +66,7 @@ class Index extends Component
         $this->authorize('update', $this->service);
         $this->loadSelectedSchedule($backupUuid);
         $this->s3s = currentTeam()->s3s;
+        $this->ageKeys = currentTeam()->ageKeys;
         $this->scheduleModalOpen = true;
     }
 

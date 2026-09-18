@@ -345,8 +345,8 @@ test('database dump compression uses the helper image and shared CPU setting', f
     $job->server = $server;
 
     $command = (new ReflectionClass($job))
-        ->getMethod('buildCompressedDumpCommand')
-        ->invoke($job, 'docker exec database pg_dumpall');
+        ->getMethod('buildPipelineCommand')
+        ->invoke($job, 'docker exec database pg_dumpall', true);
 
     expect($command)
         ->toStartWith('docker exec database pg_dumpall | docker run --rm -i')
@@ -364,11 +364,73 @@ test('all dump all database commands use shared helper compression', function ()
     $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
 
     expect($source)
-        ->toContain('$this->buildCompressedDumpCommand($backupCommand)')
+        ->toContain('$this->buildPipelineCommand($backupCommand, compress: true)')
         ->toContain('mysqldump -u root')
         ->toContain('mariadb-dump -u root')
-        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
+        ->and(substr_count($source, 'buildPipelineCommand($dumpCommand, compress: true)'))->toBe(2)
         ->and($source)->not->toContain('| gzip >');
+});
+
+test('non-compressed dump commands pass through unchanged when encryption is disabled', function () {
+    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
+    $job = new DatabaseBackupJob($backup);
+
+    $command = (new ReflectionClass($job))
+        ->getMethod('buildPipelineCommand')
+        ->invoke($job, 'docker exec database pg_dump --format=custom mydb', false);
+
+    expect($command)->toBe('docker exec database pg_dump --format=custom mydb');
+});
+
+test('pipeline command pipes through age when encryption is enabled', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
+    $job = new DatabaseBackupJob($backup);
+    $server = new Server;
+    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
+    $job->server = $server;
+
+    $reflection = new ReflectionClass($job);
+    $reflection->getProperty('age_public_key')->setValue($job, 'age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq');
+
+    $command = $reflection->getMethod('buildPipelineCommand')
+        ->invoke($job, 'docker exec database pg_dump --format=custom mydb', false);
+
+    expect($command)
+        ->toStartWith('docker exec database pg_dump --format=custom mydb | docker run --rm -i')
+        ->toContain('AGE_PUBLIC_KEY=age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq')
+        ->toContain(' -e ')
+        ->toContain('age -r $AGE_PUBLIC_KEY');
+});
+
+test('pipeline command chains compression and encryption together', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
+    $job = new DatabaseBackupJob($backup);
+    $server = new Server;
+    $server->setRelation('settings', new ServerSetting(['backup_compression_cpu_percentage' => 25]));
+    $job->server = $server;
+
+    $reflection = new ReflectionClass($job);
+    $reflection->getProperty('age_public_key')->setValue($job, 'age1testkey');
+
+    $command = $reflection->getMethod('buildPipelineCommand')
+        ->invoke($job, 'docker exec database pg_dumpall', true);
+
+    expect($command)
+        ->toContain('command -v pigz')
+        ->toContain('age -r $AGE_PUBLIC_KEY')
+        ->and(strpos($command, 'pigz'))->toBeLessThan(strpos($command, 'age -r'));
+});
+
+test('scheduled database backup casts encryption_enabled to boolean and exposes age key relation', function () {
+    $model = new ScheduledDatabaseBackup;
+
+    expect($model->getCasts())->toMatchArray(['encryption_enabled' => 'boolean'])
+        ->and((new ScheduledDatabaseBackup(['encryption_enabled' => '0']))->encryption_enabled)->toBeFalse()
+        ->and((new ScheduledDatabaseBackup(['encryption_enabled' => '1']))->encryption_enabled)->toBeTrue();
+
+    expect(method_exists($model, 'ageKey'))->toBeTrue();
 });
 
 test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {

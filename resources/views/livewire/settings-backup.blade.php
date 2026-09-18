@@ -24,7 +24,7 @@
                 </form>
 
                 <livewire:project.database.backup-edit :backup="$backup" :available-s3-storages="$s3s"
-                    :status="data_get($database, 'status')" />
+                    :available-age-keys="$ageKeys" :status="data_get($database, 'status')" />
 
                 <livewire:project.database.backup-executions :backup="$backup" />
             @else

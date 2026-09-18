@@ -28,6 +28,8 @@ class DatabaseBackups extends Component
 
     public $s3s;
 
+    public $ageKeys;
+
     protected $listeners = ['refreshScheduledBackups' => '$refresh'];
 
     public function mount(): mixed
@@ -78,6 +80,7 @@ class DatabaseBackups extends Component
                     ->where('uuid', request()->route('backup_uuid'))
                     ->firstOrFail();
                 $this->s3s = currentTeam()->s3s;
+                $this->ageKeys = currentTeam()->ageKeys;
                 $this->backupParameters = [...$this->parameters, 'backup_uuid' => $this->backup->uuid];
                 $this->section = match (request()->route()?->getName()) {
                     'project.service.database.backup.s3' => 's3',
