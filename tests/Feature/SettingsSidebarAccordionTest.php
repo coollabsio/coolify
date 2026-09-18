@@ -8,6 +8,7 @@ $groupedSidebars = [
     'application' => 'resources/views/components/application/configuration-sidebar.blade.php',
     'database' => 'resources/views/components/database/configuration-sidebar.blade.php',
     'service' => 'resources/views/components/service/configuration-sidebar.blade.php',
+    'service-page' => 'resources/views/livewire/project/service/configuration.blade.php',
     'server' => 'resources/views/components/server/sidebar.blade.php',
 ];
 
@@ -18,9 +19,19 @@ it('wires the collapsible accordion into every grouped settings sidebar', functi
         ->toContain('settingsSidebarAccordion(')          // shared Alpine data provider
         ->toContain('$activeGroup')                        // only the active group opens by default
         ->toContain('nav-section-toggle')                  // group header is a toggle button
-        ->toContain("toggle(")                             // header collapses/expands the group
+        ->toContain('toggle(')                             // header collapses/expands the group
         ->toContain("? 'xl:block' : 'xl:hidden'");         // desktop-only collapse wrapper
 })->with($groupedSidebars);
+
+it('only expands in-page sub-sections for the active page', function () {
+    // Regression: the application sidebar used to render every item's sub-sections
+    // (Advanced's Build/Container/… showed while you were on General).
+    $contents = file_get_contents(base_path('resources/views/components/application/configuration-sidebar.blade.php'));
+
+    expect($contents)
+        ->toContain("\$menuItem['active'] && filled(\$sections)")
+        ->not->toContain('@if (filled($sections))');
+});
 
 it('registers the accordion Alpine provider', function () {
     expect(file_get_contents(base_path('resources/js/app.js')))

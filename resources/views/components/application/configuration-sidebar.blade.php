@@ -288,23 +288,17 @@
                                         </span>
                                     @endif
                                 </a>
-                                @if (filled($sections))
+                                {{-- Sub-sections belong to the current page only; collapse them for
+                                     every other item so the sidebar stays short. --}}
+                                @if ($menuItem['active'] && filled($sections))
                                     <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
                                         x-data="{ activeSection: '' }">
                                         @foreach ($sections as $section)
-                                            @if ($menuItem['active'])
-                                                <button type="button" class="menu-subitem"
-                                                    :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                                    x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </button>
-                                            @else
-                                                <a class="menu-subitem"
-                                                    href="{{ route($menuItem['route'], $applicationRouteParameters) }}#{{ $section['id'] }}"
-                                                    {{ wireNavigate() }}>
-                                                    <span class="menu-item-label text-left">{{ $section['label'] }}</span>
-                                                </a>
-                                            @endif
+                                            <button type="button" class="menu-subitem"
+                                                :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                                x-on:click="activeSection = '{{ $section['id'] }}'; history.replaceState(null, '', '#{{ $section['id'] }}'); window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                                <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                                            </button>
                                         @endforeach
                                     </div>
                                 @endif
