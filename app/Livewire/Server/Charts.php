@@ -100,12 +100,34 @@ class Charts extends Component
         try {
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
+            // Disk/network/load arrived in a later Sentinel; fetch each optionally so an
+            // older Sentinel (which 404s them) still shows CPU and memory.
+            $diskMetrics = $this->optionalMetric(fn () => $this->server->getDiskMetrics($this->interval));
+            $loadMetrics = $this->optionalMetric(fn () => $this->server->getLoadMetrics($this->interval));
+            $networkMetrics = $this->optionalMetric(fn () => $this->server->getNetworkMetrics($this->interval)) ?? [];
             $this->dispatch("refreshChartData-{$this->chartId}-metrics", [
                 'cpuSeries' => $cpuMetrics,
                 'memorySeries' => $memoryMetrics,
+                'diskSeries' => $diskMetrics,
+                'loadSeries' => $loadMetrics,
+                'networkRxSeries' => $networkMetrics['rx'] ?? [],
+                'networkTxSeries' => $networkMetrics['tx'] ?? [],
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Fetch a metric that may not exist on an older Sentinel; a failure yields null
+     * rather than breaking the whole chart refresh.
+     */
+    private function optionalMetric(callable $fetch): mixed
+    {
+        try {
+            return $fetch();
+        } catch (\Throwable) {
+            return null;
         }
     }
 
