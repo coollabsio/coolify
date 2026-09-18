@@ -71,7 +71,7 @@
                                         {{ $project->name }}
                                     </h3>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $project->description ?: 'No description' }}
+                                        {{ $project->description }}
                                     </p>
                                 </div>
                             </div>
@@ -186,7 +186,7 @@
                                         {{ $server->name }}
                                     </h3>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                        {{ $server->description ?: 'No description' }}
+                                        {{ $server->description }}
                                     </p>
                                 </div>
                                 @if ($serverStatusType !== 'success')
