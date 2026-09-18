@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Application;
+use App\Models\Server;
+use App\Models\Service;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
@@ -188,4 +192,47 @@ it('identifies none as not predefined (per codebase pattern)', function () {
     // 'none' is technically a Docker predefined network, but existing codebase
     // only filters 'default' and 'host', so we maintain consistency
     expect(isDockerPredefinedNetwork('none'))->toBeFalse();
+});
+
+it('returns empty collections for resources with empty compose definitions', function () {
+    $service = new Service;
+    $service->forceFill([
+        'uuid' => 'service-network',
+        'docker_compose_raw' => '',
+    ]);
+
+    $application = new Application;
+    $application->forceFill([
+        'uuid' => 'application-network',
+        'docker_compose_raw' => '',
+    ]);
+
+    expect(getTopLevelNetworks($service))->toBeInstanceOf(Collection::class)->toBeEmpty()
+        ->and(getTopLevelNetworks($application))->toBeInstanceOf(Collection::class)->toBeEmpty();
+});
+
+it('filters null and empty networks when collecting server networks', function () {
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->standaloneDockers = [
+        ['network' => 'default'],
+        ['network' => ''],
+        ['network' => 'app-network'],
+    ];
+
+    $service = Mockery::mock(Service::class);
+    $service->shouldReceive('isRunning')->once()->andReturnFalse();
+    $service->shouldReceive('networks')->once()->andReturn(null);
+
+    $serviceRelation = Mockery::mock();
+    $serviceRelation->shouldReceive('get')->once()->andReturn(collect([$service]));
+
+    $server->shouldReceive('isSwarm')->times(2)->andReturnFalse();
+    $server->shouldReceive('services')->once()->andReturn($serviceRelation);
+    $server->shouldReceive('dockerComposeBasedApplications')->once()->andReturn(collect());
+    $server->shouldReceive('dockerComposeBasedPreviewDeployments')->once()->andReturn(collect());
+
+    $result = collectDockerNetworksByServer($server);
+
+    expect($result['networks']->values()->all())->toBe(['app-network'])
+        ->and($result['allNetworks']->values()->all())->toBe(['app-network']);
 });

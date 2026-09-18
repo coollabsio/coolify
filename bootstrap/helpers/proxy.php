@@ -82,12 +82,24 @@ function collectDockerNetworksByServer(Server $server)
         $networks->push($network);
         $allNetworks->push($network);
     }
-    $networks = collect($networks)->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
-    $allNetworks = $allNetworks->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
+    $networks = collect($networks)
+        ->flatten()
+        ->unique()
+        ->filter(function ($network) {
+            return is_string($network) && trim($network) !== '';
+        })
+        ->filter(function ($network) {
+            return ! isDockerPredefinedNetwork($network);
+        });
+    $allNetworks = $allNetworks
+        ->flatten()
+        ->unique()
+        ->filter(function ($network) {
+            return is_string($network) && trim($network) !== '';
+        })
+        ->filter(function ($network) {
+            return ! isDockerPredefinedNetwork($network);
+        });
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);

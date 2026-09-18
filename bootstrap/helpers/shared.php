@@ -1581,6 +1581,10 @@ function sanitizeLogsForExport(string $text): string
 
 function getTopLevelNetworks(Service|Application $resource)
 {
+    if (blank($resource->docker_compose_raw)) {
+        return collect();
+    }
+
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
@@ -1705,6 +1709,8 @@ function getTopLevelNetworks(Service|Application $resource)
 
         return $topLevelNetworks->keys();
     }
+
+    return collect();
 }
 function sourceIsLocal(Stringable $source)
 {
