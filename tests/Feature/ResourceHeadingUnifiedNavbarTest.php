@@ -151,7 +151,8 @@ it('keeps advanced operations in a dedicated Advanced dropdown', function () {
         ->toContain('service-desktop-actions')
         ->toContain('Force Deploy')
         ->toContain('Force Cleanup Containers')
-        ->toContain('Restart (pull latest)')
+        ->toContain('Restart current version')
+        ->toContain('Pull latest and restart')
         ->not->toContain('resource-heading-overflow-separator')
         ->not->toContain('Pull Latest Images & Restart');
 
@@ -226,10 +227,11 @@ it('groups service restart options in the Actions dropdown', function () {
 
     expect($desktop)
         ->toContain('service-desktop-actions')
-        ->toContain('Restart')
-        ->toContain('Restart (pull latest)')
+        ->toContain('Restart current version')
+        ->toContain('Pull latest and restart')
         ->toContain("\$wire.dispatch('pullAndRestartEvent')")
         ->not->toContain('Pull Latest Images & Restart')
+        ->not->toContain('Restart (pull latest)')
         ->not->toContain('<x-services.restart');
 
     $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
@@ -244,9 +246,9 @@ it('orders service restart actions before stop and advanced operations', functio
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $actions = str($heading)->after('id="service-desktop-actions"')->before('@else\n                        <a href')->toString();
 
-    expect(strpos($actions, 'Restart\n'))
-        ->toBeLessThan(strpos($actions, 'Restart (pull latest)'))
-        ->and(strpos($actions, 'Restart (pull latest)'))
+    expect(strpos($actions, 'Restart current version'))
+        ->toBeLessThan(strpos($actions, 'Pull latest and restart'))
+        ->and(strpos($actions, 'Pull latest and restart'))
         ->toBeLessThan(strpos($actions, 'Stop'));
 });
 
@@ -260,6 +262,7 @@ it('groups application lifecycle options in an Actions dropdown', function () {
         ->toContain('Actions')
         ->toContain('Deploy')
         ->toContain('Deploy (without cache)')
+        ->not->toContain('Redeploy')
         ->toContain('force_deploy_without_cache')
         ->toContain('deploy(true)')
         ->and($trigger)
@@ -292,18 +295,20 @@ it('shows stop in application action menus when the application is exited', func
         ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
 });
 
-it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
+it('uses the same deploy labels in the mobile and desktop application action menus', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $actions = str($heading)->after('id="application-desktop-actions"')->before('@endteleport')->toString();
+    $mobileActions = str($heading)->after('id="application-mobile-actions"')->before("@teleport('#resource-action-hud-slot')")->toString();
 
     expect($actions)
-        ->toContain("str(\$application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)'")
-        ->toContain("str(\$application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)'");
-
-    expect(strpos($actions, 'wire:click="deploy"'))
-        ->toBeLessThan(strpos($actions, 'Redeploy (without cache)'))
-        ->and(strpos($actions, 'Redeploy (without cache)'))
-        ->toBeLessThan(strpos($actions, 'Restart'));
+        ->toContain('Deploy')
+        ->toContain('Deploy (without cache)')
+        ->not->toContain('Redeploy')
+        ->toContain("str(\$application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)'")
+        ->and($mobileActions)
+        ->toContain('Deploy')
+        ->toContain('Deploy (without cache)')
+        ->not->toContain('Redeploy');
 });
 
 it('uses the shared Coollabs gradient for primary resource actions in the desktop header', function () {

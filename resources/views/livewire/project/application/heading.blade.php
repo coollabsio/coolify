@@ -228,12 +228,12 @@
                                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                                 wire:click="deploy" @click="open = false" role="menuitem">
                                                 <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                Redeploy
+                                                Deploy
                                             </button>
                                         @else
                                             <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
                                                 <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                Redeploy
+                                                Deploy
                                             </button>
                                         @endcan
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -241,7 +241,7 @@
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            {{ str($application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)' }}
+                                            Deploy (without cache)
                                         </button>
                                     @endif
                                     @if ($application->build_pack !== 'dockercompose')
