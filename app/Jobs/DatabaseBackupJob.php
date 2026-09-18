@@ -18,6 +18,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
+use App\Services\ScheduledJobDeliveryService;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use Carbon\Carbon;
@@ -78,7 +79,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $backup_log_uuid = null;
 
-    public function __construct(public ScheduledDatabaseBackup $backup)
+    public function __construct(public ScheduledDatabaseBackup $backup, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
         $this->timeout = $backup->timeout ?? 3600;
@@ -93,6 +94,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
+        $failed = false;
+
         try {
             $databasesToBackup = null;
 
@@ -483,8 +490,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->removeExpiredBackups();
             }
         } catch (Throwable $e) {
+            $failed = true;
             throw $e;
         } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
             if ($this->backup_log) {
                 $this->backup_log->update([
                     'finished_at' => Carbon::now()->toImmutable(),
@@ -852,6 +864,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if ($this->occurrenceUuid) {
+            app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
         Log::channel('scheduled-errors')->error('DatabaseBackup permanently failed', [
             'job' => 'DatabaseBackupJob',
             'backup_id' => $this->backup->uuid,
