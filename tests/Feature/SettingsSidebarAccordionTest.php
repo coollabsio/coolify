@@ -37,7 +37,7 @@ it('adds a client-side search to the application settings sidebar', function () 
     $sidebar = file_get_contents(base_path('resources/views/components/application/configuration-sidebar.blade.php'));
 
     expect($sidebar)
-        ->toContain('Search settings')
+        ->toContain('Filter settings')
         ->toContain('x-model.debounce.100ms="search"')
         ->toContain('matches(')
         // Results are built from a flat index that also covers in-page sub-sections,
