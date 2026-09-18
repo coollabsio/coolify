@@ -1,6 +1,8 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
+// Registers window.terminalRendererToolbar() for the console renderer selector.
+import './terminal-renderer-toolbar.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 
