@@ -47,6 +47,10 @@ use Symfony\Component\Yaml\Yaml;
  *     latest: string,
  *     type: 'patch_update'|'minor_upgrade',
  *     checked_at: string,
+ *     fingerprint: string,
+ *     first_seen_at: string,
+ *     last_seen_at: string,
+ *     last_notified_at: string|null,
  *     newer_branch_target?: string,
  *     newer_branch_latest?: string,
  *     upgrade_target?: string
@@ -62,6 +66,10 @@ use Symfony\Component\Yaml\Yaml;
  *     'latest' => '3.5.2',               // Latest patch version available
  *     'type' => 'patch_update',          // Update type identifier
  *     'checked_at' => '2025-11-14T10:00:00Z',  // ISO8601 timestamp
+ *     'fingerprint' => '...',            // Canonical alert-state hash
+ *     'first_seen_at' => '2025-11-14T10:00:00Z',
+ *     'last_seen_at' => '2025-11-14T10:00:00Z',
+ *     'last_notified_at' => '2025-11-14T10:00:00Z',
  *     'newer_branch_target' => 'v3.6',   // (Optional) Available major/minor version
  *     'newer_branch_latest' => '3.6.2'   // (Optional) Latest version in that branch
  * ]
@@ -74,14 +82,20 @@ use Symfony\Component\Yaml\Yaml;
  *     'latest' => '3.6.2',               // Latest version in target branch
  *     'type' => 'minor_upgrade',         // Update type identifier
  *     'upgrade_target' => 'v3.6',        // Target branch (with 'v' prefix)
- *     'checked_at' => '2025-11-14T10:00:00Z'  // ISO8601 timestamp
+ *     'checked_at' => '2025-11-14T10:00:00Z', // ISO8601 timestamp
+ *     'fingerprint' => '...',
+ *     'first_seen_at' => '2025-11-14T10:00:00Z',
+ *     'last_seen_at' => '2025-11-14T10:00:00Z',
+ *     'last_notified_at' => '2025-11-14T10:00:00Z'
  * ]
  * ```
  *
  * **Null value**: Set to null when:
  * - Server is fully up-to-date with the latest version
  * - Traefik image uses the 'latest' tag (no fixed version tracking)
- * - No Traefik version detected on the server
+ * - The server no longer uses Traefik
+ *
+ * Transient detection, network, feed, or parsing failures preserve the last known state.
  *
  * @see CheckTraefikVersionForServerJob Where this data is populated
  * @see Proxy Where this data is read and displayed
