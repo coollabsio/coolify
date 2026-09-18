@@ -182,9 +182,6 @@
         // Group that holds the current page — the only one expanded by default.
         $activeGroup = (string) $groupedMenuItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
-        // All item labels, so the search box can show a "no results" state.
-        $allLabels = collect($configurationMenuItems)->pluck('label')->values()->all();
-
         // In-page sections (cards) shown as sub-items under the active page
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
@@ -248,6 +245,34 @@
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];
+
+        // Flat, searchable index: every page plus its in-page sub-sections. Each
+        // entry carries a breadcrumb (its category, and parent page for a
+        // sub-section) and combined text so the query matches sub-pages too.
+        $searchIndex = [];
+        foreach ($groupedMenuItems as $groupLabel => $groupItems) {
+            foreach ($groupItems as $item) {
+                $searchIndex[] = [
+                    'label' => $item['label'],
+                    'breadcrumb' => $groupLabel,
+                    'searchText' => $item['label'].' '.$groupLabel,
+                    'href' => route($item['route'], $applicationRouteParameters),
+                    'icon' => $menuIcons[$item['label']] ?? 'settings',
+                    'navigate' => $item['navigate'] ?? true,
+                ];
+                foreach ($pageSections[$item['route']] ?? [] as $section) {
+                    $searchIndex[] = [
+                        'label' => $section['label'],
+                        'breadcrumb' => $groupLabel.' · '.$item['label'],
+                        'searchText' => $section['label'].' '.$item['label'].' '.$groupLabel,
+                        'href' => route($item['route'], $applicationRouteParameters).'#'.$section['id'],
+                        'icon' => $menuIcons[$item['label']] ?? 'settings',
+                        'navigate' => true,
+                    ];
+                }
+            }
+        }
+        $searchTexts = array_column($searchIndex, 'searchText');
     @endphp
 
 <aside @class([
@@ -255,7 +280,7 @@
     'is-flush' => $flush,
 ])>
                 <nav aria-label="Configuration sections"
-                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application', labels: @js($allLabels) })"
+                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application', labels: @js($searchTexts) })"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     <div class="relative col-span-full mb-1 xl:mb-2">
                         <x-reicon name="search"
@@ -272,6 +297,22 @@
                         class="col-span-full px-2.5 py-2 text-[12px] text-neutral-500 dark:text-fg-dim">
                         No settings match “<span x-text="search"></span>”.
                     </p>
+
+                    {{-- Flat search results (pages + sub-sections), each with its category/parent. --}}
+                    <div x-cloak x-show="searching" class="col-span-full flex flex-col gap-0.5">
+                        @foreach ($searchIndex as $entry)
+                            <a href="{{ $entry['href'] }}" @if ($entry['navigate']) {{ wireNavigate() }} @endif
+                                x-show="matches(@js($entry['searchText']))"
+                                class="group flex flex-col gap-0.5 rounded-md px-2.5 py-1.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05]">
+                                <span class="flex min-w-0 items-center gap-2.5">
+                                    <x-reicon :name="$entry['icon']" class="size-[18px] shrink-0 text-nav-text opacity-90" />
+                                    <span class="truncate text-[13px] font-medium text-nav-text">{{ $entry['label'] }}</span>
+                                </span>
+                                <span class="truncate pl-[28px] text-[11px] text-neutral-400 dark:text-fg-faint">{{ $entry['breadcrumb'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
@@ -286,11 +327,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                             </svg>
                         </button>
-                        <div class="contents" :class="(searching || isOpen(@js($groupLabel))) ? 'xl:block' : 'xl:hidden'">
+                        <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}"
-                                x-show="matches(@js($menuItem['label']))">
+                                x-show="!searching">
                                 <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',

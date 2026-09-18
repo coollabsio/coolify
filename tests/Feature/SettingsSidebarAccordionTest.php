@@ -39,7 +39,12 @@ it('adds a client-side search to the application settings sidebar', function () 
     expect($sidebar)
         ->toContain('Search settings')
         ->toContain('x-model.debounce.100ms="search"')
-        ->toContain('matches(');
+        ->toContain('matches(')
+        // Results are built from a flat index that also covers in-page sub-sections,
+        // each carrying a breadcrumb (category + parent page).
+        ->toContain('$searchIndex')
+        ->toContain("'breadcrumb'")
+        ->toContain('$pageSections[$item[\'route\']]');
 
     expect(file_get_contents(base_path('resources/js/settings-sidebar-accordion.js')))
         ->toContain('matches(label)')
