@@ -6,6 +6,7 @@ use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\CoolifyUpgradeStatus;
+use App\Services\MigrationFailure;
 use Livewire\Component;
 
 class Upgrade extends Component
@@ -71,6 +72,9 @@ class Upgrade extends Component
             if ($this->updateInProgress) {
                 return;
             }
+            // Drop any marker left by a previous failed upgrade so the status poll for
+            // this fresh attempt does not immediately report the old failure.
+            MigrationFailure::clear();
             $this->updateInProgress = true;
             dispatch(function () {
                 try {
@@ -89,6 +93,23 @@ class Upgrade extends Component
         // Only root team members can view upgrade status
         if (auth()->user()?->currentTeam()?->id !== 0) {
             return ['status' => 'none'];
+        }
+
+        $runningVersion = $this->currentVersion !== '' ? $this->currentVersion : (string) config('constants.coolify.version');
+        $targetVersion = $this->latestVersion !== '' ? $this->latestVersion : get_latest_version_of_coolify();
+
+        // A failed migration passes the web health check, so the upgrade script still
+        // reports "complete". Surface the real migration failure first so the UI does
+        // not show a false success.
+        $migrationFailure = MigrationFailure::current();
+        if ($migrationFailure) {
+            return [
+                'status' => 'error',
+                'step' => 0,
+                'message' => 'Database migration failed: '.$migrationFailure['message'],
+                'running_version' => $runningVersion,
+                'target_version' => $targetVersion,
+            ];
         }
 
         $server = Server::find(0);
@@ -111,8 +132,8 @@ class Upgrade extends Component
 
         return CoolifyUpgradeStatus::fromFile(
             content: $content,
-            runningVersion: $this->currentVersion !== '' ? $this->currentVersion : (string) config('constants.coolify.version'),
-            targetVersion: $this->latestVersion !== '' ? $this->latestVersion : get_latest_version_of_coolify(),
+            runningVersion: $runningVersion,
+            targetVersion: $targetVersion,
         );
     }
 }
