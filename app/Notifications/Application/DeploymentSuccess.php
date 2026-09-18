@@ -30,6 +30,8 @@ class DeploymentSuccess extends CustomEmailNotification
 
     public ?string $fqdn;
 
+    public ?string $preview_fqdn = null;
+
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
         $this->onQueue('high');
@@ -43,6 +45,10 @@ class DeploymentSuccess extends CustomEmailNotification
         $this->fqdn = data_get($application, 'fqdn');
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
+        }
+        $this->preview_fqdn = data_get($preview, 'fqdn');
+        if (str($this->preview_fqdn)->explode(',')->count() > 1) {
+            $this->preview_fqdn = str($this->preview_fqdn)->explode(',')->first();
         }
         $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
@@ -60,7 +66,7 @@ class DeploymentSuccess extends CustomEmailNotification
         if ($pull_request_id === 0) {
             $mail->subject("Coolify: New version is deployed of {$this->application_name}");
         } else {
-            $fqdn = $this->preview->fqdn;
+            $fqdn = $this->preview_fqdn;
             $mail->subject("Coolify: Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
         }
         $mail->view('emails.application-deployment-success', [
@@ -82,8 +88,8 @@ class DeploymentSuccess extends CustomEmailNotification
                 color: DiscordMessage::successColor(),
             );
 
-            if ($this->preview->fqdn) {
-                $message->addField('Application', '[Link]('.$this->preview->fqdn.')');
+            if ($this->preview_fqdn) {
+                $message->addField('Application', '[Link]('.$this->preview_fqdn.')');
             }
 
             $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
@@ -115,10 +121,10 @@ class DeploymentSuccess extends CustomEmailNotification
     {
         if ($this->preview) {
             $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
-            if ($this->preview->fqdn) {
+            if ($this->preview_fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
-                    'url' => $this->preview->fqdn,
+                    'url' => $this->preview_fqdn,
                 ];
             }
         } else {
@@ -148,10 +154,10 @@ class DeploymentSuccess extends CustomEmailNotification
         if ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
             $message = 'New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
-            if ($this->preview->fqdn) {
+            if ($this->preview_fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
-                    'url' => $this->preview->fqdn,
+                    'url' => $this->preview_fqdn,
                 ];
             }
         } else {
@@ -184,8 +190,8 @@ class DeploymentSuccess extends CustomEmailNotification
         if ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
             $description = "New version successfully deployed for {$this->application_name}";
-            if ($this->preview->fqdn) {
-                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            if ($this->preview_fqdn) {
+                $description .= "\nPreview URL: {$this->preview_fqdn}";
             }
         } else {
             $title = 'New version successfully deployed';
