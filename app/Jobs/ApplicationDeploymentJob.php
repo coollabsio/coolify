@@ -671,7 +671,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
                 );
                 if ($this->saved_outputs->has($saveName)) {
-                    $fileStat = $this->saved_outputs->get($saveName);
+                    $fileStat = $this->trimmedSavedOutput($saveName);
                     if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
@@ -2171,12 +2171,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                         }
 
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                        $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
+                        if ($healthCheckStatus === 'healthy') {
                             $this->newVersionIsHealthy = true;
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        } elseif ($healthCheckStatus === 'unhealthy') {
                             $this->newVersionIsHealthy = false;
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
@@ -2189,7 +2190,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $sleeptime++;
                         }
                     }
-                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    if ($this->trimmedSavedOutput('health_check')->replace('"', '')->value() === 'starting') {
                         $this->query_logs();
                     }
                 }
@@ -2571,7 +2572,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'));
+            $commit_message = $this->trimmedSavedOutput('commit_message');
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
@@ -2641,7 +2642,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
         );
         if ($this->saved_outputs->get('nixpacks_type')) {
-            $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
+            $this->nixpacks_type = $this->trimmedSavedOutput('nixpacks_type')->value();
             if (str($this->nixpacks_type)->isEmpty()) {
                 throw new DeploymentException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }

@@ -9,6 +9,7 @@ use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Stringable;
 
 trait ExecuteRemoteCommand
 {
@@ -247,7 +248,12 @@ trait ExecuteRemoteCommand
             return;
         }
 
-        $this->saved_outputs->put($this->save, str($output));
+        $this->saved_outputs->put($this->save, str($output)->trim());
+    }
+
+    private function trimmedSavedOutput(string $key): Stringable
+    {
+        return str($this->saved_outputs->get($key))->trim();
     }
 
     /**
