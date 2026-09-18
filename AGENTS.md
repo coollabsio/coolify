@@ -20,7 +20,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down                        # stop services
 
 # Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
-./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
+./scripts/dev-instances up                   # a:8000 + b:8001 (uses bun run build for CSS/JS)
 ./scripts/dev-instances up a --with vite     # HMR only when starting a single instance
 ./scripts/dev-instances urls
 ./scripts/dev-instances down
@@ -60,9 +60,10 @@ php artisan test --compact tests/Feature/SomeTest.php  # specific file
 # Code formatting (Pint, Laravel preset)
 vendor/bin/pint --dirty --format agent              # format changed files
 
-# Frontend
-npm run dev                     # vite dev server
-npm run build                   # production build
+# Frontend (bun — see bunfig.toml for Socket.dev supply-chain scanning)
+bun install                     # install deps (runs Socket security scanner)
+bun run dev                     # vite dev server
+bun run build                   # production build
 ```
 
 ## Browser Tests (Pest Browser Plugin)
@@ -281,7 +282,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `bun run build`, `bun run dev`, or `composer run dev`. Ask them.
 
 ## Documentation Files
 
@@ -381,7 +382,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `bun run build` or ask the user to run `bun run dev` or `composer run dev`.
 
 === laravel/v12 rules ===
 

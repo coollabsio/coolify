@@ -136,7 +136,7 @@ services:
 
   vite:
     profiles: ["vite"]
-    image: node:24-alpine
+    image: oven/bun:1-alpine
     pull_policy: always
     working_dir: /var/www/html
     environment:
@@ -146,7 +146,7 @@ services:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
-    command: sh -c "npm install && npm run dev -- --port ${VITE_PORT:-5173} --host"
+    command: sh -c "bun install && bun run dev -- --port ${VITE_PORT:-5173} --host"
     networks:
       - coolify
 
