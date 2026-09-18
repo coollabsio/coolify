@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -249,4 +250,100 @@ describe('POST /api/v1/deployments/{uuid}/cancel', function () {
         $deployment->refresh();
         expect($deployment->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
     });
+
+    test('cancels a deployment running on a shared build server', function () {
+        $ownerTeam = Team::factory()->create();
+        $privateKey = PrivateKey::factory()->create([
+            'team_id' => $ownerTeam->id,
+        ]);
+
+        $buildServer = Server::factory()->create([
+            'team_id' => $ownerTeam->id,
+            'private_key_id' => $privateKey->id,
+            'ip' => '192.0.2.50',
+        ]);
+
+        $buildServer->settings()->update([
+            'is_build_server' => true,
+            'is_reachable' => true,
+        ]);
+
+        $buildServer->sharedTeams()->attach($this->team->id, [
+            'can_build' => true,
+        ]);
+
+        $deployment = ApplicationDeploymentQueue::create([
+            'deployment_uuid' => 'shared-build-server-deployment',
+            'application_id' => 1,
+            'server_id' => $this->server->id,
+            'build_server_id' => $buildServer->id,
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+
+        expect(
+            Server::accessibleDeploymentExecutionServersForTeam($this->team->id)
+                ->find($buildServer->id)
+        )->not->toBeNull();
+
+        Process::fake([
+            '*' => $deployment->deployment_uuid,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
+
+        $response->assertSuccessful();
+
+        expect($deployment->fresh()->status)
+            ->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
+
+        Process::assertRan(
+            fn ($process) => str_contains($process->command, $buildServer->ip)
+                && str_contains($process->command, 'docker ps')
+        );
+
+        Process::assertRan(
+            fn ($process) => str_contains($process->command, $buildServer->ip)
+                && str_contains($process->command, 'docker rm -f')
+        );
+    });
+
+    test('does not execute commands on an unshared build server', function () {
+        $ownerTeam = Team::factory()->create();
+
+        $buildServer = Server::factory()->create([
+            'team_id' => $ownerTeam->id,
+            'ip' => '192.0.2.51',
+        ]);
+
+        $buildServer->settings()->update([
+            'is_build_server' => true,
+            'is_reachable' => true,
+        ]);
+
+        $deployment = ApplicationDeploymentQueue::create([
+            'deployment_uuid' => 'unshared-build-server-deployment',
+            'application_id' => 1,
+            'server_id' => $this->server->id,
+            'build_server_id' => $buildServer->id,
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+
+        Process::fake();
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/deployments/{$deployment->deployment_uuid}/cancel");
+
+        $response->assertSuccessful();
+
+        expect($deployment->fresh()->status)
+            ->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
+
+        Process::assertNothingRan();
+    });
+
 });
