@@ -182,6 +182,9 @@
         // Group that holds the current page — the only one expanded by default.
         $activeGroup = (string) $groupedMenuItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
+        // All item labels, so the search box can show a "no results" state.
+        $allLabels = collect($configurationMenuItems)->pluck('label')->values()->all();
+
         // In-page sections (cards) shown as sub-items under the active page
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
@@ -252,14 +255,30 @@
     'is-flush' => $flush,
 ])>
                 <nav aria-label="Configuration sections"
-                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application' })"
+                    x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.application', labels: @js($allLabels) })"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                    <div class="relative col-span-full mb-1 xl:mb-2">
+                        <x-reicon name="search"
+                            class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                        <input x-model.debounce.100ms="search" type="search" placeholder="Search settings"
+                            aria-label="Search settings"
+                            class="h-8 w-full rounded-lg border border-neutral-200 bg-white py-0 pr-7 pl-8 text-[12px] shadow-none placeholder:text-neutral-400 focus:border-accent focus:ring-0 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg dark:placeholder:text-fg-faint">
+                        <button x-cloak x-show="searching" type="button" @click="search = ''" aria-label="Clear search"
+                            class="absolute top-1/2 right-1.5 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                            <x-reicon name="x" class="size-3" />
+                        </button>
+                    </div>
+                    <p x-cloak x-show="searching && !hasResults"
+                        class="col-span-full px-2.5 py-2 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        No settings match “<span x-text="search"></span>”.
+                    </p>
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
-                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
+                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
+                                x-show="!searching" aria-hidden="true"></div>
                         @endunless
-                        <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
-                            :aria-expanded="isOpen(@js($groupLabel))">
+                        <button type="button" class="nav-section-toggle hidden xl:flex" x-show="!searching"
+                            @click="toggle(@js($groupLabel))" :aria-expanded="isOpen(@js($groupLabel))">
                             <span>{{ $groupLabel }}</span>
                             <svg class="size-3 shrink-0 opacity-60 transition-transform"
                                 :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
@@ -267,10 +286,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                             </svg>
                         </button>
-                        <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
+                        <div class="contents" :class="(searching || isOpen(@js($groupLabel))) ? 'xl:block' : 'xl:hidden'">
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
-                            <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                            <div wire:key="application-settings-group-{{ str($menuItem['label'])->slug() }}"
+                                x-show="matches(@js($menuItem['label']))">
                                 <a wire:key="application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -291,7 +311,7 @@
                                 {{-- Sub-sections belong to the current page only; collapse them for
                                      every other item so the sidebar stays short. --}}
                                 @if ($menuItem['active'] && filled($sections))
-                                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex" x-show="!searching"
                                         x-data="{ activeSection: '' }">
                                         @foreach ($sections as $section)
                                             <button type="button" class="menu-subitem"

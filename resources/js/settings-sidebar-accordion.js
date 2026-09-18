@@ -9,6 +9,21 @@ export function initializeSettingsSidebarAccordionComponent() {
         activeGroup: config.activeGroup || '',
         storageKey: config.storageKey || 'coolify.settings-sidebar',
         groups: {},
+        // Optional client-side filter (sidebars that render a search box).
+        search: '',
+        labels: Array.isArray(config.labels) ? config.labels : [],
+        get searching() {
+            return this.search.trim() !== '';
+        },
+        matches(label) {
+            if (!this.searching) {
+                return true;
+            }
+            return String(label).toLowerCase().includes(this.search.trim().toLowerCase());
+        },
+        get hasResults() {
+            return !this.searching || this.labels.some((label) => this.matches(label));
+        },
         init() {
             let stored = {};
             try {

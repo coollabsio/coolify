@@ -33,6 +33,19 @@ it('only expands in-page sub-sections for the active page', function () {
         ->not->toContain('@if (filled($sections))');
 });
 
+it('adds a client-side search to the application settings sidebar', function () {
+    $sidebar = file_get_contents(base_path('resources/views/components/application/configuration-sidebar.blade.php'));
+
+    expect($sidebar)
+        ->toContain('Search settings')
+        ->toContain('x-model.debounce.100ms="search"')
+        ->toContain('matches(');
+
+    expect(file_get_contents(base_path('resources/js/settings-sidebar-accordion.js')))
+        ->toContain('matches(label)')
+        ->toContain('hasResults');
+});
+
 it('registers the accordion Alpine provider', function () {
     expect(file_get_contents(base_path('resources/js/app.js')))
         ->toContain('initializeSettingsSidebarAccordionComponent');
