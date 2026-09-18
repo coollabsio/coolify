@@ -5099,3 +5099,89 @@ a.command-palette-item:focus-visible {
         height: 2.5rem;
     }
 }
+
+/* Assistant chat markdown — compact typographic styles for rendered agent messages. */
+.prose-assistant {
+    @apply text-sm leading-relaxed;
+}
+
+.prose-assistant > :first-child {
+    margin-top: 0;
+}
+
+.prose-assistant > :last-child {
+    margin-bottom: 0;
+}
+
+.prose-assistant p {
+    @apply my-2;
+}
+
+.prose-assistant h1,
+.prose-assistant h2,
+.prose-assistant h3,
+.prose-assistant h4,
+.prose-assistant h5,
+.prose-assistant h6 {
+    @apply mt-3 mb-1 font-semibold text-[0.95rem] leading-snug;
+}
+
+.prose-assistant ul {
+    @apply my-2 list-disc pl-5 space-y-1;
+}
+
+.prose-assistant ol {
+    @apply my-2 list-decimal pl-5 space-y-1;
+}
+
+.prose-assistant a {
+    @apply font-medium text-coollabs underline underline-offset-2 dark:text-warning;
+}
+
+.prose-assistant strong {
+    @apply font-semibold;
+}
+
+.prose-assistant code {
+    @apply rounded bg-black/[0.06] px-1 py-0.5 font-mono text-[0.85em] dark:bg-white/10;
+}
+
+.prose-assistant pre {
+    @apply my-2 overflow-x-auto rounded-lg bg-neutral-900 p-3 text-xs text-neutral-100 dark:bg-black/40;
+}
+
+.prose-assistant pre code {
+    @apply bg-transparent p-0 text-[0.95em];
+}
+
+.prose-assistant blockquote {
+    @apply my-2 border-l-2 border-neutral-300 pl-3 text-neutral-500 dark:border-white/15 dark:text-fg-dim;
+}
+
+.prose-assistant hr {
+    @apply my-3 border-0 border-t border-neutral-200 dark:border-white/10;
+}
+
+.prose-assistant .assistant-table-wrap {
+    @apply my-3 overflow-x-auto rounded-lg border border-neutral-200 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-300 dark:border-white/10 dark:scrollbar-thumb-white/10;
+}
+
+.prose-assistant table {
+    @apply w-full border-collapse text-xs;
+}
+
+.prose-assistant thead th {
+    @apply bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500 dark:bg-white/[0.03] dark:text-fg-faint;
+}
+
+.prose-assistant tbody td {
+    @apply border-t border-neutral-100 px-3 py-2 text-left align-top dark:border-white/[0.06];
+}
+
+.prose-assistant tbody td:first-child {
+    @apply font-medium text-neutral-700 dark:text-fg;
+}
+
+.prose-assistant tbody tr:hover td {
+    @apply bg-black/[0.02] dark:bg-white/[0.02];
+}

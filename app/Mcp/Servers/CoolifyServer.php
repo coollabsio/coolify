@@ -9,6 +9,11 @@ use App\Mcp\Resources\InfrastructureOverviewResource;
 use App\Mcp\Tools\CancelDeployment;
 use App\Mcp\Tools\Control;
 use App\Mcp\Tools\CoolifyHelp;
+use App\Mcp\Tools\CreateApplication;
+use App\Mcp\Tools\CreateDatabase;
+use App\Mcp\Tools\CreateEnvironment;
+use App\Mcp\Tools\CreateProject;
+use App\Mcp\Tools\CreateService;
 use App\Mcp\Tools\Deploy;
 use App\Mcp\Tools\GetApplication;
 use App\Mcp\Tools\GetCurrentTeam;
@@ -36,6 +41,7 @@ use App\Mcp\Tools\ListEnvKeys;
 use App\Mcp\Tools\ListGithubApps;
 use App\Mcp\Tools\ListGithubBranches;
 use App\Mcp\Tools\ListGithubRepositories;
+use App\Mcp\Tools\ListPrivateKeys;
 use App\Mcp\Tools\ListProjects;
 use App\Mcp\Tools\ListResources;
 use App\Mcp\Tools\ListResourceTags;
@@ -133,9 +139,15 @@ MD;
         ListGithubApps::class,
         ListGithubRepositories::class,
         ListGithubBranches::class,
+        ListPrivateKeys::class,
         Control::class,
         Deploy::class,
         CancelDeployment::class,
+        CreateDatabase::class,
+        CreateService::class,
+        CreateProject::class,
+        CreateEnvironment::class,
+        CreateApplication::class,
     ];
 
     protected array $resources = [
@@ -147,4 +159,35 @@ MD;
         TroubleshootApplication::class,
         ExplainFailedDeploy::class,
     ];
+
+    /**
+     * MCP tools that change state. Excluded from the in-app AI assistant, which
+     * uses gated native tools for every mutation.
+     */
+    public const MUTATING_TOOL_CLASSES = [
+        Control::class,
+        Deploy::class,
+        CancelDeployment::class,
+        CreateDatabase::class,
+        CreateService::class,
+        CreateProject::class,
+        CreateEnvironment::class,
+        CreateApplication::class,
+    ];
+
+    /**
+     * @return array<int, class-string>
+     */
+    public static function toolClasses(): array
+    {
+        return (new \ReflectionClass(static::class))->getDefaultProperties()['tools'] ?? [];
+    }
+
+    /**
+     * @return array<int, class-string>
+     */
+    public static function readToolClasses(): array
+    {
+        return array_values(array_diff(self::toolClasses(), self::MUTATING_TOOL_CLASSES));
+    }
 }

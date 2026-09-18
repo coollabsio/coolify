@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Ai\Concerns\HasConversations;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -40,7 +41,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
+    use Auditable, HasConversations, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
     protected $fillable = [
         'name',
@@ -49,15 +50,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'show_boarding',
         'custom_server_limit',
         'is_mcp_server_enabled',
+        'is_ai_assistant_enabled',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
+        'is_ai_assistant_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'is_ai_assistant_enabled' => 'boolean',
     ];
 
     protected static function booted()

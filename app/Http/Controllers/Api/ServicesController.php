@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Service\CreateService;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Shared\ResolveResourcePlacement;
+use App\Exceptions\ResourceCreationException;
+use App\Exceptions\ResourcePlacementException;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\VolumeCloneJob;
@@ -28,6 +32,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ServicesController extends Controller
 {
+    use Concerns\HandlesResourceCreationErrors;
     use Concerns\HandlesTagsApi;
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
@@ -428,350 +433,100 @@ class ServicesController extends Controller
         if (blank($environmentUuid) && blank($environmentName)) {
             return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
         }
-        $serverUuid = $request->server_uuid;
         $instantDeploy = $request->instant_deploy ?? false;
-        if ($request->is_public && ! $request->public_port) {
-            $request->offsetSet('is_public', false);
+
+        try {
+            $placement = ResolveResourcePlacement::run(
+                $teamId, (string) $request->project_uuid, $environmentName, $environmentUuid, (string) $request->server_uuid, $request->destination_uuid,
+            );
+        } catch (ResourcePlacementException $e) {
+            return $this->creationErrorResponse($e);
         }
-        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-        if (! $project) {
-            return response()->json(['message' => 'Project not found.'], 404);
-        }
-        $environment = $project->environments()->where('name', $environmentName)->first();
-        if (! $environment) {
-            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
-        }
-        if (! $environment) {
-            return response()->json(['message' => 'Environment not found.'], 404);
-        }
-        $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-        if (! $server->canHostResources()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
-            ], 422);
-        }
-        $destinations = $server->destinations();
-        if ($destinations->count() == 0) {
-            return response()->json(['message' => 'Server has no destinations.'], 400);
-        }
-        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
-        }
-        $destination = $destinations->first();
-        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
-            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
-            if (! $destination) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
-                    ],
-                ], 422);
-            }
-        }
-        $services = get_service_templates();
-        $serviceKeys = $services->keys();
-        if ($serviceKeys->contains($request->type)) {
-            $oneClickServiceName = $request->type;
-            $oneClickService = data_get($services, "$oneClickServiceName.compose");
-            $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
-            if ($oneClickDotEnvs) {
-                $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
-                    return ! empty($value);
-                });
-            }
-            if ($oneClickService) {
-                $dockerComposeRaw = base64_decode($oneClickService);
 
-                // Validate for command injection BEFORE creating service
-                try {
-                    validateDockerComposeForInjection($dockerComposeRaw);
-                } catch (\Exception $e) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'docker_compose_raw' => $e->getMessage(),
-                        ],
-                    ], 422);
-                }
-
-                $servicePayload = [
-                    'name' => "$oneClickServiceName-".str()->random(10),
-                    'docker_compose_raw' => $dockerComposeRaw,
-                    'environment_id' => $environment->id,
-                    'service_type' => $oneClickServiceName,
-                    'server_id' => $server->id,
-                    'destination_id' => $destination->id,
-                    'destination_type' => $destination->getMorphClass(),
-                ];
-                if (in_array($oneClickServiceName, NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK)) {
-                    data_set($servicePayload, 'connect_to_docker_network', true);
-                }
-                $service = new Service($servicePayload);
-                $service->save();
-                $service->name = $request->name ?? "$oneClickServiceName-".$service->uuid;
-                $service->description = $request->description;
-                if ($request->has('is_container_label_escape_enabled')) {
-                    $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
-                }
-                $service->save();
-                if ($oneClickDotEnvs?->count() > 0) {
-                    $oneClickDotEnvs->each(function ($value) use ($service) {
-                        $key = str()->before($value, '=');
-                        $value = str(str()->after($value, '='));
-                        $generatedValue = $value;
-                        if ($value->contains('SERVICE_')) {
-                            $command = $value->after('SERVICE_')->beforeLast('_');
-                            $generatedValue = generateEnvValue($command->value(), $service);
-                        }
-                        EnvironmentVariable::create([
-                            'key' => $key,
-                            'value' => $generatedValue,
-                            'resourceable_id' => $service->id,
-                            'resourceable_type' => $service->getMorphClass(),
-                            'is_preview' => false,
-                        ]);
-                    });
-                }
-                $service->parse(isNew: true);
-
-                // Apply service-specific application prerequisites
-                applyServiceApplicationPrerequisites($service);
-
-                if ($request->has('urls') && is_array($request->urls)) {
-                    $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                    if ($urlResult !== null) {
-                        $service->delete();
-                        if (isset($urlResult['errors'])) {
-                            return response()->json([
-                                'message' => 'Validation failed.',
-                                'errors' => $urlResult['errors'],
-                            ], 422);
-                        }
-                        if (isset($urlResult['conflicts'])) {
-                            return response()->json([
-                                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                                'conflicts' => $urlResult['conflicts'],
-                                'warning' => $urlResult['warning'],
-                            ], 409);
-                        }
-                    }
-                }
-
-                if ($request->has('tags')) {
-                    $this->attachTagsToResource($service, $request->tags, $teamId);
-                }
-
-                if ($instantDeploy) {
-                    StartService::dispatch($service);
-                }
-
-                auditLog('api.service.created', [
-                    'team_id' => $teamId,
-                    'service_uuid' => $service->uuid,
-                    'service_name' => $service->name,
-                    'service_type' => $oneClickServiceName ?? null,
-                    'instant_deploy' => (bool) $instantDeploy,
-                ]);
-
-                return response()->json([
-                    'uuid' => $service->uuid,
-                    'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
-                ])->setStatusCode(201);
-            }
-
-            return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
-        } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
-
-            $validationRules = [
-                'project_uuid' => 'string|required',
-                'environment_name' => 'string|nullable',
-                'environment_uuid' => 'string|nullable',
-                'server_uuid' => 'string|required',
-                'destination_uuid' => 'string',
-                'name' => 'string|max:255',
-                'description' => 'string|nullable',
-                'instant_deploy' => 'boolean',
-                'connect_to_docker_network' => 'boolean',
-                'docker_compose_raw' => 'string|required',
-                'urls' => 'array|nullable',
-                'urls.*' => 'array:name,url',
-                'urls.*.name' => 'string|required',
-                'urls.*.url' => ValidationPatterns::applicationDomainRules(),
-                'force_domain_override' => 'boolean',
-                'is_container_label_escape_enabled' => 'boolean',
-                'tags' => 'array|nullable',
-                'tags.*' => 'string|min:2',
-            ];
-            $validationMessages = [
-                'urls.*.array' => 'An item in the urls array has invalid fields. Only name and url fields are supported.',
-            ];
-            $validator = Validator::make($request->all(), $validationRules, $validationMessages);
-
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-
-            $environmentUuid = $request->environment_uuid;
-            $environmentName = $request->environment_name;
-            if (blank($environmentUuid) && blank($environmentName)) {
-                return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
-            }
-            $serverUuid = $request->server_uuid;
-            $projectUuid = $request->project_uuid;
-            $project = Project::whereTeamId($teamId)->whereUuid($projectUuid)->first();
-            if (! $project) {
-                return response()->json(['message' => 'Project not found.'], 404);
-            }
-            $environment = $project->environments()->where('name', $environmentName)->first();
-            if (! $environment) {
-                $environment = $project->environments()->where('uuid', $environmentUuid)->first();
-            }
-            if (! $environment) {
-                return response()->json(['message' => 'Environment not found.'], 404);
-            }
-            $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-            if (! $server) {
-                return response()->json(['message' => 'Server not found.'], 404);
-            }
-            if (! $server->canHostResources()) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
-                ], 422);
-            }
-            $destinations = $server->destinations();
-            if ($destinations->count() == 0) {
-                return response()->json(['message' => 'Server has no destinations.'], 400);
-            }
-            if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-                return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
-            }
-            $destination = $destinations->first();
-            if ($destinations->count() > 1 && $request->has('destination_uuid')) {
-                $destination = $destinations->where('uuid', $request->destination_uuid)->first();
-                if (! $destination) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
-                        ],
-                    ], 422);
-                }
-            }
+        $isCompose = filled($request->docker_compose_raw);
+        if ($isCompose) {
             if (! isBase64Encoded($request->docker_compose_raw)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.']], 422);
             }
-            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-            if (mb_detect_encoding($dockerComposeRaw, 'UTF-8', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                    ],
-                ], 422);
+            $decoded = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($decoded, 'UTF-8', true) === false) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.']], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-
-            // Validate for command injection BEFORE saving to database
             try {
-                validateDockerComposeForInjection($dockerComposeRaw);
+                validateDockerComposeForInjection(Yaml::dump(Yaml::parse($decoded), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK));
             } catch (\Exception $e) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'docker_compose_raw' => $e->getMessage(),
-                    ],
-                ], 422);
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['docker_compose_raw' => $e->getMessage()]], 422);
             }
-
-            $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
-            $instantDeploy = $request->instant_deploy ?? false;
-
-            $service = new Service;
-            $service->name = $request->name ?? 'service-'.str()->random(10);
-            $service->description = $request->description;
-            $service->docker_compose_raw = $dockerComposeRaw;
-            $service->environment_id = $environment->id;
-            $service->server_id = $server->id;
-            $service->destination_id = $destination->id;
-            $service->destination_type = $destination->getMorphClass();
-            $service->connect_to_docker_network = $connectToDockerNetwork;
-            if ($request->has('is_container_label_escape_enabled')) {
-                $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
-            }
-            $service->save();
-
-            $service->parse(isNew: true);
-
-            if ($request->has('urls') && is_array($request->urls)) {
-                $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                if ($urlResult !== null) {
-                    $service->delete();
-                    if (isset($urlResult['errors'])) {
-                        return response()->json([
-                            'message' => 'Validation failed.',
-                            'errors' => $urlResult['errors'],
-                        ], 422);
-                    }
-                    if (isset($urlResult['conflicts'])) {
-                        return response()->json([
-                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                            'conflicts' => $urlResult['conflicts'],
-                            'warning' => $urlResult['warning'],
-                        ], 409);
-                    }
-                }
-            }
-
-            if ($request->has('tags')) {
-                $this->attachTagsToResource($service, $request->tags, $teamId);
-            }
-
-            if ($instantDeploy) {
-                StartService::dispatch($service);
-            }
-
-            auditLog('api.service.created', [
-                'team_id' => $teamId,
-                'service_uuid' => $service->uuid,
-                'service_name' => $service->name,
-                'service_type' => 'docker_compose',
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json([
-                'uuid' => $service->uuid,
-                'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
-            ])->setStatusCode(201);
-        } elseif (filled($request->type)) {
-            return response()->json([
-                'message' => 'Invalid service type.',
-                'valid_service_types' => $serviceKeys,
-            ], 404);
+        } elseif (! get_service_templates()->keys()->contains($request->type)) {
+            return response()->json(['message' => 'Invalid service type.', 'valid_service_types' => get_service_templates()->keys()], 404);
         }
+
+        $data = array_filter([
+            'name' => $request->name,
+            'description' => $request->description,
+            'connect_to_docker_network' => $request->has('connect_to_docker_network') ? $request->boolean('connect_to_docker_network') : null,
+            'is_container_label_escape_enabled' => $request->has('is_container_label_escape_enabled') ? $request->boolean('is_container_label_escape_enabled') : null,
+        ], fn ($v) => $v !== null);
+
+        try {
+            // Create without deploying: the service is only safe to deploy once
+            // URL validation below has passed. A 409/422 here deletes the service,
+            // and an already-queued StartService would still deploy the deleted one.
+            $service = CreateService::run($placement, $isCompose ? null : $request->type, $isCompose ? $request->docker_compose_raw : null, $data, false);
+        } catch (ResourcePlacementException|ResourceCreationException $e) {
+            return $this->creationErrorResponse($e);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => ['docker_compose_raw' => $e->getMessage()]], 422);
+        }
+
+        if ($request->has('urls') && is_array($request->urls)) {
+            $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+            if ($urlResult !== null) {
+                // CreateService already ran parse(isNew:true), which persisted
+                // ServiceApplication/ServiceDatabase rows and generated env vars.
+                // A plain soft-delete would orphan those, so run the same cleanup
+                // the delete endpoint uses. The service was never deployed (deploy
+                // happens only after this block), so skip docker/network cleanup.
+                $service->delete();
+                DeleteResourceJob::dispatch(
+                    resource: $service,
+                    deleteVolumes: true,
+                    deleteConnectedNetworks: false,
+                    deleteConfigurations: true,
+                    dockerCleanup: false,
+                );
+                if (isset($urlResult['errors'])) {
+                    return response()->json(['message' => 'Validation failed.', 'errors' => $urlResult['errors']], 422);
+                }
+
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $urlResult['conflicts'],
+                    'warning' => $urlResult['warning'],
+                ], 409);
+            }
+        }
+        if ($request->has('tags')) {
+            $this->attachTagsToResource($service, $request->tags, $teamId);
+        }
+
+        // Deploy only now that creation, URL validation, and tagging all succeeded.
+        if ($instantDeploy) {
+            StartService::dispatch($service);
+        }
+
+        auditLog('api.service.created', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_name' => $service->name,
+            'service_type' => $isCompose ? 'docker_compose' : $request->type,
+            'instant_deploy' => (bool) $instantDeploy,
+        ]);
+
+        return response()->json([
+            'uuid' => $service->uuid,
+            'domains' => $service->applications()->pluck('fqdn')->filter()->sort()->values(),
+        ])->setStatusCode(201);
     }
 
     #[OA\Get(

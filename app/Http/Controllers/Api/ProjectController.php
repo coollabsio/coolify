@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Project\CreateEnvironment;
+use App\Actions\Project\CreateProject;
+use App\Exceptions\ResourceCreationException;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Support\ValidationPatterns;
@@ -12,6 +15,8 @@ use OpenApi\Attributes as OA;
 
 class ProjectController extends Controller
 {
+    use Concerns\HandlesResourceCreationErrors;
+
     #[OA\Get(
         summary: 'List',
         description: 'List projects.',
@@ -265,11 +270,7 @@ class ProjectController extends Controller
             ], 422);
         }
 
-        $project = Project::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'team_id' => $teamId,
-        ]);
+        $project = CreateProject::run($teamId, (string) $request->name, $request->description);
 
         return response()->json([
             'uuid' => $project->uuid,
@@ -642,14 +643,11 @@ class ProjectController extends Controller
         }
         $this->authorize('update', $project);
 
-        $existingEnvironment = $project->environments()->where('name', $request->name)->first();
-        if ($existingEnvironment) {
-            return response()->json(['message' => 'Environment with this name already exists.'], 409);
+        try {
+            $environment = CreateEnvironment::run($project, (string) $request->name);
+        } catch (ResourceCreationException $e) {
+            return $this->creationErrorResponse($e);
         }
-
-        $environment = $project->environments()->create([
-            'name' => $request->name,
-        ]);
 
         auditLog('api.project.environment_created', [
             'team_id' => $teamId,

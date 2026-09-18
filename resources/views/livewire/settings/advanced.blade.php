@@ -74,16 +74,10 @@
                 </x-application.settings-section>
             @endif
 
-            <x-application.settings-section id="api-section" title="API and MCP">
+            <x-application.settings-section id="api-section" title="API access">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.listbox id="is_api_enabled" label="API access"
                         helper="Allow authenticated requests to the Coolify REST API." onChange="instantSave"
-                        :options="[
-                            ['value' => true, 'label' => 'Enabled'],
-                            ['value' => false, 'label' => 'Disabled'],
-                        ]" />
-                    <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
-                        helper="Expose the authenticated Streamable HTTP endpoint at /mcp." onChange="instantSave"
                         :options="[
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
@@ -97,11 +91,6 @@
                 @if ($is_api_enabled && (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? '')))))
                     <x-callout type="warning" title="API access is open to every source" class="mt-4">
                         Restrict the allowlist before using API access on a public production instance.
-                    </x-callout>
-                @endif
-                @if ($is_mcp_server_enabled)
-                    <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
                     </x-callout>
                 @endif
             </x-application.settings-section>

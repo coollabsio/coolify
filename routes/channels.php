@@ -11,6 +11,7 @@
 |
 */
 
+use App\Models\AiConversation;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
@@ -29,4 +30,10 @@ Broadcast::channel('user.{userId}', function (User $user) {
     }
 
     return false;
+});
+
+Broadcast::channel('ai-conversation.{uuid}', function (User $user, string $uuid) {
+    $conversation = AiConversation::where('uuid', $uuid)->first();
+
+    return $conversation !== null && $user->can('view', $conversation);
 });

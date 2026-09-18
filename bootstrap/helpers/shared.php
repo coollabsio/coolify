@@ -4190,6 +4190,17 @@ function instanceSettings()
     return InstanceSettings::get();
 }
 
+function isAiAssistantEnabled(): bool
+{
+    return aiAssistantEnabledForTeam(currentTeam());
+}
+
+function aiAssistantEnabledForTeam(?Team $team): bool
+{
+    return (bool) (instanceSettings()->is_ai_assistant_enabled ?? false)
+        && (bool) ($team?->is_ai_assistant_enabled ?? false);
+}
+
 function wireNavigate(): string
 {
     try {

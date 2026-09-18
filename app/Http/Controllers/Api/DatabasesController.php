@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Database\CreateDatabase;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Shared\ResolveResourcePlacement;
 use App\Enums\NewDatabaseTypes;
+use App\Exceptions\ResourceCreationException;
+use App\Exceptions\ResourcePlacementException;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
@@ -33,6 +37,7 @@ use OpenApi\Attributes as OA;
 class DatabasesController extends Controller
 {
     use Concerns\HandlesDatabaseImportsApi;
+    use Concerns\HandlesResourceCreationErrors;
     use Concerns\HandlesTagsApi;
 
     #[OA\Post(
@@ -1885,52 +1890,14 @@ class DatabasesController extends Controller
         if ($request->is_public && ! $request->public_port) {
             $request->offsetSet('is_public', false);
         }
-        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-        if (! $project) {
-            return response()->json(['message' => 'Project not found.'], 404);
-        }
-        $environment = $project->environments()->where('name', $environmentName)->first();
-        if (! $environment) {
-            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
-        }
-        if (! $environment) {
-            return response()->json(['message' => 'You need to provide a valid environment_name or environment_uuid.'], 422);
-        }
-        $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-        if (! $server->canHostResources()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
-            ], 422);
-        }
-        $destinations = $server->destinations();
-        if ($destinations->count() == 0) {
-            return response()->json(['message' => 'Server has no destinations.'], 400);
-        }
-        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
-        }
-        $destination = $destinations->first();
-        if ($destinations->count() > 1 && $request->has('destination_uuid')) {
-            $destination = $destinations->where('uuid', $request->destination_uuid)->first();
-            if (! $destination) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'destination_uuid' => 'Provided destination_uuid does not belong to the specified server.',
-                    ],
-                ], 422);
-            }
+        try {
+            $placement = ResolveResourcePlacement::run(
+                $teamId, (string) $request->project_uuid, $environmentName, $environmentUuid, (string) $serverUuid, $request->destination_uuid,
+            );
+        } catch (ResourcePlacementException $e) {
+            return $this->creationErrorResponse($e);
         }
 
-        if ($request->has('public_port') && $request->is_public) {
-            if (isPublicPortAlreadyUsed($server, $request->public_port)) {
-                return response()->json(['message' => 'Public port already used by another database.'], 400);
-            }
-        }
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
@@ -1954,7 +1921,7 @@ class DatabasesController extends Controller
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
         ]);
-        if ($validator->failed()) {
+        if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),
@@ -1977,516 +1944,132 @@ class DatabasesController extends Controller
                 ], 422);
             }
         }
-        if ($type === NewDatabaseTypes::POSTGRESQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'postgres_user' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'postgres_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'postgres_db' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'postgres_initdb_args' => 'string',
-                'postgres_host_auth_method' => 'string',
-                'postgres_conf' => 'string',
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
+        $commonFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares'];
+        [$typeFields, $rules, $confKey] = match ($type) {
+            NewDatabaseTypes::POSTGRESQL => [
+                ['postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'],
+                [
+                    'postgres_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'postgres_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'postgres_db' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'postgres_initdb_args' => 'string',
+                    'postgres_host_auth_method' => 'string',
+                    'postgres_conf' => 'string',
+                ],
+                'postgres_conf',
+            ],
+            NewDatabaseTypes::MARIADB => [
+                ['mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'],
+                [
+                    'mariadb_conf' => 'string',
+                    'mariadb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mariadb_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mariadb_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mariadb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
+                ],
+                'mariadb_conf',
+            ],
+            NewDatabaseTypes::MYSQL => [
+                ['mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'],
+                [
+                    'mysql_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mysql_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mysql_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mysql_database' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mysql_conf' => 'string',
+                ],
+                'mysql_conf',
+            ],
+            NewDatabaseTypes::REDIS => [
+                ['redis_password', 'redis_conf'],
+                [
+                    'redis_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'redis_conf' => 'string',
+                ],
+                'redis_conf',
+            ],
+            NewDatabaseTypes::DRAGONFLY => [
+                ['dragonfly_password'],
+                ['dragonfly_password' => ValidationPatterns::databasePasswordRules(required: false)],
+                null,
+            ],
+            NewDatabaseTypes::KEYDB => [
+                ['keydb_password', 'keydb_conf'],
+                [
+                    'keydb_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'keydb_conf' => 'string',
+                ],
+                'keydb_conf',
+            ],
+            NewDatabaseTypes::CLICKHOUSE => [
+                ['clickhouse_admin_user', 'clickhouse_admin_password'],
+                [
+                    'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
+                ],
+                null,
+            ],
+            NewDatabaseTypes::MONGODB => [
+                ['mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'],
+                [
+                    'mongo_conf' => 'string',
+                    'mongo_initdb_root_username' => ValidationPatterns::databaseIdentifierRules(required: false),
+                    'mongo_initdb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
+                    'mongo_initdb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
+                ],
+                'mongo_conf',
+            ],
+        };
+        $allowedFields = [...$commonFields, ...$typeFields, 'tags'];
 
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('postgres_conf')) {
-                if (! isBase64Encoded($request->postgres_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'postgres_conf' => 'The postgres_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $postgresConf = base64_decode($request->postgres_conf);
-                if (mb_detect_encoding($postgresConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'postgres_conf' => 'The postgres_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('postgres_conf', $postgresConf);
-            }
-            $database = create_standalone_postgresql($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MARIADB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'mariadb_conf' => 'string',
-                'mariadb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'mariadb_user' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'mariadb_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'mariadb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('mariadb_conf')) {
-                if (! isBase64Encoded($request->mariadb_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $mariadbConf = base64_decode($request->mariadb_conf);
-                if (mb_detect_encoding($mariadbConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mariadb_conf' => 'The mariadb_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('mariadb_conf', $mariadbConf);
-            }
-            $database = create_standalone_mariadb($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
+        $validator = customApiValidator($request->all(), $rules);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
             }
 
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
+            return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+        }
+        if ($confKey && $request->has($confKey)) {
+            if (! isBase64Encoded($request->{$confKey})) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => [$confKey => "The {$confKey} should be base64 encoded."]], 422);
             }
+            $decoded = base64_decode($request->{$confKey});
+            if (mb_detect_encoding($decoded, 'UTF-8', true) === false) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => [$confKey => "The {$confKey} should be base64 encoded."]], 422);
+            }
+            $request->offsetSet($confKey, $decoded);
+        }
+        removeUnnecessaryFieldsFromRequest($request);
 
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MYSQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'mysql_root_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'mysql_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'mysql_user' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'mysql_database' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'mysql_conf' => 'string',
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('mysql_conf')) {
-                if (! isBase64Encoded($request->mysql_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mysql_conf' => 'The mysql_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $mysqlConf = base64_decode($request->mysql_conf);
-                if (mb_detect_encoding($mysqlConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mysql_conf' => 'The mysql_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('mysql_conf', $mysqlConf);
-            }
-            $database = create_standalone_mysql($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::REDIS) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'redis_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'redis_conf' => 'string',
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('redis_conf')) {
-                if (! isBase64Encoded($request->redis_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'redis_conf' => 'The redis_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $redisConf = base64_decode($request->redis_conf);
-                if (mb_detect_encoding($redisConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'redis_conf' => 'The redis_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('redis_conf', $redisConf);
-            }
-            $database = create_standalone_redis($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'dragonfly_password' => ValidationPatterns::databasePasswordRules(required: false),
-            ]);
-
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-
-            removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_dragonfly($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            return response()->json(serializeApiResponse([
-                'uuid' => $database->uuid,
-            ]))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::KEYDB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'keydb_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'keydb_conf' => 'string',
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('keydb_conf')) {
-                if (! isBase64Encoded($request->keydb_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'keydb_conf' => 'The keydb_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $keydbConf = base64_decode($request->keydb_conf);
-                if (mb_detect_encoding($keydbConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'keydb_conf' => 'The keydb_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('keydb_conf', $keydbConf);
-            }
-            $database = create_standalone_keydb($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'clickhouse_admin_user' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'clickhouse_admin_password' => ValidationPatterns::databasePasswordRules(required: false),
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            $database = create_standalone_clickhouse($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MONGODB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'tags'];
-            $validator = customApiValidator($request->all(), [
-                'mongo_conf' => 'string',
-                'mongo_initdb_root_username' => ValidationPatterns::databaseIdentifierRules(required: false),
-                'mongo_initdb_root_password' => ValidationPatterns::databasePasswordRules(required: false),
-                'mongo_initdb_database' => ValidationPatterns::databaseIdentifierRules(required: false),
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('mongo_conf')) {
-                if (! isBase64Encoded($request->mongo_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $mongoConf = base64_decode($request->mongo_conf);
-                if (mb_detect_encoding($mongoConf, 'UTF-8', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('mongo_conf', $mongoConf);
-            }
-            $database = create_standalone_mongodb($environment->id, $destination, $request->only($allowedFields));
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-            if ($tagNames !== []) {
-                $this->attachTagsToResource($database, $tagNames, $teamId);
-            }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            auditLog('api.database.created', [
-                'team_id' => $teamId,
-                'database_uuid' => $database->uuid,
-                'database_name' => $database->name,
-                'database_type' => $type->value,
-                'server_uuid' => $serverUuid,
-                'is_public' => (bool) $database->is_public,
-                'instant_deploy' => (bool) $instantDeploy,
-            ]);
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        try {
+            $database = CreateDatabase::run($placement, $type, $request->only($allowedFields), null, (bool) $instantDeploy);
+        } catch (ResourcePlacementException|ResourceCreationException $e) {
+            return $this->creationErrorResponse($e);
         }
 
-        return response()->json(['message' => 'Invalid database type requested.'], 400);
+        if ($tagNames !== []) {
+            $this->attachTagsToResource($database, $tagNames, $teamId);
+        }
+        $database->refresh();
+        $payload = ['uuid' => $database->uuid, 'internal_db_url' => $database->internal_db_url];
+        if ($database->is_public && $database->public_port) {
+            $payload['external_db_url'] = $database->external_db_url;
+        }
+
+        auditLog('api.database.created', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'database_name' => $database->name,
+            'database_type' => $type->value,
+            'server_uuid' => $serverUuid,
+            'is_public' => (bool) $database->is_public,
+            'instant_deploy' => (bool) $instantDeploy,
+        ]);
+
+        return response()->json(serializeApiResponse($payload))->setStatusCode(201);
     }
 
     #[OA\Get(

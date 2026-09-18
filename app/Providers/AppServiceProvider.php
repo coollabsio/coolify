@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Ai\Storage\AuthoredConversationStore;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Stripe\StripeClient;
@@ -21,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
+
+        // Swap the SDK conversation store so user turns are stamped with author_user_id.
+        $this->app->singleton(ConversationStore::class, fn () => new AuthoredConversationStore(
+            config('ai.conversations.connection'),
+        ));
     }
 
     public function boot(): void
