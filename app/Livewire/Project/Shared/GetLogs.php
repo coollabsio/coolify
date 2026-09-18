@@ -167,13 +167,13 @@ class GetLogs extends Component
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$logTail} -t {$this->container}";
+                    $command = "timeout -k 5 20 docker service logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "docker logs -n {$logTail} -t {$this->container}";
+                    $command = "timeout -k 5 20 docker logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
@@ -181,13 +181,13 @@ class GetLogs extends Component
                 }
             } else {
                 if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$logTail} {$this->container}";
+                    $command = "timeout -k 5 20 docker service logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "docker logs -n {$logTail} {$this->container}";
+                    $command = "timeout -k 5 20 docker logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
@@ -203,7 +203,7 @@ class GetLogs extends Component
             $logChunks = [];
             $accumulatedBytes = 0;
             $truncated = false;
-            Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
+            Process::timeout(20)->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
                 if ($truncated) {
                     return;
                 }
@@ -259,15 +259,15 @@ class GetLogs extends Component
 
         if ($this->showTimeStamps) {
             if ($this->server->isSwarm()) {
-                $command = "docker service logs -t {$this->container}";
+                $command = "timeout -k 5 30 docker service logs -t {$this->container}";
             } else {
-                $command = "docker logs -t {$this->container}";
+                $command = "timeout -k 5 30 docker logs -t {$this->container}";
             }
         } else {
             if ($this->server->isSwarm()) {
-                $command = "docker service logs {$this->container}";
+                $command = "timeout -k 5 30 docker service logs {$this->container}";
             } else {
-                $command = "docker logs {$this->container}";
+                $command = "timeout -k 5 30 docker logs {$this->container}";
             }
         }
 
@@ -285,7 +285,7 @@ class GetLogs extends Component
         $accumulatedBytes = 0;
         $truncated = false;
 
-        Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
+        Process::timeout(30)->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
             if ($truncated) {
                 return;
             }
