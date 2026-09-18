@@ -2455,6 +2455,59 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Get(
+        summary: 'Get preview application logs.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/logs',
+        operationId: 'get-preview-application-logs-by-pull-request-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'path',
+                description: 'Pull request ID of the preview deployment.',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
+            ),
+            new OA\Parameter(
+                name: 'show_timestamps',
+                in: 'query',
+                description: 'Show timestamps in the logs.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [new OA\Property(property: 'logs', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
     public function logs_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -2470,7 +2523,25 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+        $this->authorize('view', $application);
+
+        $pullRequestId = null;
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if ($pullRequestIdRaw !== null) {
+            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+                return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+            }
+            $pullRequestId = (int) $pullRequestIdRaw;
+
+            $previewExists = ApplicationPreview::where('application_id', $application->id)
+                ->where('pull_request_id', $pullRequestId)
+                ->exists();
+            if (! $previewExists) {
+                return response()->json(['message' => 'Preview not found.'], 404);
+            }
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([
