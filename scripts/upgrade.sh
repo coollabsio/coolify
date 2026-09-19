@@ -292,8 +292,15 @@ nohup bash -c "
     fi
 
     log 'Running docker compose up...'
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-docker.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env \${COMPOSE_FILES} up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1
-    log 'Docker compose up completed'
+    if docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock \${DOCKER_CONFIG_MOUNT} --rm \${REGISTRY_URL:-docker.io}/coollabsio/coolify-helper:\${LATEST_HELPER_VERSION} bash -c \"LATEST_IMAGE=\${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env \${COMPOSE_FILES} up -d --remove-orphans --wait --wait-timeout 60\" >>\"\$LOGFILE\" 2>&1; then
+        log 'Docker compose up completed'
+    else
+        exit_code=\$?
+        error_message=\"Failed to start Coolify containers (exit code \${exit_code})\"
+        log \"ERROR: \${error_message}\"
+        write_status 'error' \"\${error_message}\"
+        exit \"\${exit_code}\"
+    fi
 
     # Final log entry
     echo '' >>\"\$LOGFILE\"
