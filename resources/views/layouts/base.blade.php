@@ -80,6 +80,14 @@
                 window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
             },
             previewThemeColor(color) {
+                // A closed picker cannot produce a real color choice. Stale or
+                // backgrounded tabs can still receive input/change events on the
+                // always-mounted color field (form-state restoration, autofill,
+                // extension scripts), so ignore them and let the persisted theme
+                // change only through explicit user actions.
+                if (!this.pickerOpen) {
+                    return;
+                }
                 this.themeColor = color;
                 if (this.theme !== 'custom') {
                     this.theme = 'custom';
@@ -97,6 +105,9 @@
                 });
             },
             saveThemeColor(color) {
+                if (!this.pickerOpen) {
+                    return;
+                }
                 this.previewThemeColor(color);
                 localStorage.setItem('themeColor', color);
                 localStorage.setItem('theme', 'custom');
