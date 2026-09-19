@@ -1590,6 +1590,33 @@ function escapeEnvVariables($value)
 
     return str_replace($search, $replace, $value);
 }
+/**
+ * Escape an externally-sourced env value for a generated .env file.
+ *
+ * Mirrors EnvironmentVariable::getResolvedValueWithServer() so that an inherited
+ * secret is written exactly like a resource-level variable holding the same value:
+ * JSON objects/arrays pass through untouched, multiline values are single quoted
+ * so they cannot split the file into extra lines, and everything else goes through
+ * escapeEnvVariables().
+ */
+function escapeInheritedEnvValue(?string $value): string
+{
+    if ($value === null || $value === '') {
+        return '';
+    }
+
+    // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+    if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+        return $value;
+    }
+
+    if (str_contains($value, "\n")) {
+        return "'".$value."'";
+    }
+
+    return escapeEnvVariables($value);
+}
+
 function escapeDollarSign($value)
 {
     $search = ['$'];

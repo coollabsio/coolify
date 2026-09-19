@@ -84,6 +84,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $newVersionIsHealthy = false;
 
+    private ?InfisicalBinding $infisicalBinding = null;
+
+    private bool $infisicalBindingResolved = false;
+
+    /** @var Collection<string, string>|null */
+    private ?Collection $inheritedSecrets = null;
+
     private ApplicationDeploymentQueue $application_deployment_queue;
 
     private Application $application;
@@ -1368,12 +1375,47 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function syncInheritedSecrets(): void
     {
-        SyncBindingSafely::run(
-            InfisicalBinding::query()
-                ->where('environment_id', $this->application->environment_id)
-                ->where('is_enabled', true)
-                ->first()
-        );
+        SyncBindingSafely::run($this->infisicalBinding());
+    }
+
+    /**
+     * The enabled Infisical binding for this deployment's environment, if any.
+     *
+     * Memoised: deployments without a binding must not pay for this lookup twice.
+     */
+    private function infisicalBinding(): ?InfisicalBinding
+    {
+        if ($this->infisicalBindingResolved) {
+            return $this->infisicalBinding;
+        }
+
+        $this->infisicalBindingResolved = true;
+
+        return $this->infisicalBinding = InfisicalBinding::query()
+            ->where('environment_id', $this->application->environment_id)
+            ->where('is_enabled', true)
+            ->first();
+    }
+
+    /**
+     * Infisical-owned variables inherited from this deployment's environment, as key => value.
+     *
+     * Memoised: the runtime and build-time generators each ask for these, and every
+     * deployment pays for the lookup whether or not Infisical is configured.
+     *
+     * @return Collection<string, string>
+     */
+    private function inheritedSecrets(): Collection
+    {
+        if ($this->inheritedSecrets !== null) {
+            return $this->inheritedSecrets;
+        }
+
+        if ($this->infisicalBinding() === null) {
+            return $this->inheritedSecrets = collect();
+        }
+
+        return $this->inheritedSecrets = ResolveInheritedSecrets::run($this->application);
     }
 
     private function generate_runtime_environment_variables()
@@ -1392,6 +1434,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $sorted_environment_variables_preview = $sorted_environment_variables_preview->reject(fn (EnvironmentVariable $env) => $this->isGeneratedDockerComposeEnvironmentVariable($env));
         }
         $ports = $this->application->main_port();
+
+        // Inherited Infisical secrets are the lowest precedence: they are pushed before the
+        // Coolify-generated and resource-level variables below, both of which overwrite matching keys.
+        foreach ($this->inheritedSecrets() as $key => $value) {
+            $envs->push("{$key}=".escapeInheritedEnvValue($value));
+        }
+
         $coolify_envs = $this->generate_coolify_env_variables();
         $coolify_envs->each(function ($item, $key) use ($envs) {
             $envs->push($key.'='.$item);
@@ -1442,11 +1491,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return 1;
             });
-
-            // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
-            foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
-                $envs->push("{$key}={$value}");
-            }
 
             foreach ($runtime_environment_variables as $env) {
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
@@ -1514,11 +1558,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return 1;
             });
-
-            // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
-            foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
-                $envs->push("{$key}={$value}");
-            }
 
             foreach ($runtime_environment_variables_preview as $env) {
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
@@ -1715,6 +1754,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        // 1.5 Add inherited Infisical secrets. They sit below the Coolify/SERVICE generated
+        // variables and the user-defined variables below, both of which override them.
+        foreach ($this->inheritedSecrets() as $key => $value) {
+            $envs_dict[$key] = escapeBashEnvValue($value);
+        }
+
         // 2. Add COOLIFY variables (can override nixpacks, but shouldn't happen in practice)
         $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
         foreach ($coolify_envs as $key => $item) {
@@ -1774,11 +1819,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-        }
-
-        // 3.5 Add inherited Infisical secrets before the user-defined variables below, which override them.
-        foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
-            $envs_dict[$key] = escapeBashEnvValue($value);
         }
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)

@@ -1592,6 +1592,13 @@ class Service extends BaseModel
 
         $envs = collect([]);
 
+        // Inherited Infisical secrets are the lowest precedence: they are pushed before the
+        // generated SERVICE_NAME_* variables and the resource-level variables below, both of
+        // which overwrite matching keys.
+        foreach (ResolveInheritedSecrets::run($this) as $key => $value) {
+            $envs->push("{$key}=".escapeInheritedEnvValue($value));
+        }
+
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
@@ -1615,11 +1622,6 @@ class Service extends BaseModel
 
             return 3;
         });
-
-        // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
-        foreach (ResolveInheritedSecrets::run($this) as $key => $value) {
-            $envs->push("{$key}={$value}");
-        }
 
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$env->real_value}");
