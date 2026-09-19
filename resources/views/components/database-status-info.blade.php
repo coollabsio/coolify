@@ -23,10 +23,10 @@
         <x-forms.input :label="$label . ' URL (internal)'" disabled value="Hidden (only admins can view)" />
         <x-forms.input :label="$label . ' URL (public)'" disabled value="Hidden (only admins can view)" />
     @else
-        <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly
+        <x-forms.input :label="$label . ' URL (internal)'" :helper="$urlHelper" type="password" readonly copyable
             wire:model="dbUrl" canGate="update" :canResource="$database" />
         @if ($dbUrlPublic)
-            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly
+            <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" type="password" readonly copyable
                 wire:model="dbUrlPublic" canGate="update" :canResource="$database" />
         @elseif ($showPublicUrlPlaceholder)
             <x-forms.input :label="$label . ' URL (public)'" :helper="$urlHelper" readonly

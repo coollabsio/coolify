@@ -2960,10 +2960,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -3036,10 +3032,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true
@@ -5931,10 +5923,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -6007,10 +5995,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true
@@ -10944,6 +10928,10 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                max_restart_count:
+                  description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
+                  type: [integer, 'null']
+                  minimum: 0
                 is_force_https_enabled:
                   type: [boolean, 'null']
               type: object
@@ -12493,10 +12481,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -12569,10 +12553,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true

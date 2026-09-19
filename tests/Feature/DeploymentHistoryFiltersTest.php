@@ -4,12 +4,14 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Livewire\Project\Application\Deployment\Index;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 
 uses(RefreshDatabase::class);
 
@@ -87,4 +89,55 @@ it('always shows source filters and includes server filters', function () {
         ->toContain('Reset filters')
         ->and($loadingComponent)
         ->toContain('wire:loading.flex');
+});
+
+it('shows the active pull request id on the deployment filter control', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
+    $filter = Blade::render(<<<'BLADE'
+        <x-table.filter :active-count="1" active-text="Pull request #41" reset-action="clearFilter">
+            Filter options
+        </x-table.filter>
+    BLADE);
+
+    expect($view)->toContain(":active-text=\"filled(\$pull_request_id) ? 'Pull request #'.\$pull_request_id : null\"")
+        ->and($filter)->toContain('<span class="truncate">Pull request #41</span>');
+});
+
+it('keeps a pull request filter from the URL when it has no deployment records yet', function () {
+    $application = Application::factory()->create();
+    $component = new Index;
+    $component->application = $application;
+    $component->pull_request_id = '41';
+
+    $method = new ReflectionMethod(Index::class, 'loadPullRequestOptions');
+    $method->invoke($component);
+
+    expect($component->pull_request_id)->toBe('41')
+        ->and($component->pullRequestOptions)->toContain([
+            'value' => '41',
+            'label' => 'Pull request #41',
+        ]);
+});
+
+it('includes every configured preview in the pull request filter options', function () {
+    $application = Application::factory()->create();
+    foreach ([41, 72] as $pullRequestId) {
+        ApplicationPreview::query()->create([
+            'application_id' => $application->id,
+            'pull_request_id' => $pullRequestId,
+            'pull_request_html_url' => "https://github.com/example/repository/pull/{$pullRequestId}",
+        ]);
+    }
+
+    $component = new Index;
+    $component->application = $application;
+
+    $method = new ReflectionMethod(Index::class, 'loadPullRequestOptions');
+    $method->invoke($component);
+
+    expect($component->pullRequestOptions)->toBe([
+        ['value' => '', 'label' => 'All deployments'],
+        ['value' => '72', 'label' => 'Pull request #72'],
+        ['value' => '41', 'label' => 'Pull request #41'],
+    ]);
 });

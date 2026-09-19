@@ -1,14 +1,9 @@
 <form wire:submit="submit">
     <x-unsaved-bar action="submit" />
 
-    <section class="application-settings-section">
-        <div class="application-settings-section-header">
-            <div>
-                <h2>Retention</h2>
-                <p>The first reached limit removes the oldest backup. Use 0 for unlimited retention.</p>
-            </div>
-        </div>
-        <div class="application-settings-section-body space-y-6">
+    <x-application.settings-section title="Retention"
+        description="The first reached limit removes the oldest backup. Use 0 for unlimited retention.">
+        <div class="space-y-6">
             <div>
                 <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Local backups</h3>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -35,5 +30,5 @@
                 </div>
             </div>
         </div>
-    </section>
+    </x-application.settings-section>
 </form>

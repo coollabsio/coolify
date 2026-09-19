@@ -621,3 +621,70 @@ describe('DELETE /api/v1/databases/{uuid}/storages/{storage_uuid}', function () 
         expect(LocalPersistentVolume::find($vol->id))->toBeNull();
     });
 });
+
+test('rejects host paths when creating persistent storage through the API', function (string $resourceType) {
+    if ($resourceType === 'application') {
+        $resource = createTestApplication($this);
+        $url = "/api/v1/applications/{$resource->uuid}/storages";
+        $payload = [];
+    } elseif ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+        $payload = [];
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+        $payload = ['resource_uuid' => $resource->uuid];
+    }
+
+    $storageCountBefore = $resource->persistentStorages()->count();
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->bearerToken,
+        'Content-Type' => 'application/json',
+    ])->postJson($url, array_merge($payload, [
+        'type' => 'persistent',
+        'name' => 'blocked-bind-mount',
+        'mount_path' => '/data',
+        'host_path' => '/srv/data',
+    ]));
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('errors.host_path.0', 'This field is not allowed.');
+
+    expect($resource->persistentStorages()->count())->toBe($storageCountBefore);
+})->with(['application', 'database', 'service']);
+
+test('rejects host paths when updating persistent storage through the API', function (string $resourceType) {
+    if ($resourceType === 'application') {
+        $resource = createTestApplication($this);
+        $url = "/api/v1/applications/{$resource->uuid}/storages";
+    } elseif ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+    }
+
+    $storage = LocalPersistentVolume::create([
+        'name' => $resource->uuid.'-data',
+        'mount_path' => '/data',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->bearerToken,
+        'Content-Type' => 'application/json',
+    ])->patchJson($url, [
+        'uuid' => $storage->uuid,
+        'type' => 'persistent',
+        'host_path' => '/srv/data',
+    ]);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('errors.host_path.0', 'This field is not allowed.');
+
+    expect($storage->refresh()->host_path)->toBeNull();
+})->with(['application', 'database', 'service']);

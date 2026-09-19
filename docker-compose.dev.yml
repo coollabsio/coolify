@@ -150,7 +150,7 @@ services:
     networks:
       - coolify
   minio-init:
-    image: minio/mc:latest
+    image: ghcr.io/coollabsio/mx:0.1.0
     pull_policy: always
     container_name: coolify-minio-init
     restart: no
