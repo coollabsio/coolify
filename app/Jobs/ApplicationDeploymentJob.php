@@ -361,21 +361,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Check custom port
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
-            if (data_get($this->application, 'settings.is_build_server_enabled')) {
-                $teamId = data_get($this->application, 'environment.project.team.id');
-                $buildServers = Server::buildServers($teamId)->get();
-                if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
-                    $this->build_server = $this->server;
-                } else {
-                    $this->build_server = $buildServers->random();
-                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
-                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
-                    $this->use_build_server = true;
-                }
-            } else {
-                $this->build_server = $this->server;
-            }
+            $this->selectBuildServer();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
         } catch (Exception $e) {
@@ -422,6 +408,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
             }
         }
+    }
+
+    private function selectBuildServer(): void
+    {
+        if (! data_get($this->application, 'settings.is_build_server_enabled')) {
+            $this->build_server = $this->server;
+
+            return;
+        }
+
+        $team = $this->application->environment->project->team;
+        $buildServers = Server::buildServers($team->id)->get();
+
+        if ($buildServers->isEmpty()) {
+            if (! $team->is_build_server_fallback_enabled) {
+                throw new DeploymentException('No available dedicated build server was found. Enable a usable build server for this team or allow fallback to the deployment server in the team settings.');
+            }
+
+            $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
+            $this->build_server = $this->server;
+
+            return;
+        }
+
+        $this->build_server = $buildServers->random();
+        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+        $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
+        $this->use_build_server = true;
     }
 
     private function detectBuildKitCapabilities(): void

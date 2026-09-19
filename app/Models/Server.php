@@ -903,7 +903,12 @@ $siteAddress {
 
     public static function buildServers($teamId)
     {
-        return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
+        return Server::whereTeamId($teamId)
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', true)
+            ->whereRelation('settings', 'force_disabled', false);
     }
 
     public function isForceDisabled()
