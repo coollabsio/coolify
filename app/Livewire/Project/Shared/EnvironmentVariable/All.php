@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Actions\Infisical\ResolveInheritedSecrets;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
@@ -231,6 +232,23 @@ class All extends Component
     public function getIsSearchActiveProperty(): bool
     {
         return $this->searchTerm() !== '';
+    }
+
+    /**
+     * Infisical-owned variables inherited by this resource's environment,
+     * keyed by variable name. Rendered read-only with a badge; never
+     * editable or deletable from this list, since they are managed by the
+     * next Infisical sync rather than by this resource.
+     *
+     * @return Collection<string, string>
+     */
+    public function getInheritedSecretsProperty(): Collection
+    {
+        if (! $this->readyToLoad) {
+            return collect();
+        }
+
+        return ResolveInheritedSecrets::run($this->resource);
     }
 
     public function getHardcodedEnvironmentVariablesProperty()

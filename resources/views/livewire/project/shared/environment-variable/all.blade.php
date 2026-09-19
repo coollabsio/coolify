@@ -250,6 +250,37 @@
                     </div>
                 @endif
             </div>
+
+            @if ($this->inheritedSecrets->isNotEmpty())
+                <div id="environment-table-inherited-section"
+                    class="application-settings-section-body relative mt-4 scroll-mt-28 is-flush w-full">
+                    <div class="flex items-center gap-2 border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.07]">
+                        <span class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">
+                            Inherited from Infisical
+                        </span>
+                        <x-helper helper="These variables are synced from an Infisical binding on this environment. Edit or remove them in Infisical; the next sync will update Coolify." />
+                    </div>
+                    <div class="data-table w-full">
+                        @foreach ($this->inheritedSecrets->keys() as $inheritedKey)
+                            <div wire:key="inherited-secret-{{ $inheritedKey }}"
+                                class="data-table-row env-table-grid-no-type items-center">
+                                <div class="flex min-w-0 items-center gap-2">
+                                    <span class="min-w-0 truncate font-mono text-[13px] text-black dark:text-fg">
+                                        {{ $inheritedKey }}
+                                    </span>
+                                    <span class="table-badge shrink-0">Infisical</span>
+                                </div>
+                                <span class="data-table-cell-dash">-</span>
+                                <span class="data-table-cell-dash">-</span>
+                                <span class="data-table-cell-dash">-</span>
+                                <span class="justify-self-end text-[11px] text-neutral-400 dark:text-fg-faint">
+                                    Read-only
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         @endif
     @endif
 </div>
