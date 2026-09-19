@@ -3,6 +3,7 @@
 namespace App\Services\Infisical;
 
 use App\Models\InfisicalConnection;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class InfisicalClient
@@ -22,13 +23,19 @@ class InfisicalClient
      */
     public function fetchSecrets(string $projectId, string $environmentSlug, string $secretPath): array
     {
-        $response = Http::timeout(self::TIMEOUT_SECONDS)
-            ->withToken($this->accessToken())
-            ->get($this->connection->host.'/api/v3/secrets/raw', [
-                'workspaceId' => $projectId,
-                'environment' => $environmentSlug,
-                'secretPath' => $secretPath,
-            ]);
+        try {
+            $response = Http::timeout(self::TIMEOUT_SECONDS)
+                ->withToken($this->accessToken())
+                ->get($this->connection->host.'/api/v3/secrets/raw', [
+                    'workspaceId' => $projectId,
+                    'environment' => $environmentSlug,
+                    'secretPath' => $secretPath,
+                ]);
+        } catch (ConnectionException $e) {
+            throw new InfisicalApiException(
+                "Could not connect to Infisical host {$this->connection->host} to fetch secrets: {$e->getMessage()}"
+            );
+        }
 
         if ($response->failed()) {
             throw new InfisicalApiException(
@@ -36,13 +43,29 @@ class InfisicalClient
             );
         }
 
+        $hiddenKeys = [];
         $secrets = [];
         foreach ($response->json('secrets', []) as $secret) {
             $key = data_get($secret, 'secretKey');
             if ($key === null) {
                 continue;
             }
+
+            if (data_get($secret, 'secretValueHidden') === true) {
+                $hiddenKeys[] = $key;
+
+                continue;
+            }
+
             $secrets[$key] = (string) data_get($secret, 'secretValue', '');
+        }
+
+        if ($hiddenKeys !== []) {
+            $keys = implode(', ', $hiddenKeys);
+
+            throw new InfisicalApiException(
+                "Infisical machine identity lacks permission to read the value of secret(s): {$keys}."
+            );
         }
 
         return $secrets;
@@ -60,11 +83,17 @@ class InfisicalClient
             return $this->accessToken;
         }
 
-        $response = Http::timeout(self::TIMEOUT_SECONDS)
-            ->post($this->connection->host.'/api/v1/auth/universal-auth/login', [
-                'clientId' => $this->connection->client_id,
-                'clientSecret' => $this->connection->client_secret,
-            ]);
+        try {
+            $response = Http::timeout(self::TIMEOUT_SECONDS)
+                ->post($this->connection->host.'/api/v1/auth/universal-auth/login', [
+                    'clientId' => $this->connection->client_id,
+                    'clientSecret' => $this->connection->client_secret,
+                ]);
+        } catch (ConnectionException $e) {
+            throw new InfisicalApiException(
+                "Could not connect to Infisical host {$this->connection->host} to authenticate: {$e->getMessage()}"
+            );
+        }
 
         if ($response->failed()) {
             throw new InfisicalApiException(
