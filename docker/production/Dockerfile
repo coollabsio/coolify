@@ -1,8 +1,6 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
-# https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.7.3
 # https://www.postgresql.org/support/versioning/
@@ -63,7 +61,7 @@ RUN npm run build
 # =================================================================
 # Stage 3: Get MinIO client
 # =================================================================
-FROM minio/mc:${MINIO_VERSION} AS minio-client
+FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 # =================================================================
 # Final Stage: Production image

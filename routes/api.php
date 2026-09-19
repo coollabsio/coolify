@@ -244,6 +244,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/previews/{pull_request_id}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);

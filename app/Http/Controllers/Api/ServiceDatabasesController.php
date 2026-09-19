@@ -288,7 +288,16 @@ class ServiceDatabasesController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'database_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'lines', in: 'query', required: false, schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ]),
+            ),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Logs.', content: new OA\JsonContent(type: 'object', properties: [new OA\Property(property: 'logs', type: 'string')])),

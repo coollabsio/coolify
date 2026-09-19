@@ -1567,7 +1567,7 @@ it('deletes local archives before deleting a volume backup schedule', function (
     ]);
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->call('delete', 'password')
+        ->call('delete', 'password', ['delete_associated_backups_locally'])
         ->assertDispatched('success')
         ->assertRedirectToRoute('project.application.backup.index', [
             'project_uuid' => $application->project()->uuid,
@@ -1578,6 +1578,36 @@ it('deletes local archives before deleting a volume backup schedule', function (
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
     Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
         && str_contains($process->command, 'archive.tar.gz'));
+});
+
+it('deletes a volume backup schedule without deleting unselected archives', function () {
+    Process::fake();
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
+        'size' => 128,
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 'danger',
+    ])
+        ->assertSee('Delete all local archives created by this schedule.')
+        ->assertSee('Delete all S3 archives created by this schedule.')
+        ->call('delete', 'password', [])
+        ->assertDispatched('success');
+
+    expect($backup->fresh())->toBeNull();
+    Process::assertNothingRan();
 });
 
 it('deletes a volume backup schedule without a password when two-step confirmation is disabled', function () {
@@ -1646,7 +1676,7 @@ it('deletes S3 archives from the storage recorded on each execution', function (
         ->andReturn($disk);
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->call('delete', 'password')
+        ->call('delete', 'password', ['delete_associated_backups_s3'])
         ->assertDispatched('success');
 
     expect($backup->fresh())->toBeNull();

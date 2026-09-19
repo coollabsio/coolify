@@ -264,6 +264,7 @@ class Server extends BaseModel
         'unreachable_notification_sent' => 'boolean',
         'is_build_server' => 'boolean',
         'force_disabled' => 'boolean',
+        'sentinel_waiting_since' => 'datetime',
     ];
 
     /**
@@ -967,9 +968,25 @@ $siteAddress {
         return $wait;
     }
 
+    public function firstSentinelReportTimeoutSeconds(): int
+    {
+        return max(30, $this->settings->sentinel_push_interval_seconds + 30);
+    }
+
     public function isSentinelLive()
     {
         return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));
+    }
+
+    public function sentinelStatus(): string
+    {
+        if ($this->sentinel_waiting_since !== null) {
+            return $this->sentinel_waiting_since->isAfter(now()->subSeconds($this->firstSentinelReportTimeoutSeconds()))
+                ? 'waiting'
+                : 'out_of_sync';
+        }
+
+        return $this->isSentinelLive() ? 'in_sync' : 'out_of_sync';
     }
 
     public function isSentinelEnabled(): bool

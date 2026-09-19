@@ -2,6 +2,15 @@
 
 @php
     $serverRouteParameters = ['server_uuid' => $server->uuid];
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelStatusStartedAt = $server->sentinel_waiting_since ?? \Illuminate\Support\Carbon::parse($server->sentinel_updated_at);
+    $sentinelTimeoutSeconds = $server->sentinel_waiting_since !== null
+        ? $server->firstSentinelReportTimeoutSeconds()
+        : $server->waitBeforeDoingSshCheck();
+    $sentinelExpiresInMilliseconds = max(
+        0,
+        ($sentinelStatusStartedAt->copy()->addSeconds($sentinelTimeoutSeconds)->timestamp - now()->timestamp) * 1000,
+    );
     $serverMenuItems = [
         [
             'label' => 'General',
@@ -70,7 +79,8 @@
             'icon' => 'shield-star',
             'group' => 'Platform',
             'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
-            'warning' => $server->isSentinelEnabled() && ! $server->isSentinelLive(),
+            'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
+            'tracks_sentinel_status' => true,
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
                 ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
@@ -173,11 +183,24 @@
 <aside class="application-settings-navigation min-w-0 xl:self-start"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
-        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())
+        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
+        sentinelOutOfSync: @js($server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync'),
+        sentinelExpiryTimer: null,
+        scheduleSentinelExpiry(delay) {
+            clearTimeout(this.sentinelExpiryTimer);
+            if (!this.sentinelOutOfSync) {
+                this.sentinelExpiryTimer = setTimeout(() => this.sentinelOutOfSync = true, delay);
+            }
+        }
     }"
+    x-init="scheduleSentinelExpiry(@js($sentinelExpiresInMilliseconds))"
     @proxy-configuration-state-changed.window="
         proxyConfigurationPending = $event.detail.pending;
         traefikOutdated = $event.detail.traefikOutdated;
+    "
+    @sentinel-status-changed.window="
+        sentinelOutOfSync = $event.detail.outOfSync;
+        scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
     ">
     <nav aria-label="Server configuration sections"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -200,6 +223,9 @@
                     @if ($menuItem['tracks_proxy_configuration'] ?? false)
                         <x-reicon name="alert-triangle" x-cloak
                             x-show="proxyConfigurationPending || traefikOutdated"
+                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['tracks_sentinel_status'] ?? false)
+                        <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
                     @elseif ($menuItem['warning'] ?? false)
                         <x-reicon name="alert-triangle"

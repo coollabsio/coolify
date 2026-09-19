@@ -247,14 +247,14 @@
                                             @disabled(!auth()->user()->can('deploy', $service))
                                             @click="open = false; document.getElementById('service-restart-trigger')?.click()">
                                             <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                            Restart
+                                            Restart current version
                                         </button>
                                         @if ($serviceStatus->contains('running'))
                                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                                 @disabled(!auth()->user()->can('deploy', $service))
                                                 @click="$wire.dispatch('pullAndRestartEvent'); open = false">
                                                 <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                                Restart (pull latest)
+                                                Pull latest and restart
                                             </button>
                                         @endif
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"

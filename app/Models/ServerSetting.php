@@ -60,6 +60,12 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
+
+    public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
+
+    public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
+
     protected $fillable = [
         'server_id',
         'is_swarm_manager',
@@ -236,6 +242,10 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
+        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+            $url = null;
+        }
+
         if (blank($url)) {
             $url = $this->generateSentinelUrl(ignoreEvent: true);
         }
@@ -247,12 +257,22 @@ class ServerSetting extends Model
         return $url;
     }
 
+    public function restoreDefaultSentinelConfiguration(): void
+    {
+        $this->generateSentinelUrl(save: false, ignoreEvent: true);
+        $this->sentinel_metrics_refresh_rate_seconds = self::DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS;
+        $this->sentinel_metrics_history_days = self::DEFAULT_SENTINEL_METRICS_HISTORY_DAYS;
+        $this->sentinel_push_interval_seconds = self::DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS;
+        $this->is_sentinel_debug_enabled = false;
+        $this->saveQuietly();
+    }
+
     public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
-            $domain = 'http://host.docker.internal:8000';
+            $domain = 'http://coolify:8080';
         } elseif ($settings->fqdn) {
             $domain = $settings->fqdn;
         } elseif ($settings->public_ipv4) {

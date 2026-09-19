@@ -55,7 +55,7 @@
             return [
                 'uuid' => $server->uuid,
                 'name' => $server->name,
-                'description' => $server->description ?: 'No description',
+                'description' => $server->description,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,

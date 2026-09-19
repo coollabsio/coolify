@@ -2410,13 +2410,12 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -2456,6 +2455,59 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Get(
+        summary: 'Get preview application logs.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/logs',
+        operationId: 'get-preview-application-logs-by-pull-request-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'path',
+                description: 'Pull request ID of the preview deployment.',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
+            ),
+            new OA\Parameter(
+                name: 'show_timestamps',
+                in: 'query',
+                description: 'Show timestamps in the logs.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [new OA\Property(property: 'logs', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
     public function logs_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -2471,7 +2523,25 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+        $this->authorize('view', $application);
+
+        $pullRequestId = null;
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if ($pullRequestIdRaw !== null) {
+            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+                return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+            }
+            $pullRequestId = (int) $pullRequestIdRaw;
+
+            $previewExists = ApplicationPreview::where('application_id', $application->id)
+                ->where('pull_request_id', $pullRequestId)
+                ->exists();
+            if (! $previewExists) {
+                return response()->json(['message' => 'Preview not found.'], 404);
+            }
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -4873,7 +4943,6 @@ class ApplicationsController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -4935,11 +5004,10 @@ class ApplicationsController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4981,7 +5049,7 @@ class ApplicationsController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -5019,9 +5087,6 @@ class ApplicationsController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {
@@ -5077,7 +5142,6 @@ class ApplicationsController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -5122,14 +5186,13 @@ class ApplicationsController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -5165,7 +5228,6 @@ class ApplicationsController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $application->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $application->id,
                 'resource_type' => $application->getMorphClass(),
             ]);
