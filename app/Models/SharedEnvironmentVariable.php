@@ -28,6 +28,9 @@ class SharedEnvironmentVariable extends Model
 
         // Metadata
         'version',
+
+        // Provenance
+        'infisical_binding_id',
     ];
 
     protected $hidden = [
@@ -72,5 +75,10 @@ class SharedEnvironmentVariable extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function infisicalBinding()
+    {
+        return $this->belongsTo(InfisicalBinding::class, 'infisical_binding_id');
     }
 }
