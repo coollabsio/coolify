@@ -274,6 +274,15 @@ function dockerRemoveCommandWithTimeout(string $container, int $timeout = 60, in
     return 'bash -c '.escapeShellValue($script);
 }
 
+function dockerRunWithNameConflictRetryCommand(string $command, string $container, int $timeout = 60): string
+{
+    $conflict = escapeShellValue('is already in use by container');
+    $message = escapeShellValue("Timed out waiting to start container {$container} after name conflicts.");
+    $retry = "while true; do output=\$({$command} 2>&1); exit_code=\$?; if [ \"\$exit_code\" -eq 0 ]; then exit 0; fi; case \"\$output\" in *{$conflict}*) if [ \"\$SECONDS\" -ge \"{$timeout}\" ]; then printf '%s\\n' {$message} >&2; exit 124; fi; sleep 0.1 ;; *) printf '%s\\n' \"\$output\" >&2; exit \$exit_code ;; esac; done";
+
+    return 'bash -c '.escapeShellValue($retry);
+}
+
 function dockerRemoveCommand(string $container): string
 {
     $command = 'docker rm -f '.escapeShellValue($container);
