@@ -1,13 +1,4 @@
-<div x-data="{
-    settingsUrl: @js(route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid])),
-    openSettings(event) {
-        if (event.target.closest('a, button')) {
-            return;
-        }
-        Livewire.navigate(this.settingsUrl);
-    }
-}">
-    @php
+@php
         [$statusType, $statusLabel] = match (true) {
             str($resource->status)->contains('running') => ['success', formatContainerStatus($resource->status)],
             str($resource->status)->contains(['starting', 'restarting', 'degraded']) => ['warning', formatContainerStatus($resource->status)],
@@ -16,7 +7,20 @@
         $resourceName = $resource->human_name
             ? Str::headline($resource->human_name)
             : Str::headline($resource->name);
-    @endphp
+@endphp
+
+<x-modal-input title="{{ $resourceName }}"
+    subtitle="{{ $isApplication ? 'Identity, image, and public access for this compose application.' : 'Identity, image, and public access for this compose database.' }}"
+    :contentClicks="false" :wireIgnore="false" isLarge>
+    <x-slot:content>
+    <div x-data="{
+        openSettings(event) {
+            if (event.target.closest('a, button')) {
+                return;
+            }
+            modalOpen = true;
+        }
+    }">
 
     <div x-cloak x-show="viewMode === 'grid'"
         class="group flex min-w-0 flex-col overflow-hidden rounded-[10px] border border-neutral-200 bg-white transition-[border-color,background-color,box-shadow] hover:border-neutral-300 hover:shadow-sm dark:border-white/[0.07] dark:bg-surface dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]">
@@ -66,10 +70,10 @@
                 </a>
             @endcan
         @endif
-        <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
-            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+        <button type="button" class="icon-button" title="Resource settings" aria-label="Resource settings"
+            @click="modalOpen = true">
             <x-reicon name="settings" class="size-4" />
-        </a>
+        </button>
         @if (str($resource->status)->contains('running'))
             @can('update', $service)
                 <x-modal-confirmation
@@ -119,10 +123,20 @@
                         </a>
                     @endcan
                 @endif
-                <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
-            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+                <button type="button" class="icon-button" title="Resource settings" aria-label="Resource settings"
+                    @click="modalOpen = true">
                     <x-reicon name="settings" class="size-4" />
-                </a>
+                </button>
         </div>
     </div>
-</div>
+    </div>
+    </x-slot:content>
+
+    @if ($isApplication)
+        <livewire:project.service.index :serviceApplication="$resource" :embedded="true"
+            wire:key="service-application-settings-{{ $resource->id }}" lazy />
+    @else
+        <livewire:project.service.index :serviceApplication="$resource" :embedded="true"
+            wire:key="service-database-settings-{{ $resource->id }}" lazy />
+    @endif
+</x-modal-input>

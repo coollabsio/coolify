@@ -57,6 +57,7 @@ class Index extends Component
                     'href' => $project->navigateTo(),
                     'environmentCount' => $project->environments->count(),
                     'resourceCount' => $resourceCount,
+                    'createdAt' => $project->created_at?->format('M j, Y') ?? '-',
                     'settingsHref' => auth()->user()->can('update', $project)
                         ? route('project.edit', ['project_uuid' => $project->uuid])
                         : null,

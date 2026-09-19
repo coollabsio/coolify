@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
@@ -92,8 +93,15 @@ class SentinelController extends Controller
 
         $data = $request->all();
 
+        $wasSentinelLive = $server->sentinel_updated_at !== null && $server->isSentinelLive();
+
         // Heartbeat MUST update on every push — drives isSentinelLive() and SSH-check skipping.
+        $server->sentinel_waiting_since = null;
         $server->sentinelHeartbeat();
+
+        if (! $wasSentinelLive) {
+            SentinelSynchronized::dispatch($server);
+        }
 
         if ($this->shouldDispatchUpdate($server, $data)) {
             PushServerUpdateJob::dispatch($server, $data);

@@ -220,7 +220,8 @@ it('keeps domain settings out of the overview and supports editing and removal',
         ->assertValue('#editingDomainParts-port', '8080')
         ->assertDontSee('Edit address and port')
         ->assertDontSee('Save address')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
+        ->assertSee('Regenerate hostname')
+        ->assertSee('Save')
         ->assertSee('Search engine indexing')
         ->screenshot(filename: 'service-domain-settings');
 
@@ -233,23 +234,23 @@ it('keeps domain settings out of the overview and supports editing and removal',
     JS))->toBeTrue();
 
     $page->fill('#editingDomainParts-port', '80')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
         ->screenshot(filename: 'service-domain-unsaved-changes');
 
     $domainKey = hash('sha256', 'https://long-public-domain-for-the-service.example.com|'.$this->serviceApplication->id);
     $page->click('#service-domain-indexing-'.$this->serviceApplication->id.'-'.$domainKey.'-trigger')
         ->click('Noindex')
-        ->screenshot(filename: 'service-domain-indexing-saved')
+        ->screenshot(filename: 'service-domain-indexing-draft')
         ->assertSee('Domain settings')
-        ->assertVisible('[aria-label="Search indexing blocked"]')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->assertVisible('[aria-label="Search indexing allowed"]')
         ->assertNoJavaScriptErrors();
 
-    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeTrue();
+    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeFalse();
 
-    $page->click('[wire\\:click="updateDomain"]')
+    $page->click('Save')
         ->assertDontSee('Domain settings')
         ->assertVisible('[aria-label="Internal port 80"] >> nth=0');
+
+    expect($this->serviceApplication->fresh()->isDomainNoindexed('https://long-public-domain-for-the-service.example.com'))->toBeTrue();
 
     $page->click('[wire\\:key="svc-domain-'.$this->serviceApplication->id.'-'.md5('https://long-public-domain-for-the-service.example.com').'"] [aria-label="Remove domain"]')
         ->assertSee('Remove domain?')
@@ -267,12 +268,10 @@ it('keeps domain settings out of the overview and supports editing and removal',
 
     $page->click('[aria-label="Settings for https://second.example.com"]')
         ->fill('#editingDomainParts-path', '/discard-this')
-        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
-        ->click('Reset')
+        ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertValue('#editingDomainParts-path', '')
-        ->assertMissing('.is-dirty [wire\\:click="updateDomain"]')
         ->click('[aria-label="Close"]:visible')
         ->assertDontSee('Domain settings')
         ->assertNoJavaScriptErrors();

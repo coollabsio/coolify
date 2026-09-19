@@ -1,4 +1,4 @@
-<nav class="w-full max-w-none pb-3 lg:pb-0">
+<nav class="w-full max-w-none pb-3 lg:pb-0" wire:poll.30s="refreshAgentStatus">
     <x-process-dialog @startproxy.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
@@ -53,7 +53,7 @@
                     && ! $server->isSwarm()
                     && ! $server->settings->is_build_server
                     && auth()->user()?->can('viewSentinel', $server),
-                'warning' => $server->isSentinelEnabled() && ! $server->isSentinelLive(),
+                'warning' => $sentinelWarningOverride ?? ($server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync'),
             ],
             [
                 'label' => 'Resources',
@@ -116,7 +116,11 @@
                     <span class="min-w-0 truncate font-semibold text-black dark:text-fg">
                         {{ $server->name }}
                     </span>
-                    <x-reicon name="chevron-down" class="size-3 shrink-0 text-neutral-400 dark:text-fg-faint" />
+                    <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
+                        fill="none" aria-hidden="true">
+                        <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
                 </button>
                 <div x-cloak x-show="open" x-transition.origin.top.left
                     class="listbox-panel top-9! left-1! z-[90]! w-64! min-w-0!">

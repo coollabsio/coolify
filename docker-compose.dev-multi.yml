@@ -195,7 +195,7 @@ services:
 
   minio-init:
     profiles: ["minio"]
-    image: minio/mc:latest
+    image: ghcr.io/coollabsio/mx:0.1.0
     pull_policy: always
     restart: "no"
     depends_on:

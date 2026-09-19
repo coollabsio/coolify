@@ -25,6 +25,10 @@
         : $redirect;
     $isNoindexed = $application->isDomainNoindexed($row['url']);
     $domainKey = hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
+    $editingParts = \App\Support\DomainUrlParts::split($row['url']);
+    if ($row['has_port_override'] ?? false) {
+        $editingParts['port'] = (string) $row['internal_port'];
+    }
 @endphp
 
 <div wire:key="domain-row-{{ md5(($isSuggested ? 's:' : '') . $row['url'] . '|' . ($row['service'] ?? '')) }}"
@@ -117,6 +121,11 @@
             @if ($row['dns_status'] === 'failed')
                 <x-status-badge as="button" @click="$dispatch('open-dns-records-modal')" :status="$dnsLabel" :type="$dnsType"
                     title="View DNS records to fix" class="cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/[0.1]" />
+            @elseif ($row['dns_status'] === 'checking')
+                <x-status-badge dynamic :title="$row['dns_message']">
+                    <x-loading compact aria-label="Checking DNS" />
+                    <span class="truncate">Checking DNS...</span>
+                </x-status-badge>
             @else
                 <x-status-badge :status="$dnsLabel" :type="$dnsType"
                     :title="$row['dns_status'] === 'ok' ? null : $row['dns_message']" />
@@ -129,11 +138,7 @@
                     wire:loading.attr="disabled"
                     wire:target="checkDomainDns({{ $index }}),checkAllDns"
                     class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                    <x-reicon name="refresh" class="size-3.5"
-                        wire:loading.remove.delay
-                        wire:target="checkDomainDns({{ $index }}),checkAllDns" />
-                    <x-loading-on-button wire:loading.delay
-                        wire:target="checkDomainDns({{ $index }}),checkAllDns" />
+                    <x-reicon name="refresh" class="size-3.5" />
                 </button>
                 @unless ($labelsAreWritable)
                     @if ($isSuggested)
@@ -147,7 +152,8 @@
                             </x-forms.button>
                         @endif
                     @else
-                        <button type="button" wire:click="startEdit({{ $index }})"
+                        <button type="button"
+                            @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))"
                             class="icon-button shrink-0"
                             title="Domain settings" aria-label="Settings for {{ $publicUrl }}">
                             <x-reicon name="settings" class="size-3.5" />
