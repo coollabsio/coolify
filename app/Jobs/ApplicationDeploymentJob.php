@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Infisical\ResolveInheritedSecrets;
+use App\Actions\Infisical\SyncBindingSafely;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationConfigurationChanged;
@@ -14,6 +16,7 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InfisicalBinding;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -377,6 +380,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->build_server = $this->server;
             }
             $this->detectBuildKitCapabilities();
+            $this->syncInheritedSecrets();
             $this->decide_what_to_do();
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
@@ -1357,6 +1361,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Refresh this environment's Infisical-owned variables before generating env files.
+     *
+     * Never fatal: an Infisical outage falls back to the last-synced values.
+     */
+    private function syncInheritedSecrets(): void
+    {
+        SyncBindingSafely::run(
+            InfisicalBinding::query()
+                ->where('environment_id', $this->application->environment_id)
+                ->where('is_enabled', true)
+                ->first()
+        );
+    }
+
     private function generate_runtime_environment_variables()
     {
         $envs = collect([]);
@@ -1424,6 +1443,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return 1;
             });
 
+            // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
+            foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
+                $envs->push("{$key}={$value}");
+            }
+
             foreach ($runtime_environment_variables as $env) {
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
             }
@@ -1490,6 +1514,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return 1;
             });
+
+            // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
+            foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
+                $envs->push("{$key}={$value}");
+            }
 
             foreach ($runtime_environment_variables_preview as $env) {
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
@@ -1745,6 +1774,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
+        }
+
+        // 3.5 Add inherited Infisical secrets before the user-defined variables below, which override them.
+        foreach (ResolveInheritedSecrets::run($this->application) as $key => $value) {
+            $envs_dict[$key] = escapeBashEnvValue($value);
         }
 
         // 4. Add user-defined build-time variables LAST (highest priority - can override everything)

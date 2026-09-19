@@ -38,6 +38,7 @@ class ResolveInheritedSecrets
         }
 
         return SharedEnvironmentVariable::query()
+            ->where('type', 'environment')
             ->where('infisical_binding_id', $binding->id)
             ->get()
             ->mapWithKeys(fn (SharedEnvironmentVariable $variable) => [$variable->key => $variable->value]);

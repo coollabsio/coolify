@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Infisical\ResolveInheritedSecrets;
 use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
 use App\Support\DomainPortOverrides;
@@ -1614,6 +1615,12 @@ class Service extends BaseModel
 
             return 3;
         });
+
+        // Inherited Infisical secrets go first so resource-level variables below overwrite matching keys.
+        foreach (ResolveInheritedSecrets::run($this) as $key => $value) {
+            $envs->push("{$key}={$value}");
+        }
+
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$env->real_value}");
         }
