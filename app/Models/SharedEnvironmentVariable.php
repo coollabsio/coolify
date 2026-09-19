@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SharedEnvironmentVariable extends Model
 {
@@ -77,7 +78,7 @@ class SharedEnvironmentVariable extends Model
         return $this->belongsTo(Server::class);
     }
 
-    public function infisicalBinding()
+    public function infisicalBinding(): BelongsTo
     {
         return $this->belongsTo(InfisicalBinding::class, 'infisical_binding_id');
     }

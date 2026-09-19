@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -67,7 +68,7 @@ class InfisicalConnection extends BaseModel
     /**
      * Scope connections to the acting team.
      */
-    public static function ownedByCurrentTeam(array $select = ['*'])
+    public static function ownedByCurrentTeam(array $select = ['*']): Builder
     {
         return static::query()->select($select)->where('team_id', currentTeam()->id);
     }
