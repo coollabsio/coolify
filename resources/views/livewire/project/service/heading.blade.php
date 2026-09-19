@@ -195,13 +195,13 @@
                                         @click="document.getElementById('service-restart-trigger')?.click()">
                                         <x-loading-on-button x-show="deploying" x-cloak />
                                         <x-reicon name="restart" class="size-3.5" x-show="!deploying" />
-                                        <span x-text="deploying ? 'Restarting…' : 'Restart'">Restart</span>
+                                        <span x-text="deploying ? 'Restarting…' : 'Restart current version'">Restart current version</span>
                                     </x-slot:main>
                                     @if ($serviceStatus->contains('running'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="$wire.dispatch('pullAndRestartEvent'); open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Restart (pull latest)
+                                            Pull latest and restart
                                         </button>
                                     @endif
                                     @if ($serviceStatus->contains('degraded'))

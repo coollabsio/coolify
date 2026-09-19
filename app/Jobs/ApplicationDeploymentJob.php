@@ -365,21 +365,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Check custom port
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
-            if (data_get($this->application, 'settings.is_build_server_enabled')) {
-                $teamId = data_get($this->application, 'environment.project.team.id');
-                $buildServers = Server::buildServers($teamId)->get();
-                if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
-                    $this->build_server = $this->server;
-                } else {
-                    $this->build_server = $buildServers->random();
-                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
-                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
-                    $this->use_build_server = true;
-                }
-            } else {
-                $this->build_server = $this->server;
-            }
+            $this->selectBuildServer();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
         } catch (Exception $e) {
@@ -426,6 +412,40 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
             }
         }
+    }
+
+    private function selectBuildServer(): void
+    {
+        if (! data_get($this->application, 'settings.is_build_server_enabled')) {
+            $this->build_server = $this->server;
+
+            return;
+        }
+
+        $team = $this->application->environment->project->team;
+        $buildServers = Server::buildServers($team->id)->get();
+
+        if ($buildServers->isEmpty()) {
+            if (! $team->is_build_server_fallback_enabled) {
+                throw new DeploymentException('No available dedicated build server was found. Enable a usable build server for this team or allow fallback to the deployment server in the team settings.');
+            }
+
+            $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
+            $this->build_server = $this->server;
+
+            return;
+        }
+
+        $this->build_server = $buildServers->random();
+        if ($this->build_server->is($this->server)) {
+            $this->application_deployment_queue->addLogEntry("Using deployment server ({$this->server->name}) for the build.");
+
+            return;
+        }
+
+        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+        $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
+        $this->use_build_server = true;
     }
 
     private function detectBuildKitCapabilities(): void
@@ -675,7 +695,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
                 );
                 if ($this->saved_outputs->has($saveName)) {
-                    $fileStat = $this->saved_outputs->get($saveName);
+                    $fileStat = $this->trimmedSavedOutput($saveName);
                     if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
@@ -2290,12 +2310,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                         }
 
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                        $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
+                        if ($healthCheckStatus === 'healthy') {
                             $this->newVersionIsHealthy = true;
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        } elseif ($healthCheckStatus === 'unhealthy') {
                             $this->newVersionIsHealthy = false;
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
@@ -2308,7 +2329,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $sleeptime++;
                         }
                     }
-                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    if ($this->trimmedSavedOutput('health_check')->replace('"', '')->value() === 'starting') {
                         $this->query_logs();
                     }
                 }
@@ -2690,7 +2711,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'));
+            $commit_message = $this->trimmedSavedOutput('commit_message');
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
@@ -2760,7 +2781,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
         );
         if ($this->saved_outputs->get('nixpacks_type')) {
-            $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
+            $this->nixpacks_type = $this->trimmedSavedOutput('nixpacks_type')->value();
             if (str($this->nixpacks_type)->isEmpty()) {
                 throw new DeploymentException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
