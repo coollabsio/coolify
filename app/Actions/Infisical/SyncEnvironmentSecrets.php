@@ -24,13 +24,19 @@ class SyncEnvironmentSecrets
      * is skipped and reported as "shadowed" rather than adopted or blocking
      * the rest of the sync.
      *
-     * @return array{created: int, updated: int, deleted: int, skipped: array<int, string>, shadowed: array<int, string>}
+     * A fetch that yields zero usable secrets while the binding still owns rows
+     * is treated as an upstream fault (renamed folder, moved secret_path, a
+     * machine identity that lost project scope and degrades to an empty list)
+     * rather than as "every secret was deleted": the stored values are left
+     * intact and the binding is marked failed.
+     *
+     * @return array{created: int, updated: int, deleted: int, skipped: array<int, string>, shadowed: array<int, string>, aborted: bool}
      *
      * @throws InfisicalApiException
      */
     public function handle(InfisicalBinding $binding): array
     {
-        $empty = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'skipped' => [], 'shadowed' => []];
+        $empty = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'skipped' => [], 'shadowed' => [], 'aborted' => false];
 
         if (! $binding->is_enabled) {
             return $empty;
@@ -104,6 +110,21 @@ class SyncEnvironmentSecrets
                     $existing->update(['value' => $value]);
                     $result['updated']++;
                 }
+            }
+
+            $ownedRowCount = SharedEnvironmentVariable::query()
+                ->where('infisical_binding_id', $binding->id)
+                ->count();
+
+            if ($seen === [] && $ownedRowCount > 0) {
+                $result['aborted'] = true;
+
+                $binding->forceFill([
+                    'last_sync_status' => InfisicalBinding::STATUS_FAILED,
+                    'last_sync_error' => "Infisical returned no usable secrets while {$ownedRowCount} synced secret(s) are stored for this binding. Refusing to delete them. Check the Infisical project ID, environment slug, secret path, and that the machine identity still has access.",
+                ])->save();
+
+                return $result;
             }
 
             $result['deleted'] = SharedEnvironmentVariable::query()

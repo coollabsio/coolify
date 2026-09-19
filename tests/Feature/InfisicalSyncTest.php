@@ -227,3 +227,45 @@ test('a key colliding with a user owned row is shadowed, not adopted or overwrit
     $binding->refresh();
     expect($binding->last_sync_status)->toBe(InfisicalBinding::STATUS_SUCCESS);
 });
+
+test('an empty upstream response does not wipe the rows the binding already owns', function () {
+    $binding = InfisicalBinding::factory()->create();
+
+    fakeInfisical(['DB_PASSWORD' => 'hunter2', 'API_KEY' => 'abc']);
+    SyncEnvironmentSecrets::run($binding);
+    expect(SharedEnvironmentVariable::where('infisical_binding_id', $binding->id)->count())->toBe(2);
+
+    fakeInfisicalRawSecrets([]);
+    $result = SyncEnvironmentSecrets::run($binding);
+
+    expect($result['aborted'])->toBeTrue();
+    expect($result['deleted'])->toBe(0);
+    expect(SharedEnvironmentVariable::where('infisical_binding_id', $binding->id)->count())->toBe(2);
+    expect(SharedEnvironmentVariable::where('key', 'DB_PASSWORD')->first()->value)->toBe('hunter2');
+});
+
+test('an empty upstream response records a failure on the binding', function () {
+    $binding = InfisicalBinding::factory()->create();
+
+    fakeInfisical(['DB_PASSWORD' => 'hunter2']);
+    SyncEnvironmentSecrets::run($binding);
+
+    fakeInfisicalRawSecrets([]);
+    SyncEnvironmentSecrets::run($binding);
+
+    $binding->refresh();
+    expect($binding->last_sync_status)->toBe(InfisicalBinding::STATUS_FAILED);
+    expect($binding->last_sync_error)->toContain('no usable secrets');
+});
+
+test('an empty upstream response on a binding that owns nothing is a plain success', function () {
+    $binding = InfisicalBinding::factory()->create();
+
+    fakeInfisical([]);
+    $result = SyncEnvironmentSecrets::run($binding);
+
+    expect($result['aborted'])->toBeFalse();
+
+    $binding->refresh();
+    expect($binding->last_sync_status)->toBe(InfisicalBinding::STATUS_SUCCESS);
+});
