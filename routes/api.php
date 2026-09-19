@@ -68,6 +68,7 @@ Route::group([
     Route::get('/teams', [TeamController::class, 'teams'])->middleware(['api.ability:read']);
     // Token's team
     Route::get('/team', [TeamController::class, 'current_team'])->middleware(['api.ability:read']);
+    Route::patch('/team', [TeamController::class, 'update_current_team'])->middleware(['api.ability:write']);
     Route::get('/team/members', [TeamController::class, 'current_team_members'])->middleware(['api.ability:read']);
     // Deprecated aliases — same handlers as /team and /team/members (remove in a later release)
     Route::get('/teams/current', [TeamController::class, 'current_team'])->middleware(['api.ability:read']);
