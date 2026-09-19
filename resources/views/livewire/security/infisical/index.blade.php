@@ -1,8 +1,10 @@
-<div class="application-settings-form w-full">
+<div>
     <x-slot:title>
         Infisical | Coolify
     </x-slot>
 
+    <x-security.settings-layout>
+    <div class="application-settings-form w-full">
     <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
             <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Infisical</h1>
@@ -34,17 +36,33 @@
         @else
             <div class="data-table w-full">
                 @foreach ($this->connections as $connection)
-                    <x-modal-input title="{{ $connection->name }}" :closeOutside="false"
-                        wire:key="infisical-connection-{{ $connection->uuid }}">
-                        <x-slot:content>
-                            <button type="button"
-                                class="data-table-row flex w-full items-center justify-between px-3 py-2.5 text-left text-[13px]">
-                                <span class="truncate font-medium text-black dark:text-fg">{{ $connection->name }}</span>
-                                <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $connection->host }}</span>
-                            </button>
-                        </x-slot:content>
-                        <livewire:security.infisical.form :connection="$connection" :key="'infisical-connection-form-'.$connection->uuid" />
-                    </x-modal-input>
+                    <div wire:key="infisical-connection-{{ $connection->uuid }}"
+                        class="data-table-row flex w-full items-center gap-2 px-3 py-2.5 text-[13px]">
+                        <x-modal-input title="{{ $connection->name }}" :closeOutside="false">
+                            <x-slot:content>
+                                <button type="button"
+                                    class="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
+                                    <span class="truncate font-medium text-black dark:text-fg">{{ $connection->name }}</span>
+                                    <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $connection->host }}</span>
+                                </button>
+                            </x-slot:content>
+                            <livewire:security.infisical.form :connection="$connection" :key="'infisical-connection-form-'.$connection->uuid" />
+                        </x-modal-input>
+                        @can('delete', $connection)
+                            <div class="ml-auto shrink-0">
+                                <x-modal-confirmation title="Confirm Connection Deletion?" isErrorButton
+                                    buttonTitle="Delete" submitAction="deleteConnection('{{ $connection->uuid }}')"
+                                    :actions="[
+                                        'This Infisical connection will be permanently deleted.',
+                                        'Every environment binding using it will be deleted.',
+                                        'Every shared variable those bindings synced will be removed from Coolify.',
+                                    ]" confirmationText="{{ $connection->name }}"
+                                    confirmationLabel="Enter the connection name to confirm deletion"
+                                    shortConfirmationLabel="Connection name" :confirmWithPassword="false"
+                                    step2ButtonText="Delete connection" />
+                            </div>
+                        @endcan
+                    </div>
                 @endforeach
             </div>
         @endif
@@ -96,7 +114,9 @@
                             {{ $binding->infisical_project_id }} ({{ $binding->infisical_environment_slug }})
                         </div>
                         <div class="text-center">
-                            @if ($binding->last_sync_status === 'success')
+                            @if (! $binding->is_enabled)
+                                <span class="table-badge">Disabled</span>
+                            @elseif ($binding->last_sync_status === 'success')
                                 <span class="table-badge table-badge-success">Synced</span>
                             @elseif ($binding->last_sync_status === 'failed')
                                 <span class="table-badge table-badge-danger">Failed</span>
@@ -104,12 +124,28 @@
                                 <span class="table-badge">Never synced</span>
                             @endif
                         </div>
-                        <div class="justify-self-end">
+                        <div class="flex items-center justify-end gap-2 justify-self-end">
                             @can('update', $binding)
                                 <x-forms.button type="button" wire:click="syncNow('{{ $binding->uuid }}')"
                                     wire:loading.attr="disabled" wire:target="syncNow('{{ $binding->uuid }}')">
                                     Sync now
                                 </x-forms.button>
+                                <x-forms.button type="button" wire:click="toggleBinding('{{ $binding->uuid }}')"
+                                    wire:loading.attr="disabled" wire:target="toggleBinding('{{ $binding->uuid }}')">
+                                    {{ $binding->is_enabled ? 'Disable' : 'Enable' }}
+                                </x-forms.button>
+                            @endcan
+                            @can('delete', $binding)
+                                <x-modal-confirmation title="Confirm Binding Deletion?" isErrorButton
+                                    buttonTitle="Delete" submitAction="deleteBinding('{{ $binding->uuid }}')"
+                                    :actions="[
+                                        'This Infisical binding will be permanently deleted.',
+                                        'Every shared variable it synced will be removed from this environment, and resources that read them will lose those values on their next deployment.',
+                                        'Disable the binding instead if you want to keep the synced values.',
+                                    ]" confirmationText="{{ $binding->environment?->name }}"
+                                    confirmationLabel="Enter the environment name to confirm deletion"
+                                    shortConfirmationLabel="Environment name" :confirmWithPassword="false"
+                                    step2ButtonText="Delete binding" />
                             @endcan
                         </div>
                     </div>
@@ -117,4 +153,6 @@
             </div>
         @endif
     </x-application.settings-section>
+    </div>
+    </x-security.settings-layout>
 </div>

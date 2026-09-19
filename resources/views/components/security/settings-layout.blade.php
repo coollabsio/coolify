@@ -18,6 +18,12 @@
             'active' => request()->routeIs('security.cloud-init-scripts*'),
             'icon' => 'file-content',
         ] : null,
+        auth()->user()?->can('viewAny', App\Models\InfisicalConnection::class) ? [
+            'label' => 'Infisical',
+            'route' => 'security.infisical.index',
+            'active' => request()->routeIs('security.infisical.*'),
+            'icon' => 'shield-star',
+        ] : null,
         [
             'label' => 'API Tokens',
             'route' => 'security.api-tokens',

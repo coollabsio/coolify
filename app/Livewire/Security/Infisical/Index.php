@@ -6,6 +6,7 @@ use App\Actions\Infisical\SyncEnvironmentSecrets;
 use App\Models\Environment;
 use App\Models\InfisicalBinding;
 use App\Models\InfisicalConnection;
+use App\Services\Infisical\InfisicalApiException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -116,6 +117,18 @@ class Index extends Component
     }
 
     /**
+     * Resolve a binding by uuid, scoped to the current team through its
+     * connection. Never trust the browser-supplied identifier.
+     */
+    private function findBinding(string $uuid): InfisicalBinding
+    {
+        return InfisicalBinding::query()
+            ->whereHas('connection', fn ($query) => $query->where('team_id', currentTeam()->id))
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+    }
+
+    /**
      * "Sync now" is authorized against the binding's `update` ability rather
      * than a bespoke `syncNow` ability: the policies only define viewAny,
      * view, create, update, delete, and authorizing an undefined ability
@@ -123,10 +136,7 @@ class Index extends Component
      */
     public function syncNow(string $uuid): void
     {
-        $binding = InfisicalBinding::query()
-            ->whereHas('connection', fn ($query) => $query->where('team_id', currentTeam()->id))
-            ->where('uuid', $uuid)
-            ->firstOrFail();
+        $binding = $this->findBinding($uuid);
 
         $this->authorize('update', $binding);
 
@@ -134,8 +144,79 @@ class Index extends Component
             SyncEnvironmentSecrets::run($binding);
 
             $this->dispatch('success', 'Infisical secrets synced.');
-        } catch (\Throwable $e) {
+        } catch (InfisicalApiException $e) {
+            // InfisicalApiException messages are built by us and safe to show.
             $this->dispatch('error', 'Failed to sync secrets.', $e->getMessage());
+        } catch (\Throwable $e) {
+            // Anything else (QueryException, TypeError, ...) can carry SQL or
+            // internal detail: log it and show a bounded message instead.
+            report($e);
+
+            $this->dispatch('error', 'Failed to sync secrets.', 'An unexpected error occurred. Check the instance logs for details.');
+        }
+    }
+
+    /**
+     * Enable or disable a binding. A disabled binding is skipped by both the
+     * scheduled sync and the resolver, so its already-synced rows stop being
+     * injected without being deleted.
+     */
+    public function toggleBinding(string $uuid): void
+    {
+        $binding = $this->findBinding($uuid);
+
+        $this->authorize('update', $binding);
+
+        try {
+            $binding->is_enabled = ! $binding->is_enabled;
+            $binding->save();
+
+            $this->dispatch('success', $binding->is_enabled ? 'Binding enabled.' : 'Binding disabled.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Delete a binding. The shared_environment_variables FK is
+     * `cascadeOnDelete`, so every row this binding synced goes with it --
+     * that is intentional: the rows exist only as a projection of the binding
+     * and nothing else can keep them current. Operators who want to keep the
+     * values should disable the binding instead.
+     */
+    public function deleteBinding(string $uuid): void
+    {
+        $binding = $this->findBinding($uuid);
+
+        $this->authorize('delete', $binding);
+
+        try {
+            $binding->delete();
+
+            $this->dispatch('success', 'Binding deleted. Its synced secrets were removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Delete a connection. Bindings cascade from the connection, and synced
+     * shared variables cascade from those bindings.
+     */
+    public function deleteConnection(string $uuid): void
+    {
+        $connection = InfisicalConnection::ownedByCurrentTeam()
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        $this->authorize('delete', $connection);
+
+        try {
+            $connection->delete();
+
+            $this->dispatch('success', 'Connection deleted.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
