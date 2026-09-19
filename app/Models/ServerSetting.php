@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ServerRole;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use OpenApi\Attributes as OA;
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
-        'is_build_server' => ['type' => 'boolean'],
+        'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
@@ -71,6 +72,7 @@ class ServerSetting extends Model
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
+        'server_role',
         'is_reachable',
         'is_usable',
         'wildcard_domain',
@@ -126,6 +128,7 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
+        'server_role' => ServerRole::class,
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
@@ -140,6 +143,7 @@ class ServerSetting extends Model
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
+        'is_build_server',
         'sentinel_token',
         'sentinel_custom_url',
         'logdrain_newrelic_license_key',
@@ -173,6 +177,11 @@ class ServerSetting extends Model
                 $settings->server->restartSentinel();
             }
         });
+    }
+
+    public function effectiveServerRole(): ServerRole
+    {
+        return $this->server_role ?? ($this->is_build_server ? ServerRole::BUILD : ServerRole::BOTH);
     }
 
     /**

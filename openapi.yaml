@@ -13186,6 +13186,42 @@ paths:
       security:
         -
           bearerAuth: []
+    patch:
+      tags:
+        - Teams
+      summary: 'Update authenticated team'
+      description: 'Update settings for the team bound to the API token.'
+      operationId: update-token-team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - is_build_server_fallback_enabled
+              properties:
+                is_build_server_fallback_enabled:
+                  type: boolean
+                  description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
+              type: object
+      responses:
+        '200':
+          description: 'Updated team.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /team/members:
     get:
       tags:
@@ -14673,6 +14709,9 @@ components:
         custom_server_limit:
           type: string
           description: 'The custom server limit.'
+        is_build_server_fallback_enabled:
+          type: boolean
+          description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
         members:
           description: 'The members of the team.'
           type: array

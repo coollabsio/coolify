@@ -95,6 +95,7 @@ test('strict teams reject ineligible dedicated build servers', function (array $
     $buildServer->settings()->update(array_merge([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
         'is_swarm_worker' => false,
         'force_disabled' => false,
@@ -119,6 +120,7 @@ test('strict teams use an available dedicated build server', function () {
     $buildServer->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
         'force_disabled' => false,
     ]);
@@ -132,4 +134,30 @@ test('strict teams use an available dedicated build server', function () {
     invokeBuildServerSelection($job);
 
     expect(selectedBuildServer($job)->is($buildServer))->toBeTrue();
+});
+
+test('a combined deployment server builds locally without remote build handling', function () {
+    $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
+    $deploymentServer = Server::factory()->create(['team_id' => $team->id]);
+    $deploymentServer->settings()->update([
+        'server_role' => 'both',
+        'is_build_server' => false,
+        'is_reachable' => true,
+        'is_usable' => true,
+        'is_swarm_worker' => false,
+        'force_disabled' => false,
+    ]);
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer);
+
+    $deploymentQueue->shouldNotReceive('setAttribute');
+    $deploymentQueue->shouldReceive('addLogEntry')
+        ->once()
+        ->with("Using deployment server ({$deploymentServer->name}) for the build.");
+
+    invokeBuildServerSelection($job);
+
+    $useBuildServer = (new ReflectionProperty(ApplicationDeploymentJob::class, 'use_build_server'))->getValue($job);
+
+    expect(selectedBuildServer($job)->is($deploymentServer))->toBeTrue()
+        ->and($useBuildServer)->toBeFalse();
 });

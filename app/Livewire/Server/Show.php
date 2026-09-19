@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\StopSentinel;
+use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
@@ -47,10 +48,10 @@ class Show extends Component
 
     public bool $isSwarmWorker;
 
-    public bool $isBuildServer;
+    public string $serverRole;
 
     #[Locked]
-    public bool $isBuildServerLocked = false;
+    public ?string $pendingServerRole = null;
 
     public bool $isMetricsEnabled;
 
@@ -150,7 +151,7 @@ class Show extends Component
             'isUsable' => 'required',
             'isSwarmManager' => 'required',
             'isSwarmWorker' => 'required',
-            'isBuildServer' => 'required',
+            'serverRole' => ['required', 'in:deployment,build,both'],
             'isMetricsEnabled' => 'required',
             'sentinelToken' => 'required',
             'sentinelUpdatedAt' => 'nullable',
@@ -198,9 +199,6 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-            if (! $this->server->isBuildServer() && ! $this->server->isEmpty()) {
-                $this->isBuildServerLocked = true;
-            }
             // Load saved Hetzner status and validation state
             $this->hetznerServerStatus = $this->server->hetzner_server_status;
             $this->vultrInstanceStatus = $this->server->vultr_instance_status;
@@ -254,7 +252,9 @@ class Show extends Component
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
-            $this->server->settings->is_build_server = $this->isBuildServer;
+            $role = ServerRole::from($this->serverRole);
+            $this->server->settings->server_role = $role;
+            $this->server->settings->is_build_server = $role === ServerRole::BUILD;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
             $this->server->settings->sentinel_token = $this->sentinelToken;
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
@@ -284,7 +284,7 @@ class Show extends Component
             $this->isUsable = $this->server->settings->is_usable;
             $this->isSwarmManager = $this->server->settings->is_swarm_manager;
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
-            $this->isBuildServer = $this->server->settings->is_build_server;
+            $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = $this->server->settings->sentinel_token;
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
@@ -409,29 +409,65 @@ class Show extends Component
         }
     }
 
-    public function updatedIsBuildServer($value)
+    public function requestServerRoleChange(): void
     {
         try {
             $this->authorize('update', $this->server);
-            if ($value === true && ! $this->server->isEmpty()) {
-                $this->isBuildServer = false;
-                $this->dispatch('error', 'A server with existing resources cannot be configured as a build server.');
+            $newRole = ServerRole::from($this->serverRole);
+            $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
+
+            if ($newRole === ServerRole::BUILD && ! $this->server->isEmpty()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Move or remove the existing resources before you set this server to build only.');
 
                 return;
             }
-            if ($value === true && $this->server->isSentinelEnabled()) {
-                $this->isMetricsEnabled = false;
-                $this->isSentinelDebugEnabled = false;
-                $this->server->settings->is_sentinel_enabled = false;
-                StopSentinel::dispatch($this->server);
-                $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+
+            if ($newRole === ServerRole::DEPLOYMENT && ! Server::buildServers($this->server->team_id)->whereKeyNot($this->server->id)->exists()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Add another build-capable server before you set this server to deployments only.');
+
+                return;
             }
-            $this->submit();
-            // Dispatch event to refresh the navbar
-            $this->dispatch('refreshServerShow');
+
+            if ($newRole === ServerRole::BOTH && $currentRole !== ServerRole::BOTH) {
+                $this->pendingServerRole = $newRole->value;
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('open-server-role-confirmation');
+
+                return;
+            }
+
+            $this->saveServerRole($newRole);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
+    }
+
+    public function confirmServerRoleChange(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $role = ServerRole::from($this->pendingServerRole ?? '');
+            $this->pendingServerRole = null;
+            $this->saveServerRole($role);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function saveServerRole(ServerRole $role): void
+    {
+        $this->serverRole = $role->value;
+        if ($role === ServerRole::BUILD && $this->server->isSentinelEnabled()) {
+            $this->isMetricsEnabled = false;
+            $this->isSentinelDebugEnabled = false;
+            $this->server->settings->is_sentinel_enabled = false;
+            StopSentinel::dispatch($this->server);
+            $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+        }
+        $this->submit();
+        $this->dispatch('refreshServerShow');
     }
 
     public function regenerateSentinelToken()

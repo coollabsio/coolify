@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\ServerRole;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -451,8 +452,13 @@ class ServerTransferImporter
         $server->uuid = $uuid;
         $server->save();
 
-        if ($server->settings && data_get($payload, 'is_build_server')) {
-            $server->settings->is_build_server = true;
+        if ($server->settings) {
+            $serverRole = data_get($payload, 'server_role');
+            if (! in_array($serverRole, array_column(ServerRole::cases(), 'value'), true)) {
+                $serverRole = data_get($payload, 'is_build_server') ? ServerRole::BUILD->value : ServerRole::BOTH->value;
+            }
+            $server->settings->server_role = $serverRole;
+            $server->settings->is_build_server = $serverRole === ServerRole::BUILD->value;
             $server->settings->save();
         }
 

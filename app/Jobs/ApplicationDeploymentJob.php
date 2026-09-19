@@ -433,6 +433,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->build_server = $buildServers->random();
+        if ($this->build_server->is($this->server)) {
+            $this->application_deployment_queue->addLogEntry("Using deployment server ({$this->server->name}) for the build.");
+
+            return;
+        }
+
         $this->application_deployment_queue->build_server_id = $this->build_server->id;
         $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
         $this->use_build_server = true;

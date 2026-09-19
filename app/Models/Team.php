@@ -28,6 +28,7 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string', 'description' => 'The date and time the team was last updated.'],
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
+        'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',

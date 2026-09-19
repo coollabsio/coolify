@@ -63,7 +63,7 @@
             'active' => $activeMenu === 'proxy',
             'icon' => 'network',
             'group' => 'Platform',
-            'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
+            'visible' => ! $server->isSwarmWorker() && $server->canHostResources(),
             'warning' => $server->hasCurrentTraefikOutdatedInfo(),
             'tracks_proxy_configuration' => true,
             'children' => [
@@ -78,7 +78,7 @@
             'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
             'icon' => 'shield-star',
             'group' => 'Platform',
-            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
+            'visible' => $server->isFunctional() && ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
             'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
             'tracks_sentinel_status' => true,
             'children' => [
