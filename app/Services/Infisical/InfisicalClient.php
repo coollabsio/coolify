@@ -51,7 +51,7 @@ class InfisicalClient
                 continue;
             }
 
-            if (data_get($secret, 'secretValueHidden') === true) {
+            if (data_get($secret, 'secretValueHidden')) {
                 $hiddenKeys[] = $key;
 
                 continue;

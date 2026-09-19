@@ -133,6 +133,22 @@ test('it throws when a secret value is hidden, naming the key but not any value'
     }
 });
 
+test('a truthy but non-boolean secretValueHidden still aborts the fetch', function () {
+    Http::fake([
+        'https://infisical.test/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
+        'https://infisical.test/api/v3/secrets/raw*' => Http::response([
+            'secrets' => [
+                ['secretKey' => 'SUPER_SECRET', 'secretValue' => '', 'secretValueHidden' => 1],
+            ],
+        ]),
+    ]);
+
+    $connection = InfisicalConnection::factory()->create(['host' => 'https://infisical.test']);
+
+    expect(fn () => (new InfisicalClient($connection))->fetchSecrets('proj-1', 'prod', '/'))
+        ->toThrow(InfisicalApiException::class);
+});
+
 test('it authenticates only once across multiple fetchSecrets calls', function () {
     Http::fake([
         'https://infisical.test/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
