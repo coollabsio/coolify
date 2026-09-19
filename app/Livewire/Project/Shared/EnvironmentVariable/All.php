@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Actions\Infisical\ResolveInheritedSecrets;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\Service;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Database\Eloquent\Builder;
@@ -240,6 +241,12 @@ class All extends Component
      * editable or deletable from this list, since they are managed by the
      * next Infisical sync rather than by this resource.
      *
+     * Only applications and services receive inherited secrets at deploy time.
+     * Standalone databases carry an environment_id too, so the resolver would
+     * happily return rows for them -- but Start* never injects them, and
+     * databases are an explicit spec non-goal. Gate here so the UI never
+     * claims an inheritance the deployment path does not perform.
+     *
      * @return Collection<string, string>
      */
     public function getInheritedSecretsProperty(): Collection
@@ -248,7 +255,21 @@ class All extends Component
             return collect();
         }
 
+        if (! $this->resourceReceivesInheritedSecrets()) {
+            return collect();
+        }
+
         return ResolveInheritedSecrets::run($this->resource);
+    }
+
+    /**
+     * Whether this resource type actually receives injected Infisical secrets
+     * at deploy time. Mirrors the only two call sites of ResolveInheritedSecrets
+     * in the deployment path: ApplicationDeploymentJob and Service.
+     */
+    private function resourceReceivesInheritedSecrets(): bool
+    {
+        return $this->resource instanceof Application || $this->resource instanceof Service;
     }
 
     public function getHardcodedEnvironmentVariablesProperty()
