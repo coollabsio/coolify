@@ -1,16 +1,20 @@
 <?php
 
+use App\Actions\Proxy\StartProxy;
 use App\Enums\ProxyTypes;
+use App\Models\AuditEvent;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutDefer();
     InstanceSettings::forceCreate(['id' => 0]);
 });
 
@@ -186,4 +190,21 @@ test('start proxy button shows a loading state while proxy startup actions run',
         ->assertSeeHtml('wire:loading.attr="disabled"')
         ->assertSeeHtml('wire:loading.class="is-loading"')
         ->assertSeeHtml('wire:target="checkProxy,startProxy"');
+});
+
+test('starting a proxy records a team audit event', function () {
+    [$user, $team, $server] = setupProxyUser('admin');
+    $activity = Activity::create([
+        'description' => 'proxy start',
+        'properties' => ['team_id' => $team->id],
+    ]);
+    StartProxy::shouldRun()->andReturn($activity);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    Livewire::test('server.navbar', ['server' => $server])
+        ->call('startProxy');
+
+    expect(AuditEvent::query()->sole()->event)->toBe('ui.proxy.started');
 });

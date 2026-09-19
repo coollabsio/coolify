@@ -12,8 +12,20 @@ test('sentinel unsaved bar scopes dirty tracking to savable form fields', functi
 
     expect($contents)
         ->toContain('x-unsaved-bar')
-        ->toContain('targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds"')
+        ->toContain('targets="sentinelCustomUrl,sentinelToken"')
+        ->not->toContain('trafficTopn')
+        ->not->toContain('sentinelMetricsRefreshRateSeconds')
+        ->not->toContain('sentinelMetricsHistoryDays')
+        ->not->toContain('sentinelPushIntervalSeconds')
         ->not->toMatch('/x-unsaved-bar\s+action="submit"\s*\/>/');
+});
+
+test('metrics unsaved bar scopes dirty tracking to metrics collection fields', function () {
+    $contents = file_get_contents(resource_path('views/livewire/server/charts.blade.php'));
+
+    expect($contents)
+        ->toContain('x-unsaved-bar action="saveMetricsSettings"')
+        ->toContain('targets="sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds"');
 });
 
 test('unsaved bar component accepts optional wire:target list', function () {
@@ -139,6 +151,17 @@ test('sentinel custom docker image x-init only sets wire when a value exists', f
     expect($contents)
         ->toContain("x-init=\"if (customImage) { \$wire.set('sentinelCustomDockerImage', customImage) }\"")
         ->not->toContain("x-init=\"\$wire.set('sentinelCustomDockerImage', customImage)\"");
+});
+
+test('sentinel custom docker image does not rerender while typing and has an explicit apply action', function () {
+    $contents = file_get_contents(resource_path('views/livewire/server/sentinel.blade.php'));
+
+    expect($contents)
+        ->toContain('async applyCustomImage()')
+        ->toContain("await \$wire.set('sentinelCustomDockerImage', this.customImage || null)")
+        ->toContain('await $wire.restartSentinel()')
+        ->toContain('Apply and restart')
+        ->not->toContain('@input.debounce.500ms="saveCustomImage()"');
 });
 
 /**

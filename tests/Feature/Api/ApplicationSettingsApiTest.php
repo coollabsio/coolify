@@ -467,3 +467,32 @@ test('rejects swarm fields on application update', function (string $field, mixe
     'swarm_placement_constraints' => ['swarm_placement_constraints', 'node.role==worker'],
     'is_swarm_only_worker_nodes' => ['is_swarm_only_worker_nodes', true],
 ]);
+
+test('PATCH /api/v1/applications/{uuid} saves a slugged container name prefix', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'My API'])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBe('my-api');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->getJson("/api/v1/applications/{$this->application->uuid}")
+        ->assertOk()
+        ->assertJsonPath('settings.custom_container_name_prefix', 'my-api');
+});
+
+test('PATCH /api/v1/applications/{uuid} rejects a container name prefix that is in use', function () {
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherApplication->settings->update(['custom_container_name_prefix' => 'shared-prefix']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_container_name_prefix' => 'shared-prefix'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('custom_container_name_prefix');
+
+    expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});

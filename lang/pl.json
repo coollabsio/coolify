@@ -8,6 +8,7 @@
     "auth.login.github": "Zaloguj się przez GitHub",
     "auth.login.gitlab": "Zaloguj się przez Gitlab",
     "auth.login.google": "Zaloguj się przez Google",
+    "auth.login.oidc": "Zaloguj się przez SSO",
     "auth.login.infomaniak": "Zaloguj się przez Infomaniak",
     "auth.login.zitadel": "Zaloguj się przez Zitadel",
     "auth.already_registered": "Już zarejestrowany?",
