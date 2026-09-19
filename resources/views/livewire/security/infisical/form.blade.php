@@ -12,10 +12,14 @@
                 <x-forms.input label="Client ID" disabled value="Hidden (only admins can view)" />
                 <x-forms.input label="Client Secret" disabled value="Hidden (only admins can view)" />
             @else
-                <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection" required
-                    type="password" label="Client ID" id="client_id" />
-                <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection" required
-                    type="password" label="Client Secret" id="client_secret" />
+                <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection"
+                    :required="! $connection" type="password" label="Client ID" id="client_id"
+                    :placeholder="$connection ? 'Leave blank to keep the current value' : ''"
+                    :helper="$connection ? 'Stored securely. Leave blank to keep the current value.' : null" />
+                <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection"
+                    :required="! $connection" type="password" label="Client Secret" id="client_secret"
+                    :placeholder="$connection ? 'Leave blank to keep the current value' : ''"
+                    :helper="$connection ? 'Stored securely. Leave blank to keep the current value.' : null" />
             @endif
         </div>
     </x-application.settings-section>

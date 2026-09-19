@@ -103,6 +103,18 @@ test('an owner can create an infisical connection scoped to their team', functio
     expect($connection->client_secret)->toBe('secret-xyz');
 });
 
+test('creating still requires both client id and client secret', function () {
+    actingAsTeamRole('owner');
+
+    Livewire::test(InfisicalForm::class)
+        ->set('name', 'Production Infisical')
+        ->set('host', 'https://infisical.test')
+        ->set('client_id', '')
+        ->set('client_secret', '')
+        ->call('submit')
+        ->assertHasErrors(['client_id' => 'required', 'client_secret' => 'required']);
+});
+
 test('submit validation rejects a missing host', function () {
     actingAsTeamRole('owner');
 
@@ -129,6 +141,77 @@ test('an admin of another team may not update a connection belonging to a differ
 
 // --- Secret hiding ---
 
+// Regression test for a credential disclosure: Form::mount() used to
+// repopulate the public $client_id/$client_secret properties from the
+// (decrypted, via the `encrypted` cast) model attributes when editing an
+// existing connection. Livewire serialises public properties into the
+// component's wire:snapshot on every render, so the decrypted secret ended
+// up in the page HTML on every edit-form mount - regardless of what any
+// Blade line printed. `assertDontSee()` defaults to stripping that
+// snapshot JSON before asserting, which is exactly why this needs to check
+// the raw response body instead.
+test('mounting the form with an existing connection never puts its secret in the raw render', function () {
+    [$team] = actingAsTeamRole('owner');
+    $connection = InfisicalConnection::factory()->create([
+        'team_id' => $team->id,
+        'client_id' => 'real-client-id-value',
+        'client_secret' => 'super-secret-value',
+    ]);
+
+    $component = Livewire::test(InfisicalForm::class, ['connection' => $connection]);
+
+    // html(false) = the raw response including wire:snapshot, unlike
+    // assertSee/assertDontSee which strip it by default.
+    $rawHtml = $component->html(false);
+
+    expect($rawHtml)->not->toContain('super-secret-value')
+        ->not->toContain('real-client-id-value');
+    expect($component->get('client_id'))->toBe('');
+    expect($component->get('client_secret'))->toBe('');
+});
+
+test('saving an edit with blank credential fields leaves the stored secrets unchanged', function () {
+    [$team] = actingAsTeamRole('owner');
+    $connection = InfisicalConnection::factory()->create([
+        'team_id' => $team->id,
+        'client_id' => 'original-client-id',
+        'client_secret' => 'original-client-secret',
+    ]);
+
+    Livewire::test(InfisicalForm::class, ['connection' => $connection])
+        ->set('name', 'Renamed connection')
+        ->set('client_id', '')
+        ->set('client_secret', '')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $connection->refresh();
+
+    expect($connection->name)->toBe('Renamed connection');
+    expect($connection->client_id)->toBe('original-client-id');
+    expect($connection->client_secret)->toBe('original-client-secret');
+});
+
+test('saving an edit with new credential values overwrites the stored secrets', function () {
+    [$team] = actingAsTeamRole('owner');
+    $connection = InfisicalConnection::factory()->create([
+        'team_id' => $team->id,
+        'client_id' => 'original-client-id',
+        'client_secret' => 'original-client-secret',
+    ]);
+
+    Livewire::test(InfisicalForm::class, ['connection' => $connection])
+        ->set('client_id', 'new-client-id')
+        ->set('client_secret', 'new-client-secret')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $connection->refresh();
+
+    expect($connection->client_id)->toBe('new-client-id');
+    expect($connection->client_secret)->toBe('new-client-secret');
+});
+
 test('the client secret input renders as a password field', function () {
     [$team] = actingAsTeamRole('owner');
     $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
@@ -142,15 +225,13 @@ test('the client secret input renders as a password field', function () {
         ->toContain('x-bind:type="type"');
 });
 
-// InfisicalConnectionPolicy::viewAny() is admin/owner-only (locked down by
-// the authorization task this UI builds on), so a member is refused before
-// Form::mount() ever reaches the isPasswordHiddenForMember branch - there is
-// no reachable state where isMember() is true and viewAny() also passes.
-// The branch is kept anyway, mirroring the Storage\Form exemplar, as
-// defense-in-depth against a future relaxation of that policy; it is
-// exercised directly here so a regression there cannot silently reintroduce
-// a credential leak.
-test('isPasswordHiddenForMember blanks credential fields once set', function () {
+// syncData() is the only place mount() pulls model data into public
+// properties. It must never touch client_id/client_secret - that was the
+// root cause of the credential disclosure fixed above - regardless of
+// isPasswordHiddenForMember, which is defense-in-depth for a policy branch
+// that isn't reachable today (InfisicalConnectionPolicy::viewAny() is
+// admin/owner-only, so a member never reaches Form::mount() at all).
+test('syncData never copies credential fields from the model', function () {
     [$team] = actingAsTeamRole('owner');
     $connection = InfisicalConnection::factory()->create([
         'team_id' => $team->id,
@@ -164,14 +245,7 @@ test('isPasswordHiddenForMember blanks credential fields once set', function () 
     $reflection->setAccessible(true);
     $reflection->invoke($form, false);
 
-    expect($form->client_id)->toBe('real-client-id');
-
-    $form->isPasswordHiddenForMember = true;
-    if ($form->isPasswordHiddenForMember) {
-        $form->client_id = '';
-        $form->client_secret = '';
-    }
-
+    expect($form->name)->toBe($connection->name);
     expect($form->client_id)->toBe('');
     expect($form->client_secret)->toBe('');
 });

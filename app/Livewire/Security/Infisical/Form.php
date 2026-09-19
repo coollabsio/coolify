@@ -19,13 +19,32 @@ class Form extends Component
     #[Validate(['required', 'url', 'max:255'])]
     public string $host = 'https://app.infisical.com';
 
-    #[Validate(['required', 'string', 'max:255'])]
+    /**
+     * Never repopulated from the model: `client_id`/`client_secret` are
+     * `encrypted`-cast, so setting them from `$this->connection` would put
+     * the decrypted value into this component's public state - and Livewire
+     * serialises public properties into `wire:snapshot`, landing the
+     * decrypted secret in the page HTML on every edit-form mount. Left
+     * blank on edit; `rules()` makes both required only on create, and
+     * `submit()` only overwrites the stored value when a new one is typed.
+     */
     public string $client_id = '';
 
-    #[Validate(['required', 'string', 'max:512'])]
     public string $client_secret = '';
 
     public bool $isPasswordHiddenForMember = false;
+
+    protected function rules(): array
+    {
+        $requiredOnCreate = $this->connection ? 'nullable' : 'required';
+
+        return [
+            'name' => ['required', 'string', 'max:128'],
+            'host' => ['required', 'url', 'max:255'],
+            'client_id' => [$requiredOnCreate, 'string', 'max:255'],
+            'client_secret' => [$requiredOnCreate, 'string', 'max:512'],
+        ];
+    }
 
     protected function messages(): array
     {
@@ -39,7 +58,10 @@ class Form extends Component
     }
 
     /**
-     * Sync data between component properties and model.
+     * Sync non-secret data between component properties and model. Secrets
+     * are never pulled from the model into properties (see property
+     * docblocks above) and are applied to the model separately in
+     * `submit()`, only when a new value was typed.
      *
      * @param  bool  $toModel  If true, sync FROM properties TO model. If false, sync FROM model TO properties.
      */
@@ -52,13 +74,9 @@ class Form extends Component
         if ($toModel) {
             $this->connection->name = $this->name;
             $this->connection->host = $this->host;
-            $this->connection->client_id = $this->client_id;
-            $this->connection->client_secret = $this->client_secret;
         } else {
             $this->name = $this->connection->name;
             $this->host = $this->connection->host;
-            $this->client_id = $this->connection->client_id;
-            $this->client_secret = $this->connection->client_secret;
         }
     }
 
@@ -69,11 +87,6 @@ class Form extends Component
         $this->syncData(false);
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-
-        if ($this->isPasswordHiddenForMember) {
-            $this->client_id = '';
-            $this->client_secret = '';
-        }
     }
 
     public function submit(): void
@@ -83,6 +96,16 @@ class Form extends Component
 
         if ($this->connection) {
             $this->syncData(true);
+
+            // Blank credential fields mean "leave unchanged" - never
+            // overwrite a stored secret with an empty string.
+            if ($this->client_id !== '') {
+                $this->connection->client_id = $this->client_id;
+            }
+            if ($this->client_secret !== '') {
+                $this->connection->client_secret = $this->client_secret;
+            }
+
             $this->connection->save();
         } else {
             $this->connection = InfisicalConnection::create([
@@ -93,6 +116,12 @@ class Form extends Component
                 'client_secret' => $this->client_secret,
             ]);
         }
+
+        // Never leave the submitted secret values sitting in this
+        // component's public state (and thus the next wire:snapshot) after
+        // save.
+        $this->client_id = '';
+        $this->client_secret = '';
 
         $this->dispatch('success', 'Infisical connection saved.');
         $this->dispatch('infisicalConnectionSaved');
