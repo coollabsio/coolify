@@ -38,12 +38,31 @@ class Form extends Component
     {
         $requiredOnCreate = $this->connection ? 'nullable' : 'required';
 
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:128'],
             'host' => ['required', 'url', 'max:255'],
             'client_id' => [$requiredOnCreate, 'string', 'max:255'],
             'client_secret' => [$requiredOnCreate, 'string', 'max:512'],
         ];
+
+        // On create there is no stored credential to fall back to, so a
+        // whitespace-only value (which satisfies `required` but not
+        // `trim() !== ''`) must be rejected outright rather than silently
+        // creating a connection with a blank secret. On edit, a
+        // whitespace-only value is instead treated as "leave unchanged" in
+        // submit() - see the trim() guards there.
+        if ($this->connection === null) {
+            $notBlank = function (string $attribute, mixed $value, \Closure $fail): void {
+                if (is_string($value) && trim($value) === '') {
+                    $fail('The '.str($attribute)->replace('_', ' ')->title().' field must not be blank.');
+                }
+            };
+
+            $rules['client_id'][] = $notBlank;
+            $rules['client_secret'][] = $notBlank;
+        }
+
+        return $rules;
     }
 
     protected function messages(): array
@@ -97,13 +116,22 @@ class Form extends Component
         if ($this->connection) {
             $this->syncData(true);
 
-            // Blank credential fields mean "leave unchanged" - never
-            // overwrite a stored secret with an empty string.
-            if ($this->client_id !== '') {
-                $this->connection->client_id = $this->client_id;
+            $trimmedClientId = trim($this->client_id);
+            $trimmedClientSecret = trim($this->client_secret);
+
+            // Blank (or whitespace-only) credential fields mean "leave
+            // unchanged" - never overwrite a stored secret with an empty
+            // value. Guarding on trim() rather than the raw string matters:
+            // InfisicalConnection::boot()'s `saving` hook trims
+            // client_id/client_secret before persisting, so a
+            // whitespace-only submission that slipped past a `!== ''` guard
+            // would still be trimmed down to '' and silently wipe the
+            // stored credential.
+            if ($trimmedClientId !== '') {
+                $this->connection->client_id = $trimmedClientId;
             }
-            if ($this->client_secret !== '') {
-                $this->connection->client_secret = $this->client_secret;
+            if ($trimmedClientSecret !== '') {
+                $this->connection->client_secret = $trimmedClientSecret;
             }
 
             $this->connection->save();
@@ -112,8 +140,8 @@ class Form extends Component
                 'team_id' => currentTeam()->id,
                 'name' => $this->name,
                 'host' => $this->host,
-                'client_id' => $this->client_id,
-                'client_secret' => $this->client_secret,
+                'client_id' => trim($this->client_id),
+                'client_secret' => trim($this->client_secret),
             ]);
         }
 

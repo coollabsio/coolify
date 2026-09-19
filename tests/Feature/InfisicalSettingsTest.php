@@ -212,6 +212,45 @@ test('saving an edit with new credential values overwrites the stored secrets', 
     expect($connection->client_secret)->toBe('new-client-secret');
 });
 
+// Regression test: `client_secret !== ''` alone does not catch a
+// whitespace-only submission (a single space passes that guard and
+// `nullable|string|max` validation), and InfisicalConnection::boot()'s
+// `saving` hook then trims it to '' and persists an empty credential -
+// silently destroying a working secret while showing a success toast.
+test('saving an edit with a whitespace-only client secret leaves the stored credential unchanged', function () {
+    [$team] = actingAsTeamRole('owner');
+    $connection = InfisicalConnection::factory()->create([
+        'team_id' => $team->id,
+        'client_id' => 'original-client-id',
+        'client_secret' => 'original-client-secret',
+    ]);
+
+    Livewire::test(InfisicalForm::class, ['connection' => $connection])
+        ->set('client_id', ' ')
+        ->set('client_secret', ' ')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $connection->refresh();
+
+    expect($connection->client_id)->toBe('original-client-id');
+    expect($connection->client_secret)->toBe('original-client-secret');
+});
+
+test('creating with a whitespace-only client secret is a validation error, not a saved empty credential', function () {
+    actingAsTeamRole('owner');
+
+    Livewire::test(InfisicalForm::class)
+        ->set('name', 'Production Infisical')
+        ->set('host', 'https://infisical.test')
+        ->set('client_id', ' ')
+        ->set('client_secret', ' ')
+        ->call('submit')
+        ->assertHasErrors(['client_id', 'client_secret']);
+
+    expect(InfisicalConnection::query()->where('name', 'Production Infisical')->exists())->toBeFalse();
+});
+
 test('the client secret input renders as a password field', function () {
     [$team] = actingAsTeamRole('owner');
     $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
