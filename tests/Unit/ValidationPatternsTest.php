@@ -169,6 +169,13 @@ it('accepts shell-safe keys for sourced build-time env files', function (string 
     'digits after first character' => 'NODE_VERSION_20',
 ]);
 
+it('treats dotted keys as incompatible with Docker secret ids', function () {
+    expect(ValidationPatterns::isDockerSecretCompatibleKey('SAFE_FROM_TOML'))->toBeTrue();
+    expect(ValidationPatterns::isDockerSecretCompatibleKey('X.VALUE'))->toBeFalse();
+    expect(ValidationPatterns::isDockerSecretCompatibleKey('DOTTED.USER'))->toBeFalse();
+    expect(ValidationPatterns::isDockerSecretCompatibleKey('X$(id)'))->toBeFalse();
+});
+
 it('rejects keys that bash would interpret when sourcing a build-time env file', function (string $key) {
     expect(fn () => ValidationPatterns::validatedShellEnvironmentVariableKey($key))
         ->toThrow(InvalidArgumentException::class);

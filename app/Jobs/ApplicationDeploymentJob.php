@@ -1425,7 +1425,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Check for PORT environment variable mismatch with ports_exposes
@@ -1492,7 +1492,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Fall back to production env vars for keys not overridden by preview vars,
@@ -1506,7 +1506,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     return $env->is_runtime && ! in_array($env->key, $previewKeys);
                 });
                 foreach ($fallback_production_vars as $env) {
-                    $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                    $envs->push($this->runtimeEnvironmentAssignment($env));
                 }
             }
 
@@ -1524,6 +1524,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Return the generated environment variables instead of storing them globally
         return $envs;
+    }
+
+    private function runtimeEnvironmentAssignment(EnvironmentVariable $environmentVariable): string
+    {
+        $resolvedValue = $environmentVariable->get_real_environment_variables_with_server(
+            $environmentVariable->value,
+            $environmentVariable->resourceable,
+            $this->mainServer,
+        );
+        $isJson = json_validate((string) $resolvedValue)
+            && (str_starts_with((string) $resolvedValue, '{') || str_starts_with((string) $resolvedValue, '['));
+        $allowInterpolation = ! $isJson && ! $environmentVariable->is_literal && ! $environmentVariable->is_multiline;
+
+        return $environmentVariable->key.'='.escapeComposeEnvFileValue(
+            $resolvedValue,
+            allowInterpolation: $allowInterpolation,
+        );
     }
 
     private function isGeneratedDockerComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
@@ -1928,6 +1945,41 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $displaySuggestedKey = ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey);
 
         $this->application_deployment_queue->addLogEntry("   Suggested name: {$displaySuggestedKey}", type: 'info');
+    }
+
+    private function logDottedDockerSecretKeys(array $keys, string $origin): void
+    {
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+        foreach ($keys as $key) {
+            $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
+            $this->application_deployment_queue->addLogEntry("⚠️ Dotted environment variable name from {$origin}: {$displayKey}", 'stderr');
+            $this->logSuggestedShellEnvironmentVariableKey($key);
+        }
+        $this->application_deployment_queue->addLogEntry('Docker secret IDs cannot contain dots.', 'stderr');
+
+        if ($origin === 'the Nixpacks plan') {
+            $this->application_deployment_queue->addLogEntry('   Open nixpacks.toml and check the [variables] section. Rename dotted keys to use underscores.', type: 'info');
+        }
+
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+    }
+
+    private function assertDockerSecretCompatibleKeys(Collection $variables, string $origin): void
+    {
+        $incompatibleKeys = $variables->keys()
+            ->map(fn ($key): string => (string) $key)
+            ->filter(fn (string $key): bool => ! ValidationPatterns::isDockerSecretCompatibleKey($key))
+            ->values();
+
+        if ($incompatibleKeys->isEmpty()) {
+            return;
+        }
+
+        $this->logDottedDockerSecretKeys($incompatibleKeys->all(), $origin);
+
+        throw new DeploymentException(
+            'Dotted build-time environment variable names cannot be passed as Docker build secrets: '.$incompatibleKeys->implode(', ').'. Rename these keys to use underscores instead of dots, or disable build secrets and use a Dockerfile ARG.'
+        );
     }
 
     private function save_buildtime_environment_variables()
@@ -2882,6 +2934,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function railpack_build_secret_flags(Collection $variables): string
     {
+        $this->assertDockerSecretCompatibleKeys($variables, 'Railpack build secrets');
+
         if ($variables->isEmpty()) {
             return '';
         }
@@ -4311,19 +4365,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->analyzeBuildTimeVariables($variables);
         }
 
-        $requiresDottedEnvironmentSecrets = $this->application->build_pack === 'nixpacks'
-            && $variables->keys()->contains(fn ($key): bool => str_contains((string) $key, '.'));
+        if ($this->build_pack === 'nixpacks') {
+            $incompatibleKeys = collect($variables->keys())
+                ->map(fn ($key): string => (string) $key)
+                ->filter(fn (string $key): bool => ! ValidationPatterns::isDockerSecretCompatibleKey($key) && str_contains($key, '.'))
+                ->values();
 
-        if ($requiresDottedEnvironmentSecrets) {
-            if (! $this->dockerSecretsAvailable) {
-                $dottedKeys = $variables->keys()
-                    ->filter(fn ($key): bool => str_contains((string) $key, '.'))
-                    ->implode(', ');
+            if ($incompatibleKeys->isNotEmpty()) {
+                $this->logDottedDockerSecretKeys($incompatibleKeys->all(), 'the Nixpacks plan');
 
-                throw new DeploymentException("Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: {$dottedKeys}. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.");
+                throw new DeploymentException(
+                    'Dotted Nixpacks build-time environment variable names cannot be passed as Docker build secrets: '.$incompatibleKeys->implode(', ').'. Rename these keys to use underscores instead of dots (for example '.$incompatibleKeys->map(fn (string $key): string => str_replace('.', '_', $key))->first().').'
+                );
             }
-
-            $this->dockerSecretsSupported = true;
         }
 
         if ($this->dockerSecretsSupported) {
@@ -4407,6 +4461,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_secrets(Collection $variables)
     {
+        $this->assertDockerSecretCompatibleKeys($variables, 'Docker build secrets');
+
         if ($variables->isEmpty()) {
             $this->build_secrets = '';
 
@@ -4621,44 +4677,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return;
         }
 
-        $dottedKeys = $variables->keys()
-            ->map(fn ($key): string => (string) $key)
-            ->filter(fn (string $key): bool => str_contains($key, '.'));
-
-        if ($dottedKeys->isNotEmpty()) {
-            $originalDockerfile = $dockerfile;
-            $dockerfile = $dockerfile->map(function (string $line) use ($dottedKeys): ?string {
-                $trimmedLine = trim($line);
-
-                if (! str_starts_with($trimmedLine, 'ARG ') && ! str_starts_with($trimmedLine, 'ENV ')) {
-                    return $line;
-                }
-
-                [$instruction, $arguments] = explode(' ', $trimmedLine, 2);
-                $filteredArguments = collect(preg_split('/\s+/', $arguments))
-                    ->reject(function (string $argument) use ($dottedKeys): bool {
-                        $key = str($argument)->before('=')->toString();
-
-                        return $dottedKeys->contains($key);
-                    });
-
-                if ($filteredArguments->isEmpty()) {
-                    return null;
-                }
-
-                return $instruction.' '.$filteredArguments->implode(' ');
-            })->filter()->values();
-
-            $modified = $dockerfile->all() !== $originalDockerfile->values()->all();
-        }
-
         // Generate mount strings for all secrets
         $mountStrings = $variables->map(fn ($value, $key) => "--mount=type=secret,id={$key},env={$key}")->implode(' ');
 
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
 
-        $modified ??= false;
+        $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
             $trimmed = ltrim($line);
 

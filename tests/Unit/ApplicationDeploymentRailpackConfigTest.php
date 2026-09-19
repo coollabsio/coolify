@@ -36,6 +36,10 @@ function makeRailpackDeploymentJob(array $applicationAttributes = [], array $sav
         'workdir' => '/artifacts/test-app',
         'deployment_uuid' => 'deployment-uuid',
         'saved_outputs' => new Collection($savedOutputs),
+        'application_deployment_queue' => new class extends ApplicationDeploymentQueue
+        {
+            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false): void {}
+        },
         'env_railpack_args' => "--env 'RAILPACK_NODE_VERSION=22'",
         'force_rebuild' => false,
         'addHosts' => '',
@@ -287,6 +291,28 @@ it('filters reserved docker client variables from railpack build secrets', funct
         ->not->toContain('id=DOCKER_HOST')
         ->not->toContain("env 'DOCKER_CONFIG=")
         ->not->toContain("env 'DOCKER_HOST=");
+});
+
+it('rejects dotted railpack build-time keys before emitting docker secret flags', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob();
+
+    expect(fn () => invokeRailpackMethod($job, $reflection, 'railpack_build_secret_flags', [
+        collect([
+            'APP_ENV' => 'production',
+            'DOTTED.USER' => 'railpack-dotted',
+        ]),
+    ]))->toThrow(DeploymentException::class, 'DOTTED.USER');
+});
+
+it('emits secret flags for underscore railpack keys', function () {
+    [$job, $reflection] = makeRailpackDeploymentJob();
+
+    $flags = invokeRailpackMethod($job, $reflection, 'railpack_build_secret_flags', [
+        collect(['APP_ENV' => 'production']),
+    ]);
+
+    expect($flags)->toContain("--secret 'id=APP_ENV,env=APP_ENV'");
+    expect($flags)->not->toContain('DOTTED');
 });
 
 it('builds railpack docker command with matching env and secret flags for all railpack variables', function () {
