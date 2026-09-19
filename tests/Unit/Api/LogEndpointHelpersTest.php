@@ -93,7 +93,7 @@ it('builds docker log commands with options before an escaped container id', fun
     $server->settings = ['is_swarm_manager' => false];
 
     expect(buildContainerLogsCommand($server, 'container-1', 25, true))
-        ->toBe("docker logs -n 25 --timestamps 'container-1' 2>&1");
+        ->toBe("timeout -k 5s 20s docker logs -n 25 --timestamps 'container-1' 2>&1");
 });
 
 it('builds docker log commands for all and zero lines', function () {
@@ -101,9 +101,9 @@ it('builds docker log commands for all and zero lines', function () {
     $server->settings = ['is_swarm_manager' => false];
 
     expect(buildContainerLogsCommand($server, 'container-1', 'all'))
-        ->toBe("docker logs -n all 'container-1' 2>&1")
+        ->toBe("timeout -k 5s 20s docker logs -n all 'container-1' 2>&1")
         ->and(buildContainerLogsCommand($server, 'container-1', 0))
-        ->toBe("docker logs -n 0 'container-1' 2>&1");
+        ->toBe("timeout -k 5s 20s docker logs -n 0 'container-1' 2>&1");
 });
 
 it('builds swarm service log commands with options before an escaped service id', function () {
@@ -117,7 +117,7 @@ it('builds swarm service log commands with options before an escaped service id'
     $server->settings = ['is_swarm_manager' => true];
 
     expect(buildContainerLogsCommand($server, "service'name", 25, true))
-        ->toBe("docker service logs -n 25 --timestamps 'service'\\''name' 2>&1");
+        ->toBe("timeout -k 5s 20s docker service logs -n 25 --timestamps 'service'\\''name' 2>&1");
 });
 
 it('filters service sub containers in PHP instead of using user input in shell filters', function () {
