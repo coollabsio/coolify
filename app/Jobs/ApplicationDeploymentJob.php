@@ -1425,6 +1425,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
             }
 
@@ -1492,6 +1496,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
             }
 
@@ -1506,6 +1514,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     return $env->is_runtime && ! in_array($env->key, $previewKeys);
                 });
                 foreach ($fallback_production_vars as $env) {
+                    if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                        continue;
+                    }
+
                     $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
                 }
             }
@@ -1533,6 +1545,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $key->startsWith('SERVICE_FQDN_')
             || $key->startsWith('SERVICE_URL_')
             || $key->startsWith('SERVICE_NAME_');
+    }
+
+    private function shouldOmitBlankComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool
+    {
+        if ($this->build_pack !== 'dockercompose' || filled($environmentVariable->getResolvedValueWithServer($this->mainServer))) {
+            return false;
+        }
+
+        return dockerComposeEnvironmentVariableRequiresUnsetWhenBlank(
+            $this->application->docker_compose_raw ?? $this->application->docker_compose,
+            $environmentVariable->key
+        );
     }
 
     private function save_runtime_environment_variables()
@@ -1761,6 +1785,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
                     continue;
                 }
@@ -1816,6 +1844,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             foreach ($sorted_environment_variables as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
                     continue;
                 }
@@ -3333,6 +3365,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {
                     $this->env_args->put($env->key, $resolvedValue);
@@ -3349,6 +3385,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
+                if ($this->shouldOmitBlankComposeEnvironmentVariable($env)) {
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {
                     $this->env_args->put($env->key, $resolvedValue);

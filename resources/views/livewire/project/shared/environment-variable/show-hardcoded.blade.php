@@ -14,6 +14,7 @@
             @if ($serviceName)
                 <span class="table-badge shrink-0">{{ $serviceName }}</span>
             @endif
+            <span class="table-badge shrink-0">{{ $composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose' }}</span>
         </div>
         <span class="env-managed-desktop data-table-cell-check">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -42,8 +43,19 @@
                     @if (filled($comment))
                         <x-forms.input label="Comment" :value="$comment" readonly />
                     @endif
-                    <x-callout type="info" title="Managed by Docker Compose">
-                        Update this value in the Compose file.
+                    <x-callout type="info" :title="$composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose'">
+                        @if ($composeType === 'derived')
+                            This value is derived from
+                            @foreach ($references as $reference)
+                                <button type="button" data-compose-reference
+                                    class="font-mono underline underline-offset-2"
+                                    @click="$dispatch('focus-compose-environment-variable', { key: @js($reference) }); modalOpen = false">
+                                    {{ $reference }}</button>{{ $loop->last ? '' : ',' }}
+                            @endforeach.
+                            Edit those variables or update the Compose file.
+                        @else
+                            This value is defined directly in Docker Compose. Update it in the Compose file.
+                        @endif
                     </x-callout>
                 </div>
             </x-modal-input>

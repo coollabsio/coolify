@@ -993,6 +993,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
 
+        $passthroughEnvironmentKeys = extractDockerComposePassthroughKeys(data_get($service, 'environment', []));
         $normalEnvironments = $environment->diffKeys($allMagicEnvironments);
         $normalEnvironments = $normalEnvironments->filter(function ($value, $key) {
             return ! str($value)->startsWith('SERVICE_');
@@ -1002,6 +1003,35 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value())) {
+                $resource->environment_variables()->firstOrCreate([
+                    'key' => $key,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'is_preview' => false,
+                ]);
+
+                continue;
+            }
+            extractDockerComposeEnvironmentVariableReferences($value->value())
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_'))
+                ->each(function (string $reference) use ($resource): void {
+                    $environmentVariable = $resource->environment_variables()->firstOrCreate([
+                        'key' => $reference,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'is_preview' => false,
+                    ]);
+                    $isRequired = dockerComposeEnvironmentVariableIsRequired(
+                        $resource->docker_compose_raw ?? $resource->docker_compose,
+                        $reference
+                    );
+                    if ((bool) $environmentVariable->is_required !== $isRequired) {
+                        $environmentVariable->update(['is_required' => $isRequired]);
+                    }
+                });
             if ($value->startsWith('$SERVICE_')) {
                 $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
@@ -1054,13 +1084,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                             ], [
-                                'value' => $defaultValue,
+                                'value' => $isRequired ? null : $defaultValue,
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                             ]);
 
-                            // Add the variable to the environment so it will be shown in the deployable compose file
-                            $environment[$varName] = $envVar->value;
+                            if ($isRequired && $envVar->value === $defaultValue) {
+                                $envVar->update(['value' => null, 'is_required' => true]);
+                            }
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
@@ -1086,7 +1117,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                                 'value' => $nestedSplit['default'],
                                                 'is_preview' => false,
                                             ]);
-                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
                                         } else {
                                             $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
                                                 'key' => $nestedContent,
@@ -1095,7 +1125,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                             ], [
                                                 'is_preview' => false,
                                             ]);
-                                            $environment[$nestedContent] = $nestedEnvVar->value;
                                         }
                                     }
 
@@ -1117,8 +1146,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                             ]);
-                            // Add the variable to the environment using the saved DB value
-                            $environment[$content] = $envVar->value;
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -1543,6 +1570,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
+
+    syncDockerComposeEnvironmentVariableRequiredState($resource);
 
     return $topLevel;
 }
@@ -2325,6 +2354,7 @@ function serviceParser(Service $resource): Collection
             }
         }
 
+        $passthroughEnvironmentKeys = extractDockerComposePassthroughKeys(data_get($service, 'environment', []));
         $normalEnvironments = $environment->diffKeys($allMagicEnvironments);
         $normalEnvironments = $normalEnvironments->filter(function ($value, $key) {
             return ! str($value)->startsWith('SERVICE_');
@@ -2335,6 +2365,36 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
+            if ($value->isEmpty() && $passthroughEnvironmentKeys->contains($key->value())) {
+                $resource->environment_variables()->firstOrCreate([
+                    'key' => $key,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
+                ], [
+                    'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
+                ]);
+
+                continue;
+            }
+            extractDockerComposeEnvironmentVariableReferences($value->value())
+                ->reject(fn (string $reference): bool => str_starts_with($reference, 'SERVICE_'))
+                ->each(function (string $reference) use ($resource): void {
+                    $environmentVariable = $resource->environment_variables()->firstOrCreate([
+                        'key' => $reference,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'is_preview' => false,
+                    ]);
+                    $isRequired = dockerComposeEnvironmentVariableIsRequired(
+                        $resource->docker_compose_raw ?? $resource->docker_compose,
+                        $reference
+                    );
+                    if ((bool) $environmentVariable->is_required !== $isRequired) {
+                        $environmentVariable->update(['is_required' => $isRequired]);
+                    }
+                });
             if ($parsedValue->startsWith('SERVICE_')) {
                 $resource->environment_variables()->updateOrCreate([
                     'key' => $key,
@@ -2390,14 +2450,15 @@ function serviceParser(Service $resource): Collection
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                             ], [
-                                'value' => $defaultValue,
+                                'value' => $isRequired ? null : $defaultValue,
                                 'is_preview' => false,
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
 
-                            // Add the variable to the environment so it will be shown in the deployable compose file
-                            $environment[$varName] = $envVar->value;
+                            if ($isRequired && $envVar->value === $defaultValue) {
+                                $envVar->update(['value' => null, 'is_required' => true]);
+                            }
 
                             // Recursively process nested variables in default value
                             if (str_contains($defaultValue, '${')) {
@@ -2425,8 +2486,6 @@ function serviceParser(Service $resource): Collection
                                                 'value' => $nestedSplit['default'],
                                                 'is_preview' => false,
                                             ]);
-                                            // Add nested variable to environment
-                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
                                         } else {
                                             // Simple nested variable without default (only if it doesn't exist)
                                             $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
@@ -2436,8 +2495,6 @@ function serviceParser(Service $resource): Collection
                                             ], [
                                                 'is_preview' => false,
                                             ]);
-                                            // Add nested variable to environment
-                                            $environment[$nestedContent] = $nestedEnvVar->value;
                                         }
                                     }
 
@@ -2461,8 +2518,6 @@ function serviceParser(Service $resource): Collection
                                 'is_required' => $isRequired,
                                 'comment' => $envComments[$originalKey] ?? null,
                             ]);
-                            // Add the variable to the environment using the saved DB value
-                            $environment[$content] = $envVar->value;
                         }
                     } else {
                         // Fallback to old behavior for malformed input (backward compatibility)
@@ -2782,6 +2837,8 @@ function serviceParser(Service $resource): Collection
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
+
+    syncDockerComposeEnvironmentVariableRequiredState($resource);
 
     return $topLevel;
 }

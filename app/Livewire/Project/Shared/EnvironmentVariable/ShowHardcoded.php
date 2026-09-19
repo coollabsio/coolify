@@ -20,12 +20,19 @@ class ShowHardcoded extends Component
 
     public bool $isPreview = false;
 
+    public string $composeType = 'literal';
+
+    /** @var list<string> */
+    public array $references = [];
+
     public function mount()
     {
         $this->key = $this->env['key'];
         $this->value = $this->env['value'] ?? null;
         $this->comment = $this->env['comment'] ?? null;
         $this->serviceName = $this->env['service_name'] ?? null;
+        $this->composeType = $this->env['compose_type'] ?? 'literal';
+        $this->references = $this->env['references'] ?? [];
     }
 
     public function render()
