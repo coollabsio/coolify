@@ -4,7 +4,9 @@ namespace App\Livewire\SharedVariables\Environment;
 
 use App\Models\Application;
 use App\Models\Project;
+use App\Models\SharedEnvironmentVariable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -71,7 +73,31 @@ class Show extends Component
 
     public function getDevView()
     {
-        $this->variables = $this->formatEnvironmentVariables($this->environment->environment_variables->sortBy('key'));
+        $this->variables = $this->formatEnvironmentVariables($this->editableVariables->sortBy('key'));
+    }
+
+    /**
+     * User-owned rows: the only ones this screen may edit or delete.
+     *
+     * Rows carrying an infisical_binding_id belong to an Infisical binding and
+     * are replaced wholesale by the next sync, so they are excluded from both
+     * the normal-view table and the developer-view textarea.
+     *
+     * @return Collection<int, SharedEnvironmentVariable>
+     */
+    public function getEditableVariablesProperty(): Collection
+    {
+        return $this->environment->environment_variables->whereNull('infisical_binding_id')->values();
+    }
+
+    /**
+     * Infisical-owned rows for this environment, rendered read-only with a badge.
+     *
+     * @return Collection<int, SharedEnvironmentVariable>
+     */
+    public function getInheritedVariablesProperty(): Collection
+    {
+        return $this->environment->environment_variables->whereNotNull('infisical_binding_id')->sortBy('key')->values();
     }
 
     private function formatEnvironmentVariables($variables)
@@ -131,15 +157,28 @@ class Show extends Component
         }
     }
 
+    /**
+     * Delete user-owned rows the admin dropped from the bulk textarea.
+     *
+     * Binding-owned rows are never in the textarea, so they must never be
+     * reachable here: the whereNull guard is the control that keeps a missing
+     * key from hard-deleting a secret a running deployment depends on.
+     */
     private function deleteRemovedVariables($variables)
     {
-        $variablesToDelete = $this->environment->environment_variables()->whereNotIn('key', array_keys($variables))->get();
+        $variablesToDelete = $this->environment->environment_variables()
+            ->whereNull('infisical_binding_id')
+            ->whereNotIn('key', array_keys($variables))
+            ->get();
 
         if ($variablesToDelete->isEmpty()) {
             return 0;
         }
 
-        $this->environment->environment_variables()->whereNotIn('key', array_keys($variables))->delete();
+        $this->environment->environment_variables()
+            ->whereNull('infisical_binding_id')
+            ->whereNotIn('key', array_keys($variables))
+            ->delete();
 
         return $variablesToDelete->count();
     }
@@ -150,7 +189,16 @@ class Show extends Component
         foreach ($variables as $key => $data) {
             $value = is_array($data) ? ($data['value'] ?? '') : $data;
 
-            $found = $this->environment->environment_variables()->where('key', $key)->first();
+            $found = $this->environment->environment_variables()
+                ->whereNull('infisical_binding_id')
+                ->where('key', $key)
+                ->first();
+
+            if ($found === null && $this->environment->environment_variables()->whereNotNull('infisical_binding_id')->where('key', $key)->exists()) {
+                // An Infisical-owned row already holds this key. Never shadow it
+                // with a second row from the textarea.
+                continue;
+            }
 
             if ($found) {
                 if (! $found->is_shown_once && ! $found->is_multiline) {

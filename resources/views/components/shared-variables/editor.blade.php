@@ -6,9 +6,11 @@
     'view',
     'variablesLabel',
     'readOnlyKeys' => [],
+    'inheritedVariables' => null,
 ])
 
 @php
+    $inheritedVariables = $inheritedVariables ?? collect();
     $alphabeticalPositions = $variables->sortBy('key')->values()->pluck('id')->flip();
     $sharedVariableRows = $variables
         ->map(fn($variable) => [
@@ -139,7 +141,46 @@
                     </div>
                 </div>
             @endif
+            @if ($inheritedVariables->isNotEmpty())
+                <div class="border-t border-neutral-200 dark:border-white/[0.08]">
+                    <div class="flex items-center gap-2 px-4 py-2.5">
+                        <span class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">
+                            Inherited from Infisical
+                        </span>
+                        <x-helper
+                            helper="These variables are synced from an Infisical binding on this environment. Edit or remove them in Infisical; the next sync will update Coolify." />
+                    </div>
+                    <div class="data-table w-full">
+                        @foreach ($inheritedVariables as $inherited)
+                            <div wire:key="inherited-shared-variable-{{ $inherited->id }}"
+                                class="data-table-row env-table-grid-shared items-center">
+                                <div class="flex min-w-0 items-center gap-2">
+                                    <span class="min-w-0 truncate font-mono text-[13px] text-black dark:text-fg"
+                                        title="{{ $inherited->key }}">{{ $inherited->key }}</span>
+                                    <span class="table-badge shrink-0">Infisical</span>
+                                </div>
+                                <span class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">{{ str($type)->headline() }}</span>
+                                <span class="data-table-cell-dash">-</span>
+                                <span class="data-table-cell-dash">-</span>
+                                <span class="justify-self-end text-[11px] text-neutral-400 dark:text-fg-faint">Read-only</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         @else
+            @if ($inheritedVariables->isNotEmpty())
+                <div class="border-b border-neutral-200 p-4 dark:border-white/[0.08]">
+                    <div class="mb-2 flex items-center gap-2 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        <span>Inherited from Infisical</span>
+                        <span class="table-badge shrink-0">Infisical</span>
+                        <span class="text-neutral-400 dark:text-fg-faint">Read-only</span>
+                    </div>
+                    @foreach ($inheritedVariables as $inherited)
+                        <div class="break-all font-mono text-[13px]">{{ $inherited->key }}=(Managed by Infisical, edit it there)</div>
+                    @endforeach
+                </div>
+            @endif
             @if ($variables->whereIn('key', $readOnlyKeys)->isNotEmpty())
                 <div class="border-b border-neutral-200 p-4 dark:border-white/[0.08]">
                     <div class="mb-2 text-[12px] text-neutral-500 dark:text-fg-dim">Built-in · Read-only</div>

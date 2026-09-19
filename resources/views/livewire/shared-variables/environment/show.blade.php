@@ -4,7 +4,8 @@
     </x-slot>
 
     <x-shared-variables.editor :resource="$environment"
-        :variables="$environment->environment_variables" type="environment"
+        :variables="$this->editableVariables" type="environment"
         title="{{ $project->name }} / {{ $environment->name }}"
-        :view="$view" variablesLabel="Environment shared variables" />
+        :view="$view" variablesLabel="Environment shared variables"
+        :inheritedVariables="$this->inheritedVariables" />
 </div>
