@@ -5,39 +5,57 @@ use App\Models\InfisicalBinding;
 use App\Models\SharedEnvironmentVariable;
 use App\Services\Infisical\InfisicalApiException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Factory as HttpFactory;
-use Illuminate\Support\Collection;
+use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 /**
+ * Holds the response sequence for the secrets endpoint across multiple
+ * fakeInfisical()/fakeInfisicalRawSecrets() calls within a single test.
+ *
  * Http::fake() registrations accumulate rather than replace one another: an
- * earlier wildcard stub for the same URL pattern always wins, so a test that
- * calls this helper more than once (e.g. to change the response mid-test)
- * needs the previous registrations cleared first.
+ * earlier wildcard stub for a URL always wins over a later, overlapping one.
+ * A test that needs a different response on a later call to the same
+ * endpoint (e.g. a rotated secret, or a hidden-value response) must instead
+ * push successive responses onto one shared Http::fakeSequence() instance.
  */
-function resetHttpFakes(): void
+function infisicalHttpState(): object
 {
-    $factory = app(HttpFactory::class);
-    $property = new ReflectionProperty($factory, 'stubCallbacks');
-    $property->setAccessible(true);
-    $property->setValue($factory, new Collection);
+    static $state;
+
+    return $state ??= new class
+    {
+        public ?ResponseSequence $secretsSequence = null;
+    };
+}
+
+beforeEach(function () {
+    infisicalHttpState()->secretsSequence = null;
+});
+
+/**
+ * @param  array<int, array<string, mixed>>  $secrets  Raw Infisical secret entries.
+ */
+function fakeInfisicalRawSecrets(array $secrets): void
+{
+    $state = infisicalHttpState();
+    $state->secretsSequence ??= Http::fakeSequence('*/api/v3/secrets/raw*');
+    $state->secretsSequence->push(['secrets' => $secrets]);
 }
 
 function fakeInfisical(array $secrets): void
 {
-    resetHttpFakes();
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
+    ]);
 
     $payload = [];
     foreach ($secrets as $key => $value) {
         $payload[] = ['secretKey' => $key, 'secretValue' => $value];
     }
 
-    Http::fake([
-        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
-        '*/api/v3/secrets/raw*' => Http::response(['secrets' => $payload]),
-    ]);
+    fakeInfisicalRawSecrets($payload);
 }
 
 test('it creates environment scoped shared variables owned by the binding', function () {
@@ -152,12 +170,8 @@ test('a hidden secret value aborts the sync instead of blanking the stored value
     SyncEnvironmentSecrets::run($binding);
     expect(SharedEnvironmentVariable::where('key', 'DB_PASSWORD')->first()->value)->toBe('hunter2');
 
-    resetHttpFakes();
-    Http::fake([
-        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
-        '*/api/v3/secrets/raw*' => Http::response(['secrets' => [
-            ['secretKey' => 'DB_PASSWORD', 'secretValue' => '', 'secretValueHidden' => true],
-        ]]),
+    fakeInfisicalRawSecrets([
+        ['secretKey' => 'DB_PASSWORD', 'secretValue' => '', 'secretValueHidden' => true],
     ]);
 
     expect(fn () => SyncEnvironmentSecrets::run($binding))->toThrow(InfisicalApiException::class);
@@ -172,12 +186,8 @@ test('a hidden secret never causes the stored row to be deleted', function () {
     fakeInfisical(['API_KEY' => 'abc']);
     SyncEnvironmentSecrets::run($binding);
 
-    resetHttpFakes();
-    Http::fake([
-        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
-        '*/api/v3/secrets/raw*' => Http::response(['secrets' => [
-            ['secretKey' => 'API_KEY', 'secretValue' => '', 'secretValueHidden' => true],
-        ]]),
+    fakeInfisicalRawSecrets([
+        ['secretKey' => 'API_KEY', 'secretValue' => '', 'secretValueHidden' => true],
     ]);
 
     try {
@@ -187,4 +197,33 @@ test('a hidden secret never causes the stored row to be deleted', function () {
     }
 
     expect(SharedEnvironmentVariable::where('key', 'API_KEY')->exists())->toBeTrue();
+});
+
+test('a key colliding with a user owned row is shadowed, not adopted or overwritten, and the rest of the sync still succeeds', function () {
+    $binding = InfisicalBinding::factory()->create();
+
+    $userOwned = SharedEnvironmentVariable::create([
+        'key' => 'DB_PASSWORD',
+        'value' => 'user-value',
+        'type' => 'environment',
+        'team_id' => $binding->connection->team_id,
+        'environment_id' => $binding->environment_id,
+    ]);
+
+    fakeInfisical(['DB_PASSWORD' => 'hunter2', 'API_KEY' => 'abc']);
+
+    $result = SyncEnvironmentSecrets::run($binding);
+
+    expect($result['shadowed'])->toBe(['DB_PASSWORD']);
+    expect($result['created'])->toBe(1);
+
+    $userOwned->refresh();
+    expect($userOwned->exists)->toBeTrue();
+    expect($userOwned->value)->toBe('user-value');
+    expect($userOwned->infisical_binding_id)->toBeNull();
+
+    expect(SharedEnvironmentVariable::where('key', 'API_KEY')->exists())->toBeTrue();
+
+    $binding->refresh();
+    expect($binding->last_sync_status)->toBe(InfisicalBinding::STATUS_SUCCESS);
 });
