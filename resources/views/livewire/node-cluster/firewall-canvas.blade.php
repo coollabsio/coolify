@@ -1,4 +1,5 @@
 <div
+    wire:ignore
     x-data="firewallCanvas({
         nodes: @js($firewallCanvasNodes),
         rules: @js($firewallCanvasRules),
@@ -37,8 +38,9 @@
                             x-on:click="selectConnection(connection.id)"
                         />
                         <line
-                            x-bind:class="selectedConnectionId === connection.id ? 'stroke-amber-300' : 'stroke-amber-500'"
+                            x-bind:class="selectedConnectionId === connection.id ? 'stroke-yellow-300' : 'stroke-yellow-400'"
                             stroke-width="2.5"
+                            stroke-dasharray="8 6"
                             x-bind:marker-start="hasReverseConnection(connection) ? 'url(#firewall-canvas-arrow)' : null"
                             marker-end="url(#firewall-canvas-arrow)"
                             x-bind:x1="connectionPoints(connection).x1"
@@ -53,12 +55,12 @@
             <svg class="pointer-events-none absolute inset-0 size-full overflow-visible" aria-hidden="true">
                 <defs>
                     <marker id="firewall-canvas-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse">
-                        <path d="M0,0 L8,4 L0,8 z" class="fill-amber-500" />
+                        <path d="M0,0 L8,4 L0,8 z" class="fill-yellow-400" />
                     </marker>
                 </defs>
                 <line
                     x-show="draft"
-                    class="stroke-amber-400"
+                    class="stroke-yellow-400"
                     stroke-width="2"
                     stroke-dasharray="6 6"
                     x-bind:x1="draft?.sourceX ?? 0"

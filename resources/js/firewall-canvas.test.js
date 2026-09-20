@@ -171,9 +171,42 @@ test('detects two-way application connections', () => {
     assert.equal(canvas.isVisibleConnection(outbound), true);
 });
 
+test('updates directional arrows immediately after adding and removing rules', async () => {
+    const canvas = firewallCanvas({ nodes: [], rules: [] });
+    const outbound = {
+        id: 'workload:api->workload:frontend',
+        source: 'workload:api',
+        destination: 'workload:frontend',
+        rules: [{ uuid: 'outbound', protocol: 'tcp', port: 80 }],
+    };
+    const reverse = {
+        id: 'workload:frontend->workload:api',
+        source: 'workload:frontend',
+        destination: 'workload:api',
+        rules: [],
+    };
+    canvas.connections = [outbound, reverse];
+    canvas.selectedConnectionId = reverse.id;
+    canvas.$wire = {
+        createFirewallRule: async () => ({ uuid: 'reverse', protocol: 'tcp', port: 80 }),
+        removeFirewallRule: async () => {},
+    };
+
+    await canvas.addRule();
+    assert.equal(canvas.hasReverseConnection(outbound), true);
+    assert.deepEqual(reverse.rules.map((rule) => rule.uuid), ['reverse']);
+
+    await canvas.removeRule('reverse');
+    assert.equal(canvas.hasReverseConnection(outbound), false);
+    assert.equal(canvas.selectedConnectionId, outbound.id);
+});
+
 test('renders connection loops outside the SVG namespace', () => {
     const template = readFileSync(new URL('../views/livewire/node-cluster/firewall-canvas.blade.php', import.meta.url), 'utf8');
 
+    assert.match(template, /<div\s+wire:ignore\s+x-data="firewallCanvas/);
     assert.match(template, /<template x-for="connection in connections"[\s\S]*?<svg/);
     assert.doesNotMatch(template, /<svg[^>]*>[\s\S]*?<template x-for="connection in connections"/);
+    assert.match(template, /stroke-dasharray="8 6"/);
+    assert.match(template, /fill-yellow-400/);
 });

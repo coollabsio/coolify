@@ -342,7 +342,14 @@ export function firewallCanvas(config) {
             const destinationUuid = connection.destination.replace('workload:', '');
             this.saving = true;
             try {
-                await this.$wire.createFirewallRule(sourceType, sourceUuid, destinationUuid, this.protocol, this.protocol === 'icmp' ? 0 : Number(this.port));
+                const rule = await this.$wire.createFirewallRule(sourceType, sourceUuid, destinationUuid, this.protocol, this.protocol === 'icmp' ? 0 : Number(this.port));
+                if (rule) {
+                    connection.rules = [
+                        ...connection.rules.filter((existing) => existing.uuid !== rule.uuid),
+                        rule,
+                    ];
+                    this.connections = [...this.connections];
+                }
             } finally {
                 this.saving = false;
             }
@@ -352,9 +359,20 @@ export function firewallCanvas(config) {
             if (this.saving) {
                 return;
             }
+            const selected = this.selectedConnection;
             this.saving = true;
             try {
                 await this.$wire.removeFirewallRule(ruleUuid);
+                for (const connection of this.connections) {
+                    connection.rules = connection.rules.filter((rule) => rule.uuid !== ruleUuid);
+                }
+                this.connections = this.connections.filter((connection) => connection.rules.length > 0);
+                if (!this.selectedConnection && selected) {
+                    this.selectedConnectionId = this.connections.find((connection) => (
+                        connection.source === selected.destination
+                        && connection.destination === selected.source
+                    ))?.id ?? null;
+                }
             } finally {
                 this.saving = false;
             }

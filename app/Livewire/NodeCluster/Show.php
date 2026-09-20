@@ -169,7 +169,8 @@ class Show extends Component
         $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
     }
 
-    public function createFirewallRule(string $sourceType, string $sourceUuid, string $destinationUuid, string $protocol, int $port): void
+    /** @return array{uuid: string, sourceType: string, sourceUuid: string, destinationUuid: string, protocol: string, port: int}|null */
+    public function createFirewallRule(string $sourceType, string $sourceUuid, string $destinationUuid, string $protocol, int $port): ?array
     {
         $this->authorize('update', $this->cluster);
         $validated = validator([
@@ -201,10 +202,10 @@ class Show extends Component
             $this->addError('firewallDestinationUuid', 'The source and destination workloads must be different.');
         }
         if ($this->getErrorBag()->isNotEmpty()) {
-            return;
+            return null;
         }
 
-        $created = DB::transaction(function () use ($validated, $sourceWorkload, $sourceNode, $destination): bool {
+        $result = DB::transaction(function () use ($validated, $sourceWorkload, $sourceNode, $destination): array {
             $rule = NodeFirewallRule::query()->firstOrCreate([
                 'node_cluster_id' => $this->cluster->id,
                 'source_workload_id' => $sourceWorkload?->id,
@@ -217,12 +218,21 @@ class Show extends Component
                 $this->cluster->increment('desired_revision');
             }
 
-            return $rule->wasRecentlyCreated;
+            return ['created' => $rule->wasRecentlyCreated, 'rule' => $rule];
         });
-        if ($created) {
+        if ($result['created']) {
             $this->queueNetworkReconciliation();
         }
-        $this->dispatch('success', $created ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
+        $this->dispatch('success', $result['created'] ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
+
+        return [
+            'uuid' => $result['rule']->uuid,
+            'sourceType' => $validated['sourceType'],
+            'sourceUuid' => $validated['sourceUuid'],
+            'destinationUuid' => $validated['destinationUuid'],
+            'protocol' => $result['rule']->protocol,
+            'port' => $result['rule']->port,
+        ];
     }
 
     public function removeFirewallRule(string $ruleUuid): void
