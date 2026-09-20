@@ -32,6 +32,7 @@ it('records a bounded Flux connection observation', function () {
         'protocol_version' => 1,
         'trust_bundle_version' => 1,
         'transport' => 'plaintext',
+        'capabilities' => ['container.list.v1', 'workload.deploy.v1'],
     ], ['Authorization' => 'Bearer internal-secret'])->assertNoContent();
 
     expect(Cache::get("flux:connection:{$this->node->uuid}"))->toMatchArray([
@@ -42,6 +43,7 @@ it('records a bounded Flux connection observation', function () {
         'transport' => 'plaintext',
         'endpoint' => 'http://flux:7443',
         'last_heartbeat_at' => now()->toIso8601String(),
+        'capabilities' => ['container.list.v1', 'workload.deploy.v1'],
     ])->and($this->node->refresh()->is_reachable)->toBeTrue();
 });
 

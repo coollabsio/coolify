@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -28,6 +29,22 @@ beforeEach(function () {
     config()->set('constants.flux.public_url', 'https://192.0.2.1:7443');
     $this->user = User::factory()->create();
     $this->team = $this->user->teams()->firstOrFail();
+});
+
+it('rejects network reconciliation before changing state when Sentinel lacks a capability', function () {
+    $cluster = CreateNodeCluster::run($this->team, $this->user, 'Mesh');
+    $node = Node::factory()->create(['team_id' => $this->team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    Cache::put($node->cacheKey(), [
+        'status' => 'connected',
+        'capabilities' => ['network.wireguard.key.ensure.v1'],
+    ]);
+
+    expect(fn () => ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user))
+        ->toThrow(RuntimeException::class, 'Upgrade Sentinel');
+
+    expect($cluster->refresh()->network_status)->toBe('pending')
+        ->and(NodeOperation::query()->count())->toBe(0);
 });
 
 it('reconciles a complete full mesh through durable typed operations', function () {

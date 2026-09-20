@@ -13,6 +13,7 @@ use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
@@ -65,6 +66,26 @@ it('rejects reuse of an idempotency key for another request', function () {
         'same-key',
         request: ['image' => 'two'],
     ))->toThrow(InvalidArgumentException::class, 'Idempotency key');
+});
+
+it('rejects a command that the connected Sentinel did not negotiate', function () {
+    Cache::put($this->node->cacheKey(), [
+        'status' => 'connected',
+        'capabilities' => ['container.list.v1'],
+    ]);
+
+    expect(fn () => CreateOperation::run($this->node, 'workload.deploy.v1', 'unsupported-command'))
+        ->toThrow(RuntimeException::class, 'Upgrade Sentinel');
+
+    expect(NodeOperation::query()->count())->toBe(0);
+});
+
+it('allows operation creation until the connected Sentinel reports capabilities', function () {
+    Cache::put($this->node->cacheKey(), ['status' => 'connected']);
+
+    $operation = CreateOperation::run($this->node, 'workload.deploy.v1', 'unknown-capabilities');
+
+    expect($operation->status)->toBe(NodeOperationStatus::QUEUED);
 });
 
 it('records valid operation transitions and attempts', function () {

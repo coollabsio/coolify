@@ -19,6 +19,8 @@ class PublishNodeDiscoveryEndpoints
 
     public function handle(Node $node, Carbon $observedAt): void
     {
+        $node->ensureCapability('discovery.corrosion.endpoints.reconcile.v1');
+
         $node->loadMissing('cluster');
         if ($node->cluster === null || $node->cluster->network_status !== 'active' || blank($node->wireguard_ip)) {
             return;

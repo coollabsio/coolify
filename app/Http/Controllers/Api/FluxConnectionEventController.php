@@ -31,6 +31,8 @@ class FluxConnectionEventController extends Controller
             'protocol_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
             'trust_bundle_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
             'transport' => ['required_if:event,connected', 'nullable', 'in:tls,plaintext'],
+            'capabilities' => ['nullable', 'array', 'max:64'],
+            'capabilities.*' => ['required', 'string', 'max:100', 'distinct'],
             'observed_at_unix_ms' => ['nullable', 'integer', 'min:0'],
             'event_id' => ['required_if:event,runtime_changed', 'nullable', 'string', 'max:255'],
         ]);
@@ -81,6 +83,7 @@ class FluxConnectionEventController extends Controller
             'trust_bundle_version' => $data['trust_bundle_version'] ?? data_get($current, 'trust_bundle_version'),
             'transport' => $data['transport'] ?? data_get($current, 'transport'),
             'endpoint' => $fluxUrl,
+            'capabilities' => $data['capabilities'] ?? data_get($current, 'capabilities'),
         ], fn ($value) => $value !== null), now()->addMinutes(5));
         if (! $node->is_reachable) {
             $node->update(['is_reachable' => true]);

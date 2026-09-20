@@ -20,6 +20,8 @@ class CreateDeploymentOperation
     /** @return array{operation: NodeOperation, created: bool} */
     public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null): array
     {
+        $node->ensureCapability('workload.deploy.v1');
+
         return DB::transaction(function () use ($node, $revision, $requestedBy): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)

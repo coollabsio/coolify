@@ -15,6 +15,8 @@ class FetchContainers
 
     public function handle(Node $node): int
     {
+        $node->ensureCapability('container.list.v1');
+
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
         if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {

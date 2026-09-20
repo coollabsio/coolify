@@ -28,6 +28,19 @@ class ReconcileNodeClusterNetwork
     public function handle(NodeCluster $cluster, User $user): array
     {
         Gate::forUser($user)->authorize('update', $cluster);
+        $requiredCapabilities = [
+            'network.wireguard.key.ensure.v1',
+            'network.wireguard.reconcile.v1',
+            'network.firewall.reconcile.v1',
+            'discovery.corrosion.inspect.v1',
+            'discovery.corrosion.reconcile.v1',
+            'discovery.corrosion.endpoints.reconcile.v1',
+        ];
+        foreach ($cluster->nodes as $node) {
+            foreach ($requiredCapabilities as $capability) {
+                $node->ensureCapability($capability);
+            }
+        }
         $attempt = (string) Str::uuid();
         $cluster->update(['network_status' => 'reconciling']);
 

@@ -29,6 +29,7 @@ class CreateOperation
         if (blank($commandType) || mb_strlen($commandType) > 100) {
             throw new InvalidArgumentException('The command type is invalid.');
         }
+        $node->ensureCapability($commandType);
         if (blank($idempotencyKey) || mb_strlen($idempotencyKey) > 255) {
             throw new InvalidArgumentException('The idempotency key is invalid.');
         }

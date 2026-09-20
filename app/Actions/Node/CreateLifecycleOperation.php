@@ -26,6 +26,8 @@ class CreateLifecycleOperation
         ?User $requestedBy = null,
         bool $updateDesiredState = true,
     ): NodeOperation {
+        $node->ensureCapability('workload.lifecycle.v1');
+
         return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState): NodeOperation {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)

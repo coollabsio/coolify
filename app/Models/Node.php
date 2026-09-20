@@ -113,6 +113,23 @@ class Node extends BaseModel
         }
     }
 
+    public function supportsCapability(string $capability): ?bool
+    {
+        $capabilities = data_get(Cache::get($this->cacheKey()), 'capabilities');
+        if (! is_array($capabilities)) {
+            return null;
+        }
+
+        return in_array($capability, $capabilities, true);
+    }
+
+    public function ensureCapability(string $capability): void
+    {
+        if ($this->supportsCapability($capability) === false) {
+            throw new RuntimeException("This Node does not support {$capability}. Upgrade Sentinel and try again.");
+        }
+    }
+
     public function restartSentinel(): ?string
     {
         return instant_remote_process(['systemctl restart sentinel.service'], $this);
