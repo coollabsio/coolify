@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Http\Controllers\Controller;
+use App\Jobs\RefreshNodeContainersJob;
 use App\Models\Node;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,7 +24,7 @@ class FluxConnectionEventController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'event' => ['required', 'in:connected,heartbeat,disconnected'],
+            'event' => ['required', 'in:connected,heartbeat,disconnected,runtime_changed'],
             'server_id' => ['required', 'string', 'max:255'],
             'connection_id' => ['required', 'uuid'],
             'sentinel_version' => ['required_if:event,connected', 'nullable', 'string', 'max:100'],
@@ -31,6 +32,7 @@ class FluxConnectionEventController extends Controller
             'trust_bundle_version' => ['required_if:event,connected', 'nullable', 'integer', 'min:1'],
             'transport' => ['required_if:event,connected', 'nullable', 'in:tls,plaintext'],
             'observed_at_unix_ms' => ['nullable', 'integer', 'min:0'],
+            'event_id' => ['required_if:event,runtime_changed', 'nullable', 'string', 'max:255'],
         ]);
         if ($validator->fails()) {
             abort(422, $validator->errors()->first());
@@ -39,6 +41,15 @@ class FluxConnectionEventController extends Controller
         $node = Node::query()->where('uuid', $data['server_id'])->firstOrFail();
         $key = $node->cacheKey();
         $current = Cache::get($key, []);
+
+        if ($data['event'] === 'runtime_changed') {
+            if (data_get($current, 'status') === 'connected'
+                && data_get($current, 'connection_id') === $data['connection_id']) {
+                RefreshNodeContainersJob::dispatch($node->id);
+            }
+
+            return response()->noContent();
+        }
 
         if ($data['event'] === 'disconnected') {
             if (data_get($current, 'connection_id') === $data['connection_id']) {

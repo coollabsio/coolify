@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\RefreshNodeContainersJob;
 use App\Models\Node;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -61,6 +63,44 @@ it('restores a Node when a heartbeat arrives after it was unavailable', function
             'status' => 'connected',
             'last_heartbeat_at' => now()->toIso8601String(),
         ]);
+});
+
+it('queues an immediate inventory refresh for a runtime change from the active connection', function () {
+    Queue::fake();
+    Cache::put($this->node->cacheKey(), [
+        'status' => 'connected',
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+        'last_heartbeat_at' => now()->toIso8601String(),
+    ]);
+
+    $this->postJson('/api/v1/internal/sentinel/control/events', [
+        'event' => 'runtime_changed',
+        'server_id' => $this->node->uuid,
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+        'event_id' => 'runtime-1',
+        'observed_at_unix_ms' => now()->getTimestampMs(),
+    ], ['Authorization' => 'Bearer internal-secret'])->assertNoContent();
+
+    Queue::assertPushed(RefreshNodeContainersJob::class, fn ($job) => $job->nodeId === $this->node->id);
+});
+
+it('ignores a runtime change from an old connection', function () {
+    Queue::fake();
+    Cache::put($this->node->cacheKey(), [
+        'status' => 'connected',
+        'connection_id' => '22222222-2222-4222-8222-222222222222',
+        'last_heartbeat_at' => now()->toIso8601String(),
+    ]);
+
+    $this->postJson('/api/v1/internal/sentinel/control/events', [
+        'event' => 'runtime_changed',
+        'server_id' => $this->node->uuid,
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+        'event_id' => 'runtime-old',
+        'observed_at_unix_ms' => now()->getTimestampMs(),
+    ], ['Authorization' => 'Bearer internal-secret'])->assertNoContent();
+
+    Queue::assertNothingPushed();
 });
 
 it('uses the derived TLS endpoint in connection observations', function () {
