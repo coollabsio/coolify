@@ -86,16 +86,18 @@ profile_values() {
     case "$1" in
         node-worker-a) printf '%s\n' coolify-dev-node-worker-a 192.168.122.50 52:54:00:ca:00:09 ;;
         node-worker-b) printf '%s\n' coolify-dev-node-worker-b 192.168.122.51 52:54:00:ca:00:0a ;;
+        node-onboarding) printf '%s\n' coolify-dev-node-onboarding 192.168.122.52 52:54:00:ca:00:0b naked ;;
         *) fail "Unknown automatic development QEMU profile: $1" ;;
     esac
 }
 
 create_worker() {
-    local profile="$1" domain ip mac disk user_data network_config network_xml host_xml
+    local profile="$1" domain ip mac runtime disk user_data network_config network_xml host_xml
     mapfile -t values < <(profile_values "$profile")
     domain="${values[0]}"
     ip="${values[1]}"
     mac="${values[2]}"
+    runtime="${values[3]:-node}"
     disk="$storage_path/$domain.qcow2"
     user_data="$storage_path/$domain-user-data.yaml"
     network_config="$storage_path/$domain-network.yaml"
@@ -124,7 +126,25 @@ create_worker() {
     chmod 0644 "$image"
     chmod 0666 "$disk"
 
-    cat > "$user_data" <<YAML
+    if [[ "$runtime" == naked ]]; then
+        cat > "$user_data" <<YAML
+#cloud-config
+disable_root: false
+users:
+  - name: root
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - $public_key
+package_update: true
+packages:
+  - openssh-server
+  - sudo
+runcmd:
+  - systemctl enable --now ssh
+YAML
+    else
+        cat > "$user_data" <<YAML
 #cloud-config
 disable_root: false
 users:
@@ -148,6 +168,7 @@ runcmd:
   - systemctl enable --now ssh
   - systemctl enable --now podman.socket && ln -sfn /run/podman/podman.sock /var/run/docker.sock && printf '192.168.122.1 coolify-flux\n' >> /etc/hosts
 YAML
+    fi
     cat > "$network_config" <<YAML
 version: 2
 ethernets:
@@ -189,13 +210,23 @@ wait_for_worker() {
 configure_host
 
 index=0
+managed_nodes=false
 for profile in "$@"; do
     create_worker "$profile"
+    mapfile -t values < <(profile_values "$profile")
+    runtime="${values[3]:-node}"
+    if [[ "$runtime" == naked ]]; then
+        step "$profile is ready for UI onboarding at ${values[1]}"
+        continue
+    fi
     seed_options=()
     (( index > 0 )) && seed_options+=(--keep-others)
     docker exec coolify php artisan dev:qemu:seed "$profile" "${seed_options[@]}"
+    managed_nodes=true
     (( index += 1 ))
 done
 
-step 'Configuring Sentinel, WireGuard, and internal DNS'
-docker exec coolify php artisan dev:qemu:bootstrap-nodes
+if [[ "$managed_nodes" == true ]]; then
+    step 'Configuring Sentinel, WireGuard, and internal DNS'
+    docker exec coolify php artisan dev:qemu:bootstrap-nodes
+fi
