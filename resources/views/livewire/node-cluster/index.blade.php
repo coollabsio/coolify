@@ -6,8 +6,13 @@
             <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Clusters</h1>
             <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Group Nodes in private full-mesh networks.</p>
         </div>
-        @can('create', App\Models\NodeCluster::class)
-            <div class="w-fit shrink-0">
+        @can('create', App\Models\Node::class)
+            <div class="flex w-fit shrink-0 items-center gap-2">
+                <a class="button button-highlighted" href="{{ route('node.onboarding') }}" {{ wireNavigate() }}>
+                    <x-reicon name="plus" class="size-3.5" />
+                    Add Node
+                </a>
+                @can('create', App\Models\NodeCluster::class)
                 <x-modal-input title="New Node Cluster" :wireIgnore="false">
                     <x-slot:content>
                         <button type="button" class="button button-highlighted">
@@ -25,6 +30,7 @@
                         </div>
                     </form>
                 </x-modal-input>
+                @endcan
             </div>
         @endcan
     </header>
