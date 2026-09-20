@@ -12,6 +12,7 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\RefreshNodeContainersJob;
 use App\Models\InstanceSettings;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeContainer;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -28,10 +29,21 @@ beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     $this->team = Team::factory()->create();
     $key = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
     $this->node = Node::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $key->id,
         'is_usable' => true,
+        'is_reachable' => true,
+        'node_cluster_id' => $cluster->id,
+        'metadata' => [
+            'cpu_usage_percent' => 10,
+            'memory_bytes' => 1_000,
+            'memory_used_bytes' => 100,
+            'disk_total_bytes' => 1_000,
+            'disk_available_bytes' => 900,
+            'collected_at' => now()->toIso8601String(),
+        ],
     ]);
     $this->workload = NodeWorkload::factory()->create([
         'team_id' => $this->team->id,

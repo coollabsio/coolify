@@ -45,15 +45,28 @@ class CreateClusterDockerImageWorkload
         return DB::transaction(function () use ($project, $environment, $cluster, $image, $requestedBy, $targetNode): array {
             $availableNodes = $cluster->nodes()
                 ->where('is_usable', true)
-                ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER]);
+                ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
+                ->with('cluster')
+                ->withCount('workloads')
+                ->orderBy('workloads_count')
+                ->orderBy('id');
             $node = $targetNode === null
-                ? $availableNodes->withCount('workloads')->orderBy('workloads_count')->orderBy('id')->first()
+                ? $availableNodes->get()->first(function (Node $candidate): bool {
+                    try {
+                        EnsureNodeAcceptsDeployment::run($candidate);
+
+                        return true;
+                    } catch (\DomainException) {
+                        return false;
+                    }
+                })
                 : $availableNodes->whereKey($targetNode->id)->first();
             if ($node === null) {
                 throw new RuntimeException($targetNode === null
-                    ? 'The cluster has no available workload nodes.'
+                    ? 'The cluster has no workload Node that can accept a deployment.'
                     : 'The selected Node is not available in this cluster.');
             }
+            EnsureNodeAcceptsDeployment::run($node);
 
             $workload = NodeWorkload::query()->create([
                 'team_id' => $project->team_id,

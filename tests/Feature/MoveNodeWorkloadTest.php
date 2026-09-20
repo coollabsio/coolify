@@ -30,7 +30,20 @@ it('publishes a ready target before it removes and withdraws the source workload
     $key = PrivateKey::factory()->create(['team_id' => $team->id]);
     $cluster = CreateNodeCluster::run($team, $user, 'Move mesh');
     $source = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $key->id]);
-    $target = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $key->id]);
+    $target = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $key->id,
+        'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => [
+            'cpu_usage_percent' => 10,
+            'memory_bytes' => 1_000,
+            'memory_used_bytes' => 100,
+            'disk_total_bytes' => 1_000,
+            'disk_available_bytes' => 900,
+            'collected_at' => now()->toIso8601String(),
+        ],
+    ]);
     AssignNodeToCluster::run($cluster, $source);
     AssignNodeToCluster::run($cluster, $target);
     $cluster->update(['network_status' => 'active']);

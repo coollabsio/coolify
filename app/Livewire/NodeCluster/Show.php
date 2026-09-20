@@ -38,6 +38,14 @@ class Show extends Component
 
     public int $wireguardPort = 51820;
 
+    public int $cpuPressureThreshold = 95;
+
+    public int $memoryPressureThreshold = 90;
+
+    public int $diskPressureThreshold = 90;
+
+    public int $resourceStaleAfterMinutes = 5;
+
     public string $nodeUuid = '';
 
     public string $firewallSourceUuid = '';
@@ -97,6 +105,26 @@ class Show extends Component
         $this->cluster->refresh();
         $this->reset('nodeUuid');
         $this->dispatch('success', 'Node assigned to the cluster.');
+    }
+
+    public function savePressurePolicy(): void
+    {
+        $this->authorize('update', $this->cluster);
+        $validated = $this->validate([
+            'cpuPressureThreshold' => ['required', 'integer', 'between:1,100'],
+            'memoryPressureThreshold' => ['required', 'integer', 'between:1,100'],
+            'diskPressureThreshold' => ['required', 'integer', 'between:1,100'],
+            'resourceStaleAfterMinutes' => ['required', 'integer', 'between:1,60'],
+        ]);
+        $this->cluster->update([
+            'cpu_pressure_threshold' => $validated['cpuPressureThreshold'],
+            'memory_pressure_threshold' => $validated['memoryPressureThreshold'],
+            'disk_pressure_threshold' => $validated['diskPressureThreshold'],
+            'resource_stale_after_minutes' => $validated['resourceStaleAfterMinutes'],
+        ]);
+        $this->cluster->refresh();
+        $this->fillFromCluster();
+        $this->dispatch('success', 'Deployment pressure policy saved.');
     }
 
     public function removeNode(string $nodeUuid): void
@@ -308,5 +336,9 @@ class Show extends Component
         $this->cidr = $this->cluster->cidr;
         $this->wireguardInterface = $this->cluster->wireguard_interface;
         $this->wireguardPort = $this->cluster->wireguard_port;
+        $this->cpuPressureThreshold = $this->cluster->cpu_pressure_threshold;
+        $this->memoryPressureThreshold = $this->cluster->memory_pressure_threshold;
+        $this->diskPressureThreshold = $this->cluster->disk_pressure_threshold;
+        $this->resourceStaleAfterMinutes = $this->cluster->resource_stale_after_minutes;
     }
 }

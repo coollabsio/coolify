@@ -12,6 +12,18 @@
                 <div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save settings</x-forms.button></div>
             </form>
         </x-application.settings-section>
+        <x-application.settings-section title="Deployment pressure" helper="Block new deployments when a selected Node is unavailable, its resource data is stale, or usage reaches a configured limit.">
+            <form wire:submit="savePressurePolicy" class="flex flex-col gap-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <x-forms.input wire:model="cpuPressureThreshold" type="number" min="1" max="100" label="CPU limit (%)" required />
+                    <x-forms.input wire:model="memoryPressureThreshold" type="number" min="1" max="100" label="Memory limit (%)" required />
+                    <x-forms.input wire:model="diskPressureThreshold" type="number" min="1" max="100" label="Disk limit (%)" required />
+                    <x-forms.input wire:model="resourceStaleAfterMinutes" type="number" min="1" max="60" label="Data max age (minutes)" required />
+                </div>
+                <p class="text-xs text-neutral-500 dark:text-fg-dim">A value of 100 blocks only when that resource is fully used. Running workloads are not stopped.</p>
+                @can('update', $cluster)<div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save pressure policy</x-forms.button></div>@endcan
+            </form>
+        </x-application.settings-section>
         <x-application.settings-section title="Nodes" helper="The first usable address is reserved for cluster infrastructure.">
             @can('update', $cluster)
                 <form wire:submit="assignNode" class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end"><x-forms.select wire:model="nodeUuid" label="Unassigned Node"><option value="">Select a Node</option>@foreach ($availableNodes as $node)<option value="{{ $node->uuid }}">{{ $node->name }}</option>@endforeach</x-forms.select><x-forms.button type="submit">Assign Node</x-forms.button></form>

@@ -45,6 +45,8 @@ beforeEach(function () {
         'node_cluster_id' => $this->cluster->id,
         'private_key_id' => $key->id,
         'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => healthyNodeResourceMetadata(),
     ]);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
@@ -75,6 +77,8 @@ it('deploys a cluster Docker image to the selected Node', function () {
         'node_cluster_id' => $this->cluster->id,
         'private_key_id' => $this->node->private_key_id,
         'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => healthyNodeResourceMetadata(),
     ]);
 
     $deployment = CreateClusterDockerImageWorkload::run(
@@ -87,6 +91,33 @@ it('deploys a cluster Docker image to the selected Node', function () {
     );
 
     expect($deployment['workload']->nodes()->sole()->is($selectedNode))->toBeTrue();
+});
+
+it('skips a pressured Node when it selects a deployment target', function () {
+    $this->node->update(['metadata' => [...$this->node->metadata, 'memory_used_bytes' => 950]]);
+    $healthyNode = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'node_cluster_id' => $this->cluster->id,
+        'private_key_id' => $this->node->private_key_id,
+        'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => healthyNodeResourceMetadata(),
+    ]);
+
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+
+    expect($deployment['workload']->nodes()->sole()->is($healthyNode))->toBeTrue();
+});
+
+it('returns the pressure reason for an explicitly selected Node before creating records', function () {
+    $this->node->update(['metadata' => [...$this->node->metadata, 'disk_available_bytes' => 50]]);
+
+    expect(fn () => CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user, $this->node,
+    ))->toThrow(DomainException::class, 'disk pressure')
+        ->and(NodeWorkload::query()->count())->toBe(0);
 });
 
 it('rejects a cluster from another team', function () {
@@ -127,8 +158,20 @@ it('requires an available workload node in the selected cluster', function () {
         $this->cluster,
         'nginx:latest',
         $this->user,
-    ))->toThrow(RuntimeException::class, 'The cluster has no available workload nodes.');
+    ))->toThrow(RuntimeException::class, 'The cluster has no workload Node that can accept a deployment.');
 });
+
+function healthyNodeResourceMetadata(): array
+{
+    return [
+        'cpu_usage_percent' => 10,
+        'memory_bytes' => 1_000,
+        'memory_used_bytes' => 100,
+        'disk_total_bytes' => 1_000,
+        'disk_available_bytes' => 900,
+        'collected_at' => now()->toIso8601String(),
+    ];
+}
 
 it('creates and queues a cluster Docker image from the environment resource flow', function () {
     Queue::fake();

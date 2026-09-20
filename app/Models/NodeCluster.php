@@ -11,6 +11,13 @@ class NodeCluster extends BaseModel
 {
     use Auditable, HasFactory;
 
+    protected $attributes = [
+        'cpu_pressure_threshold' => 95,
+        'memory_pressure_threshold' => 90,
+        'disk_pressure_threshold' => 90,
+        'resource_stale_after_minutes' => 5,
+    ];
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -18,6 +25,10 @@ class NodeCluster extends BaseModel
         return [
             'desired_revision' => 'integer',
             'wireguard_port' => 'integer',
+            'cpu_pressure_threshold' => 'integer',
+            'memory_pressure_threshold' => 'integer',
+            'disk_pressure_threshold' => 'integer',
+            'resource_stale_after_minutes' => 'integer',
             'last_reconciled_at' => 'datetime',
         ];
     }

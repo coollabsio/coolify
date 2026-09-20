@@ -73,6 +73,9 @@
             $memoryPercent = $memoryTotal > 0 ? round(($memoryUsed / $memoryTotal) * 100, 1) : null;
             $diskPercent = $diskTotal > 0 ? round((($diskTotal - $diskAvailable) / $diskTotal) * 100, 1) : null;
             $cpuPercent = is_numeric(data_get($node->metadata, 'cpu_usage_percent')) ? (float) data_get($node->metadata, 'cpu_usage_percent') : null;
+            $cpuLimit = $node->cluster?->cpu_pressure_threshold ?? 95;
+            $memoryLimit = $node->cluster?->memory_pressure_threshold ?? 90;
+            $diskLimit = $node->cluster?->disk_pressure_threshold ?? 90;
         @endphp
         <div class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <div><span class="text-neutral-500 dark:text-fg-dim">CPU usage</span><p class="font-medium">{{ $cpuPercent !== null ? number_format($cpuPercent, 1).'%' : 'Unknown' }}</p></div>
@@ -80,8 +83,8 @@
             <div><span class="text-neutral-500 dark:text-fg-dim">Disk usage</span><p class="font-medium">{{ $diskPercent !== null ? formatBytes($diskTotal - $diskAvailable).' / '.formatBytes($diskTotal).' ('.$diskPercent.'%)' : 'Unknown' }}</p></div>
             <div><span class="text-neutral-500 dark:text-fg-dim">Load average</span><p class="font-medium">{{ is_numeric(data_get($node->metadata, 'load_average.one')) ? collect(data_get($node->metadata, 'load_average'))->map(fn ($value) => number_format((float) $value, 2))->implode(' / ') : 'Unknown' }}</p></div>
         </div>
-        @if (($memoryPercent !== null && $memoryPercent >= 90) || ($diskPercent !== null && $diskPercent >= 90) || ($cpuPercent !== null && $cpuPercent >= 90))
-            <x-callout type="warning" title="Node pressure">One or more Node resources are at or above 90% usage.</x-callout>
+        @if (($memoryPercent !== null && $memoryPercent >= $memoryLimit) || ($diskPercent !== null && $diskPercent >= $diskLimit) || ($cpuPercent !== null && $cpuPercent >= $cpuLimit))
+            <x-callout type="warning" title="Node pressure">One or more Node resources reached the cluster deployment limit.</x-callout>
         @endif
     </x-application.settings-section>
 

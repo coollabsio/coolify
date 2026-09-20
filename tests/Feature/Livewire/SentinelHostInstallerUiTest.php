@@ -71,7 +71,7 @@ it('refreshes the node Flux connection state from cache', function () {
 
 it('shows current Node capacity and resource pressure', function () {
     $this->node->update(['metadata' => [
-        'cpu_usage_percent' => 91.25,
+        'cpu_usage_percent' => 96.25,
         'memory_bytes' => 8_000_000_000,
         'memory_used_bytes' => 4_000_000_000,
         'disk_total_bytes' => 10_000_000_000,
@@ -81,7 +81,7 @@ it('shows current Node capacity and resource pressure', function () {
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
         ->assertSee('CPU usage')
-        ->assertSee('91.3%')
+        ->assertSee('96.3%')
         ->assertSee('Memory usage')
         ->assertSee('50%')
         ->assertSee('Disk usage')

@@ -9,6 +9,7 @@ use App\Jobs\DeployNodeWorkloadJob;
 use App\Livewire\Node\Show;
 use App\Models\InstanceSettings;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
@@ -257,7 +258,8 @@ it('queues an assigned revision from the Node page without storing environment v
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
-    $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
+    $node = Node::factory()->create(deploymentReadyNodeAttributes($team->id, $this->key->id, $cluster->id));
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
     $node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create([
@@ -342,7 +344,8 @@ it('allows the same revision to be deployed again after a final operation', func
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
-    $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
+    $node = Node::factory()->create(deploymentReadyNodeAttributes($team->id, $this->key->id, $cluster->id));
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
     $node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
@@ -369,7 +372,8 @@ it('does not queue a second deployment while the same revision is active', funct
     config()->set('constants.sentinel.host_enabled', true);
     $user = User::factory()->create();
     $team = $user->teams()->firstOrFail();
-    $node = Node::factory()->create(['team_id' => $team->id, 'private_key_id' => $this->key->id]);
+    $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
+    $node = Node::factory()->create(deploymentReadyNodeAttributes($team->id, $this->key->id, $cluster->id));
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
     $node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
@@ -385,3 +389,22 @@ it('does not queue a second deployment while the same revision is active', funct
     expect($node->operations()->count())->toBe(1);
     Queue::assertPushed(DeployNodeWorkloadJob::class, 1);
 });
+
+function deploymentReadyNodeAttributes(int $teamId, int $privateKeyId, int $clusterId): array
+{
+    return [
+        'team_id' => $teamId,
+        'private_key_id' => $privateKeyId,
+        'node_cluster_id' => $clusterId,
+        'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => [
+            'cpu_usage_percent' => 10,
+            'memory_bytes' => 1_000,
+            'memory_used_bytes' => 100,
+            'disk_total_bytes' => 1_000,
+            'disk_available_bytes' => 900,
+            'collected_at' => now()->toIso8601String(),
+        ],
+    ];
+}

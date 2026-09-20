@@ -50,6 +50,7 @@ class CreateDeploymentOperation
                 return ['operation' => $active, 'created' => false];
             }
 
+            EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']));
             $workload->update(['desired_state' => NodeWorkloadDesiredState::RUNNING]);
 
             $operation = CreateOperation::run(
