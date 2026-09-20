@@ -50,7 +50,15 @@ class OnboardNodeJob implements ShouldQueue
 
             $this->step($node, 'ready', 'Node ready', 'ready');
         } catch (Throwable $exception) {
-            $this->step($node, 'failed', 'Installation needs attention', 'failed', $this->safeMessage($exception));
+            $failedStep = (string) data_get($node->fresh()->metadata, 'onboarding.step', 'preparing');
+            $this->step(
+                $node,
+                $failedStep,
+                'Installation needs attention',
+                'failed',
+                $this->safeMessage($exception),
+                mb_substr(trim($exception->getMessage()), 0, 4000),
+            );
             throw $exception;
         }
     }
@@ -71,8 +79,14 @@ class OnboardNodeJob implements ShouldQueue
         }
     }
 
-    private function step(Node $node, string $step, string $label, string $status = 'running', ?string $error = null): void
-    {
+    private function step(
+        Node $node,
+        string $step,
+        string $label,
+        string $status = 'running',
+        ?string $error = null,
+        ?string $technicalError = null,
+    ): void {
         $node->refresh();
         $node->update(['metadata' => [
             ...($node->metadata ?? []),
@@ -81,6 +95,7 @@ class OnboardNodeJob implements ShouldQueue
                 'step' => $step,
                 'label' => $label,
                 'error' => $error,
+                'technical_error' => $technicalError,
                 'updated_at' => now()->toIso8601String(),
             ],
         ]]);

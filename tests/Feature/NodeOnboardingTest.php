@@ -137,3 +137,28 @@ it('does not restore another team node from the URL', function () {
     expect(fn () => Livewire::withQueryParams(['node' => $foreignNode->uuid])->test(Onboarding::class))
         ->toThrow(ModelNotFoundException::class);
 });
+
+it('stores and displays technical details for the failed installation stage', function () {
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $node = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->key->id,
+        'node_cluster_id' => $cluster->id,
+    ]);
+    PrepareNodeHost::shouldRun()->andThrow(new RuntimeException('apt-get failed: package repository unavailable'));
+
+    expect(fn () => (new OnboardNodeJob($node->id, $this->user->id))->handle())
+        ->toThrow(RuntimeException::class);
+
+    $onboarding = data_get($node->fresh()->metadata, 'onboarding');
+    expect($onboarding['status'])->toBe('failed')
+        ->and($onboarding['step'])->toBe('preparing')
+        ->and($onboarding['technical_error'])->toContain('apt-get failed');
+
+    Livewire::withQueryParams(['node' => $node->uuid])
+        ->test(Onboarding::class)
+        ->assertSet('step', 3)
+        ->assertSee('Technical details')
+        ->assertSee('Preparing server')
+        ->assertSee('apt-get failed: package repository unavailable');
+});
