@@ -1,21 +1,22 @@
-# Show core cluster firewall rules
+# Enforce the workload firewall on the same Node
 
-- [x] Add a failing Livewire test for the system-managed rules.
-- [x] Add the read-only core traffic section to the cluster firewall UI.
-- [x] Run formatting and focused tests.
-- [x] Verify the section in the running UI.
-- [x] Commit and push the changes.
+- [x] Add failing Sentinel tests for same-bridge workload isolation.
+- [x] Add the bridge-family policy to Sentinel firewall reconciliation.
+- [x] Run Sentinel formatting, tests, and lint checks.
+- [x] Commit and push Sentinel, then wait for the image build.
+- [x] Update Sentinel and Flux on both local KVM Nodes.
+- [x] Smoke-test default deny and an explicit allow rule between same-Node containers.
 - [x] Record review results.
 
 ## Review
 
-- The Firewall panel shows six read-only cards for WireGuard, Corrosion gossip, the local Corrosion API, workload DNS, established connections, and the default deny policy.
-- The WireGuard card uses the cluster's configured UDP port.
-- The cards use the existing firewall row size, spacing, typography, and neutral system-managed badge.
-- The browser check found that the deny policy blocked the local Corrosion API. Sentinel now permits TCP 8080 only when the source and destination are the same local Node address.
-- The Node cluster test suite passed: 37 tests and 137 assertions.
-- The production frontend build passed.
-- Sentinel network tests and Clippy passed.
-- Sentinel CI and release passed for commit `ba3e99f`.
-- Both VMs use Sentinel SHA-256 `f76f7a7a13fe0ae7cfb3011b7b2a1c49631daba96e97d52031e0220b35c79204`.
-- Live endpoint reconciliation succeeded on both Nodes after the local-only rule was installed.
+- Sentinel now owns an atomic `bridge` nftables table in addition to its routed `inet` table.
+- The bridge table allows established traffic and explicit workload-source rules, then denies all other workload-to-workload traffic on the same Node.
+- Node-source rules stay in the routed table and are not copied into the bridge table.
+- Rollback snapshots, activation checks, and cleanup include both owned tables without changing unrelated nftables rules.
+- The full Sentinel workspace tests and Clippy passed.
+- Sentinel CI and the multi-architecture release passed for commit `08951c3`.
+- Flux and Sentinel were updated in the local development stack and on both KVM Nodes.
+- Both KVM Nodes run active Sentinel services with SHA-256 `11016ff37f741875fa7aba3ef81a775b7d3fd7ac8be6bf0905e67ade74631ba1`.
+- A live same-Node test confirmed default deny, TCP 8080 access after an explicit allow rule, and default deny again after rule removal.
+- All temporary workloads, firewall records, and containers were removed after the smoke test.
