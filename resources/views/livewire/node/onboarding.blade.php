@@ -22,7 +22,7 @@
         <form wire:submit="connect" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
             <div class="mb-4"><h2 class="text-[15px]! font-semibold!">Connect your server</h2><p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">Use a fresh Linux server that Coolify can reach through SSH.</p></div>
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-forms.input wire:model="ip" label="IP address" placeholder="203.0.113.10" required />
+                <x-forms.input wire:model.live.debounce.500ms="ip" label="IP address" placeholder="203.0.113.10" required />
                 <x-forms.input wire:model="name" label="Node name" required />
                 <div class="sm:col-span-2">
                     <x-forms.select wire:model="privateKeyId" label="SSH private key" required>

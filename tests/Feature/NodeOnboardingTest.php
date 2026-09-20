@@ -173,23 +173,10 @@ it('prepares the Docker-compatible socket required by Sentinel', function () {
         ->toContain('test -S /var/run/docker.sock');
 });
 
-it('uses the reachable development gateway callback for a qemu node', function () {
-    ValidateNodeCallback::shouldRun()->andReturn('ok');
-    InspectNodeHost::shouldRun()->andReturn([
-        'hostname' => 'worker-qemu', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 2,
-        'memory_bytes' => 4_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
-    ]);
-
-    $component = Livewire::test(Onboarding::class)
-        ->set('name', 'QEMU onboarding')
+it('shows the reachable development gateway callback when a qemu IP is entered', function () {
+    Livewire::test(Onboarding::class)
         ->set('ip', '192.168.122.52')
-        ->set('privateKeyId', $this->key->id)
-        ->set('coolifyUrl', 'https://devserver.example.test:8000')
-        ->call('connect')
-        ->assertHasNoErrors();
-
-    $node = Node::query()->where('uuid', $component->get('nodeUuid'))->firstOrFail();
-    expect($node->sentinel_url)->toBe('http://192.168.122.1:8000');
+        ->assertSet('coolifyUrl', 'http://192.168.122.1:8000');
 });
 
 it('checks the Coolify callback from the node before installation', function () {
@@ -204,11 +191,15 @@ it('does not continue when the node cannot reach the Coolify callback', function
         'hostname' => 'worker-callback', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 2,
         'memory_bytes' => 4_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
     ]);
-    ValidateNodeCallback::shouldRun()->andThrow(new RuntimeException('TLS connection failed'));
+    $checkedUrl = null;
+    ValidateNodeCallback::shouldRun()->andReturnUsing(function (Node $node, string $callbackUrl) use (&$checkedUrl): never {
+        $checkedUrl = $callbackUrl;
+        throw new RuntimeException('TLS connection failed');
+    });
 
     Livewire::test(Onboarding::class)
         ->set('name', 'Invalid callback')
-        ->set('ip', '192.0.2.80')
+        ->set('ip', '192.168.122.52')
         ->set('privateKeyId', $this->key->id)
         ->set('coolifyUrl', 'https://wrong.example.com:8000')
         ->call('connect')
@@ -216,5 +207,6 @@ it('does not continue when the node cannot reach the Coolify callback', function
         ->assertHasErrors('coolifyUrl')
         ->assertSee('could not reach Coolify');
 
-    expect(Node::query()->where('ip', '192.0.2.80')->exists())->toBeFalse();
+    expect($checkedUrl)->toBe('https://wrong.example.com:8000')
+        ->and(Node::query()->where('ip', '192.168.122.52')->exists())->toBeFalse();
 });

@@ -86,7 +86,7 @@ class Onboarding extends Component
             'coolifyUrl' => ['required', 'url', 'starts_with:http://,https://'],
         ]);
         $privateKey = PrivateKey::ownedAndOnlySShKeys()->whereKey($validated['privateKeyId'])->firstOrFail();
-        $callbackUrl = $this->callbackUrlFor($validated['ip'], $validated['coolifyUrl']);
+        $callbackUrl = rtrim($validated['coolifyUrl'], '/');
         $this->coolifyUrl = $callbackUrl;
         $node = Node::query()->create([
             'team_id' => currentTeam()->id,
@@ -169,6 +169,18 @@ class Onboarding extends Component
         }
     }
 
+    public function updatedIp(string $ip): void
+    {
+        $developmentUrl = $this->developmentCallbackUrlFor($ip);
+        $currentUrl = rtrim($this->coolifyUrl, '/');
+        $defaultUrl = rtrim((string) config('app.url'), '/');
+        $previousDevelopmentUrl = $this->developmentCallbackUrlFor((string) config('development-qemu.gateway'));
+
+        if ($developmentUrl !== null && ($currentUrl === '' || $currentUrl === $defaultUrl || $currentUrl === $previousDevelopmentUrl)) {
+            $this->coolifyUrl = $developmentUrl;
+        }
+    }
+
     public function render(): View
     {
         $privateKeys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->orderBy('name')->get(['id', 'name']);
@@ -220,16 +232,16 @@ class Onboarding extends Component
         };
     }
 
-    private function callbackUrlFor(string $ip, string $configuredUrl): string
+    private function developmentCallbackUrlFor(string $ip): ?string
     {
         if (! isDev() || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-            return rtrim($configuredUrl, '/');
+            return null;
         }
 
         $range = PrivateIpv4Cidr::range((string) config('development-qemu.subnet'));
         $address = (int) sprintf('%u', ip2long($ip));
         if ($address < $range['start'] || $address > $range['end']) {
-            return rtrim($configuredUrl, '/');
+            return null;
         }
 
         $gateway = config('development-qemu.gateway');
