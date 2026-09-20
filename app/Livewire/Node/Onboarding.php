@@ -9,6 +9,7 @@ use App\Jobs\OnboardNodeJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\PrivateKey;
+use App\Rules\PrivateIpv4Cidr;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -84,6 +85,8 @@ class Onboarding extends Component
             'coolifyUrl' => ['required', 'url', 'starts_with:http://,https://'],
         ]);
         $privateKey = PrivateKey::ownedAndOnlySShKeys()->whereKey($validated['privateKeyId'])->firstOrFail();
+        $callbackUrl = $this->callbackUrlFor($validated['ip'], $validated['coolifyUrl']);
+        $this->coolifyUrl = $callbackUrl;
         $node = Node::query()->create([
             'team_id' => currentTeam()->id,
             'private_key_id' => $privateKey->id,
@@ -91,7 +94,7 @@ class Onboarding extends Component
             'ip' => $validated['ip'],
             'user' => $validated['user'],
             'port' => $validated['port'],
-            'sentinel_url' => rtrim($validated['coolifyUrl'], '/'),
+            'sentinel_url' => $callbackUrl,
             'metadata' => ['onboarding' => ['status' => 'inspecting', 'step' => 'connect', 'label' => 'Inspecting server']],
         ]);
 
@@ -201,5 +204,23 @@ class Onboarding extends Component
             'queued', 'running', 'failed', 'ready' => 3,
             default => 1,
         };
+    }
+
+    private function callbackUrlFor(string $ip, string $configuredUrl): string
+    {
+        if (! isDev() || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            return rtrim($configuredUrl, '/');
+        }
+
+        $range = PrivateIpv4Cidr::range((string) config('development-qemu.subnet'));
+        $address = (int) sprintf('%u', ip2long($ip));
+        if ($address < $range['start'] || $address > $range['end']) {
+            return rtrim($configuredUrl, '/');
+        }
+
+        $gateway = config('development-qemu.gateway');
+        $port = config('development-qemu.coolify_host_port');
+
+        return "http://{$gateway}:{$port}";
     }
 }

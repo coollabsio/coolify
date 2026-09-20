@@ -169,3 +169,21 @@ it('prepares the Docker-compatible socket required by Sentinel', function () {
         ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
         ->toContain('test -S /var/run/docker.sock');
 });
+
+it('uses the reachable development gateway callback for a qemu node', function () {
+    InspectNodeHost::shouldRun()->andReturn([
+        'hostname' => 'worker-qemu', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 2,
+        'memory_bytes' => 4_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
+    ]);
+
+    $component = Livewire::test(Onboarding::class)
+        ->set('name', 'QEMU onboarding')
+        ->set('ip', '192.168.122.52')
+        ->set('privateKeyId', $this->key->id)
+        ->set('coolifyUrl', 'https://devserver.example.test:8000')
+        ->call('connect')
+        ->assertHasNoErrors();
+
+    $node = Node::query()->where('uuid', $component->get('nodeUuid'))->firstOrFail();
+    expect($node->sentinel_url)->toBe('http://192.168.122.1:8000');
+});
