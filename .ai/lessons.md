@@ -167,3 +167,4 @@
 - When the Clusters page becomes the home for Node infrastructure, move the Nodes collection there instead of showing it on both Clusters and Servers, and use the concise "Clusters" label throughout navigation.
 - For the Clusters sidebar item, use the layered-stack icon instead of the generic network icon; it distinguishes Clusters from both Servers and network settings.
 - When ICMP is permitted from Nodes to workload addresses, cover both the local output path and the remote WireGuard-to-workload forward path. A local ping can pass while a ping from another mesh Node still fails.
+- Bind native event callbacks from an Alpine component's `init()` method so closures mutate Alpine's reactive proxy. Callbacks bound on the raw object returned by an `Alpine.data` factory can change backing values without updating the DOM.

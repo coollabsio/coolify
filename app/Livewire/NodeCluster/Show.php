@@ -157,12 +157,40 @@ class Show extends Component
                 ? ['required', 'integer', 'in:0']
                 : ['required', 'integer', 'between:1,65535'],
         ]);
-        [$sourceType, $sourceUuid] = array_pad(explode(':', $validated['firewallSourceUuid'], 2), 2, null);
+
+        [$sourceType, $sourceUuid] = array_pad(explode(':', $validated['firewallSourceUuid'], 2), 2, '');
+        $this->createFirewallRule(
+            $sourceType,
+            $sourceUuid,
+            $validated['firewallDestinationUuid'],
+            $validated['firewallProtocol'],
+            $validated['firewallPort'],
+        );
+        $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
+    }
+
+    public function createFirewallRule(string $sourceType, string $sourceUuid, string $destinationUuid, string $protocol, int $port): void
+    {
+        $this->authorize('update', $this->cluster);
+        $validated = validator([
+            'sourceType' => $sourceType,
+            'sourceUuid' => $sourceUuid,
+            'destinationUuid' => $destinationUuid,
+            'protocol' => $protocol,
+            'port' => $protocol === 'icmp' ? 0 : $port,
+        ], [
+            'sourceType' => ['required', Rule::in(['workload', 'node'])],
+            'sourceUuid' => ['required', 'string'],
+            'destinationUuid' => ['required', 'string'],
+            'protocol' => ['required', Rule::in(['tcp', 'udp', 'icmp'])],
+            'port' => $protocol === 'icmp' ? ['required', 'integer', 'in:0'] : ['required', 'integer', 'between:1,65535'],
+        ])->validate();
+
         $sourceWorkload = $sourceType === 'workload' ? $this->meshWorkloads()->where('uuid', $sourceUuid)->first() : null;
         $sourceNode = $sourceType === 'node'
             ? Node::query()->where('team_id', $this->cluster->team_id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $sourceUuid)->first()
             : null;
-        $destination = $this->meshWorkloads()->where('uuid', $validated['firewallDestinationUuid'])->first();
+        $destination = $this->meshWorkloads()->where('uuid', $validated['destinationUuid'])->first();
         if ($sourceWorkload === null && $sourceNode === null) {
             $this->addError('firewallSourceUuid', 'Select a workload or Node from this mesh.');
         }
@@ -182,8 +210,8 @@ class Show extends Component
                 'source_workload_id' => $sourceWorkload?->id,
                 'source_node_id' => $sourceNode?->id,
                 'destination_workload_id' => $destination->id,
-                'protocol' => $validated['firewallProtocol'],
-                'port' => $validated['firewallPort'],
+                'protocol' => $validated['protocol'],
+                'port' => $validated['port'],
             ]);
             if ($rule->wasRecentlyCreated) {
                 $this->cluster->increment('desired_revision');
@@ -194,7 +222,6 @@ class Show extends Component
         if ($created) {
             $this->queueNetworkReconciliation();
         }
-        $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
         $this->dispatch('success', $created ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
     }
 
@@ -312,8 +339,42 @@ class Show extends Component
             ->latest('id')
             ->limit(30)
             ->get();
+        $firewallCanvasNodes = $nodes->map(fn (Node $node): array => [
+            'id' => 'node:'.$node->uuid,
+            'type' => 'node',
+            'uuid' => $node->uuid,
+            'name' => $node->name,
+            'subtitle' => 'Cluster Node',
+            'status' => $node->is_usable ? 'Ready' : 'Unavailable',
+        ])->concat($workloads->map(fn (NodeWorkload $workload): array => [
+            'id' => 'workload:'.$workload->uuid,
+            'type' => 'workload',
+            'uuid' => $workload->uuid,
+            'name' => $workload->name,
+            'subtitle' => $workload->internal_dns_name
+                ? $workload->internal_dns_name.'.default.coolify.internal'
+                : 'Internal DNS pending',
+            'status' => str($workload->desired_state->value)->title()->toString(),
+        ]))->values();
+        $firewallCanvasRules = $firewallRules->map(fn (NodeFirewallRule $rule): array => [
+            'uuid' => $rule->uuid,
+            'sourceType' => $rule->sourceNode !== null ? 'node' : 'workload',
+            'sourceUuid' => $rule->sourceNode?->uuid ?? $rule->sourceWorkload?->uuid,
+            'destinationUuid' => $rule->destinationWorkload->uuid,
+            'protocol' => $rule->protocol,
+            'port' => $rule->port,
+        ])->values();
 
-        return view('livewire.node-cluster.show', compact('nodes', 'availableNodes', 'workloads', 'firewallRules', 'ingressRules', 'operations'));
+        return view('livewire.node-cluster.show', compact(
+            'nodes',
+            'availableNodes',
+            'workloads',
+            'firewallRules',
+            'ingressRules',
+            'operations',
+            'firewallCanvasNodes',
+            'firewallCanvasRules',
+        ));
     }
 
     private function meshWorkloads(): Builder

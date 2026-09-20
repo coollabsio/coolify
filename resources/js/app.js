@@ -2,6 +2,7 @@ import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+import { initializeFirewallCanvas } from './firewall-canvas.js';
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
@@ -20,6 +21,7 @@ document.addEventListener('livewire:navigated', () => {
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeFirewallCanvas);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms

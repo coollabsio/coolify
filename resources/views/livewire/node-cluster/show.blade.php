@@ -66,6 +66,8 @@
             </x-application.settings-section>
         </div>
         <x-application.settings-section title="Firewall" helper="Nodes allow only required cluster traffic by default. Workloads reject mesh and external connections by default. Outbound internet access stays available.">
+            @include('livewire.node-cluster.firewall-canvas')
+            <div class="my-6 border-t border-neutral-200 dark:border-white/[0.08]"></div>
             <div class="mb-6">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <h3 class="text-base font-semibold">Core cluster traffic</h3>

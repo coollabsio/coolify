@@ -261,6 +261,10 @@ it('prevents members from changing firewall rules', function () {
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('addIngressRule')
         ->assertForbidden();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('createFirewallRule', 'workload', 'source', 'destination', 'tcp', 80)
+        ->assertForbidden();
 });
 
 it('does not allow active cidr changes', function () {
@@ -378,6 +382,29 @@ it('adds and removes scoped workload firewall rules', function () {
     expect(NodeFirewallRule::query()->exists())->toBeFalse()
         ->and($cluster->refresh()->desired_revision)->toBe(4);
     Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, 2);
+});
+
+it('creates a scoped firewall rule through the canvas action', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Canvas firewall mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $source = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    EnsureNodeWorkloadAddress::run($node, $source);
+    EnsureNodeWorkloadAddress::run($node, $destination);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('createFirewallRule', 'workload', $source->uuid, $destination->uuid, 'udp', 53)
+        ->assertDispatched('success');
+
+    $rule = NodeFirewallRule::query()->sole();
+    expect($rule->source_workload_id)->toBe($source->id)
+        ->and($rule->destination_workload_id)->toBe($destination->id)
+        ->and($rule->protocol)->toBe('udp')
+        ->and($rule->port)->toBe(53);
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class);
 });
 
 it('adds an ICMP firewall rule without a port', function () {
