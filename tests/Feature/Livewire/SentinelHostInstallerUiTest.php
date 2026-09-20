@@ -69,6 +69,27 @@ it('refreshes the node Flux connection state from cache', function () {
         ->assertDispatched('info', 'Flux connection state refreshed.');
 });
 
+it('shows current Node capacity and resource pressure', function () {
+    $this->node->update(['metadata' => [
+        'cpu_usage_percent' => 91.25,
+        'memory_bytes' => 8_000_000_000,
+        'memory_used_bytes' => 4_000_000_000,
+        'disk_total_bytes' => 10_000_000_000,
+        'disk_available_bytes' => 2_500_000_000,
+        'load_average' => ['one' => 1.25, 'five' => 1.0, 'fifteen' => 0.75],
+    ]]);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSee('CPU usage')
+        ->assertSee('91.3%')
+        ->assertSee('Memory usage')
+        ->assertSee('50%')
+        ->assertSee('Disk usage')
+        ->assertSee('75%')
+        ->assertSee('1.25 / 1.00 / 0.75')
+        ->assertSee('Node pressure');
+});
+
 it('does not expose node controls on a legacy server', function () {
     $server = Server::factory()->create(['team_id' => $this->node->team_id]);
 

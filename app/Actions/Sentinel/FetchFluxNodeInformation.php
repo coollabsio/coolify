@@ -18,6 +18,7 @@ class FetchFluxNodeInformation
      */
     public function handle(Node $node): array
     {
+        $node->ensureCapability('system.info.v1');
         $url = config('constants.flux.internal_url');
         $token = config('constants.flux.internal_token');
         if (! is_string($url) || $url === '' || ! is_string($token) || $token === '') {
@@ -48,6 +49,12 @@ class FetchFluxNodeInformation
             'uptime_seconds' => ['nullable', 'integer', 'min:0'],
             'container_runtime' => ['nullable', 'string'],
             'container_runtime_version' => ['nullable', 'string'],
+            'cpu_usage_percent' => ['nullable', 'numeric', 'between:0,100'],
+            'memory_used_bytes' => ['nullable', 'integer', 'min:0'],
+            'memory_available_bytes' => ['nullable', 'integer', 'min:0'],
+            'load_average_one' => ['nullable', 'numeric', 'min:0'],
+            'load_average_five' => ['nullable', 'numeric', 'min:0'],
+            'load_average_fifteen' => ['nullable', 'numeric', 'min:0'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('Flux returned an invalid server information response.');
@@ -76,6 +83,14 @@ class FetchFluxNodeInformation
             'boot_id' => $information['boot_id'] ?? null,
             'container_runtime' => $information['container_runtime'] ?? null,
             'container_runtime_version' => $information['container_runtime_version'] ?? null,
+            'cpu_usage_percent' => $information['cpu_usage_percent'] ?? null,
+            'memory_used_bytes' => $information['memory_used_bytes'] ?? null,
+            'memory_available_bytes' => $information['memory_available_bytes'] ?? null,
+            'load_average' => [
+                'one' => $information['load_average_one'] ?? null,
+                'five' => $information['load_average_five'] ?? null,
+                'fifteen' => $information['load_average_fifteen'] ?? null,
+            ],
             'collected_at' => $observedAt->toIso8601String(),
             'source' => 'flux',
         ];

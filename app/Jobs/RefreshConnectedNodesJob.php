@@ -27,8 +27,11 @@ class RefreshConnectedNodesJob implements ShouldBeUnique, ShouldQueue
             ->chunkById(500, function ($nodes): void {
                 foreach ($nodes as $node) {
                     if (SyncNodeReachability::run($node)) {
+                        $delay = now()->addSeconds(random_int(0, 59));
                         RefreshNodeContainersJob::dispatch($node->id)
-                            ->delay(now()->addSeconds(random_int(0, 59)));
+                            ->delay($delay);
+                        RefreshNodeInformationJob::dispatch($node->id)
+                            ->delay($delay);
                     }
                 }
             });

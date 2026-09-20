@@ -2,6 +2,7 @@
 
 use App\Jobs\RefreshConnectedNodesJob;
 use App\Jobs\RefreshNodeContainersJob;
+use App\Jobs\RefreshNodeInformationJob;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\PrivateKey;
@@ -38,12 +39,30 @@ it('queues inventory only for usable Nodes with a recent Flux heartbeat without 
     (new RefreshConnectedNodesJob)->handle();
 
     Queue::assertPushed(RefreshNodeContainersJob::class, 1);
+    Queue::assertPushed(RefreshNodeInformationJob::class, 1);
+    Queue::assertPushed(RefreshNodeInformationJob::class, fn ($job) => $job->nodeId === $this->node->id && $job->delay !== null);
     Queue::assertPushed(RefreshNodeContainersJob::class, fn ($job) => $job->nodeId === $this->node->id && $job->delay !== null);
 
     expect($this->node->refresh()->is_reachable)->toBeTrue()
         ->and($stale->refresh()->is_reachable)->toBeFalse()
         ->and(Cache::get($stale->cacheKey()))->toMatchArray(['status' => 'unavailable'])
         ->and($unusable->refresh()->is_reachable)->toBeTrue();
+});
+
+it('refreshes resource information for one Node', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'secret');
+    Http::fake(['*/v1/commands/system.info' => Http::response([
+        'command_id' => 'information-1',
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'sentinel_version' => 'main',
+        'cpu_usage_percent' => 12.5,
+    ])]);
+    Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String()]);
+
+    (new RefreshNodeInformationJob($this->node->id))->handle();
+
+    expect($this->node->fresh()->metadata)->toMatchArray(['cpu_usage_percent' => 12.5]);
 });
 
 it('refreshes the complete container inventory for one Node', function () {

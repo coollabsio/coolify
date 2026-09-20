@@ -29,6 +29,12 @@ it('fetches and stores server information through Flux', function () {
             'uptime_seconds' => 3600,
             'container_runtime' => 'podman',
             'container_runtime_version' => '5.4.2',
+            'cpu_usage_percent' => 37.5,
+            'memory_used_bytes' => 8_589_934_592,
+            'memory_available_bytes' => 8_589_934_592,
+            'load_average_one' => 1.25,
+            'load_average_five' => 1.0,
+            'load_average_fifteen' => 0.75,
         ]),
     ]);
     $node = Node::factory()->create([
@@ -53,6 +59,10 @@ it('fetches and stores server information through Flux', function () {
             'boot_id' => 'boot-1',
             'container_runtime' => 'podman',
             'container_runtime_version' => '5.4.2',
+            'cpu_usage_percent' => 37.5,
+            'memory_used_bytes' => 8_589_934_592,
+            'memory_available_bytes' => 8_589_934_592,
+            'load_average' => ['one' => 1.25, 'five' => 1.0, 'fifteen' => 0.75],
             'source' => 'flux',
             'transfer' => ['status' => 'pending'],
         ]);
@@ -60,6 +70,21 @@ it('fetches and stores server information through Flux', function () {
     Http::assertSent(fn ($request) => $request->url() === 'http://flux:7080/v1/commands/system.info'
         && $request->hasHeader('Authorization', 'Bearer internal-secret')
         && $request['server_id'] === $node->uuid);
+});
+
+it('rejects invalid resource utilization values', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    Http::fake(['*' => Http::response([
+        'command_id' => 'command-1',
+        'observed_at_unix_ms' => 1_789_140_000_000,
+        'sentinel_version' => '1.0.1',
+        'cpu_usage_percent' => 101,
+    ])]);
+    $node = Node::factory()->create(['team_id' => Team::factory()]);
+
+    expect(fn () => FetchFluxNodeInformation::run($node))
+        ->toThrow(RuntimeException::class, 'Flux returned an invalid server information response.');
 });
 
 it('rejects an invalid Flux server information response', function () {
