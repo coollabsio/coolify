@@ -2,7 +2,7 @@
 # slogan: Self-hosted real-time audio and video infrastructure
 # category: communication
 # tags: livekit,webrtc,audio,video,realtime
-# logo: svgs/livekit.png
+# logo: svgs/livekit.svg
 # port: 7880
 
 services:

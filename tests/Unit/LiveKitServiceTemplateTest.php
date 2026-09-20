@@ -22,5 +22,5 @@ it('provides a LiveKit service with generated credentials and direct media ports
 });
 
 it('provides the LiveKit icon at the catalog path', function () {
-    expect(dirname(__DIR__, 2).'/public/svgs/livekit.png')->toBeFile();
+    expect(dirname(__DIR__, 2).'/public/svgs/livekit.svg')->toBeFile();
 });
