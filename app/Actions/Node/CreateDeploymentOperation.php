@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
 
 class CreateDeploymentOperation
 {
@@ -50,7 +51,11 @@ class CreateDeploymentOperation
                 return ['operation' => $active, 'created' => false];
             }
 
-            EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']));
+            if (filled(data_get($revision->configuration, 'resources')) && $node->supportsCapability('workload.resources.v1') !== true) {
+                throw new RuntimeException('This Node does not support workload resource settings. Upgrade Sentinel and try again.');
+            }
+
+            EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $revision);
             $workload->update(['desired_state' => NodeWorkloadDesiredState::RUNNING]);
 
             $operation = CreateOperation::run(

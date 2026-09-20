@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Models\Node;
+use App\Models\NodeWorkloadRevision;
 use DomainException;
 use Illuminate\Support\Carbon;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -11,7 +12,7 @@ class EnsureNodeAcceptsDeployment
 {
     use AsAction;
 
-    public function handle(Node $node): void
+    public function handle(Node $node, ?NodeWorkloadRevision $revision = null): void
     {
         if (! $node->is_usable) {
             throw new DomainException("Node {$node->name} is not usable.");
@@ -48,6 +49,10 @@ class EnsureNodeAcceptsDeployment
         $this->rejectAtLimit('CPU', $cpu, $cluster->cpu_pressure_threshold, $node);
         $this->rejectAtLimit('memory', ($memoryUsed / $memoryTotal) * 100, $cluster->memory_pressure_threshold, $node);
         $this->rejectAtLimit('disk', (($diskTotal - min($diskAvailable, $diskTotal)) / $diskTotal) * 100, $cluster->disk_pressure_threshold, $node);
+
+        if ($revision !== null) {
+            $this->ensureReservationsFit($node, $revision, $memoryTotal);
+        }
     }
 
     /** @param array<string, mixed> $metadata */
@@ -72,6 +77,38 @@ class EnsureNodeAcceptsDeployment
             $formattedUsage = number_format($usage, 1);
 
             throw new DomainException("Node {$node->name} has {$resource} pressure: {$formattedUsage}% usage reached the {$limit}% deployment limit.");
+        }
+    }
+
+    private function ensureReservationsFit(Node $node, NodeWorkloadRevision $revision, float $memoryTotal): void
+    {
+        $requested = data_get($revision->configuration, 'resources', []);
+        $cpuReservation = (float) data_get($requested, 'cpu_reservation', 0);
+        $memoryReservation = (int) data_get($requested, 'memory_reservation_bytes', 0);
+        $workloads = $node->workloads()
+            ->whereKeyNot($revision->node_workload_id)
+            ->where('desired_state', 'running')
+            ->with(['revisions' => fn ($query) => $query->latest('id')->limit(1)])
+            ->get();
+        foreach ($workloads as $workload) {
+            $resources = data_get($workload->revisions->first()?->configuration, 'resources', []);
+            $cpuReservation += (float) data_get($resources, 'cpu_reservation', 0);
+            $memoryReservation += (int) data_get($resources, 'memory_reservation_bytes', 0);
+        }
+
+        if ($cpuReservation > 0) {
+            $cpuCount = $this->positiveNumber(is_array($node->metadata) ? $node->metadata : [], 'cpus');
+            if ($cpuCount === null) {
+                throw new DomainException("Node {$node->name} CPU capacity is unavailable for this reservation.");
+            }
+            $availableCpuReservation = $cpuCount * ($node->cluster->cpu_pressure_threshold / 100);
+            if ($cpuReservation > $availableCpuReservation) {
+                throw new DomainException("Node {$node->name} does not have enough CPU reservation capacity.");
+            }
+        }
+        $availableMemoryReservation = $memoryTotal * ($node->cluster->memory_pressure_threshold / 100);
+        if ($memoryReservation > $availableMemoryReservation) {
+            throw new DomainException("Node {$node->name} does not have enough memory reservation capacity.");
         }
     }
 }

@@ -32,6 +32,7 @@
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     <div class="nav-section hidden xl:block">Settings</div>
                     <a href="#general" class="menu-item menu-item-active"><x-reicon name="settings" class="menu-item-icon" /><span class="menu-item-label">General</span></a>
+                    <a href="#resources" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Resources</span></a>
                     <a href="#deployments" class="menu-item"><x-reicon name="time-back" class="menu-item-icon" /><span class="menu-item-label">Deployment Logs</span></a>
                     <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Node</span></a>
                 </nav>
@@ -45,6 +46,18 @@
                 <div><span class="text-neutral-500 dark:text-fg-dim">Node</span><p><a class="hover:underline" href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}">{{ $node->name }}</a></p></div>
                 <div><span class="text-neutral-500 dark:text-fg-dim">Internal DNS</span><p class="font-mono text-xs">{{ $workload->internal_dns_name ? $workload->internal_dns_name.'.default.coolify.internal' : 'Pending' }}</p></div>
             </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="resources" title="Resource limits" helper="Set optional runtime limits and scheduling reservations. Empty values mean unlimited.">
+            <form wire:submit="saveResources" class="flex flex-col gap-4">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-forms.input wire:model="cpuLimit" type="number" min="0.01" max="1024" step="0.01" label="CPU limit (cores)" helper="Maximum CPU capacity that Podman can use." />
+                    <x-forms.input wire:model="cpuReservation" type="number" min="0.01" max="1024" step="0.01" label="CPU reservation (cores)" helper="Capacity reserved for placement. Podman uses it as relative CPU weight." />
+                    <x-forms.input wire:model="memoryLimitMb" type="number" min="4" max="1048576" label="Memory limit (MiB)" helper="Maximum memory available to the container." />
+                    <x-forms.input wire:model="memoryReservationMb" type="number" min="4" max="1048576" label="Memory reservation (MiB)" helper="Capacity reserved for placement and soft runtime memory pressure." />
+                </div>
+                @can('update', $workload)<div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save resources</x-forms.button></div>@endcan
+            </form>
         </x-application.settings-section>
 
         <x-application.settings-section id="deployments" title="Deployment logs">

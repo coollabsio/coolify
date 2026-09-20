@@ -30,6 +30,7 @@ class IssueFluxCredential
             'system.info.v1',
             'container.list.v1',
             'workload.deploy.v1',
+            'workload.resources.v1',
             'workload.lifecycle.v1',
             'network.wireguard.key.ensure.v1',
             'network.wireguard.inspect.v1',

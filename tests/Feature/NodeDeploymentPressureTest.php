@@ -11,6 +11,7 @@ use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -48,6 +49,28 @@ it('allows deployment when the current Node snapshot is below the cluster limits
 
     expect($deployment['created'])->toBeTrue()
         ->and(NodeOperation::query()->count())->toBe(1);
+});
+
+it('rejects a reservation that does not fit below the configured cluster headroom', function () {
+    Cache::put($this->node->cacheKey(), ['capabilities' => ['workload.deploy.v1', 'workload.resources.v1']]);
+    $this->node->update(['metadata' => [...$this->node->metadata, 'cpus' => 2]]);
+    $this->revision->update(['configuration' => [
+        'resources' => ['cpu_reservation' => 1.9, 'memory_reservation_bytes' => 950],
+    ]]);
+
+    expect(fn () => CreateDeploymentOperation::run($this->node->fresh(), $this->revision->fresh(), $this->user))
+        ->toThrow(DomainException::class, 'reservation');
+});
+
+it('requires the resource capability only when a revision has resource settings', function () {
+    Cache::put($this->node->cacheKey(), ['capabilities' => ['workload.deploy.v1']]);
+    $this->revision->update(['configuration' => [
+        'resources' => ['memory_limit_bytes' => 536_870_912],
+    ]]);
+
+    expect(fn () => CreateDeploymentOperation::run($this->node, $this->revision->fresh(), $this->user))
+        ->toThrow(RuntimeException::class, 'Upgrade Sentinel')
+        ->and(NodeOperation::query()->count())->toBe(0);
 });
 
 it('rejects deployments before state changes when a configurable pressure limit is reached', function (string $metric, array $metadata, string $message) {

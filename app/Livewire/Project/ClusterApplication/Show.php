@@ -5,6 +5,7 @@ namespace App\Livewire\Project\ClusterApplication;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
@@ -32,6 +33,14 @@ class Show extends Component
 
     public string $statusType = 'neutral';
 
+    public string $cpuLimit = '';
+
+    public string $cpuReservation = '';
+
+    public string $memoryLimitMb = '';
+
+    public string $memoryReservationMb = '';
+
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid): void
     {
         $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
@@ -41,6 +50,7 @@ class Show extends Component
             ->where('uuid', $workload_uuid)->firstOrFail();
         $this->authorize('view', $this->workload);
         $this->loadData();
+        $this->loadResourceSettings();
     }
 
     public function deploy(): void
@@ -61,6 +71,36 @@ class Show extends Component
     {
         $this->authorize('view', $this->workload);
         $this->loadData();
+    }
+
+    public function saveResources(): void
+    {
+        $this->authorize('update', $this->workload);
+        $validated = $this->validate([
+            'cpuLimit' => ['nullable', 'numeric', 'between:0.01,1024'],
+            'cpuReservation' => ['nullable', 'numeric', 'between:0.01,1024'],
+            'memoryLimitMb' => ['nullable', 'integer', 'between:4,1048576'],
+            'memoryReservationMb' => ['nullable', 'integer', 'between:4,1048576'],
+        ]);
+        if (filled($validated['cpuLimit']) && filled($validated['cpuReservation']) && (float) $validated['cpuReservation'] > (float) $validated['cpuLimit']) {
+            $this->addError('cpuReservation', 'CPU reservation cannot be greater than the CPU limit.');
+        }
+        if (filled($validated['memoryLimitMb']) && filled($validated['memoryReservationMb']) && (int) $validated['memoryReservationMb'] > (int) $validated['memoryLimitMb']) {
+            $this->addError('memoryReservationMb', 'Memory reservation cannot be greater than the memory limit.');
+        }
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        UpdateNodeWorkloadResources::run($this->workload, [
+            'cpu_limit' => filled($validated['cpuLimit']) ? (float) $validated['cpuLimit'] : null,
+            'cpu_reservation' => filled($validated['cpuReservation']) ? (float) $validated['cpuReservation'] : null,
+            'memory_limit_bytes' => filled($validated['memoryLimitMb']) ? (int) $validated['memoryLimitMb'] * 1_048_576 : null,
+            'memory_reservation_bytes' => filled($validated['memoryReservationMb']) ? (int) $validated['memoryReservationMb'] * 1_048_576 : null,
+        ]);
+        $this->loadData();
+        $this->loadResourceSettings();
+        $this->dispatch('success', 'Resource settings saved. Redeploy the application to apply them.');
     }
 
     public function manage(string $actionValue): void
@@ -97,5 +137,14 @@ class Show extends Component
         $state = DetermineWorkloadState::run($this->node, $this->workload);
         $this->status = str($state->value)->title()->toString();
         $this->statusType = $state->badgeType();
+    }
+
+    private function loadResourceSettings(): void
+    {
+        $resources = $this->workload->revisions->first()?->configuration['resources'] ?? [];
+        $this->cpuLimit = isset($resources['cpu_limit']) ? (string) $resources['cpu_limit'] : '';
+        $this->cpuReservation = isset($resources['cpu_reservation']) ? (string) $resources['cpu_reservation'] : '';
+        $this->memoryLimitMb = isset($resources['memory_limit_bytes']) ? (string) ((int) $resources['memory_limit_bytes'] / 1_048_576) : '';
+        $this->memoryReservationMb = isset($resources['memory_reservation_bytes']) ? (string) ((int) $resources['memory_reservation_bytes'] / 1_048_576) : '';
     }
 }

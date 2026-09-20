@@ -237,6 +237,76 @@ it('shows the cluster application in its project and environment', function () {
         ]), false);
 });
 
+it('lets an administrator create a new revision with resource settings', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $original = $deployment['revision'];
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->assertSee('Resource limits')
+        ->set('cpuLimit', '2.5')
+        ->set('cpuReservation', '1.25')
+        ->set('memoryLimitMb', '1024')
+        ->set('memoryReservationMb', '512')
+        ->call('saveResources')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $latest = $deployment['workload']->revisions()->latest('id')->firstOrFail();
+    expect($deployment['workload']->revisions()->count())->toBe(2)
+        ->and($original->fresh()->configuration)->not->toHaveKey('resources')
+        ->and($latest->configuration['resources'])->toBe([
+            'cpu_limit' => 2.5,
+            'cpu_reservation' => 1.25,
+            'memory_limit_bytes' => 1_073_741_824,
+            'memory_reservation_bytes' => 536_870_912,
+        ]);
+});
+
+it('validates resource reservations against their limits', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->set('cpuLimit', '1')
+        ->set('cpuReservation', '2')
+        ->set('memoryLimitMb', '256')
+        ->set('memoryReservationMb', '512')
+        ->call('saveResources')
+        ->assertHasErrors(['cpuReservation', 'memoryReservationMb']);
+});
+
+it('forbids members from changing application resource settings', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->set('cpuLimit', '2')
+        ->call('saveResources')
+        ->assertForbidden();
+
+    expect($deployment['workload']->revisions()->count())->toBe(1);
+});
+
 it('offers the legacy application lifecycle actions for cluster applications', function () {
     Queue::fake();
     $deployment = CreateClusterDockerImageWorkload::run(

@@ -28,6 +28,7 @@ class DispatchWorkloadDeployment
 
         $configuration = $this->validatedConfiguration($operation->revision->configuration ?? []);
         $environment = $configuration['environment'] ?? [];
+        $resources = $configuration['resources'] ?? [];
         $ports = collect($configuration['ports'] ?? [])
             ->map(function (array $port) use ($operation): array {
                 if (filled($operation->node->wireguard_ip)) {
@@ -60,6 +61,10 @@ class DispatchWorkloadDeployment
                 'network_subnet' => $operation->node->workload_cidr ?? '',
                 'container_ip' => $containerIp ?? '',
                 'dns_server' => $containerIp === null ? '' : ($operation->node->wireguard_ip ?? ''),
+                'cpu_limit' => $resources['cpu_limit'] ?? null,
+                'cpu_reservation' => $resources['cpu_reservation'] ?? null,
+                'memory_limit_bytes' => $resources['memory_limit_bytes'] ?? null,
+                'memory_reservation_bytes' => $resources['memory_reservation_bytes'] ?? null,
             ]);
         $response->throw();
 
@@ -94,11 +99,23 @@ class DispatchWorkloadDeployment
             'ports.*.container_port' => ['required', 'integer', 'between:1,65535'],
             'ports.*.protocol' => ['required', 'in:tcp,udp,sctp'],
             'restart_policy' => ['sometimes', 'in:no,always,on-failure,unless-stopped'],
+            'resources' => ['sometimes', 'array:cpu_limit,cpu_reservation,memory_limit_bytes,memory_reservation_bytes'],
+            'resources.cpu_limit' => ['nullable', 'numeric', 'between:0.01,1024'],
+            'resources.cpu_reservation' => ['nullable', 'numeric', 'between:0.01,1024'],
+            'resources.memory_limit_bytes' => ['nullable', 'integer', 'min:4194304'],
+            'resources.memory_reservation_bytes' => ['nullable', 'integer', 'min:4194304'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('The workload revision configuration is invalid.');
         }
 
-        return $validator->validated();
+        $validated = $validator->validated();
+        $resources = $validated['resources'] ?? [];
+        if ((isset($resources['cpu_limit'], $resources['cpu_reservation']) && $resources['cpu_reservation'] > $resources['cpu_limit'])
+            || (isset($resources['memory_limit_bytes'], $resources['memory_reservation_bytes']) && $resources['memory_reservation_bytes'] > $resources['memory_limit_bytes'])) {
+            throw new RuntimeException('The workload revision resource configuration is invalid.');
+        }
+
+        return $validated;
     }
 }

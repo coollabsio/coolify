@@ -128,6 +128,32 @@ it('encodes an empty environment as a json object', function () {
     Http::assertSent(fn ($request): bool => str_contains($request->body(), '"environment":{}'));
 });
 
+it('sends workload resource limits and reservations through Flux', function () {
+    $this->revision->update(['configuration' => [
+        'restart_policy' => 'unless-stopped',
+        'resources' => [
+            'cpu_limit' => 2.5,
+            'cpu_reservation' => 1.25,
+            'memory_limit_bytes' => 1_073_741_824,
+            'memory_reservation_bytes' => 536_870_912,
+        ],
+    ]]);
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    Http::assertSent(fn ($request): bool => $request['cpu_limit'] === 2.5
+        && $request['cpu_reservation'] === 1.25
+        && $request['memory_limit_bytes'] === 1_073_741_824
+        && $request['memory_reservation_bytes'] === 536_870_912);
+});
+
 it('deploys a clustered workload with its stable managed network address', function () {
     $cluster = CreateNodeCluster::run($this->node->team, User::factory()->create(), 'Mesh');
     AssignNodeToCluster::run($cluster, $this->node);
