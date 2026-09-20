@@ -18,6 +18,9 @@ use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -155,11 +158,68 @@ it('removes membership and increments the desired revision', function () {
     $node = Node::factory()->create(['team_id' => $team->id]);
     AssignNodeToCluster::run($cluster, $node);
 
-    RemoveNodeFromCluster::run($cluster->refresh(), $node->refresh());
+    RemoveNodeFromCluster::run($cluster->refresh(), $node->refresh(), $this->user);
 
     expect($node->refresh()->node_cluster_id)->toBeNull()
         ->and($node->wireguard_ip)->toBeNull()
         ->and($cluster->refresh()->desired_revision)->toBe(3);
+});
+
+it('cleans an applied Node network before detaching it and reconciles survivors', function () {
+    Queue::fake();
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'secret');
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Network');
+    $leaving = Node::factory()->create(['team_id' => $team->id]);
+    $survivor = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $leaving);
+    AssignNodeToCluster::run($cluster->refresh(), $survivor);
+    $leavingIp = $leaving->fresh()->wireguard_ip;
+    $cluster->update(['network_status' => 'active']);
+    $leaving->update(['network_applied_revision' => $cluster->desired_revision]);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $leaving->workloads()->attach($workload, ['container_ip' => '100.64.0.2']);
+    Cache::put($leaving->cacheKey(), ['capabilities' => [
+        'discovery.corrosion.endpoints.reconcile.v1',
+        'network.cluster.leave.v1',
+    ]]);
+    Http::fake(function ($request) {
+        $base = ['command_id' => $request['command_id'], 'observed_at_unix_ms' => 1_700_000_000_000];
+        if (str_ends_with($request->url(), 'discovery.corrosion.endpoints.reconcile')) {
+            return Http::response([...$base, 'owner_node_ip' => $request['owner_node_ip'], 'endpoint_count' => 0]);
+        }
+
+        return Http::response([...$base, 'wireguard_removed' => true, 'firewall_removed' => true, 'discovery_removed' => true, 'resolver_reverted' => true]);
+    });
+
+    RemoveNodeFromCluster::run($cluster->fresh(), $leaving->fresh(), $this->user);
+
+    expect($leaving->fresh()->node_cluster_id)->toBeNull()
+        ->and($leaving->fresh()->workload_cidr)->toBeNull()
+        ->and($leaving->workloads()->count())->toBe(0)
+        ->and($cluster->fresh()->network_status)->toBe('reconciling');
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), 'network.cluster.leave')
+        && $request['interface'] === $cluster->wireguard_interface
+        && $request['owner_node_ip'] === $leavingIp);
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $cluster->id);
+});
+
+it('keeps membership when remote Node cleanup fails', function () {
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'secret');
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Network');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $cluster->update(['network_status' => 'active']);
+    $node->update(['network_applied_revision' => $cluster->desired_revision]);
+    Cache::put($node->cacheKey(), ['capabilities' => ['discovery.corrosion.endpoints.reconcile.v1', 'network.cluster.leave.v1']]);
+    Http::fake(['*' => Http::response('failed', 502)]);
+
+    expect(fn () => RemoveNodeFromCluster::run($cluster->fresh(), $node->fresh(), $this->user))->toThrow(RequestException::class)
+        ->and($node->fresh()->node_cluster_id)->toBe($cluster->id);
 });
 
 it('limits a cluster to one hundred nodes', function () {

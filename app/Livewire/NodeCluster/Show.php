@@ -131,7 +131,7 @@ class Show extends Component
     {
         $this->authorize('update', $this->cluster);
         $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
-        RemoveNodeFromCluster::run($this->cluster, $node);
+        RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
         $this->dispatch('success', 'Node removed from the cluster.');
     }
