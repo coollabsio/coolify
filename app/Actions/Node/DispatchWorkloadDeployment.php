@@ -59,6 +59,7 @@ class DispatchWorkloadDeployment
                 'network_name' => $containerIp === null ? '' : 'coolify-'.$operation->node->uuid,
                 'network_subnet' => $operation->node->workload_cidr ?? '',
                 'container_ip' => $containerIp ?? '',
+                'dns_server' => $containerIp === null ? '' : ($operation->node->wireguard_ip ?? ''),
             ]);
         $response->throw();
 

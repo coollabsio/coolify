@@ -142,7 +142,8 @@ it('deploys a clustered workload with its stable managed network address', funct
 
     Http::assertSent(fn ($request): bool => $request['network_name'] === 'coolify-'.$this->node->uuid
         && $request['network_subnet'] === '100.64.0.0/24'
-        && $request['container_ip'] === '100.64.0.2');
+        && $request['container_ip'] === '100.64.0.2'
+        && $request['dns_server'] === $this->node->fresh()->wireguard_ip);
 });
 
 it('fails when the deployed revision is not running after inventory refresh', function () {
