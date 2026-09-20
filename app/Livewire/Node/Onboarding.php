@@ -10,12 +10,12 @@ use App\Jobs\OnboardNodeJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\PrivateKey;
-use App\Rules\PrivateIpv4Cidr;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -77,14 +77,20 @@ class Onboarding extends Component
     public function connect(): void
     {
         $this->authorize('create', Node::class);
-        $validated = $this->validate([
-            'name' => ValidationPatterns::nameRules(),
-            'ip' => ['required', 'string', new ValidServerIp, Rule::unique('nodes', 'ip')->where('team_id', currentTeam()->id)],
-            'user' => ValidationPatterns::serverUsernameRules(),
-            'port' => ['required', 'integer', 'between:1,65535'],
-            'privateKeyId' => ['required', 'integer'],
-            'coolifyUrl' => ['required', 'url', 'starts_with:http://,https://'],
-        ]);
+        try {
+            $validated = $this->validate([
+                'name' => ValidationPatterns::nameRules(),
+                'ip' => ['required', 'string', new ValidServerIp, Rule::unique('nodes', 'ip')->where('team_id', currentTeam()->id)],
+                'user' => ValidationPatterns::serverUsernameRules(),
+                'port' => ['required', 'integer', 'between:1,65535'],
+                'privateKeyId' => ['required', 'integer'],
+                'coolifyUrl' => ['required', 'url', 'starts_with:http://,https://'],
+            ]);
+        } catch (ValidationException $exception) {
+            $this->dispatch('error', $exception->validator->errors()->first());
+
+            throw $exception;
+        }
         $privateKey = PrivateKey::ownedAndOnlySShKeys()->whereKey($validated['privateKeyId'])->firstOrFail();
         $callbackUrl = rtrim($validated['coolifyUrl'], '/');
         $this->coolifyUrl = $callbackUrl;
@@ -173,18 +179,6 @@ class Onboarding extends Component
         }
     }
 
-    public function updatedIp(string $ip): void
-    {
-        $developmentUrl = $this->developmentCallbackUrlFor($ip);
-        $currentUrl = rtrim($this->coolifyUrl, '/');
-        $defaultUrl = rtrim((string) config('app.url'), '/');
-        $previousDevelopmentUrl = $this->developmentCallbackUrlFor((string) config('development-qemu.gateway'));
-
-        if ($developmentUrl !== null && ($currentUrl === '' || $currentUrl === $defaultUrl || $currentUrl === $previousDevelopmentUrl)) {
-            $this->coolifyUrl = $developmentUrl;
-        }
-    }
-
     public function render(): View
     {
         $privateKeys = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->orderBy('name')->get(['id', 'name']);
@@ -234,23 +228,5 @@ class Onboarding extends Component
             'queued', 'running', 'failed', 'ready' => 3,
             default => 1,
         };
-    }
-
-    private function developmentCallbackUrlFor(string $ip): ?string
-    {
-        if (! isDev() || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-            return null;
-        }
-
-        $range = PrivateIpv4Cidr::range((string) config('development-qemu.subnet'));
-        $address = (int) sprintf('%u', ip2long($ip));
-        if ($address < $range['start'] || $address > $range['end']) {
-            return null;
-        }
-
-        $gateway = config('development-qemu.gateway');
-        $port = config('development-qemu.coolify_host_port');
-
-        return "http://{$gateway}:{$port}";
     }
 }

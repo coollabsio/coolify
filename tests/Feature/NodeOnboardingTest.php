@@ -176,10 +176,10 @@ it('prepares the Docker-compatible socket required by Sentinel', function () {
         ->toContain('test -S /var/run/docker.sock');
 });
 
-it('shows the reachable development gateway callback when a qemu IP is entered', function () {
+it('does not change the callback URL when the node IP changes', function () {
     Livewire::test(Onboarding::class)
         ->set('ip', '192.168.122.52')
-        ->assertSet('coolifyUrl', 'http://192.168.122.1:8000');
+        ->assertSet('coolifyUrl', 'https://coolify.example.com');
 });
 
 it('checks the Coolify callback from the node before installation', function () {
@@ -213,4 +213,21 @@ it('does not continue when the node cannot reach the Coolify callback', function
 
     expect($checkedUrl)->toBe('https://wrong.example.com:8000')
         ->and(Node::query()->where('ip', '192.168.122.52')->exists())->toBeFalse();
+});
+
+it('shows a notification when form validation blocks the connection check', function () {
+    Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->key->id,
+        'ip' => '192.0.2.90',
+    ]);
+
+    Livewire::test(Onboarding::class)
+        ->set('name', 'Duplicate address')
+        ->set('ip', '192.0.2.90')
+        ->set('privateKeyId', $this->key->id)
+        ->call('connect')
+        ->assertHasErrors('ip')
+        ->assertDispatched('error')
+        ->assertSee('already been taken');
 });
