@@ -5,6 +5,7 @@ use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeHost;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\ValidateNode;
+use App\Actions\Node\ValidateNodeCallback;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Jobs\OnboardNodeJob;
 use App\Livewire\Node\Onboarding;
@@ -43,6 +44,7 @@ it('shows the node onboarding route and call to action', function () {
 
 it('connects a host and creates its required cluster before queueing installation', function () {
     Queue::fake();
+    ValidateNodeCallback::shouldRun()->andReturn('ok');
     InspectNodeHost::shouldRun()->andReturn([
         'hostname' => 'worker-1', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 4,
         'memory_bytes' => 8_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
@@ -63,6 +65,7 @@ it('connects a host and creates its required cluster before queueing installatio
 
 it('does not permit a cluster from another team', function () {
     Queue::fake();
+    ValidateNodeCallback::shouldRun()->andReturn('ok');
     $foreignUser = User::factory()->create();
     $foreignCluster = NodeCluster::factory()->create(['team_id' => $foreignUser->teams()->firstOrFail()->id]);
     InspectNodeHost::shouldRun()->andReturn([
@@ -171,6 +174,7 @@ it('prepares the Docker-compatible socket required by Sentinel', function () {
 });
 
 it('uses the reachable development gateway callback for a qemu node', function () {
+    ValidateNodeCallback::shouldRun()->andReturn('ok');
     InspectNodeHost::shouldRun()->andReturn([
         'hostname' => 'worker-qemu', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 2,
         'memory_bytes' => 4_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
@@ -186,4 +190,31 @@ it('uses the reachable development gateway callback for a qemu node', function (
 
     $node = Node::query()->where('uuid', $component->get('nodeUuid'))->firstOrFail();
     expect($node->sentinel_url)->toBe('http://192.168.122.1:8000');
+});
+
+it('checks the Coolify callback from the node before installation', function () {
+    expect(ValidateNodeCallback::validationScript('https://coolify.example.com'))
+        ->toContain('https://coolify.example.com/api/health')
+        ->toContain('curl')
+        ->toContain('wget');
+});
+
+it('does not continue when the node cannot reach the Coolify callback', function () {
+    InspectNodeHost::shouldRun()->andReturn([
+        'hostname' => 'worker-callback', 'os' => 'Ubuntu 24.04', 'arch' => 'x86_64', 'cpus' => 2,
+        'memory_bytes' => 4_000_000_000, 'package_manager' => 'apt-get', 'podman_installed' => false,
+    ]);
+    ValidateNodeCallback::shouldRun()->andThrow(new RuntimeException('TLS connection failed'));
+
+    Livewire::test(Onboarding::class)
+        ->set('name', 'Invalid callback')
+        ->set('ip', '192.0.2.80')
+        ->set('privateKeyId', $this->key->id)
+        ->set('coolifyUrl', 'https://wrong.example.com:8000')
+        ->call('connect')
+        ->assertSet('step', 1)
+        ->assertHasErrors('coolifyUrl')
+        ->assertSee('could not reach Coolify');
+
+    expect(Node::query()->where('ip', '192.0.2.80')->exists())->toBeFalse();
 });

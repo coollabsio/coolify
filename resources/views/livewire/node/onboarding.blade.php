@@ -40,7 +40,10 @@
                     <div class="sm:col-span-2"><x-forms.input wire:model="coolifyUrl" label="Coolify callback URL" helper="The Node uses this URL to connect to Coolify." required /></div>
                 </div>
             </details>
-            <div class="mt-5 flex justify-end"><x-forms.button type="submit" isHighlighted wire:loading.attr="disabled"><span wire:loading.remove wire:target="connect">Connect</span><span wire:loading wire:target="connect">Connecting...</span></x-forms.button></div>
+            @error('coolifyUrl')
+                <div class="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-[12px] text-red-700 dark:text-red-300">{{ $message }}</div>
+            @enderror
+            <div class="mt-5 flex justify-end"><x-forms.button type="submit" isHighlighted wire:loading.attr="disabled"><span wire:loading.remove wire:target="connect">Connect</span><span wire:loading wire:target="connect">Checking connection...</span></x-forms.button></div>
         </form>
     @elseif ($step === 2)
         <form wire:submit="install" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">

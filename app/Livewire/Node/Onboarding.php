@@ -5,6 +5,7 @@ namespace App\Livewire\Node;
 use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateNodeCluster;
 use App\Actions\Node\InspectNodeHost;
+use App\Actions\Node\ValidateNodeCallback;
 use App\Jobs\OnboardNodeJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -100,14 +101,27 @@ class Onboarding extends Component
 
         try {
             $this->inspection = InspectNodeHost::run($node);
-            $node->update(['metadata' => [...$this->inspection, 'onboarding' => ['status' => 'review', 'step' => 'review', 'label' => 'Ready to install']]]);
-            $this->nodeUuid = $node->uuid;
-            $this->step = 2;
         } catch (Throwable $exception) {
             $node->delete();
             report($exception);
             $this->addError('ip', 'Coolify could not connect to this server. Check the address, SSH key, user, and port.');
+
+            return;
         }
+
+        try {
+            ValidateNodeCallback::run($node, $callbackUrl);
+        } catch (Throwable $exception) {
+            $node->delete();
+            report($exception);
+            $this->addError('coolifyUrl', 'This server could not reach Coolify through the callback URL. Check the URL, protocol, port, DNS, and firewall.');
+
+            return;
+        }
+
+        $node->update(['metadata' => [...$this->inspection, 'onboarding' => ['status' => 'review', 'step' => 'review', 'label' => 'Ready to install']]]);
+        $this->nodeUuid = $node->uuid;
+        $this->step = 2;
     }
 
     public function install(): void
