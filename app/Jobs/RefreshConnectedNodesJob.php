@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\SyncNodeReachability;
 use App\Models\Node;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -22,10 +23,10 @@ class RefreshConnectedNodesJob implements ShouldBeUnique, ShouldQueue
     {
         Node::query()
             ->where('is_usable', true)
-            ->select(['id', 'uuid'])
+            ->select(['id', 'uuid', 'is_reachable'])
             ->chunkById(500, function ($nodes): void {
                 foreach ($nodes as $node) {
-                    if ($node->hasRecentFluxHeartbeat()) {
+                    if (SyncNodeReachability::run($node)) {
                         RefreshNodeContainersJob::dispatch($node->id)
                             ->delay(now()->addSeconds(random_int(0, 59)));
                     }

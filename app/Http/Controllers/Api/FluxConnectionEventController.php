@@ -46,6 +46,7 @@ class FluxConnectionEventController extends Controller
                     ...$current,
                     'status' => 'reconnecting',
                 ], now()->addSeconds(15));
+                $node->update(['is_reachable' => false]);
             }
 
             return response()->noContent();
@@ -56,6 +57,7 @@ class FluxConnectionEventController extends Controller
         }
 
         $fluxUrl = $resolveFluxPublicUrl->resolve();
+        $observedAt = now()->toIso8601String();
         Cache::put($key, array_filter([
             'status' => 'connected',
             'connection_id' => $data['connection_id'],
@@ -64,11 +66,14 @@ class FluxConnectionEventController extends Controller
             'connected_at' => $data['event'] === 'connected' && data_get($current, 'status') !== 'reconnecting'
                 ? now()->toIso8601String()
                 : data_get($current, 'connected_at'),
-            'last_heartbeat_at' => $data['event'] === 'heartbeat' ? now()->toIso8601String() : data_get($current, 'last_heartbeat_at'),
+            'last_heartbeat_at' => $observedAt,
             'trust_bundle_version' => $data['trust_bundle_version'] ?? data_get($current, 'trust_bundle_version'),
             'transport' => $data['transport'] ?? data_get($current, 'transport'),
             'endpoint' => $fluxUrl,
         ], fn ($value) => $value !== null), now()->addMinutes(5));
+        if (! $node->is_reachable) {
+            $node->update(['is_reachable' => true]);
+        }
 
         return response()->noContent();
     }

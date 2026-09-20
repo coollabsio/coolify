@@ -39,7 +39,28 @@ it('records a bounded Flux connection observation', function () {
         'trust_bundle_version' => 1,
         'transport' => 'plaintext',
         'endpoint' => 'http://flux:7443',
+        'last_heartbeat_at' => now()->toIso8601String(),
+    ])->and($this->node->refresh()->is_reachable)->toBeTrue();
+});
+
+it('restores a Node when a heartbeat arrives after it was unavailable', function () {
+    $this->node->update(['is_reachable' => false]);
+    Cache::put($this->node->cacheKey(), [
+        'status' => 'connected',
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
     ]);
+
+    $this->postJson('/api/v1/internal/sentinel/control/events', [
+        'event' => 'heartbeat',
+        'server_id' => $this->node->uuid,
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+    ], ['Authorization' => 'Bearer internal-secret'])->assertNoContent();
+
+    expect($this->node->refresh()->is_reachable)->toBeTrue()
+        ->and(Cache::get($this->node->cacheKey(), []))->toMatchArray([
+            'status' => 'connected',
+            'last_heartbeat_at' => now()->toIso8601String(),
+        ]);
 });
 
 it('uses the derived TLS endpoint in connection observations', function () {
@@ -97,7 +118,7 @@ it('keeps connection state stable while Sentinel refreshes its credential', func
     expect(Cache::get("flux:connection:{$this->node->uuid}"))->toMatchArray([
         'status' => 'reconnecting',
         'connected_at' => '2026-09-12T11:13:55+00:00',
-    ]);
+    ])->and($this->node->refresh()->is_reachable)->toBeFalse();
 
     Carbon::setTestNow('2026-09-12 11:27:56');
     $this->postJson('/api/v1/internal/sentinel/control/events', [
@@ -109,7 +130,7 @@ it('keeps connection state stable while Sentinel refreshes its credential', func
         'status' => 'connected',
         'connection_id' => '22222222-2222-4222-8222-222222222222',
         'connected_at' => '2026-09-12T11:13:55+00:00',
-    ]);
+    ])->and($this->node->refresh()->is_reachable)->toBeTrue();
 });
 
 it('rejects invalid internal credentials and unknown servers', function () {

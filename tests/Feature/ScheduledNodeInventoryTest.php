@@ -27,8 +27,9 @@ beforeEach(function () {
 
 it('queues inventory only for usable Nodes with a recent Flux heartbeat without the development gate', function () {
     config()->set('constants.sentinel.host_enabled', false);
-    $stale = Node::factory()->create(['is_usable' => true, 'private_key_id' => $this->node->private_key_id]);
-    $unusable = Node::factory()->create(['is_usable' => false, 'private_key_id' => $this->node->private_key_id]);
+    $this->node->update(['is_reachable' => false]);
+    $stale = Node::factory()->create(['is_usable' => true, 'is_reachable' => true, 'private_key_id' => $this->node->private_key_id]);
+    $unusable = Node::factory()->create(['is_usable' => false, 'is_reachable' => true, 'private_key_id' => $this->node->private_key_id]);
     Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->subSeconds(30)->toIso8601String()]);
     Cache::put($stale->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->subMinutes(3)->toIso8601String()]);
     Cache::put($unusable->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String()]);
@@ -38,6 +39,11 @@ it('queues inventory only for usable Nodes with a recent Flux heartbeat without 
 
     Queue::assertPushed(RefreshNodeContainersJob::class, 1);
     Queue::assertPushed(RefreshNodeContainersJob::class, fn ($job) => $job->nodeId === $this->node->id && $job->delay !== null);
+
+    expect($this->node->refresh()->is_reachable)->toBeTrue()
+        ->and($stale->refresh()->is_reachable)->toBeFalse()
+        ->and(Cache::get($stale->cacheKey()))->toMatchArray(['status' => 'unavailable'])
+        ->and($unusable->refresh()->is_reachable)->toBeTrue();
 });
 
 it('refreshes the complete container inventory for one Node', function () {
