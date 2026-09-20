@@ -1,22 +1,18 @@
-# Enforce the workload firewall on the same Node
+# Real-time Node workload status
 
-- [x] Add failing Sentinel tests for same-bridge workload isolation.
-- [x] Add the bridge-family policy to Sentinel firewall reconciliation.
-- [x] Run Sentinel formatting, tests, and lint checks.
-- [x] Commit and push Sentinel, then wait for the image build.
-- [x] Update Sentinel and Flux on both local KVM Nodes.
-- [x] Smoke-test default deny and an explicit allow rule between same-Node containers.
-- [x] Record review results.
+- [x] Trace current Sentinel-to-Flux transport, inventory updates, and Coold status events.
+- [x] Define a minimal typed event for managed container state and health changes.
+- [x] Add tests before implementation in Sentinel and Coolify.
+- [x] Publish events from Sentinel and apply them safely in Coolify.
+- [x] Keep scheduled inventory as the recovery path.
+- [x] Run focused and broader tests, format, and lint.
+- [x] Release, install, and smoke test on the running dev stack and KVM Nodes.
+- [x] Record results, clean up, commit, and push.
 
 ## Review
 
-- Sentinel now owns an atomic `bridge` nftables table in addition to its routed `inet` table.
-- The bridge table allows established traffic and explicit workload-source rules, then denies all other workload-to-workload traffic on the same Node.
-- Node-source rules stay in the routed table and are not copied into the bridge table.
-- Rollback snapshots, activation checks, and cleanup include both owned tables without changing unrelated nftables rules.
-- The full Sentinel workspace tests and Clippy passed.
-- Sentinel CI and the multi-architecture release passed for commit `08951c3`.
-- Flux and Sentinel were updated in the local development stack and on both KVM Nodes.
-- Both KVM Nodes run active Sentinel services with SHA-256 `11016ff37f741875fa7aba3ef81a775b7d3fd7ac8be6bf0905e67ade74631ba1`.
-- A live same-Node test confirmed default deny, TCP 8080 access after an explicit allow rule, and default deny again after rule removal.
-- All temporary workloads, firewall records, and containers were removed after the smoke test.
+- Sentinel watches the Podman container event stream and sends a small typed runtime-change notification over the existing Flux stream.
+- Flux forwards the notification through the existing authenticated internal event endpoint. Coolify queues the existing full inventory refresh, so there is only one reconciliation path.
+- Old-connection events are ignored. The scheduled minute inventory remains the repair path for missed events.
+- Live stop and start changes on KVM Node B reached Coolify in about one to two seconds.
+- Sentinel CI and release passed. The released Flux and Sentinel builds are installed in the local development environment.
