@@ -105,6 +105,8 @@ it('reconciles a complete full mesh through durable typed operations', function 
         expect($node->wireguard_public_key)->toBe('public-'.$node->uuid)
             ->and($node->network_applied_revision)->toBe($cluster->desired_revision)
             ->and($node->corrosion_status)->toBe('converged')
+            ->and(data_get($node->metadata, 'firewall_applied_revision'))->toBe($cluster->desired_revision)
+            ->and(data_get($node->metadata, 'firewall_configuration_hash'))->toBe('firewall-hash')
             ->and(data_get($node->metadata, 'corrosion_endpoint_count'))->toBe(2)
             ->and(data_get($node->metadata, 'corrosion_last_convergence_unix_seconds'))->toBe(1_700_000_000);
     }

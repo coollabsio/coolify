@@ -3,6 +3,7 @@
 namespace App\Livewire\NodeCluster;
 
 use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\DeleteNodeCluster;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\UpdateNodeCluster;
@@ -101,7 +102,7 @@ class Show extends Component
         $this->authorize('update', $this->cluster);
         $this->validate(['nodeUuid' => ['required', 'string']]);
         $node = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->where('uuid', $this->nodeUuid)->firstOrFail();
-        AssignNodeToCluster::run($this->cluster, $node);
+        AssignNodeToCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
         $this->reset('nodeUuid');
         $this->dispatch('success', 'Node assigned to the cluster.');
@@ -139,7 +140,13 @@ class Show extends Component
     public function deleteCluster(): void
     {
         $this->authorize('delete', $this->cluster);
-        $this->cluster->delete();
+        try {
+            DeleteNodeCluster::run($this->cluster, auth()->user());
+        } catch (DomainException $exception) {
+            $this->dispatch('error', $exception->getMessage());
+
+            return;
+        }
         $this->redirectRoute('node-cluster.index', navigate: true);
     }
 

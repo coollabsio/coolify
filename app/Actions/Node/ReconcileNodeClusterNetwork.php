@@ -303,6 +303,13 @@ class ReconcileNodeClusterNetwork
                     'corrosion_last_convergence_unix_seconds' => data_get($result, 'last_convergence_unix_seconds'),
                 ],
             ]),
+            'network.firewall.reconcile.v1' => $node->update([
+                'metadata' => [
+                    ...($node->fresh()->metadata ?? []),
+                    'firewall_applied_revision' => data_get($result, 'applied_revision'),
+                    'firewall_configuration_hash' => data_get($result, 'configuration_hash'),
+                ],
+            ]),
             default => null,
         };
     }

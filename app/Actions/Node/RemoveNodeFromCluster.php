@@ -21,7 +21,7 @@ class RemoveNodeFromCluster
 {
     use AsAction;
 
-    public function handle(NodeCluster $cluster, Node $node, User $user): Node
+    public function handle(NodeCluster $cluster, Node $node, User $user, bool $reconcileSurvivors = true): Node
     {
         Gate::forUser($user)->authorize('update', $cluster);
         $cluster->loadMissing('nodes');
@@ -74,7 +74,7 @@ class RemoveNodeFromCluster
             return $node;
         });
 
-        if ($cluster->nodes()->exists()) {
+        if ($reconcileSurvivors && $cluster->nodes()->exists()) {
             ReconcileNodeClusterNetworkJob::dispatch($cluster->id, $user->id)->afterCommit();
         }
 

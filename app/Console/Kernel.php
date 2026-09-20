@@ -10,6 +10,7 @@ use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\InspectNodeClusterNetworksJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RefreshConnectedNodesJob;
@@ -57,6 +58,10 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new RefreshConnectedNodesJob)
             ->everyMinute()
             ->onOneServer();
+        $this->scheduleInstance->job(new InspectNodeClusterNetworksJob)
+            ->everyMinute()
+            ->onOneServer()
+            ->withoutOverlapping(10);
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('cleanup:stucked-resources')
             ->dailyAt('03:17')

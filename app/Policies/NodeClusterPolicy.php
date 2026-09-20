@@ -29,6 +29,6 @@ class NodeClusterPolicy
 
     public function delete(User $user, NodeCluster $cluster): bool
     {
-        return $user->isAdminOfTeam($cluster->team_id) && ! $cluster->nodes()->exists();
+        return $user->isAdminOfTeam($cluster->team_id);
     }
 }

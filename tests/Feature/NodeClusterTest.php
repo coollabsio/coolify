@@ -247,6 +247,10 @@ it('prevents members from mutating clusters', function () {
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('saveSettings')
         ->assertForbidden();
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('deleteCluster')
+        ->assertForbidden();
 });
 
 it('prevents members from changing firewall rules', function () {
@@ -296,14 +300,18 @@ it('does not allow cidr changes after an active network enters an error state', 
         ->assertHasErrors('cidr');
 });
 
-it('prevents deletion while nodes are assigned', function () {
+it('deletes a cluster after cleaning unused assigned nodes', function () {
     $team = $this->user->teams()->firstOrFail();
     $cluster = CreateNodeCluster::run($team, $this->user, 'Used');
-    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('deleteCluster')
-        ->assertForbidden();
+        ->assertRedirect(route('node-cluster.index'));
+
+    expect($cluster->fresh())->toBeNull()
+        ->and($node->fresh()->node_cluster_id)->toBeNull();
 });
 
 it('creates edits assigns removes and deletes through Livewire', function () {

@@ -2,8 +2,10 @@
 
 namespace App\Actions\Node;
 
+use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Models\Node;
 use App\Models\NodeCluster;
+use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -12,13 +14,14 @@ class AssignNodeToCluster
 {
     use AsAction;
 
-    public function handle(NodeCluster $cluster, Node $node): Node
+    public function handle(NodeCluster $cluster, Node $node, ?User $user = null): Node
     {
         if ($cluster->team_id !== $node->team_id) {
             throw new DomainException('The Node and cluster must belong to the same team.');
         }
 
-        return DB::transaction(function () use ($cluster, $node): Node {
+        $wasActivated = $cluster->hasActivatedNetwork();
+        $node = DB::transaction(function () use ($cluster, $node): Node {
             $cluster = NodeCluster::query()->lockForUpdate()->findOrFail($cluster->id);
             $node = Node::query()->lockForUpdate()->findOrFail($node->id);
             if ($node->node_cluster_id === $cluster->id && $node->wireguard_ip && $node->workload_cidr) {
@@ -54,6 +57,13 @@ class AssignNodeToCluster
 
             return $node;
         });
+
+        if ($wasActivated && $user !== null) {
+            $cluster->update(['network_status' => 'reconciling']);
+            ReconcileNodeClusterNetworkJob::dispatch($cluster->id, $user->id)->afterCommit();
+        }
+
+        return $node;
     }
 
     private function nextWorkloadCidr(): string
