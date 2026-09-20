@@ -14,6 +14,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\PrivateKey;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -104,4 +105,35 @@ it('runs each installation stage and marks the node ready', function () {
 
     expect(data_get($node->fresh()->metadata, 'onboarding.status'))->toBe('ready')
         ->and(data_get($node->fresh()->metadata, 'onboarding.step'))->toBe('ready');
+});
+
+it('restores installation progress after a page refresh', function () {
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $node = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->key->id,
+        'node_cluster_id' => $cluster->id,
+        'metadata' => [
+            'hostname' => 'worker-refresh',
+            'onboarding' => ['status' => 'running', 'step' => 'installing', 'label' => 'Installing Node components'],
+        ],
+    ]);
+
+    Livewire::withQueryParams(['node' => $node->uuid])
+        ->test(Onboarding::class)
+        ->assertSet('nodeUuid', $node->uuid)
+        ->assertSet('step', 3)
+        ->assertSee('Installing your Node')
+        ->assertSee('Installing Node components');
+});
+
+it('does not restore another team node from the URL', function () {
+    $foreignUser = User::factory()->create();
+    $foreignNode = Node::factory()->create([
+        'team_id' => $foreignUser->teams()->firstOrFail()->id,
+        'private_key_id' => $this->key->id,
+    ]);
+
+    expect(fn () => Livewire::withQueryParams(['node' => $foreignNode->uuid])->test(Onboarding::class))
+        ->toThrow(ModelNotFoundException::class);
 });

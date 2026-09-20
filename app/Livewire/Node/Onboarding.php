@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Throwable;
 
@@ -42,6 +43,7 @@ class Onboarding extends Component
 
     public string $clusterName = '';
 
+    #[Url(as: 'node', except: '')]
     public ?string $nodeUuid = null;
 
     /** @var array<string, mixed> */
@@ -51,6 +53,13 @@ class Onboarding extends Component
     {
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->authorize('create', Node::class);
+
+        if ($this->nodeUuid !== null) {
+            $this->restoreOnboardingNode();
+
+            return;
+        }
+
         $this->name = generate_random_name();
         $this->coolifyUrl = rtrim((string) config('app.url'), '/');
         $this->privateKeyId = PrivateKey::ownedAndOnlySShKeys()->where('id', '!=', 0)->value('id');
@@ -166,5 +175,31 @@ class Onboarding extends Component
             'onboarding' => ['status' => 'queued', 'step' => 'queued', 'label' => 'Waiting to start', 'error' => null, 'updated_at' => now()->toIso8601String()],
         ]]);
         Cache::forget($node->cacheKey());
+    }
+
+    private function restoreOnboardingNode(): void
+    {
+        $node = $this->onboardingNode();
+        $this->authorize('view', $node);
+        $onboardingStatus = data_get($node->metadata, 'onboarding.status');
+
+        $this->name = $node->name;
+        $this->ip = $node->ip;
+        $this->user = $node->user;
+        $this->port = $node->port;
+        $this->privateKeyId = $node->private_key_id;
+        $this->coolifyUrl = $node->sentinel_url ?? '';
+        $this->inspection = collect($node->metadata ?? [])->except('onboarding')->all();
+
+        if ($node->cluster !== null) {
+            $this->clusterMode = 'existing';
+            $this->clusterUuid = $node->cluster->uuid;
+        }
+
+        $this->step = match ($onboardingStatus) {
+            'review' => 2,
+            'queued', 'running', 'failed', 'ready' => 3,
+            default => 1,
+        };
     }
 }
