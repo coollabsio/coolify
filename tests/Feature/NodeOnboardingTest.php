@@ -86,7 +86,10 @@ it('removes the draft node when the SSH inspection fails', function () {
 
     Livewire::test(Onboarding::class)
         ->set('name', 'Bad host')->set('ip', '192.0.2.52')->set('privateKeyId', $this->key->id)
-        ->call('connect')->assertHasErrors('ip')->assertSet('step', 1);
+        ->call('connect')
+        ->assertHasErrors('ip')
+        ->assertDispatched('error', 'Coolify could not connect to this server. Check the address, SSH key, user, and port.')
+        ->assertSet('step', 1);
 
     expect(Node::query()->where('ip', '192.0.2.52')->exists())->toBeFalse();
 });
@@ -205,6 +208,7 @@ it('does not continue when the node cannot reach the Coolify callback', function
         ->call('connect')
         ->assertSet('step', 1)
         ->assertHasErrors('coolifyUrl')
+        ->assertDispatched('error', 'This server could not reach Coolify through the callback URL. Check the URL, protocol, port, DNS, and firewall.')
         ->assertSee('could not reach Coolify');
 
     expect($checkedUrl)->toBe('https://wrong.example.com:8000')

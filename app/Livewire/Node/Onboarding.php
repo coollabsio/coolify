@@ -104,7 +104,9 @@ class Onboarding extends Component
         } catch (Throwable $exception) {
             $node->delete();
             report($exception);
-            $this->addError('ip', 'Coolify could not connect to this server. Check the address, SSH key, user, and port.');
+            $message = 'Coolify could not connect to this server. Check the address, SSH key, user, and port.';
+            $this->addError('ip', $message);
+            $this->dispatch('error', $message);
 
             return;
         }
@@ -114,7 +116,9 @@ class Onboarding extends Component
         } catch (Throwable $exception) {
             $node->delete();
             report($exception);
-            $this->addError('coolifyUrl', 'This server could not reach Coolify through the callback URL. Check the URL, protocol, port, DNS, and firewall.');
+            $message = 'This server could not reach Coolify through the callback URL. Check the URL, protocol, port, DNS, and firewall.';
+            $this->addError('coolifyUrl', $message);
+            $this->dispatch('error', $message);
 
             return;
         }
