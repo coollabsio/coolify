@@ -65,6 +65,19 @@ it('returns an enabled development assignment with a bound short-lived credentia
         ->and($claims['caps'])->toBe(['system.ping.v1', 'system.info.v1', 'container.list.v1', 'workload.deploy.v1', 'workload.lifecycle.v1']);
 });
 
+it('rotates the short-lived Flux credential on every assignment', function () {
+    $first = requestSentinelAssignment($this->token)->assertOk()->json('credential');
+    $second = requestSentinelAssignment($this->token)->assertOk()->json('credential');
+
+    $firstClaims = (array) JWT::decode($first, new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
+    $secondClaims = (array) JWT::decode($second, new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
+
+    expect($second)->not->toBe($first)
+        ->and($secondClaims['jti'])->not->toBe($firstClaims['jti'])
+        ->and($secondClaims['sub'])->toBe($this->node->uuid)
+        ->and($secondClaims['exp'] - $secondClaims['iat'])->toBe(900);
+});
+
 it('grants the typed endpoint reconciliation capability to Nodes', function () {
     $assignment = requestSentinelAssignment($this->token, [
         'capabilities' => ['discovery.corrosion.endpoints.reconcile.v1'],
