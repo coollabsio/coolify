@@ -36,6 +36,7 @@ class InspectNodeClusterNetworksJob implements ShouldBeUnique, ShouldQueue
                     }
 
                     if ($drifted && $cluster->fresh()->network_status === 'active') {
+                        $cluster->increment('desired_revision');
                         $cluster->update(['network_status' => 'reconciling']);
                         ReconcileNodeClusterNetworkJob::dispatch($cluster->id, $user->id);
                     }

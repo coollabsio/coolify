@@ -116,6 +116,7 @@ it('queues automatic reconciliation when inspection detects drift', function () 
     $cluster->update(['network_status' => 'active']);
     $node->update(['network_observed_state' => ['configuration_hash' => 'expected']]);
     grantInspectionCapabilities($node);
+    $expectedRevision = $cluster->fresh()->desired_revision + 1;
     Http::fake(fn (Request $request) => Http::response([
         'command_id' => $request['command_id'],
         'observed_at_unix_ms' => 1_700_000_000_000,
@@ -127,6 +128,7 @@ it('queues automatic reconciliation when inspection detects drift', function () 
     (new InspectNodeClusterNetworksJob)->handle();
 
     expect($cluster->fresh()->network_status)->toBe('reconciling');
+    expect($cluster->fresh()->desired_revision)->toBe($expectedRevision);
     Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $cluster->id);
 });
 
