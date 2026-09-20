@@ -213,6 +213,7 @@ it('manages automatic qemu workers without host php', function () {
         ->not->toContain('php artisan dev:qemu ');
 
     expect(is_executable(base_path('scripts/dev-qemu')))->toBeTrue();
+    expect(substr_count($script, "printf '192.168.122.1 coolify-flux\\n' >> /etc/hosts"))->toBe(2);
 });
 
 it('preserves the docker stack when automatic qemu startup fails', function () {

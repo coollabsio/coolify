@@ -162,3 +162,10 @@ it('stores and displays technical details for the failed installation stage', fu
         ->assertSee('Preparing server')
         ->assertSee('apt-get failed: package repository unavailable');
 });
+
+it('prepares the Docker-compatible socket required by Sentinel', function () {
+    expect(PrepareNodeHost::installationScript())
+        ->toContain('systemctl enable --now podman.socket')
+        ->toContain('ln -sfn /run/podman/podman.sock /var/run/docker.sock')
+        ->toContain('test -S /var/run/docker.sock');
+});

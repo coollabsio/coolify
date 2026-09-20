@@ -142,6 +142,7 @@ packages:
   - sudo
 runcmd:
   - systemctl enable --now ssh
+  - printf '192.168.122.1 coolify-flux\n' >> /etc/hosts
 YAML
     else
         cat > "$user_data" <<YAML
