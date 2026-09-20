@@ -72,6 +72,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 $operation->revision,
                 NodeWorkloadAction::REMOVE,
                 $operation->requestedBy,
+                updateDesiredState: false,
             );
             (new ManageNodeWorkloadJob($removalOperation->id))->handle();
             $removalOperation->refresh();

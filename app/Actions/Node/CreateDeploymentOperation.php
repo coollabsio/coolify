@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -46,6 +47,8 @@ class CreateDeploymentOperation
             if ($active !== null) {
                 return ['operation' => $active, 'created' => false];
             }
+
+            $workload->update(['desired_state' => NodeWorkloadDesiredState::RUNNING]);
 
             $operation = CreateOperation::run(
                 $node,

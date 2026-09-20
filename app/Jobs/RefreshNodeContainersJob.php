@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\ReconcileNodeWorkloads;
 use App\Models\Node;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -34,5 +35,6 @@ class RefreshNodeContainersJob implements ShouldBeUnique, ShouldQueue
         }
 
         FetchContainers::run($node);
+        ReconcileNodeWorkloads::run($node);
     }
 }

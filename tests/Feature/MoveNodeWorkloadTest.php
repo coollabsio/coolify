@@ -4,6 +4,7 @@ use App\Actions\Node\AssignNodeToCluster;
 use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\CreateNodeCluster;
 use App\Enums\NodeOperationStatus;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Jobs\MoveNodeWorkloadJob;
 use App\Livewire\Node\Show;
 use App\Models\InstanceSettings;
@@ -111,6 +112,7 @@ it('publishes a ready target before it removes and withdraws the source workload
     expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
         ->and($source->workloads()->whereKey($workload->id)->exists())->toBeFalse()
         ->and($target->workloads()->whereKey($workload->id)->exists())->toBeTrue()
+        ->and($workload->refresh()->desired_state)->toBe(NodeWorkloadDesiredState::RUNNING)
         ->and($events)->toBe([
             'deploy-target',
             'publish-target',

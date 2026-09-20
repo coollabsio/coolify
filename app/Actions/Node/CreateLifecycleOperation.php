@@ -4,6 +4,7 @@ namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
+use App\Enums\NodeWorkloadDesiredState;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -18,9 +19,14 @@ class CreateLifecycleOperation
 {
     use AsAction;
 
-    public function handle(Node $node, NodeWorkloadRevision $revision, NodeWorkloadAction $action, ?User $requestedBy = null): NodeOperation
-    {
-        return DB::transaction(function () use ($node, $revision, $action, $requestedBy): NodeOperation {
+    public function handle(
+        Node $node,
+        NodeWorkloadRevision $revision,
+        NodeWorkloadAction $action,
+        ?User $requestedBy = null,
+        bool $updateDesiredState = true,
+    ): NodeOperation {
+        return DB::transaction(function () use ($node, $revision, $action, $requestedBy, $updateDesiredState): NodeOperation {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -48,6 +54,14 @@ class CreateLifecycleOperation
                 ->exists();
             if ($active) {
                 throw new RuntimeException('This workload already has an active operation.');
+            }
+
+            if ($updateDesiredState) {
+                $workload->update(['desired_state' => match ($action) {
+                    NodeWorkloadAction::START, NodeWorkloadAction::RESTART => NodeWorkloadDesiredState::RUNNING,
+                    NodeWorkloadAction::STOP => NodeWorkloadDesiredState::STOPPED,
+                    NodeWorkloadAction::REMOVE => NodeWorkloadDesiredState::REMOVED,
+                }]);
             }
 
             return CreateOperation::run(
