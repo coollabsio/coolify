@@ -9,12 +9,14 @@ use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\InfisicalPullJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
+use App\Models\InfisicalConnection;
 use App\Models\InstanceSettings;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Console\Scheduling\Schedule;
@@ -59,6 +61,20 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
+
+        // whereNotNull('adopted_at') matters: pulling before the one upward
+        // adoption push has completed would read an empty Infisical project
+        // and do nothing useful.
+        $this->scheduleInstance->call(function (): void {
+            InfisicalConnection::query()
+                ->where('is_enabled', true)
+                ->whereNotNull('adopted_at')
+                ->chunkById(100, function ($connections): void {
+                    foreach ($connections as $connection) {
+                        InfisicalPullJob::dispatch($connection);
+                    }
+                });
+        })->name('infisical-pull')->everyFifteenMinutes()->onOneServer()->withoutOverlapping();
         if (isDev()) {
             // Instance Jobs
             $this->scheduleInstance->command('horizon:snapshot')->everyMinute();

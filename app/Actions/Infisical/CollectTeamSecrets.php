@@ -60,6 +60,15 @@ class CollectTeamSecrets
      *   variable rows at all (Task 8's database credential columns). Empty
      *   here. A pull must try `rows`, then `writers`, then `create`.
      *
+     * @param  array<int, string>|null  $only  Restrict the walk to these bucket
+     *                                         ids (`"{envSlug}|{path}"`). Null
+     *                                         walks the whole team. A deploy-time
+     *                                         pull passes the three folders the
+     *                                         deploying resource actually
+     *                                         inherits, because the full walk is
+     *                                         one HTTP round trip per bucket and
+     *                                         a realistic team has well over a
+     *                                         hundred of them.
      * @return array<string, array{
      *   environment: string,
      *   path: string,
@@ -71,8 +80,45 @@ class CollectTeamSecrets
      *   writers: array<string, Closure>
      * }>
      */
-    public function handle(Team $team): array
+    public function handle(Team $team, ?array $only = null): array
     {
+        $wanted = $only === null ? null : array_flip($only);
+
+        $wants = fn (string $envSlug, string $path): bool => $wanted === null
+            || isset($wanted["{$envSlug}|{$path}"]);
+
+        // Cheap prefix tests so a scoped walk can skip whole projects and whole
+        // environments before it issues their per-row queries.
+        $touchesPath = function (string $path) use ($wanted): bool {
+            if ($wanted === null) {
+                return true;
+            }
+
+            foreach (array_keys($wanted) as $id) {
+                [, $wantedPath] = explode('|', (string) $id, 2) + [1 => ''];
+
+                if (str_starts_with($wantedPath, $path)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $touchesEnvironment = function (string $envSlug) use ($wanted): bool {
+            if ($wanted === null) {
+                return true;
+            }
+
+            foreach (array_keys($wanted) as $id) {
+                if (str_starts_with((string) $id, $envSlug.'|')) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
         $projects = $team->projects()->with('environments')->get();
         InfisicalPath::assertNoCollisions($projects->pluck('name')->all());
 
@@ -131,10 +177,17 @@ class CollectTeamSecrets
             $buckets[$id]['rows'][$row->key] = $row;
         };
 
-        // Team scope -> '/' in every environment.
-        $teamRows = $team->environment_variables()->where('type', 'team')->get();
+        // Team scope -> '/' in every environment. Rows are loaded lazily so a
+        // scoped walk that does not want '/' never queries them.
+        $teamRows = null;
 
         foreach ($environmentSlugs as $envSlug) {
+            if (! $wants($envSlug, InfisicalPath::forTeam())) {
+                continue;
+            }
+
+            $teamRows ??= $team->environment_variables()->where('type', 'team')->get();
+
             $ensure($envSlug, InfisicalPath::forTeam(), 'team', true, null);
 
             foreach ($teamRows as $row) {
@@ -145,10 +198,20 @@ class CollectTeamSecrets
         foreach ($projects as $project) {
             $projectPath = InfisicalPath::forProject($project->name);
 
+            if (! $touchesPath($projectPath)) {
+                continue;
+            }
+
             // Project scope -> '/{project}/' in every environment.
-            $projectRows = $project->environment_variables()->where('type', 'project')->get();
+            $projectRows = null;
 
             foreach ($environmentSlugs as $envSlug) {
+                if (! $wants($envSlug, $projectPath)) {
+                    continue;
+                }
+
+                $projectRows ??= $project->environment_variables()->where('type', 'project')->get();
+
                 $ensure($envSlug, $projectPath, 'project', true, null);
 
                 foreach ($projectRows as $row) {
@@ -159,13 +222,19 @@ class CollectTeamSecrets
             foreach ($project->environments as $environment) {
                 $envSlug = InfisicalPath::environmentSlug($environment->name);
 
+                if (! $touchesEnvironment($envSlug)) {
+                    continue;
+                }
+
                 // Environment scope -> same folder, this environment only.
                 // Ensured and added AFTER project scope so it both promotes the
                 // bucket and overwrites on key conflict.
-                $ensure($envSlug, $projectPath, 'environment', false, $this->environmentCreator($environment, $team->id, $projectPath));
+                if ($wants($envSlug, $projectPath)) {
+                    $ensure($envSlug, $projectPath, 'environment', false, $this->environmentCreator($environment, $team->id, $projectPath));
 
-                foreach ($environment->environment_variables()->where('type', 'environment')->get() as $row) {
-                    $add($envSlug, $projectPath, $row);
+                    foreach ($environment->environment_variables()->where('type', 'environment')->get() as $row) {
+                        $add($envSlug, $projectPath, $row);
+                    }
                 }
 
                 $resources = collect()
@@ -177,6 +246,10 @@ class CollectTeamSecrets
 
                 foreach ($resources as $resource) {
                     $resourcePath = InfisicalPath::forResource($project->name, $resource->name);
+
+                    if (! $wants($envSlug, $resourcePath)) {
+                        continue;
+                    }
 
                     $ensure($envSlug, $resourcePath, 'resource', false, $this->resourceCreator($resource, $resourcePath));
 
