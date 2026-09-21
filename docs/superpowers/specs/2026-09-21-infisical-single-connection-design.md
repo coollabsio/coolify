@@ -104,10 +104,24 @@ full success.
 
 ### Upward, continuing — system variables only
 
-Coolify generates `SERVICE_PASSWORD_*`, `SERVICE_FQDN_*`, and managed-database
-credentials. A model hook pushes these to Infisical so Infisical holds the
-complete picture. Must be guarded against re-entrancy: a downward pull writing
-rows must not trigger an upward push.
+Coolify generates `SERVICE_PASSWORD_*`, `SERVICE_FQDN_*`, `SERVICE_USER_*`,
+`SERVICE_BASE64_*` and friends through `generateEnvValue()`, plus the database
+credential columns above. Writes made inside `asSystem()` are pushed to
+Infisical so Infisical holds the complete picture.
+
+Two things are explicitly **out of scope**:
+
+- `COOLIFY_URL`, `COOLIFY_FQDN`, `COOLIFY_BRANCH`, `COOLIFY_RESOURCE_UUID`,
+  `COOLIFY_CONTAINER_NAME` and `SOURCE_COMMIT` are computed fresh at deploy
+  time and never persisted as rows. They are not secrets and are not synced.
+- `parse()` uses `firstOrCreate`, so re-running it never overwrites an existing
+  value. Generation is idempotent and a repeat `parse()` must not produce a
+  repeat push.
+
+Re-entrancy guard: a downward pull writes inside `asSystem()` too, so the push
+hook must distinguish "system generated locally" from "system wrote this
+because Infisical said so" and skip the push in the latter case. Without this,
+every pull triggers a push and the two sync directions feed each other.
 
 ### Downward, continuously — `PullTeamSecrets`
 
@@ -133,18 +147,79 @@ it.
 
 Armed whenever the team has an enabled connection.
 
-Enforcement is server-side. `@can` in Blade is presentation only and is never
-the control. The gate answers one question — is this write Coolify-generated, or
-a human edit? System passes; human is rejected with a message naming Infisical
-as the place to edit.
+### Enforcement point
 
-Surfaces, all of which must be covered:
+Enforcement lives in the **Eloquent `saving` and `deleting` hooks** of
+`EnvironmentVariable` and `SharedEnvironmentVariable`, not at the call sites.
+Call-site enforcement was investigated and rejected: it leaks in at least five
+places.
 
-- `app/Livewire/SharedVariables/{Team,Project,Environment,Server}/*`
-- `app/Livewire/Project/Shared/EnvironmentVariable/{Add,All,Show,ShowHardcoded}`
-- Every `api.ability:write` env route in `routes/api.php`, across
-  `SharedEnvironmentVariablesController`, `ApplicationsController`, and the
-  service and database controllers.
+| Leak | Why a call-site lock misses it |
+|---|---|
+| `EnvironmentVariable::booted()` `created` observer | Silently clones every new production variable into a preview row — a second write the caller never made. |
+| `StandaloneRedis::redisUsername()` accessor | **Creates a row as a side effect of a read.** Rendering a page can write. |
+| `applicationParser()` / `serviceParser()` via `parse()` | Fires from ~20 call sites including every deployment, every domain save, and clone. |
+| The Infisical pull itself | Runs from a scheduled job with no HTTP request in scope. |
+| `ServerTransferImporter` | Wraps writes in `withoutEvents()`. |
+
+The last one also bypasses model hooks, so the importer must check the lock
+**explicitly** — a model-hook lock alone will not stop it. Bulk import is
+treated as a human edit, not a system write, because it copies another
+instance's data rather than generating Coolify's own.
+
+### The bypass
+
+A scoped context — `InfisicalLock::asSystem(callable $write)` — marks a write
+as Coolify-generated. Inside it, the hooks allow the write; outside, they reject
+it when the lock is armed. Static scoping, not a model attribute, because the
+same row may be written by both a human and the system at different times.
+
+Paths that must be wrapped in `asSystem()`:
+
+- `applicationParser()`, `serviceParser()`, `parseDockerComposeFile()`
+- `EnvironmentVariable::booted()` preview-clone and version stamp
+- `Application::booted()` — `NIXPACKS_NODE_VERSION`, buildpack-switch cleanup
+- `Server::booted()` — `COOLIFY_SERVER_UUID`, `COOLIFY_SERVER_NAME`
+- `StandaloneRedis::redisUsername()` accessor
+- One-click template seeding in `ServicesController::create_service` and
+  `Livewire/Project/Resource/Create::mount()`
+- Resource-deletion cascades (`forceDeleting` on every `Standalone*` model,
+  `DeleteService`)
+- The Infisical pull action itself
+
+Paths that must be **rejected** when armed:
+
+- `app/Livewire/SharedVariables/{Team,Project,Environment,Server}/*` —
+  `saveKey()`, `submit()`
+- `app/Livewire/Project/Shared/EnvironmentVariable/{Add,All,Show}` —
+  `submit()`, `delete()`, `lock()`
+- `Service::saveExtraFields()`, reached from `StackForm::submit()`
+- All 24 `api.ability:write` env endpoints across
+  `SharedEnvironmentVariablesController` (12), `ApplicationsController` (4),
+  `DatabasesController` (4), `ServicesController` (4)
+- `ServerTransferImporter` — explicit check, since `withoutEvents()` evades the
+  hook
+
+Because the hook is the control, the UI and API layers only need to render the
+read-only state and return a clean error. They are not the security boundary.
+`@can` in Blade is presentation only and is never the control.
+
+### Database credential columns
+
+Managed database passwords are **not** environment variables for 7 of 8
+engines — `postgres_password`, `mysql_root_password`, `mysql_password`,
+`mariadb_root_password`, `mariadb_password`, `mongo_initdb_root_password`,
+`keydb_password`, `dragonfly_password`, `clickhouse_admin_password` are
+encrypted columns on the `Standalone*` models. Only Redis additionally writes
+`REDIS_PASSWORD` and `REDIS_USERNAME` as variable rows.
+
+These columns are in scope: pushed up during adoption, written back by the
+pull, and locked read-only on each database's General page. The same
+`saving`-hook enforcement applies, keyed to those specific columns.
+
+This carries Coolify's existing semantics unchanged: **changing a database
+password takes effect on redeploy and does not rotate a running database.**
+The UI must say so.
 
 Managed rows render read-only with an Infisical badge and a deep link to the
 secret in Infisical.
