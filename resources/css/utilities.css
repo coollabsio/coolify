@@ -249,6 +249,11 @@
     @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
 }
 
+/* Collapsible group header (accordion) for the resource settings sidebar. */
+@utility nav-section-toggle {
+    @apply w-full items-center justify-between gap-2 px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none rounded-md transition-colors cursor-pointer hover:text-nav-active;
+}
+
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
     /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
@@ -419,15 +424,15 @@
 }
 
 @media (min-width: 1024px) {
-    .sidebar-collapsed .menu-item {
-        justify-content: center;
-        width: var(--button-h, 2rem);
-        height: var(--button-h, 2rem);
-        min-height: var(--button-h, 2rem);
-        padding-left: 0;
-        padding-right: 0;
-        gap: 0;
-        margin-inline: auto;
+    /* Collapsed rail keeps every nav icon at its expanded x-position (left-aligned,
+       same 10px inset) so muscle memory holds when the sidebar is toggled; only the
+       label is hidden. Unlayered rule outranks the inline lg:justify-center/lg:px-0
+       utilities on each row. The footer collapse toggle keeps its own centered
+       square via the .sidebar-toggle exclusion. */
+    .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        justify-content: flex-start;
+        padding-left: 0.625rem;
+        padding-right: 0.625rem;
     }
 
     .sidebar-collapsed .sidebar-collapsed-label {
