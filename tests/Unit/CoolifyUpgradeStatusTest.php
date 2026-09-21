@@ -179,6 +179,9 @@ it('reports whether the running version has reached the target', function (strin
     'old instance still serving' => ['4.3.0', '4.3.1', false],
     'target reached' => ['4.3.1', '4.3.1', true],
     'already newer' => ['4.3.2', '4.3.1', true],
+    'rolling target has a lexically higher SHA' => ['4.5-rc.1.abc1234', '4.5-rc.1.def5678', false],
+    'rolling target has a lexically lower SHA' => ['4.5-rc.1.def5678', '4.5-rc.1.abc1234', false],
+    'rolling target reached exactly' => ['4.5-rc.1.abc1234', '4.5-rc.1.abc1234', true],
     'missing running version' => ['', '4.3.1', false],
     'missing target version' => ['4.3.1', '', false],
 ]);

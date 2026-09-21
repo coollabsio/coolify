@@ -15,6 +15,14 @@ fi
 SKIP_BACKUP=${4:-false}
 STATUS_FILE="/data/coolify/source/.upgrade-status"
 
+PERSISTED_LATEST_IMAGE="$LATEST_IMAGE"
+if [ -f "$ENV_FILE" ] && grep -q "^LATEST_IMAGE=" "$ENV_FILE"; then
+    EXISTING_LATEST_IMAGE=$(grep "^LATEST_IMAGE=" "$ENV_FILE" | cut -d '=' -f2- | head -n1)
+    if [ "$EXISTING_LATEST_IMAGE" = "next" ]; then
+        PERSISTED_LATEST_IMAGE="next"
+    fi
+fi
+
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
 
@@ -216,8 +224,27 @@ done
 log "All images pulled successfully"
 echo "     All images pulled successfully."
 
-set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
-set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
+COOLIFY_IMAGE="${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE}"
+RESOLVED_COOLIFY_VERSION="$LATEST_IMAGE"
+COMPOSE_IMAGE="$LATEST_IMAGE"
+
+if [ "$PERSISTED_LATEST_IMAGE" = "next" ]; then
+    log "Inspecting ${COOLIFY_IMAGE} for its embedded COOLIFY_VERSION"
+    RESOLVED_COOLIFY_VERSION=$(docker image inspect "$COOLIFY_IMAGE" --format '{{json .Config.Env}}' |
+        jq -r 'first(.[] | select(startswith("COOLIFY_VERSION=")) | sub("^COOLIFY_VERSION="; ""))')
+
+    if [[ ! "$RESOLVED_COOLIFY_VERSION" =~ ^[0-9]+\.[0-9]+-rc\.[0-9]+\.[0-9a-fA-F]{7}$ ]]; then
+        log "ERROR: Invalid rolling COOLIFY_VERSION in ${COOLIFY_IMAGE}: ${RESOLVED_COOLIFY_VERSION}"
+        write_status "error" "Invalid rolling COOLIFY_VERSION"
+        echo "     ERROR: Could not resolve the immutable rolling Coolify version. Aborting upgrade."
+        exit 1
+    fi
+
+    COMPOSE_IMAGE="$RESOLVED_COOLIFY_VERSION"
+fi
+
+set_env_var "LATEST_IMAGE" "$PERSISTED_LATEST_IMAGE"
+set_env_var "COOLIFY_VERSION" "$RESOLVED_COOLIFY_VERSION"
 
 log_section "Step 4/6: Stopping and restarting containers"
 write_status "4" "Stopping containers"
@@ -237,7 +264,7 @@ nohup bash -c "
     DOCKER_CONFIG_MOUNT='$DOCKER_CONFIG_MOUNT'
     REGISTRY_URL='$REGISTRY_URL'
     LATEST_HELPER_VERSION='$LATEST_HELPER_VERSION'
-    LATEST_IMAGE='$LATEST_IMAGE'
+    LATEST_IMAGE='$COMPOSE_IMAGE'
 
     log() {
         echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] \$1\" >>\"\$LOGFILE\"
@@ -309,7 +336,7 @@ echo "5/6 Containers are being restarted in the background..."
 echo "6/6 Upgrade process initiated!"
 echo ""
 echo "=========================================="
-echo "   Coolify upgrade to ${LATEST_IMAGE} in progress"
+echo "   Coolify upgrade to ${COMPOSE_IMAGE} in progress"
 echo "=========================================="
 echo ""
 echo "   The upgrade will continue in the background."

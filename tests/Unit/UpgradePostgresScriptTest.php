@@ -29,6 +29,11 @@ it('ships postgres upgrade scripts with valid bash syntax', function () {
     assertBashSyntaxIsValid('other/nightly/upgrade-postgres.sh');
 });
 
+it('ships the stable and nightly upgrade scripts with valid bash syntax', function () {
+    assertBashSyntaxIsValid('scripts/upgrade.sh');
+    assertBashSyntaxIsValid('other/nightly/upgrade.sh');
+});
+
 it('downloads postgres upgrade script during install and upgrade without auto-running it', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 
@@ -77,8 +82,12 @@ it('persists the target image and runtime version before recreating containers',
         return $offset;
     };
 
-    $latestImagePosition = $position('set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
-    $coolifyVersionPosition = $position('set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+    $latestImagePosition = $position($path === 'other/nightly/upgrade.sh'
+        ? 'set_env_var "LATEST_IMAGE" "$PERSISTED_LATEST_IMAGE"'
+        : 'set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
+    $coolifyVersionPosition = $position($path === 'other/nightly/upgrade.sh'
+        ? 'set_env_var "COOLIFY_VERSION" "$RESOLVED_COOLIFY_VERSION"'
+        : 'set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
     $imagesPulledPosition = $position('log "All images pulled successfully"');
     $composeUpPosition = $position('docker compose --env-file /data/coolify/source/.env');
 
@@ -90,6 +99,20 @@ it('persists the target image and runtime version before recreating containers',
     'stable upgrade' => 'scripts/upgrade.sh',
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
+
+it('resolves the nightly image version while preserving its rolling channel', function () {
+    $script = file_get_contents(getcwd().'/other/nightly/upgrade.sh');
+
+    expect($script)
+        ->toContain('PERSISTED_LATEST_IMAGE="$LATEST_IMAGE"')
+        ->toContain('if [ "$EXISTING_LATEST_IMAGE" = "next" ]; then')
+        ->toContain("docker image inspect \"\$COOLIFY_IMAGE\" --format '{{json .Config.Env}}'")
+        ->toContain('jq -r')
+        ->toContain('set_env_var "LATEST_IMAGE" "$PERSISTED_LATEST_IMAGE"')
+        ->toContain('set_env_var "COOLIFY_VERSION" "$RESOLVED_COOLIFY_VERSION"')
+        ->toContain("LATEST_IMAGE='\$COMPOSE_IMAGE'")
+        ->not->toContain('set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+});
 
 it('uses the existing env registry url when old callers do not pass a registry argument', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);

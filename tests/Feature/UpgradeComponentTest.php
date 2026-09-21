@@ -158,3 +158,59 @@ it('clears stale upgrade availability when current version is newer than cached 
 
     expect((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
 });
+
+it('compares rolling targets by identity instead of SHA ordering', function (string $current, string $latest) {
+    config([
+        'constants.coolify.latest_image' => 'next',
+        'constants.coolify.version' => $current,
+    ]);
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'new_version_available' => true,
+    ]);
+
+    Cache::shouldReceive('remember')
+        ->once()
+        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->andReturn([
+            'coolify' => [
+                'v4' => [
+                    'version' => $latest,
+                ],
+            ],
+        ]);
+
+    Livewire::test(Upgrade::class)
+        ->assertSet('currentVersion', $current)
+        ->assertSet('latestVersion', $latest)
+        ->assertSet('isUpgradeAvailable', true);
+})->with([
+    'rolling target has a lexically higher SHA' => ['4.5-rc.1.abc1234', '4.5-rc.1.def5678'],
+    'rolling target has a lexically lower SHA' => ['4.5-rc.1.def5678', '4.5-rc.1.abc1234'],
+]);
+
+it('does not expose the stable manifest version as a rolling target', function () {
+    config([
+        'constants.coolify.latest_image' => 'next',
+        'constants.coolify.version' => '4.5-rc.1.abc1234',
+    ]);
+    InstanceSettings::forceCreate([
+        'id' => 0,
+        'new_version_available' => true,
+    ]);
+
+    Cache::shouldReceive('remember')
+        ->once()
+        ->with('coolify:versions:all', 3600, Mockery::type(Closure::class))
+        ->andReturn([
+            'coolify' => [
+                'v4' => [
+                    'version' => '4.5.1',
+                ],
+            ],
+        ]);
+
+    Livewire::test(Upgrade::class)
+        ->assertSet('latestVersion', '')
+        ->assertSet('isUpgradeAvailable', false);
+});

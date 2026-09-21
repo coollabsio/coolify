@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Server;
+use App\Services\CoolifyUpdateTargetResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,8 +29,27 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             if ($response->successful()) {
                 $versions = $response->json();
 
-                $latest_version = data_get($versions, 'coolify.v4.version');
                 $current_version = config('constants.coolify.version');
+                $resolver = app(CoolifyUpdateTargetResolver::class);
+
+                if ($resolver->isRollingChannel()) {
+                    $server = Server::find(0);
+                    if (! $server) {
+                        throw new \RuntimeException('Cannot resolve the rolling Coolify target without the localhost server.');
+                    }
+
+                    $latest_version = $resolver->resolve($server);
+                    data_set($versions, 'coolify.v4.version', $latest_version);
+
+                    File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
+                    invalidate_versions_cache();
+                    CheckTraefikVersionJob::dispatch();
+                    $settings->update(['new_version_available' => $latest_version !== $current_version]);
+
+                    return;
+                }
+
+                $latest_version = data_get($versions, 'coolify.v4.version');
 
                 // Read existing cached version
                 $existingVersions = null;
@@ -84,7 +105,11 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
-            // Consider implementing a notification to administrators
+            if (config('constants.coolify.latest_image') === 'next') {
+                Log::warning('Failed to resolve the rolling Coolify update target', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

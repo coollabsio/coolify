@@ -16,3 +16,13 @@ it('keeps stable installations on the manifest-selected version', function () {
         ->toContain("LATEST_VERSION=\$(echo \"\$VERSIONS_JSON\" | grep -i version | xargs | awk '{print \$2}' | tr -d ',')")
         ->not->toContain('LATEST_VERSION=next');
 });
+
+it('derives the upgrade script from the persisted image channel with an explicit override', function () {
+    $constants = file_get_contents(base_path('config/constants.php'));
+
+    expect($constants)
+        ->toContain("'latest_image' => env('LATEST_IMAGE', 'latest')")
+        ->toContain("env('UPGRADE_SCRIPT_URL'")
+        ->toContain("'/coolify-nightly/upgrade.sh'")
+        ->toContain("'/coolify/upgrade.sh'");
+});

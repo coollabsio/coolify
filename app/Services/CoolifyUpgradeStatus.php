@@ -83,6 +83,15 @@ class CoolifyUpgradeStatus
             return false;
         }
 
+        if ($runningVersion === $targetVersion) {
+            return true;
+        }
+
+        if (CoolifyUpdateTargetResolver::isRollingBuildVersion($runningVersion) ||
+            CoolifyUpdateTargetResolver::isRollingBuildVersion($targetVersion)) {
+            return false;
+        }
+
         return version_compare($runningVersion, $targetVersion, '>=');
     }
 }

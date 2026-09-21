@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\CoolifyUpdateTargetResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -153,6 +154,60 @@ it('falls back to docker io for the upgrade script command when no registry is s
     expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
         "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io'"
+    );
+});
+
+it('uses the cached immutable rolling target and nightly upgrade script', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.latest_image' => 'next',
+        'constants.coolify.version' => '4.5-rc.1.abc1234',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.coollabs.io/coolify-nightly/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    Http::fake();
+    Cache::shouldReceive('remember')
+        ->once()
+        ->andReturn(['coolify' => ['v4' => ['version' => '4.5-rc.1.def5678']]]);
+
+    (new UpdateCoolify)->handle();
+
+    Http::assertNothingSent();
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
+        "curl -fsSL https://cdn.coollabs.io/coolify-nightly/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
+        "bash /data/coolify/source/upgrade.sh '4.5-rc.1.def5678' '1.0.14' 'docker.io'"
+    );
+});
+
+it('resolves a rolling target directly for a manual update when the cache is unavailable', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.latest_image' => 'next',
+        'constants.coolify.version' => '4.5-rc.1.abc1234',
+        'constants.coolify.helper_version' => '1.0.14',
+        'constants.coolify.upgrade_script_url' => 'https://cdn.coollabs.io/coolify-nightly/upgrade.sh',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    Cache::shouldReceive('remember')->once()->andReturn(null);
+    Http::fake();
+    $this->app->instance(CoolifyUpdateTargetResolver::class, new CoolifyUpdateTargetResolver(
+        fn (array $commands, Server $server): string => '4.5-rc.1.def5678'
+    ));
+
+    $action = new UpdateCoolify;
+    $action->handle(manual_update: true);
+
+    expect($action->latestVersion)->toBe('4.5-rc.1.def5678');
+    Http::assertNothingSent();
+    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toContain(
+        "bash /data/coolify/source/upgrade.sh '4.5-rc.1.def5678'"
     );
 });
 

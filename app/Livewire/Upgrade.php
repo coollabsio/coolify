@@ -6,6 +6,7 @@ use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Services\CoolifyUpgradeStatus;
+use App\Services\CoolifyUpdateTargetResolver;
 use Livewire\Component;
 
 class Upgrade extends Component
@@ -51,7 +52,14 @@ class Upgrade extends Component
         }
 
         $settings = InstanceSettings::find(0);
-        $hasNewerVersion = version_compare($this->latestVersion, $this->currentVersion, '>');
+        $rollingChannel = config('constants.coolify.latest_image') === 'next';
+        if ($rollingChannel && ! CoolifyUpdateTargetResolver::isRollingBuildVersion($this->latestVersion)) {
+            $this->latestVersion = '';
+        }
+
+        $hasNewerVersion = $rollingChannel
+            ? $this->latestVersion !== '' && $this->latestVersion !== $this->currentVersion
+            : version_compare($this->latestVersion, $this->currentVersion, '>');
         $newVersionAvailable = (bool) data_get($settings, 'new_version_available', false);
 
         if ($settings && $newVersionAvailable && ! $hasNewerVersion) {
@@ -109,10 +117,15 @@ class Upgrade extends Component
             return ['status' => 'none'];
         }
 
+        $targetVersion = $this->latestVersion;
+        if ($targetVersion === '' && config('constants.coolify.latest_image') !== 'next') {
+            $targetVersion = get_latest_version_of_coolify();
+        }
+
         return CoolifyUpgradeStatus::fromFile(
             content: $content,
             runningVersion: $this->currentVersion !== '' ? $this->currentVersion : (string) config('constants.coolify.version'),
-            targetVersion: $this->latestVersion !== '' ? $this->latestVersion : get_latest_version_of_coolify(),
+            targetVersion: $targetVersion,
         );
     }
 }
