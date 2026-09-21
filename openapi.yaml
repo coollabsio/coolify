@@ -12388,6 +12388,7 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Service starting request queued.' }
+                  activity_id: { type: integer, description: 'ID of the activity running the start. Poll it with GET /services/{uuid}/activities/{activity_id}.', example: 1234 }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -12467,7 +12468,54 @@ paths:
             application/json:
               schema:
                 properties:
-                  message: { type: string, example: 'Service restaring request queued.' }
+                  message: { type: string, example: 'Service restarting request queued.' }
+                  activity_id: { type: integer, description: 'ID of the activity running the restart. Poll it with GET /services/{uuid}/activities/{activity_id}.', example: 1234 }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/activities/{activity_id}':
+    get:
+      tags:
+        - Services
+      summary: 'Get activity'
+      description: 'Get the status and output of a start or restart activity of a service.'
+      operationId: get-service-activity-by-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'ID of the activity, as returned by the start or restart endpoints.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Activity status and output.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: { type: integer, example: 1234 }
+                  status: { type: string, description: 'One of queued, in_progress, finished, error, killed, cancelled, closed.', example: finished }
+                  exit_code: { type: integer, nullable: true, example: 0 }
+                  output: { type: string, description: 'Combined output of the executed commands.' }
+                  created_at: { type: string, format: date-time }
+                  updated_at: { type: string, format: date-time }
+                  finished_at: { type: string, format: date-time, nullable: true, description: 'Null while the activity is still running.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
