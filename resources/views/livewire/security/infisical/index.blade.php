@@ -55,9 +55,15 @@
                         </x-modal-input>
 
                         <div class="ml-auto flex shrink-0 items-center gap-2">
-                            @if ($connection->is_enabled)
+                            @if ($connection->is_enabled && $connection->last_sync_status === App\Models\InfisicalConnection::STATUS_FAILED)
                                 <span
-                                    class="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ 'Sync enabled' }}</span>
+                                    class="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">{{ 'Sync failing' }}</span>
+                            @elseif ($connection->is_enabled && ! $connection->adopted_at)
+                                <span
+                                    class="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">{{ 'Adopting…' }}</span>
+                            @elseif ($connection->is_enabled)
+                                <span
+                                    class="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">{{ 'Syncing' }}</span>
                             @else
                                 <span
                                     class="rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-white/5 dark:text-fg-dim">{{ 'Sync off' }}</span>
@@ -76,6 +82,8 @@
                             <dd class="mt-0.5 font-medium text-black dark:text-fg">
                                 @if ($connection->adopted_at)
                                     Completed {{ $connection->adopted_at->diffForHumans() }}
+                                @elseif ($connection->last_sync_status === App\Models\InfisicalConnection::STATUS_FAILED)
+                                    <span class="text-red-600 dark:text-red-300">Failed — see below</span>
                                 @else
                                     In progress
                                 @endif
@@ -97,7 +105,13 @@
 
                     @if (filled($connection->last_sync_error))
                         <x-callout type="danger" title="Last sync reported a problem">
-                            {{ $connection->last_sync_error }}
+                            <p>{{ $connection->last_sync_error }}</p>
+                            @if (! $connection->adopted_at)
+                                <p class="mt-2">
+                                    Adoption has not completed, so Coolify variables are still editable here —
+                                    the lock arms only once secrets are actually in Infisical.
+                                </p>
+                            @endif
                         </x-callout>
                     @endif
 
@@ -136,6 +150,15 @@
                 @endif
 
                 <div class="flex flex-wrap items-center gap-2">
+                    @can('update', $connection)
+                        <x-modal-input title="{{ $connection->name }}" :closeOutside="false">
+                            <x-slot:content>
+                                <button type="button" class="button">Edit connection</button>
+                            </x-slot:content>
+                            <livewire:security.infisical.form :connection="$connection" :key="'infisical-connection-edit-'.$connection->uuid" />
+                        </x-modal-input>
+                    @endcan
+
                     @can('update', $connection)
                         @if (! $connection->is_enabled)
                             <x-modal-confirmation title="Enable Infisical sync?" isHighlightedButton

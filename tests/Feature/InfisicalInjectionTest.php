@@ -23,7 +23,7 @@ uses(RefreshDatabase::class);
 function infisicalEnabledTeam(): array
 {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
 
@@ -81,7 +81,7 @@ test('a team without an enabled connection inherits nothing', function () {
 
 it('does not leak an environment scoped secret into a sibling environment', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     $project = Project::factory()->create(['team_id' => $team->id]);
 
     $environmentA = Environment::factory()->create(['project_id' => $project->id]);
@@ -103,7 +103,7 @@ it('does not leak an environment scoped secret into a sibling environment', func
 
 it('lets an environment scoped secret override the project and team scoped ones', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
 
@@ -137,7 +137,7 @@ it('lets an environment scoped secret override the project and team scoped ones'
 
 it('does not inherit a secret belonging to another project in the same team', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     $projectA = Project::factory()->create(['team_id' => $team->id]);
     $environmentA = Environment::factory()->create(['project_id' => $projectA->id]);
@@ -183,7 +183,7 @@ function makeInfisicalInjectionFixture(): array
         'team_id' => $team->id,
     ]);
     $environment = Environment::where('project_id', $project->id)->firstOrFail();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     $server = Server::factory()->create(['team_id' => $team->id]);
     $application = InfisicalLock::asSystem(fn () => Application::factory()->create([
         'environment_id' => $environment->id,

@@ -85,7 +85,7 @@ function lockedOwner(string $class): object
         ], standaloneRequiredColumns($class))),
     };
 
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     return $resource;
 }
@@ -138,7 +138,7 @@ it('allows human writes when the connection is disabled', function () {
 
 it('rejects a human write when the connection is enabled', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $team->id, 'type' => 'team',
@@ -150,14 +150,14 @@ it('rejects a human delete when the connection is enabled', function () {
     $variable = InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $team->id, 'type' => 'team',
     ]));
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => $variable->delete())->toThrow(InfisicalManagedVariableException::class);
 });
 
 it('allows a system write when the connection is enabled', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $team->id, 'type' => 'team',
@@ -195,7 +195,7 @@ it('supports nested asSystem calls', function () {
 it('does not lock one team because another team enabled infisical', function () {
     $locked = Team::factory()->create();
     $free = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $locked->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $locked->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $free->id, 'type' => 'team',
@@ -204,7 +204,7 @@ it('does not lock one team because another team enabled infisical', function () 
 
 it('leaves server scoped variables editable while the lock is armed', function () {
     InfisicalConnection::factory()->create([
-        'team_id' => $this->infraTeam->id, 'is_enabled' => true,
+        'team_id' => $this->infraTeam->id, 'is_enabled' => true, 'adopted_at' => now(),
     ]);
 
     expect(fn () => SharedEnvironmentVariable::factory()->create([
@@ -222,7 +222,7 @@ it('arms the lock within the same request when a connection is enabled', functio
 
     SharedEnvironmentVariable::factory()->create(['team_id' => $team->id, 'type' => 'team']);
 
-    $connection->update(['is_enabled' => true]);
+    $connection->update(['is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $team->id, 'type' => 'team',
@@ -232,7 +232,7 @@ it('arms the lock within the same request when a connection is enabled', functio
 it('rejects and allows two different teams in the same request', function () {
     $locked = Team::factory()->create();
     $free = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $locked->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $locked->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     expect(fn () => SharedEnvironmentVariable::factory()->create([
         'team_id' => $locked->id, 'type' => 'team',

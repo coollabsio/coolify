@@ -28,7 +28,7 @@ beforeEach(function () {
 
     InfisicalConnection::factory()->create([
         'team_id' => $this->team->id,
-        'is_enabled' => true,
+        'is_enabled' => true, 'adopted_at' => now(),
     ]);
 
     $this->actingAs($this->user);

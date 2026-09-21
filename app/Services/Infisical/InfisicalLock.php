@@ -99,6 +99,17 @@ class InfisicalLock
      * `parse()` loops that write hundreds of rows are already doing far more
      * work per row.
      */
+    /**
+     * The lock arms only once adoption has SUCCEEDED, not merely when the
+     * connection is enabled.
+     *
+     * Enabling stamps is_enabled immediately but adoption runs in the
+     * background and can fail — bad credentials, a machine identity with no
+     * project membership, an unreachable host. Arming on is_enabled alone
+     * leaves the team's variables read-only in Coolify while nothing exists
+     * in Infisical yet: locked here, absent there, nowhere to edit. Requiring
+     * adopted_at makes that state unreachable.
+     */
     public static function armedForTeam(?int $teamId): bool
     {
         if ($teamId === null) {
@@ -108,6 +119,7 @@ class InfisicalLock
         return InfisicalConnection::query()
             ->where('team_id', $teamId)
             ->where('is_enabled', true)
+            ->whereNotNull('adopted_at')
             ->exists();
     }
 
@@ -128,6 +140,7 @@ class InfisicalLock
     {
         return InfisicalConnection::query()
             ->where('is_enabled', true)
+            ->whereNotNull('adopted_at')
             ->exists();
     }
 

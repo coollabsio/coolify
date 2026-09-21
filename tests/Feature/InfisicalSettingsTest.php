@@ -309,7 +309,7 @@ test('a standalone database never shows an inherited Infisical section', functio
 
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     // The connection above is enabled, so the managed-variable lock rejects
     // this as a human edit. It stands in for a row Coolify pulled down.
     InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([
@@ -348,7 +348,7 @@ test('an application still shows the inherited Infisical section', function () {
 
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
     // The connection above is enabled, so the managed-variable lock rejects
     // this as a human edit. It stands in for a row Coolify pulled down.
     InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([

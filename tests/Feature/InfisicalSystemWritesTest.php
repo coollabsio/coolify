@@ -51,7 +51,7 @@ function lockedTeamEnvironment(): array
     $team = Team::factory()->create();
     InfisicalConnection::factory()->create([
         'team_id' => $team->id,
-        'is_enabled' => true,
+        'is_enabled' => true, 'adopted_at' => now(),
     ]);
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
@@ -78,7 +78,7 @@ function lockedTeamApplication(string $buildPack = 'dockerfile'): Application
 
 it('still seeds predefined server variables while the lock is armed', function () {
     $team = Team::factory()->create();
-    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true, 'adopted_at' => now()]);
 
     $server = Server::factory()->create([
         'team_id' => $team->id,
