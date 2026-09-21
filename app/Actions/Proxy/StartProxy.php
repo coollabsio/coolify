@@ -6,6 +6,7 @@ use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
+use App\Services\ProxyPortParser;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
 
@@ -19,6 +20,12 @@ class StartProxy
         if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
             return 'OK';
         }
+        $configuration = GetProxyConfiguration::run($server);
+        if (! $configuration) {
+            throw new \Exception('Configuration is not synced');
+        }
+        ProxyPortParser::fromConfiguration($configuration);
+
         $server->proxy->set('status', 'starting');
         $server->save();
         $server->refresh();
@@ -29,10 +36,6 @@ class StartProxy
 
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
-        $configuration = GetProxyConfiguration::run($server);
-        if (! $configuration) {
-            throw new \Exception('Configuration is not synced');
-        }
         SaveProxyConfiguration::run($server, $configuration);
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();

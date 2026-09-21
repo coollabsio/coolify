@@ -6,6 +6,7 @@ use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
+use App\Services\ProxyPortParser;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ConfigureTrafficAnalytics
@@ -14,13 +15,15 @@ class ConfigureTrafficAnalytics
 
     public function handle(Server $server, bool $enable): void
     {
+        $configuration = GetProxyConfiguration::run($server);
+        ProxyPortParser::fromConfiguration($configuration);
+
         $sentinelWasEnabled = (bool) $server->settings->is_sentinel_enabled;
 
         $server->settings->is_traffic_analytics_enabled = $enable;
         $server->settings->save();
         $server->refresh();
 
-        $configuration = GetProxyConfiguration::run($server);
         $configuration = applyTrafficAnalyticsToProxyConfiguration($server, $configuration);
         SaveProxyConfiguration::run($server, $configuration);
         RestartProxyJob::dispatch($server);
