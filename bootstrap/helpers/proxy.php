@@ -31,6 +31,76 @@ function traefikAccessLogCommands(bool $enabled): array
     ];
 }
 
+function applyTrafficAnalyticsToProxyConfiguration(Server $server, string $configuration): string
+{
+    $config = Yaml::parse($configuration);
+
+    if (! is_array($config)) {
+        throw new RuntimeException('Proxy configuration must be a YAML mapping.');
+    }
+
+    $config = applyTrafficAnalyticsToProxyConfigArray($server, $config);
+
+    return Yaml::dump($config, 12, 2);
+}
+
+function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config): array
+{
+    $enabled = $server->isTrafficAnalyticsEnabled();
+
+    if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
+        $managedCommands = traefikAccessLogCommands(true);
+        $commands = data_get($config, 'services.traefik.command', []);
+
+        if (! is_array($commands)) {
+            throw new RuntimeException('Traefik commands must be a YAML list.');
+        }
+
+        $commands = array_values(array_filter(
+            $commands,
+            fn (mixed $command): bool => ! in_array($command, $managedCommands, true)
+        ));
+
+        if ($enabled) {
+            $commands = [...$commands, ...$managedCommands];
+        }
+
+        data_set($config, 'services.traefik.command', $commands);
+        unset($config['services']['traefik-logrotate']);
+
+        if ($enabled && ! $server->isSwarm() && ! isDev()) {
+            $proxyPath = $server->proxyPath();
+            $config['services']['traefik-logrotate'] = [
+                'image' => 'alpine:3.20',
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "{$proxyPath}:/traefik",
+                ],
+                'labels' => [
+                    'coolify.managed=true',
+                ],
+                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+            ];
+        }
+    } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
+        $trafficVolume = $server->proxyPath().':/traffic';
+        $volumes = data_get($config, 'services.caddy.volumes', []);
+
+        if (! is_array($volumes)) {
+            throw new RuntimeException('Caddy volumes must be a YAML list.');
+        }
+
+        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => $volume !== $trafficVolume));
+        if ($enabled) {
+            $volumes[] = $trafficVolume;
+        }
+
+        data_set($config, 'services.caddy.volumes', $volumes);
+    }
+
+    return $config;
+}
+
 /**
  * Check if a network name is a Docker predefined system network.
  * These networks cannot be created, modified, or managed by docker network commands.
@@ -302,7 +372,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v3.6',
+                    'image' => 'traefik:v3.7',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
@@ -354,11 +424,6 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
         }
-        // Access logging + analytics header capture (JSON log, real-IP/UA/referrer headers)
-        // applies to both dev and production so traffic analytics can be exercised locally.
-        foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
-            $config['services']['traefik']['command'][] = $cmd;
-        }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
             data_forget($config, 'services.traefik.restart');
@@ -386,23 +451,6 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             }
         }
 
-        // Traefik has no native access-log rotation. Add a minimal logrotate sidecar that
-        // rotates /traefik/access.log in copytruncate mode so the file keeps the same inode
-        // and Sentinel keeps its file handle (the tailer handles len < pos by seeking to 0).
-        // Only for the non-swarm, non-dev production path (dev uses a different access-log path).
-        if ($server->isTrafficAnalyticsEnabled() && ! $server->isSwarm() && ! isDev()) {
-            $config['services']['traefik-logrotate'] = [
-                'image' => 'alpine:3.20',
-                'restart' => RESTART_MODE,
-                'volumes' => [
-                    "{$proxy_path}:/traefik",
-                ],
-                'labels' => [
-                    'coolify.managed=true',
-                ],
-                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
-            ];
-        }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
             'networks' => $array_of_networks->toArray(),
@@ -437,13 +485,11 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 ],
             ],
         ];
-        if ($server->isTrafficAnalyticsEnabled()) {
-            $config['services']['caddy']['volumes'][] = "{$proxy_path}:/traffic";
-        }
     } else {
         return null;
     }
 
+    $config = applyTrafficAnalyticsToProxyConfigArray($server, $config);
     $config = Yaml::dump($config, 12, 2);
     SaveProxyConfiguration::run($server, $config);
 

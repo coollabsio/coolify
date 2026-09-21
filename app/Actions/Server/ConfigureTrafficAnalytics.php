@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Actions\Proxy\GetProxyConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -19,8 +20,9 @@ class ConfigureTrafficAnalytics
         $server->settings->save();
         $server->refresh();
 
-        // Regenerate proxy config so the (Traefik) access-log flags / (Caddy) log labels take effect.
-        GetProxyConfiguration::run($server, forceRegenerate: true);
+        $configuration = GetProxyConfiguration::run($server);
+        $configuration = applyTrafficAnalyticsToProxyConfiguration($server, $configuration);
+        SaveProxyConfiguration::run($server, $configuration);
         RestartProxyJob::dispatch($server);
 
         // Recreate Sentinel so it picks up (enabling) or drops (disabling) the traffic env + proxy-log mount.

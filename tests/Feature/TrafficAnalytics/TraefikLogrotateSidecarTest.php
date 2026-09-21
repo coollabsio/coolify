@@ -21,6 +21,16 @@ beforeEach(function () {
     $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
 });
 
+it('uses the latest stable traefik branch for new proxy configurations', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    $config = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()));
+
+    expect($config['services']['traefik']['image'])->toBe('traefik:v3.7');
+});
+
 it('does not add a traefik-logrotate sidecar when traffic analytics is disabled', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
     $server->proxy->set('type', 'TRAEFIK');
