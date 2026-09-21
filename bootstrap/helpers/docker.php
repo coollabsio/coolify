@@ -1595,9 +1595,11 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
 
 function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
-    $command = "docker logs -n {$lines}";
+    // Bound the remote process so a dropped SSH mux cannot leave `docker logs`
+    // polling a deleted json-file forever (Docker 29 busy-polls *-json.log).
+    $command = "timeout -k 5s 20s docker logs -n {$lines}";
     if ($server->isSwarm()) {
-        $command = "docker service logs -n {$lines}";
+        $command = "timeout -k 5s 20s docker service logs -n {$lines}";
     }
 
     if ($showTimestamps) {
@@ -1609,7 +1611,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int|str
 
 function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
-    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server, timeout: 20);
     $output = removeAnsiColors($output);
 
     return $output;
