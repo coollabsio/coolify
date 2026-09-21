@@ -4,6 +4,7 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
@@ -115,6 +116,28 @@ function isDockerPredefinedNetwork(string $network): bool
     return in_array($network, ['default', 'host'], true);
 }
 
+function isUsableDockerNetworkName(mixed $network): bool
+{
+    return is_string($network)
+        && $network !== ''
+        && ! isDockerPredefinedNetwork($network)
+        && ValidationPatterns::isValidDockerNetwork($network);
+}
+
+/**
+ * Create a Docker network when it does not exist. The network name is always a single escaped argument.
+ */
+function dockerNetworkEnsureCommand(string $network, bool $overlay = false, bool $quietCreate = false): string
+{
+    $safe = escapeshellarg($network);
+    $createFlags = $overlay
+        ? '--driver overlay --attachable'
+        : '--attachable';
+    $quiet = $quietCreate ? ' >/dev/null' : '';
+
+    return "docker network inspect {$safe} >/dev/null 2>&1 || docker network create {$createFlags} {$safe}{$quiet}";
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -175,12 +198,8 @@ function collectDockerNetworksByServer(Server $server)
         $networks->push($network);
         $allNetworks->push($network);
     }
-    $networks = collect($networks)->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
-    $allNetworks = $allNetworks->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
+    $networks = collect($networks)->flatten()->unique()->filter(fn ($network) => isUsableDockerNetworkName($network));
+    $allNetworks = $allNetworks->flatten()->unique()->filter(fn ($network) => isUsableDockerNetworkName($network));
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
@@ -206,7 +225,7 @@ function connectProxyToNetworks(Server $server)
             $safe = escapeshellarg($network);
 
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                dockerNetworkEnsureCommand($network, overlay: true, quietCreate: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -238,25 +257,14 @@ function ensureProxyNetworksExist(Server $server)
 {
     ['allNetworks' => $networks] = collectDockerNetworksByServer($server);
 
-    if ($server->isSwarm()) {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
+    $commands = $networks->map(function ($network) use ($server) {
+        $safe = escapeshellarg($network);
 
-            return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
-            ];
-        });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
-
-            return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
-            ];
-        });
-    }
+        return [
+            "echo 'Ensuring network {$safe} exists...'",
+            dockerNetworkEnsureCommand($network, overlay: $server->isSwarm()),
+        ];
+    });
 
     return $commands->flatten();
 }
