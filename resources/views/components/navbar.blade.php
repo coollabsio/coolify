@@ -139,17 +139,6 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Shared Variables</span>
                 </a>
             </li>
-            @can('viewAny', App\Models\InfisicalConnection::class)
-                <li>
-                    <a title="Infisical" {{ wireNavigate() }}
-                        class="{{ request()->routeIs('security.infisical.*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                        :class="collapsed && 'lg:justify-center lg:px-0'"
-                        href="{{ route('security.infisical.index') }}">
-                        <x-reicon name="shield-star" class="menu-item-icon" />
-                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Infisical</span>
-                    </a>
-                </li>
-            @endcan
 
             {{-- Manage --}}
             <li class="nav-section mt-3" :class="collapsed && 'lg:hidden'">Manage</li>
@@ -178,6 +167,17 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Keys & Tokens</span>
                 </a>
             </li>
+            @can('viewAny', App\Models\InfisicalConnection::class)
+                <li>
+                    <a title="Infisical" {{ wireNavigate() }}
+                        class="{{ request()->routeIs('security.infisical.*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'"
+                        href="{{ route('security.infisical.index') }}">
+                        <x-reicon name="shield-star" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Infisical</span>
+                    </a>
+                </li>
+            @endcan
             @if (isCloud() && auth()->user()->isAdmin())
                 <li>
                     <a title="Subscription" {{ wireNavigate() }}
