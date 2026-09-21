@@ -37,6 +37,17 @@ class Form extends Component
 
     public bool $isPasswordHiddenForMember = false;
 
+    /**
+     * Note: `name`, `host` and `infisical_project_id` are validated twice -
+     * once by the `#[Validate]` attributes above and again by the identical
+     * entries here. That is harmless (both express the same constraint, and
+     * this method is what `validate()` consults), but it is recorded rather
+     * than tidied away because neither half is safe to delete blindly: the
+     * attributes drive Livewire's real-time per-field validation, while this
+     * method is the only place the create-vs-edit credential rules can live.
+     * The credential handling in this component is deliberate - see the
+     * property docblocks - and must not be "simplified".
+     */
     protected function rules(): array
     {
         $requiredOnCreate = $this->connection ? 'nullable' : 'required';

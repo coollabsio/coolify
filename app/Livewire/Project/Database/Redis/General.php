@@ -4,11 +4,14 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
+use App\Services\Infisical\InfisicalLock;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class General extends Component
@@ -186,6 +189,23 @@ class General extends Component
             if ($this->portsMappings) {
                 $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
             }
+
+            // REDIS_USERNAME / REDIS_PASSWORD are the one engine's credentials
+            // that live as variable rows, so the lock rejects them. They are
+            // written after syncData() and outside any transaction, so without
+            // this pre-check a locked team's save would persist the name, ports
+            // and limits and only then throw, leaving half the form applied.
+            //
+            // Only an actual credential CHANGE is refused. An unchanged
+            // updateOrCreate leaves the model clean, Eloquent skips the update,
+            // and no saving event fires — so refusing those too would needlessly
+            // block editing the name or ports on a locked team.
+            if ($this->infisicalRejectsCredentialChange()) {
+                throw InfisicalManagedVariableException::forKey(
+                    $this->redisPassword !== $this->database->redis_password ? 'REDIS_PASSWORD' : 'REDIS_USERNAME'
+                );
+            }
+
             $this->syncData(true);
 
             if (version_compare($this->redisVersion, '6.0', '>=')) {
@@ -206,6 +226,31 @@ class General extends Component
         } finally {
             $this->dispatch('refreshEnvs');
         }
+    }
+
+    /**
+     * True when the lock is armed and the submitted credentials differ from what
+     * is stored. Presentation and pre-flight only; the model hooks on
+     * EnvironmentVariable remain the control.
+     */
+    public function infisicalRejectsCredentialChange(): bool
+    {
+        if (! InfisicalLock::armedForTeam($this->database->environment?->project?->team_id)) {
+            return false;
+        }
+
+        if ($this->redisPassword !== $this->database->redis_password) {
+            return true;
+        }
+
+        return version_compare($this->redisVersion, '6.0', '>=')
+            && $this->redisUsername !== $this->database->redis_username;
+    }
+
+    #[Computed]
+    public function isInfisicalLocked(): bool
+    {
+        return InfisicalLock::armedForTeam($this->database->environment?->project?->team_id);
     }
 
     public function instantSave()

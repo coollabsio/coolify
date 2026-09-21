@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -34,6 +35,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -109,6 +111,18 @@ class ServerTransferImporter
         bool $rebindSentinel = true,
     ): array {
         ServerTransferBundle::assertValid($bundle);
+
+        // This importer writes environment variables (and Standalone* credential
+        // rows) inside withoutEvents(), so the Eloquent lock hooks never fire for
+        // any of them. The check has to be explicit and it has to be here, before
+        // the first write. A bundle copies another instance's data rather than
+        // generating Coolify's own, so it counts as a human edit, not a system
+        // write, and is refused outright while the destination team is locked.
+        // Dry runs are refused too: a preview of an import that can never be
+        // committed is worse than an early, clear refusal.
+        if (InfisicalLock::armedForTeam($teamId)) {
+            throw InfisicalManagedVariableException::forBulkImport();
+        }
 
         $validation = ServerTransferBundle::validate($bundle);
         $warnings = $validation['warnings'];

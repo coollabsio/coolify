@@ -22,11 +22,15 @@ use App\Models\InfisicalConnection;
  * falsely implies the hook was protecting something.
  *
  * The same limit cuts the other way on the HUMAN side, and that part is not
- * benign: SharedVariables\*\Show::deleteRemovedVariables() drops rows with a
- * query-builder mass delete too, so the bulk textarea can still delete a
- * locked team's variables. The hook cannot close that; the surface needs an
- * explicit check. Characterised by InfisicalSharedVariablesScreenTest.
- * ServerTransferImporter is the same shape — it writes inside withoutEvents().
+ * benign: every handleBulkSubmit() drops rows with a query-builder mass delete
+ * too, so the bulk textarea could otherwise delete a locked team's variables.
+ * The hook cannot close that, so each of those methods carries an explicit
+ * armedForTeam() check at the top instead — SharedVariables\{Team\Index,
+ * Project\Show, Environment\Show} and Project\Shared\EnvironmentVariable\All.
+ * SharedVariables\Server\Show is deliberately NOT guarded: server-scoped
+ * variables are out of scope per the spec and stay editable.
+ * ServerTransferImporter is the same shape — it writes inside withoutEvents() —
+ * and refuses explicitly in import() before its first write.
  *
  * Any NEW code path that needs to be blocked must delete through model
  * instances, not the builder.

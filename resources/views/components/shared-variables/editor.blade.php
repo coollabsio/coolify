@@ -10,7 +10,19 @@
 ])
 
 @php
+    use App\Models\InfisicalConnection;
+
     $inheritedVariables = $inheritedVariables ?? collect();
+
+    // Presentation only. The Eloquent hooks on SharedEnvironmentVariable are the
+    // control, plus the explicit armedForTeam() check in handleBulkSubmit(),
+    // which the hooks cannot reach because the bulk delete goes through the
+    // relation query builder. Server-scoped variables are out of scope: they are
+    // neither synced nor locked, so this screen stays fully editable for them.
+    $infisicalConnection = InfisicalConnection::enabledForTeam(currentTeam()?->id);
+    $infisicalLocked = $type !== 'server' && $infisicalConnection !== null;
+    $infisicalServerExemption = $type === 'server' && $infisicalConnection !== null;
+    $infisicalUrl = $infisicalConnection?->secretsUrl();
     $alphabeticalPositions = $variables->sortBy('key')->values()->pluck('id')->flip();
     $sharedVariableRows = $variables
         ->map(fn($variable) => [
@@ -41,6 +53,30 @@
                 <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
         </x-slot:actions>
+        @if ($infisicalLocked)
+            <div
+                class="border-b border-neutral-200 px-4 py-3 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-dim">
+                <span class="table-badge mr-2 align-middle">Infisical</span>
+                This team's variables are managed in Infisical and are read-only here.
+                @if ($infisicalUrl)
+                    <a href="{{ $infisicalUrl }}" target="_blank" rel="noopener noreferrer"
+                        class="underline">Open the project in Infisical</a>
+                    to change them;
+                @else
+                    Change them in Infisical;
+                @endif
+                Coolify picks the change up on the next sync.
+                Deleting a secret in Infisical does <strong>not</strong> delete it from Coolify &mdash; that stays a
+                separate, manual step here.
+            </div>
+        @elseif ($infisicalServerExemption)
+            <div
+                class="border-b border-neutral-200 px-4 py-3 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-dim">
+                Server-scoped variables are <strong>not</strong> synced to Infisical and are never locked, even while the
+                rest of this team's variables are. Servers sit outside the project/environment tree Infisical organises
+                secrets by, so these stay editable here.
+            </div>
+        @endif
         @if ($view === 'normal')
             <div
                 class="flex flex-col gap-3 border-b border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.08]">
@@ -83,16 +119,17 @@
                     </x-table.dropdown>
 
                     @can('update', $resource)
-                        <x-modal-input title="New Shared Variable">
-                            <x-slot:content>
-                                <button type="button"
-                                    class="button button-highlighted">
-                                    <x-reicon name="plus" class="size-3.5" />
-                                    Add variable
-                                </button>
-                            </x-slot:content>
-                            <livewire:project.shared.environment-variable.add :shared="true" />
-                        </x-modal-input>
+                        @if (!$infisicalLocked)
+                            <x-modal-input title="New Shared Variable">
+                                <x-slot:content>
+                                    <button type="button" class="button button-highlighted">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Add variable
+                                    </button>
+                                </x-slot:content>
+                                <livewire:project.shared.environment-variable.add :shared="true" />
+                            </x-modal-input>
+                        @endif
                     @endcan
                 </div>
             </div>
@@ -148,7 +185,7 @@
                             Inherited from Infisical
                         </span>
                         <x-helper
-                            helper="These variables are synced from an Infisical binding on this environment. Edit or remove them in Infisical; the next sync will update Coolify." />
+                            helper="These variables are synced down from Infisical. Edit them in Infisical and the next sync updates Coolify. Removing a secret in Infisical does NOT remove it from Coolify or from running deployments — deleting it here is a separate, manual step." />
                     </div>
                     <div class="data-table w-full">
                         @foreach ($inheritedVariables as $inherited)
@@ -176,6 +213,10 @@
                         <span class="table-badge shrink-0">Infisical</span>
                         <span class="text-neutral-400 dark:text-fg-faint">Read-only</span>
                     </div>
+                    <div class="mb-2 text-[11px] text-neutral-400 dark:text-fg-faint">
+                        Edit these in Infisical. Removing a secret there does not remove it from Coolify — delete it here
+                        as well.
+                    </div>
                     @foreach ($inheritedVariables as $inherited)
                         <div class="break-all font-mono text-[13px]">{{ $inherited->key }}=(Managed by Infisical, edit it there)</div>
                     @endforeach
@@ -189,12 +230,19 @@
                     @endforeach
                 </div>
             @endif
-            <form wire:submit="submit" class="p-4">
-                <x-unsaved-bar action="submit" />
-                <x-forms.textarea canGate="update" :canResource="$resource" rows="20"
-                    class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
-                    :label="$variablesLabel" />
-            </form>
+            @if ($infisicalLocked)
+                <div class="p-4">
+                    <x-forms.textarea disabled rows="20" class="whitespace-pre-wrap" id="variables"
+                        wire:model="variables" monospace :label="$variablesLabel" />
+                </div>
+            @else
+                <form wire:submit="submit" class="p-4">
+                    <x-unsaved-bar action="submit" />
+                    <x-forms.textarea canGate="update" :canResource="$resource" rows="20"
+                        class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
+                        :label="$variablesLabel" />
+                </form>
+            @endif
         @endif
     </x-application.settings-section>
 </div>
