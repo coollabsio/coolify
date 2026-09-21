@@ -77,6 +77,7 @@ class Kernel extends HttpKernel
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
             DecideWhatToDoWithUser::class,
+            \App\Http\Middleware\TranslateUi::class,
 
         ],
 
