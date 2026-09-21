@@ -744,6 +744,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $this->validateComposeBuildPaths($composeFile);
+
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
                 $composeFile = $this->add_build_secrets_to_compose($composeFile);
@@ -4866,38 +4868,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 continue;
             }
 
-            $context = '.';
-            $dockerfile = 'Dockerfile';
-
-            if (is_string($service['build'])) {
-                $context = $service['build'];
-            } elseif (is_array($service['build'])) {
-                $context = data_get($service['build'], 'context', '.');
-                $dockerfile = data_get($service['build'], 'dockerfile', 'Dockerfile');
-            }
-
-            $dockerfilePath = rtrim($context, '/').'/'.ltrim($dockerfile, '/');
-            if (str_starts_with($dockerfilePath, './')) {
-                $dockerfilePath = substr($dockerfilePath, 2);
-            }
-            if (str_starts_with($dockerfilePath, '/')) {
-                $dockerfilePath = substr($dockerfilePath, 1);
-            }
+            $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
+            $fullDockerfilePath = escapeshellarg("{$this->workdir}/{$dockerfilePath}");
 
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "test -f {$this->workdir}/{$dockerfilePath} && echo 'exists' || echo 'not found'"),
+                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath -e -- {$fullDockerfilePath}) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\""),
                 'hidden' => true,
                 'save' => 'dockerfile_check_'.$serviceName,
             ]);
 
-            if (str($this->saved_outputs->get('dockerfile_check_'.$serviceName))->trim()->toString() !== 'exists') {
+            $resolvedDockerfilePath = str($this->saved_outputs->get('dockerfile_check_'.$serviceName))->trim()->toString();
+            if (! str_starts_with($resolvedDockerfilePath, "{$this->workdir}/")) {
                 $this->application_deployment_queue->addLogEntry("Dockerfile not found for service {$serviceName} at {$dockerfilePath}, skipping ARG injection.");
 
                 continue;
             }
+            $fullDockerfilePath = escapeshellarg($resolvedDockerfilePath);
 
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}/{$dockerfilePath}"),
+                executeInDocker($this->deployment_uuid, "cat {$fullDockerfilePath}"),
                 'hidden' => true,
                 'save' => 'dockerfile_content_'.$serviceName,
             ]);
@@ -4988,7 +4977,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($totalAdded > 0) {
                 $dockerfile_base64 = base64_encode($dockerfile_lines->implode("\n"));
                 $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}/{$dockerfilePath} > /dev/null"),
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$fullDockerfilePath} > /dev/null"),
                     'hidden' => true,
                 ]);
 
@@ -4999,11 +4988,66 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
-                $fullDockerfilePath = "{$this->workdir}/{$dockerfilePath}";
                 $this->modify_dockerfile_for_secrets($fullDockerfilePath);
                 $this->application_deployment_queue->addLogEntry("Modified Dockerfile for service {$serviceName} to use build secrets.");
             }
         }
+    }
+
+    private function validateComposeBuildPaths(array|Collection $composeFile): void
+    {
+        foreach (data_get($composeFile, 'services', []) as $service) {
+            if (isset($service['build'])) {
+                $this->resolveComposeDockerfilePath($service['build']);
+            }
+        }
+    }
+
+    private function resolveComposeDockerfilePath(mixed $build): string
+    {
+        if (! is_string($build) && ! is_array($build)) {
+            throw new \RuntimeException('Invalid Docker Compose build definition.');
+        }
+
+        $context = is_string($build) ? $build : data_get($build, 'context', '.');
+        $dockerfile = is_array($build) ? data_get($build, 'dockerfile', 'Dockerfile') : 'Dockerfile';
+
+        if (! is_string($context) || ! is_string($dockerfile)) {
+            throw new \RuntimeException('Invalid Docker Compose build path: context and dockerfile must be strings.');
+        }
+
+        $this->validateComposeBuildPath($context, 'context');
+        $this->validateComposeBuildPath($dockerfile, 'dockerfile');
+
+        return $this->normalizeComposeBuildPath("{$context}/{$dockerfile}", 'dockerfile');
+    }
+
+    private function validateComposeBuildPath(string $path, string $fieldName): void
+    {
+        if ($path === '' || str_starts_with($path, '/') || ! preg_match('/^[a-zA-Z0-9._\-\/@+]+$/', $path)) {
+            throw new \RuntimeException("Invalid Docker Compose build.{$fieldName} path.");
+        }
+    }
+
+    private function normalizeComposeBuildPath(string $path, string $fieldName): string
+    {
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                if ($segments === []) {
+                    throw new \RuntimeException("Invalid Docker Compose build.{$fieldName} path: path traversal outside the repository.");
+                }
+                array_pop($segments);
+
+                continue;
+            }
+            $segments[] = $segment;
+        }
+
+        return $segments === [] ? '.' : implode('/', $segments);
     }
 
     private function add_build_secrets_to_compose($composeFile)
