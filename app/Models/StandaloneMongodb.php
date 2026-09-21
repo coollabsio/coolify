@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LocksInfisicalManagedCredentials;
 use App\Services\Infisical\InfisicalLock;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMongodb extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, LocksInfisicalManagedCredentials, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -373,6 +374,25 @@ class StandaloneMongodb extends BaseModel
                 return null;
             }
         );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function infisicalManagedColumns(): array
+    {
+        return ['mongo_initdb_root_password'];
+    }
+
+    /**
+     * `mongo_initdb_root_password` is a get-only Attribute with no cast and no
+     * setter, so a plaintext assignment would be stored in the clear.
+     *
+     * @return array<int, string>
+     */
+    public function infisicalColumnsRequiringExplicitEncryption(): array
+    {
+        return ['mongo_initdb_root_password'];
     }
 
     public function environment()

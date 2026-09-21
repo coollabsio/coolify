@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LocksInfisicalManagedCredentials;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneClickhouse extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, LocksInfisicalManagedCredentials, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -331,6 +332,14 @@ class StandaloneClickhouse extends BaseModel
                 return null;
             }
         );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function infisicalManagedColumns(): array
+    {
+        return ['clickhouse_admin_password'];
     }
 
     public function environment()

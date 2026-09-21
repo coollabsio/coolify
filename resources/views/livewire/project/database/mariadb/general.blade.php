@@ -32,7 +32,9 @@
                     <x-forms.input label="Root password" disabled value="Hidden (only admins can view)" />
                 @else
                     <x-forms.input label="Root password" id="mariadbRootPassword" type="password"
-                        :required="(bool) $database->started_at" canGate="update" :canResource="$database" />
+                        :required="(bool) $database->started_at" :readonly="$credentialsLockedByInfisical"
+                        canGate="update" :canResource="$database"
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : null }}" />
                 @endif
                 <x-forms.input label="Normal user" id="mariadbUser" required canGate="update"
                     :canResource="$database" />
@@ -40,7 +42,8 @@
                     <x-forms.input label="Normal user password" disabled value="Hidden (only admins can view)" />
                 @else
                     <x-forms.input label="Normal user password" id="mariadbPassword" type="password" required
-                        canGate="update" :canResource="$database" />
+                        :readonly="$credentialsLockedByInfisical" canGate="update" :canResource="$database"
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : null }}" />
                 @endif
                 <x-forms.input label="Initial database" id="mariadbDatabase"
                     placeholder="If empty, it will match the normal user."

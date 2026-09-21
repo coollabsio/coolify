@@ -36,8 +36,9 @@
                 @else
                     <x-forms.input label="{{ $database->started_at ? 'Initial password' : 'Password' }}"
                         id="clickhouseAdminPassword" type="password" required
-                        :readonly="(bool) $database->started_at" canGate="update" :canResource="$database"
-                        helper="{{ $database->started_at ? 'You can only change this in the database.' : null }}" />
+                        :readonly="(bool) $database->started_at || $credentialsLockedByInfisical"
+                        canGate="update" :canResource="$database"
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : ($database->started_at ? 'You can only change this in the database.' : null) }}" />
                 @endif
             </div>
         </x-application.settings-section>

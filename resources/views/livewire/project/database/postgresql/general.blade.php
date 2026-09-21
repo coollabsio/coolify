@@ -34,7 +34,8 @@
                     <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
                 @else
                     <x-forms.input label="Password" id="postgresPassword" type="password" required
-                        canGate="update" :canResource="$database" />
+                        :readonly="$credentialsLockedByInfisical" canGate="update" :canResource="$database"
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : null }}" />
                 @endif
                 <x-forms.input label="Initial database" id="postgresDb"
                     placeholder="If empty, it will match the username."

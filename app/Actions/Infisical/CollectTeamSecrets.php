@@ -57,8 +57,19 @@ class CollectTeamSecrets
      *   push-and-update only; a genuinely new key discovered in Infisical can
      *   only be created at environment or resource scope.
      * - `writers` — `key => fn (string $value): void` for values that are not
-     *   variable rows at all (Task 8's database credential columns). Empty
-     *   here. A pull must try `rows`, then `writers`, then `create`.
+     *   variable rows at all: the database credential COLUMNS on the
+     *   `Standalone*` models, keyed by the uppercased column name
+     *   (`POSTGRES_PASSWORD`, `MYSQL_ROOT_PASSWORD`, …). A pull must try
+     *   `rows`, then `writers`, then `create`.
+     *
+     * PRECEDENCE, when a database resource also owns a variable row with the
+     * same key: the ROW wins in both directions. Credential columns are added
+     * to the bucket BEFORE that resource's rows, and `$add` is last-wins by
+     * key, so the row's value is what gets pushed up; downward, the pull
+     * consults `rows` before `writers`, so the row is what gets written back.
+     * Keeping the two directions in step is the point — the alternative pushes
+     * the column's value up and then writes Infisical's answer into the row,
+     * leaving the column permanently stale.
      *
      * @param  array<int, string>|null  $only  Restrict the walk to these bucket
      *                                         ids (`"{envSlug}|{path}"`). Null
@@ -177,6 +188,33 @@ class CollectTeamSecrets
             $buckets[$id]['rows'][$row->key] = $row;
         };
 
+        // Seven of the eight database engines keep their credentials in model
+        // columns rather than variable rows, so they need a writer rather than
+        // a row. Added BEFORE the resource's own rows so a same-named row wins
+        // on both `secrets` and the pull, per the precedence note above.
+        $addCredentialColumns = function (string $envSlug, string $path, Model $resource) use (&$buckets): void {
+            if (! method_exists($resource, 'infisicalManagedColumns')) {
+                return;
+            }
+
+            $id = "{$envSlug}|{$path}";
+
+            foreach ($resource->infisicalManagedColumns() as $column) {
+                $value = $resource->infisicalCredentialPlaintext($column);
+
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $key = strtoupper($column);
+
+                $buckets[$id]['secrets'][$key] = $value;
+                $buckets[$id]['writers'][$key] = function (string $incoming) use ($resource, $column): void {
+                    $resource->infisicalWriteCredential($column, $incoming);
+                };
+            }
+        };
+
         // Team scope -> '/' in every environment. Rows are loaded lazily so a
         // scoped walk that does not want '/' never queries them.
         $teamRows = null;
@@ -252,6 +290,8 @@ class CollectTeamSecrets
                     }
 
                     $ensure($envSlug, $resourcePath, 'resource', false, $this->resourceCreator($resource, $resourcePath));
+
+                    $addCredentialColumns($envSlug, $resourcePath, $resource);
 
                     foreach ($resource->environment_variables()->get() as $row) {
                         $add($envSlug, $resourcePath, $row);

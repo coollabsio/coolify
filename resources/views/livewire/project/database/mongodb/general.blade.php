@@ -35,8 +35,9 @@
                     <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
                 @else
                     <x-forms.input label="{{ $database->started_at ? 'Initial password' : 'Password' }}"
-                        id="mongoInitdbRootPassword" type="password" required canGate="update"
-                        :canResource="$database" />
+                        id="mongoInitdbRootPassword" type="password" required
+                        :readonly="$credentialsLockedByInfisical" canGate="update" :canResource="$database"
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : null }}" />
                 @endif
                 <x-forms.input label="{{ $database->started_at ? 'Initial database' : 'Database' }}"
                     id="mongoInitdbDatabase" placeholder="If empty, it will match the username."

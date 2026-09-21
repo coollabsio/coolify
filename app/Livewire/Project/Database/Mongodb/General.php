@@ -47,6 +47,8 @@ class General extends Component
 
     public bool $isPasswordHiddenForMember = false;
 
+    public bool $credentialsLockedByInfisical = false;
+
     protected function rules(): array
     {
         return [
@@ -122,6 +124,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
+        $this->credentialsLockedByInfisical = $this->database->infisicalCredentialsLocked();
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
         if ($this->isPasswordHiddenForMember) {
             $this->mongoInitdbRootPassword = '';

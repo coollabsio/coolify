@@ -26,7 +26,8 @@
                     <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
                 @else
                     <x-forms.input label="Password" id="keydbPassword" type="password" required readonly
-                        helper="You can only change this in the database." canGate="update" :canResource="$database" />
+                        helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : 'You can only change this in the database.' }}"
+                        canGate="update" :canResource="$database" />
                 @endif
             @else
                 <x-callout type="warning" title="Verify the initial credentials">
@@ -38,7 +39,8 @@
                         <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
                     @else
                         <x-forms.input label="Password" id="keydbPassword" type="password" required
-                            canGate="update" :canResource="$database" />
+                            :readonly="$credentialsLockedByInfisical" canGate="update" :canResource="$database"
+                            helper="{{ $credentialsLockedByInfisical ? 'Managed by Infisical. Edit this secret in Infisical; Coolify picks it up on the next sync.' : null }}" />
                     @endif
                 </div>
             @endif
