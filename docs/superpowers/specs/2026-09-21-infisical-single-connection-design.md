@@ -93,6 +93,41 @@ Slugging must be deterministic and collision-aware: two Coolify resources whose
 names slug identically within one project is an error surfaced to the operator,
 not a silent merge.
 
+### Mapping Coolify's four shared-variable scopes
+
+Coolify scopes a shared variable to a team, a project, an environment, or a
+server. Infisical has no "applies to every environment" concept, because
+environment is its top-level axis. The four scopes therefore flatten:
+
+| Coolify scope | Infisical location |
+|---|---|
+| Team | `/` — written into **every** environment |
+| Project | `/{project}/` — written into **every** environment |
+| Environment | `/{project}/` — written into **that environment only** |
+| Server | **not synced** — see below |
+
+Two consequences must be stated in the UI rather than discovered:
+
+1. **Project- and team-scoped variables are replicated per environment.** After
+   adoption the "applies everywhere" property is gone; the variable becomes one
+   independent secret per Infisical environment, and changing it means changing
+   each. Infisical's own answer is secret imports, which the operator may set up
+   afterwards; Coolify does not manage them.
+2. **Project scope and environment scope collide.** Both land in
+   `/{project}/`. Where a key exists at both scopes, Coolify's existing
+   precedence applies — environment wins — and only that value is pushed. The
+   project-scoped value is not preserved.
+
+### Server-scoped variables are out of scope
+
+Servers are orthogonal to the project/environment tree and have nowhere to live
+in this layout. Server-scoped shared variables are **not synced and not
+locked** — they remain fully editable in Coolify. The Server variables screen
+must say so explicitly, otherwise the lock looks inconsistent.
+
+`COOLIFY_SERVER_UUID` and `COOLIFY_SERVER_NAME` are already blocked from human
+editing by existing code and are unaffected.
+
 ## Sync
 
 ### Upward, once — `AdoptTeamSecretsIntoInfisical`
