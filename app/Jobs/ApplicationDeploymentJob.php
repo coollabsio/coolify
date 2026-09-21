@@ -311,6 +311,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        try {
+            $this->validateDeploymentEnvironmentVariableKeys();
+        } catch (Exception $e) {
+            $this->fail($e);
+            throw $e;
+        }
+
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
@@ -2049,6 +2056,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function validateDeploymentEnvironmentVariableKeys(): void
+    {
+        $environmentVariables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()->get(['key'])
+            : $this->application->environment_variables_preview()->get(['key']);
+
+        foreach ($environmentVariables as $environmentVariable) {
+            $this->validatedBuildtimeEnvironmentVariableKey((string) $environmentVariable->key, 'the deployment environment');
+        }
+    }
+
     private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void
     {
         $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
@@ -2102,6 +2120,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Creating build-time .env file in /artifacts (outside Docker context).', hidden: true);
                 $this->execute_remote_command([
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
+                    'skip_command_log' => true,
                 ]);
 
                 if (isDev()) {
@@ -2147,6 +2166,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $contents_base64 = base64_encode($contents);
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "echo '$contents_base64' | base64 -d | tee {$path} > /dev/null"),
+                'skip_command_log' => true,
             ]);
         }
 
@@ -3024,6 +3044,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         return 'env '.$variables
             ->map(function ($value, $key) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Railpack environment');
+
                 return escapeShellValue("{$key}={$value}");
             })
             ->implode(' ').' ';
@@ -3037,6 +3059,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         return ' '.$variables
             ->map(function ($value, $key) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Railpack environment');
+
                 return '--secret '.escapeShellValue("id={$key},env={$key}");
             })
             ->implode(' ');
@@ -3951,7 +3975,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Traditional build args approach - generate COOLIFY_ variables locally
             $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
             $coolify_envs->each(function ($value, $key) {
-                $this->build_args->push("--build-arg '{$key}'");
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Coolify build environment');
+                $this->build_args->push('--build-arg '.escapeshellarg($key));
             });
         }
 
@@ -4506,7 +4531,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->build_args = generateDockerBuildArgs($vars_with_metadata);
 
             if ($secrets_hash) {
-                $this->build_args->push("--build-arg COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
+                $this->build_args->push('--build-arg '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"));
             }
         }
     }
@@ -4543,6 +4568,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Map to simple array format for the helper function
         $vars_array = $variables->map(function ($value, $key) use ($env_vars) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment');
             $env = $env_vars->firstWhere('key', $key);
 
             return [
@@ -4553,7 +4579,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         });
 
         $env_flags = generateDockerEnvFlags($vars_array);
-        $env_flags .= " -e COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}";
+        $env_flags .= ' -e '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
 
         return $env_flags;
     }
@@ -4568,7 +4594,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->build_secrets = $variables
             ->map(function ($value, $key) {
-                return "--secret id={$key},env={$key}";
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment');
+
+                return '--secret '.escapeshellarg("id={$key},env={$key}");
             })
             ->implode(' ');
 
@@ -4659,11 +4687,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->where('is_buildtime', true)
                 ->get();
             foreach ($envs as $env) {
-                if (data_get($env, 'is_multiline') === true) {
-                    $argsToInsert->push("ARG {$env->key}");
-                } else {
-                    $argsToInsert->push("ARG {$env->key}=".escapeBashEnvValue($this->resolve_environment_variable_raw($env)));
-                }
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
+                $argsToInsert->push("ARG {$key}");
             }
             // Add Coolify variables as ARGs
             if ($this->coolify_variables) {
@@ -4681,11 +4706,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->where('is_buildtime', true)
                 ->get();
             foreach ($envs as $env) {
-                if (data_get($env, 'is_multiline') === true) {
-                    $argsToInsert->push("ARG {$env->key}");
-                } else {
-                    $argsToInsert->push("ARG {$env->key}=".escapeBashEnvValue($this->resolve_environment_variable_raw($env)));
-                }
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
+                $argsToInsert->push("ARG {$key}");
             }
             // Add Coolify variables as ARGs
             if ($this->coolify_variables) {
@@ -4805,7 +4827,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         // Generate mount strings for all secrets
-        $mountStrings = $variables->map(fn ($value, $key) => "--mount=type=secret,id={$key},env={$key}")->implode(' ');
+        $mountStrings = $variables->map(function ($value, $key) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
+
+            return "--mount=type=secret,id={$key},env={$key}";
+        })->implode(' ');
 
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
@@ -4917,6 +4943,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             $argsToAdd = collect([]);
             foreach ($variables as $key => $value) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
                 $argsToAdd->push("ARG {$key}");
             }
 
@@ -5068,6 +5095,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $secrets = [];
         foreach ($variables as $key => $value) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Compose build secret environment');
             $secrets[$key] = [
                 'environment' => $key,
             ];
@@ -5084,7 +5112,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (! isset($service['build']['secrets'])) {
                     $service['build']['secrets'] = [];
                 }
-                foreach ($variables as $key => $value) {
+                foreach (array_keys($secrets) as $key) {
                     if (! in_array($key, $service['build']['secrets'])) {
                         $service['build']['secrets'][] = $key;
                     }
