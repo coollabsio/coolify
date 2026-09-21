@@ -80,7 +80,8 @@
                     <div x-show="activeSection === '{{ $modalSection }}'" x-cloak>
                         @if ($selectedDatabaseBackup)
                             <livewire:project.database.backup-edit :backup="$selectedDatabaseBackup"
-                                :available-s3-storages="$s3s" :status="data_get($selectedDatabaseBackup->database, 'status')"
+                                :available-s3-storages="$s3s" :available-age-keys="$ageKeys"
+                                :status="data_get($selectedDatabaseBackup->database, 'status')"
                                 :section="$modalSection"
                                 wire:key="service-database-backup-modal-{{ $selectedDatabaseBackup->uuid }}-{{ $modalSection }}" />
                         @else

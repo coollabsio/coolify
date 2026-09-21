@@ -15,6 +15,8 @@ class Execution extends Component
 
     public $s3s;
 
+    public $ageKeys;
+
     public array $parameters = [];
 
     public string $section = 'general';
@@ -44,6 +46,7 @@ class Execution extends Component
         $this->backup = $backup;
         $this->executions = $executions;
         $this->s3s = currentTeam()->s3s;
+        $this->ageKeys = currentTeam()->ageKeys;
         $this->parameters = get_route_parameters();
         $this->section = match (request()->route()?->getName()) {
             'project.database.backup.s3' => 's3',

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Jobs\DatabaseBackupJob;
+use App\Models\AgeKey;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
@@ -24,6 +25,9 @@ class BackupEdit extends Component
 
     #[Locked]
     public $availableS3Storages;
+
+    #[Locked]
+    public $availableAgeKeys = [];
 
     #[Locked]
     public $parameters;
@@ -82,6 +86,12 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
+    #[Validate(['required', 'boolean'])]
+    public bool $encryptionEnabled = false;
+
+    #[Validate(['nullable', 'integer'])]
+    public ?int $ageKeyId = null;
+
     #[Validate(['required', 'int', 'min:60', 'max:36000'])]
     public int|string $timeout = 3600;
 
@@ -112,6 +122,7 @@ class BackupEdit extends Component
     {
         try {
             $this->authorize('view', $this->backup->database);
+            $this->availableAgeKeys = collect($this->availableAgeKeys);
             $this->parameters = get_route_parameters();
             $this->syncData();
             $this->refreshStatus();
@@ -156,6 +167,8 @@ class BackupEdit extends Component
             $this->backup->dump_all = $this->dumpAll;
             $this->backup->timeout = $this->timeout;
             $this->backup->missing_backup_notification_days = $this->missingBackupNotificationDays;
+            $this->backup->encryption_enabled = $this->encryptionEnabled;
+            $this->backup->age_key_id = $this->ageKeyId;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -175,6 +188,8 @@ class BackupEdit extends Component
             $this->dumpAll = $this->backup->dump_all;
             $this->timeout = $this->backup->timeout;
             $this->missingBackupNotificationDays = $this->backup->missing_backup_notification_days;
+            $this->encryptionEnabled = $this->backup->encryption_enabled ?? false;
+            $this->ageKeyId = $this->backup->age_key_id;
         }
     }
 
@@ -339,6 +354,51 @@ class BackupEdit extends Component
         $this->instantSave();
     }
 
+    public function updatedAgeKeyId(): void
+    {
+        $this->instantSave();
+    }
+
+    public function toggleEncryption(): void
+    {
+        if (! $this->encryptionEnabled) {
+            if ($this->backup->database_type === 'App\Models\StandaloneClickhouse') {
+                $this->dispatch('error', 'Backup encryption is not supported for Clickhouse backups yet.');
+
+                return;
+            }
+            if ($this->availableAgeKeyIds()->isEmpty()) {
+                $this->dispatch('error', 'Add an age key before enabling backup encryption.');
+
+                return;
+            }
+        }
+
+        $this->encryptionEnabled = ! $this->encryptionEnabled;
+        $this->instantSave();
+    }
+
+    private function availableAgeKeyIds(): Collection
+    {
+        $keys = collect($this->availableAgeKeys);
+        $keyIds = $keys->pluck('id')->filter()->all();
+
+        if (empty($keyIds)) {
+            return collect();
+        }
+
+        $teamIds = $keys->pluck('team_id')->reject(fn ($teamId) => $teamId === null)->unique()->values()->all();
+
+        if (empty($teamIds)) {
+            return collect();
+        }
+
+        return AgeKey::query()
+            ->whereKey($keyIds)
+            ->whereIn('team_id', $teamIds)
+            ->pluck('id');
+    }
+
     private function customValidate()
     {
         if (! is_numeric($this->backup->s3_storage_id)) {
@@ -359,6 +419,24 @@ class BackupEdit extends Component
         // Validate that disable_local_backup can only be true when S3 backup is enabled
         if ($this->backup->disable_local_backup && ! $this->backup->save_s3) {
             $this->backup->disable_local_backup = $this->disableLocalBackup = false;
+        }
+
+        // Encryption cannot be enabled without a valid age key owned by the team, or for Clickhouse
+        $availableAgeIds = $this->availableAgeKeyIds();
+        if (! is_numeric($this->backup->age_key_id)) {
+            $this->backup->age_key_id = null;
+        }
+        if ($availableAgeIds->isEmpty() || $this->backup->database_type === 'App\Models\StandaloneClickhouse') {
+            $this->backup->age_key_id = $this->ageKeyId = null;
+            if ($this->backup->encryption_enabled) {
+                $this->backup->encryption_enabled = $this->encryptionEnabled = false;
+            }
+        } elseif (! $availableAgeIds->contains($this->backup->age_key_id)) {
+            if ($this->backup->encryption_enabled) {
+                $this->backup->age_key_id = $this->ageKeyId = $availableAgeIds->first();
+            } else {
+                $this->backup->age_key_id = $this->ageKeyId = null;
+            }
         }
 
         $isValid = validate_cron_expression($this->backup->frequency);

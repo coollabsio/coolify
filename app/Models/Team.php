@@ -316,6 +316,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(PrivateKey::class);
     }
 
+    public function ageKeys()
+    {
+        return $this->hasMany(AgeKey::class);
+    }
+
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);

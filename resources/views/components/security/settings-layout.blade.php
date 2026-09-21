@@ -6,6 +6,12 @@
             'active' => request()->routeIs('security.private-key.*'),
             'icon' => 'keys',
         ],
+        auth()->user()?->can('viewAny', App\Models\AgeKey::class) ? [
+            'label' => 'Age Keys',
+            'route' => 'security.age-key.index',
+            'active' => request()->routeIs('security.age-key.*'),
+            'icon' => 'keys',
+        ] : null,
         auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class) ? [
             'label' => 'Cloud Tokens',
             'route' => 'security.cloud-tokens',

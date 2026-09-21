@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\AgeKey;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
@@ -27,6 +28,9 @@ class SettingsBackup extends Component
 
     #[Locked]
     public $s3s;
+
+    #[Locked]
+    public $ageKeys;
 
     #[Locked]
     public $executions = [];
@@ -55,6 +59,7 @@ class SettingsBackup extends Component
         $this->server = Server::findOrFail(0);
         $this->database = StandalonePostgresql::whereName('coolify-db')->first();
         $s3s = S3Storage::whereTeamId(0)->get() ?? [];
+        $ageKeys = AgeKey::whereTeamId(0)->get() ?? [];
         if ($this->database) {
             $this->uuid = $this->database->uuid;
             $this->name = $this->database->name;
@@ -75,6 +80,7 @@ class SettingsBackup extends Component
         }
         $this->settings = $settings;
         $this->s3s = $s3s;
+        $this->ageKeys = $ageKeys;
     }
 
     public function addCoolifyDatabase()
@@ -112,6 +118,7 @@ class SettingsBackup extends Component
             $this->database->refresh();
             $this->backup->refresh();
             $this->s3s = S3Storage::whereTeamId(0)->get();
+            $this->ageKeys = AgeKey::whereTeamId(0)->get();
 
             $this->uuid = $this->database->uuid;
             $this->name = $this->database->name;
