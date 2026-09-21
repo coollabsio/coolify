@@ -16,8 +16,8 @@ it('ensures service parser does not include image in trusted service creation qu
     expect($parsersFile)
         ->toContain("\$databaseFound = ServiceDatabase::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
         ->toContain("\$applicationFound = ServiceApplication::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
-        ->toContain("create([\n                        'name' => \$serviceName,\n                        'service_id' => \$resource->id,\n                    ]);")
-        ->not->toContain("create([\n                        'name' => \$serviceName,\n                        'image' => \$image,\n                        'service_id' => \$resource->id,\n                    ]);");
+        ->toContain("create([\n                            'name' => \$serviceName,\n                            'service_id' => \$resource->id,\n                        ]);")
+        ->not->toContain("create([\n                            'name' => \$serviceName,\n                            'image' => \$image,\n                            'service_id' => \$resource->id,\n                        ]);");
 });
 
 it('ensures service parser updates image after finding or creating service', function () {

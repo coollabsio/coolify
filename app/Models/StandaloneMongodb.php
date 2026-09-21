@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Infisical\InfisicalLock;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
@@ -286,8 +287,12 @@ class StandaloneMongodb extends BaseModel
                 try {
                     return decrypt($value);
                 } catch (\Throwable $th) {
-                    $this->mongo_initdb_root_password = encrypt($value);
-                    $this->save();
+                    // Self-healing a plaintext value SAVES during a READ, so
+                    // rendering a page must not trip the managed-variable lock.
+                    InfisicalLock::asSystem(function () use ($value) {
+                        $this->mongo_initdb_root_password = encrypt($value);
+                        $this->save();
+                    });
 
                     return $value;
                 }

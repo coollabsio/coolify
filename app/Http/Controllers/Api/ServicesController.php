@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Infisical\InfisicalLock;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -520,7 +521,9 @@ class ServicesController extends Controller
                 }
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
-                    $oneClickDotEnvs->each(function ($value) use ($service) {
+                    // One-click template seeding is Coolify's own data, not a
+                    // human edit, so it must survive an armed Infisical lock.
+                    InfisicalLock::asSystem(fn () => $oneClickDotEnvs->each(function ($value) use ($service) {
                         $key = str()->before($value, '=');
                         $value = str(str()->after($value, '='));
                         $generatedValue = $value;
@@ -535,7 +538,7 @@ class ServicesController extends Controller
                             'resourceable_type' => $service->getMorphClass(),
                             'is_preview' => false,
                         ]);
-                    });
+                    }));
                 }
                 $service->parse(isNew: true);
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Infisical\InfisicalLock;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
@@ -413,10 +414,12 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
-                    $this->runtime_environment_variables()->create([
+                    // This creates a row as a side effect of a READ, so merely
+                    // rendering a page would trip the managed-variable lock.
+                    InfisicalLock::asSystem(fn () => $this->runtime_environment_variables()->create([
                         'key' => 'REDIS_USERNAME',
                         'value' => 'default',
-                    ]);
+                    ]));
 
                     return 'default';
                 }

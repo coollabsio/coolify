@@ -14,6 +14,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -58,21 +59,26 @@ function create_standalone_redis($environment_id, StandaloneDocker|SwarmDocker $
     }
     $database->save();
 
-    EnvironmentVariable::create([
-        'key' => 'REDIS_PASSWORD',
-        'value' => $redis_password,
-        'resourceable_type' => StandaloneRedis::class,
-        'resourceable_id' => $database->id,
-        'is_shared' => false,
-    ]);
+    // Coolify generates these credentials; they are not human edits, so they
+    // must survive an armed Infisical lock. NOT listed in the plan — found by
+    // the Step 8 audit grep.
+    InfisicalLock::asSystem(function () use ($database, $redis_password) {
+        EnvironmentVariable::create([
+            'key' => 'REDIS_PASSWORD',
+            'value' => $redis_password,
+            'resourceable_type' => StandaloneRedis::class,
+            'resourceable_id' => $database->id,
+            'is_shared' => false,
+        ]);
 
-    EnvironmentVariable::create([
-        'key' => 'REDIS_USERNAME',
-        'value' => 'default',
-        'resourceable_type' => StandaloneRedis::class,
-        'resourceable_id' => $database->id,
-        'is_shared' => false,
-    ]);
+        EnvironmentVariable::create([
+            'key' => 'REDIS_USERNAME',
+            'value' => 'default',
+            'resourceable_type' => StandaloneRedis::class,
+            'resourceable_id' => $database->id,
+            'is_shared' => false,
+        ]);
+    });
 
     return $database;
 }

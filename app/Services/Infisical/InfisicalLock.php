@@ -12,6 +12,24 @@ use App\Models\InfisicalConnection;
  * enforcement leaks: the preview-clone observer, the Redis username accessor
  * that writes on read, the parse() pipeline, the scheduled sync job, and
  * ServerTransferImporter's withoutEvents() all bypass it.
+ *
+ * Known limit: mass deletes via a relation query builder
+ * ($resource->environment_variables()->delete()) bypass the deleting hook
+ * entirely, because query-builder deletes fire no model events.
+ * Resource-deletion cascades (forceDeleting on every Standalone* model,
+ * DeleteService, Application's buildpack-switch cleanup) rely on this and are
+ * intentionally unguarded — wrapping them in asSystem() would be a no-op that
+ * falsely implies the hook was protecting something.
+ *
+ * The same limit cuts the other way on the HUMAN side, and that part is not
+ * benign: SharedVariables\*\Show::deleteRemovedVariables() drops rows with a
+ * query-builder mass delete too, so the bulk textarea can still delete a
+ * locked team's variables. The hook cannot close that; the surface needs an
+ * explicit check. Characterised by InfisicalSharedVariablesScreenTest.
+ * ServerTransferImporter is the same shape — it writes inside withoutEvents().
+ *
+ * Any NEW code path that needs to be blocked must delete through model
+ * instances, not the builder.
  */
 class InfisicalLock
 {

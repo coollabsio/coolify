@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -101,7 +102,10 @@ class Create extends Component
                     $service->name = "$oneClickServiceName-".$service->uuid;
                     $service->save();
                     if ($oneClickDotEnvs?->count() > 0) {
-                        $oneClickDotEnvs->each(function ($value) use ($service) {
+                        // One-click template seeding is Coolify's own data, not
+                        // a human edit, so it must survive an armed Infisical
+                        // lock.
+                        InfisicalLock::asSystem(fn () => $oneClickDotEnvs->each(function ($value) use ($service) {
                             $key = str()->before($value, '=');
                             $value = str(str()->after($value, '='));
                             if ($value) {
@@ -113,7 +117,7 @@ class Create extends Component
                                     'is_preview' => false,
                                 ]);
                             }
-                        });
+                        }));
                     }
                     $service->parse(isNew: true);
 

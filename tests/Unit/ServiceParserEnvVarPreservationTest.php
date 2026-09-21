@@ -14,8 +14,8 @@ it('uses firstOrCreate for simple variable references in serviceParser to preser
     // This is the key === parsedValue branch
     expect($parsersFile)->toContain(
         "// Simple variable reference (e.g. DATABASE_URL: \${DATABASE_URL})\n".
-        "                // Ensure the variable exists in DB for .env generation and UI display\n".
-        '                $resource->environment_variables()->firstOrCreate('
+        "                    // Ensure the variable exists in DB for .env generation and UI display\n".
+        '                    $resource->environment_variables()->firstOrCreate('
     );
 });
 
@@ -26,7 +26,7 @@ it('does not set value to null for simple variable references in serviceParser',
     // This pattern should NOT exist for simple variable references
     expect($parsersFile)->not->toContain(
         "\$value = null;\n".
-        '                $resource->environment_variables()->updateOrCreate('
+        '                    $resource->environment_variables()->updateOrCreate('
     );
 });
 
@@ -39,8 +39,8 @@ it('uses firstOrCreate for simple variable refs without default in serviceParser
     $count = substr_count(
         $parsersFile,
         "// Simple variable reference without default\n".
-        "                            // Use firstOrCreate to avoid overwriting user-saved values on redeploy\n".
-        '                            $envVar = $resource->environment_variables()->firstOrCreate('
+        "                                // Use firstOrCreate to avoid overwriting user-saved values on redeploy\n".
+        '                                $envVar = $resource->environment_variables()->firstOrCreate('
     );
 
     expect($count)->toBe(1, 'serviceParser should use firstOrCreate for simple variable refs without default');
@@ -64,6 +64,6 @@ it('does not use updateOrCreate with value null for user-editable environment va
     // This overwrites user-saved values with null on every deploy
     expect($parsersFile)->not->toContain(
         "\$value = null;\n".
-        '                $resource->environment_variables()->updateOrCreate('
+        '                    $resource->environment_variables()->updateOrCreate('
     );
 });

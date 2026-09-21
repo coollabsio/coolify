@@ -19,6 +19,7 @@ use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\Infisical\InfisicalLock;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
@@ -186,23 +187,28 @@ class Server extends BaseModel
                 $server->proxy->redirect_enabled = true;
             }
 
-            // Create predefined server shared variables
-            SharedEnvironmentVariable::create([
-                'key' => 'COOLIFY_SERVER_UUID',
-                'value' => $server->uuid,
-                'type' => 'server',
-                'server_id' => $server->id,
-                'team_id' => $server->team_id,
-                'is_literal' => true,
-            ]);
-            SharedEnvironmentVariable::create([
-                'key' => 'COOLIFY_SERVER_NAME',
-                'value' => $server->name,
-                'type' => 'server',
-                'server_id' => $server->id,
-                'team_id' => $server->team_id,
-                'is_literal' => true,
-            ]);
+            // COOLIFY_SERVER_UUID / _NAME are Coolify-generated. They are also
+            // server-scoped, which the lock exempts outright, so this wrap is
+            // belt-and-braces should that exemption ever narrow.
+            InfisicalLock::asSystem(function () use ($server) {
+                // Create predefined server shared variables
+                SharedEnvironmentVariable::create([
+                    'key' => 'COOLIFY_SERVER_UUID',
+                    'value' => $server->uuid,
+                    'type' => 'server',
+                    'server_id' => $server->id,
+                    'team_id' => $server->team_id,
+                    'is_literal' => true,
+                ]);
+                SharedEnvironmentVariable::create([
+                    'key' => 'COOLIFY_SERVER_NAME',
+                    'value' => $server->name,
+                    'type' => 'server',
+                    'server_id' => $server->id,
+                    'team_id' => $server->team_id,
+                    'is_literal' => true,
+                ]);
+            });
         });
         static::retrieved(function ($server) {
             if (! isset($server->proxy->redirect_enabled)) {

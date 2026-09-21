@@ -103,34 +103,38 @@ class EnvironmentVariable extends BaseModel
     protected static function booted()
     {
         static::created(function (ModelsEnvironmentVariable $environment_variable) {
-            if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
-                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
-                    ->where('resourceable_type', Application::class)
-                    ->where('resourceable_id', $environment_variable->resourceable_id)
-                    ->where('is_preview', true)
-                    ->first();
+            // The preview clone and the version stamp are writes the caller never
+            // made — they are Coolify's own, so they run as system writes.
+            InfisicalLock::asSystem(function () use ($environment_variable) {
+                if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
+                    $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
+                        ->where('resourceable_type', Application::class)
+                        ->where('resourceable_id', $environment_variable->resourceable_id)
+                        ->where('is_preview', true)
+                        ->first();
 
-                if (! $found) {
-                    $application = Application::find($environment_variable->resourceable_id);
-                    if ($application) {
-                        ModelsEnvironmentVariable::create([
-                            'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
-                            'is_multiline' => $environment_variable->is_multiline ?? false,
-                            'is_literal' => $environment_variable->is_literal ?? false,
-                            'is_runtime' => $environment_variable->is_runtime ?? false,
-                            'is_buildtime' => $environment_variable->is_buildtime ?? false,
-                            'comment' => $environment_variable->comment,
-                            'resourceable_type' => Application::class,
-                            'resourceable_id' => $environment_variable->resourceable_id,
-                            'is_preview' => true,
-                        ]);
+                    if (! $found) {
+                        $application = Application::find($environment_variable->resourceable_id);
+                        if ($application) {
+                            ModelsEnvironmentVariable::create([
+                                'key' => $environment_variable->key,
+                                'value' => $environment_variable->value,
+                                'is_multiline' => $environment_variable->is_multiline ?? false,
+                                'is_literal' => $environment_variable->is_literal ?? false,
+                                'is_runtime' => $environment_variable->is_runtime ?? false,
+                                'is_buildtime' => $environment_variable->is_buildtime ?? false,
+                                'comment' => $environment_variable->comment,
+                                'resourceable_type' => Application::class,
+                                'resourceable_id' => $environment_variable->resourceable_id,
+                                'is_preview' => true,
+                            ]);
+                        }
                     }
                 }
-            }
-            $environment_variable->update([
-                'version' => config('constants.coolify.version'),
-            ]);
+                $environment_variable->update([
+                    'version' => config('constants.coolify.version'),
+                ]);
+            });
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
