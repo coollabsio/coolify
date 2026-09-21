@@ -393,7 +393,8 @@ it('sends terminal mobile toolbar controls through the websocket', function () {
         ->toContain('sendTerminalKey(key)')
         ->toContain('navigator.clipboard.readText()')
         ->toContain('navigator.clipboard.writeText(selection)')
-        ->toContain("sendTerminalInput(data) {\n                if (!this.term || !this.terminalActive) {\n                    return;\n                }\n\n                this.sendMessage({ message: data });")
+        ->toContain("sendTerminalInput(data) {\n                if (!this.term || !this.terminalActive) {\n                    return;\n                }")
+        ->toContain("if (this.isConsoleMode()) {\n                    return;\n                }\n\n                this.sendMessage({ message: data });")
         ->not->toContain("sendTerminalInput(data) {\n                if (!this.term || !this.terminalActive) {\n                    return;\n                }\n\n                this.term.focus();");
 });
 
