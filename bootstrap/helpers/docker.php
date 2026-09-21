@@ -43,11 +43,15 @@ function traefikSafeServiceNameSegment(string $serviceName): string
     return $normalized.'-'.traefikServiceNameHash($serviceName);
 }
 
-function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
+function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false, ?string $composeServiceName = null): Collection
 {
     $containers = collect([]);
     if (! $server->isSwarm()) {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
+        $filters = "--filter='label=coolify.applicationId={$id}'";
+        if (filled($composeServiceName)) {
+            $filters .= ' --filter '.escapeshellarg("label=com.docker.compose.service={$composeServiceName}");
+        }
+        $containers = instant_remote_process(["docker ps -a {$filters} --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
 
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {

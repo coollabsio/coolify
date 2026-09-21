@@ -164,6 +164,38 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
             ->assertJson(['logs' => 'preview runtime log']);
     });
 
+    test('returns runtime logs of the requested Docker Compose service', function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        createPreview($this->application, 42);
+        $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+        $this->server->update(['private_key_id' => $privateKey->id]);
+        Process::fake(function ($process) {
+            if (str_contains($process->command, 'docker ps -a')) {
+                return Process::result(output: collect(['gateway-pr-42', 'server-pr-42'])
+                    ->filter(fn (string $service) => ! str_contains($process->command, 'com.docker.compose.service=')
+                        || str_contains($process->command, "com.docker.compose.service={$service}'"))
+                    ->map(fn (string $service) => json_encode([
+                        'ID' => $service,
+                        'Names' => "{$service}-{$this->application->uuid}",
+                        'Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=42,com.docker.compose.service={$service}",
+                    ]))->implode("\n"));
+            }
+            if (str_contains($process->command, 'docker inspect')) {
+                return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
+            }
+            if (preg_match('/docker logs .*(gateway|server)-pr-42/', $process->command, $matches)) {
+                return Process::result(output: "{$matches[1]} runtime log");
+            }
+
+            return Process::result();
+        });
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42/logs?service_name=server")
+            ->assertOk()
+            ->assertJson(['logs' => 'server runtime log']);
+    });
+
     test('returns 404 when the preview does not exist', function () {
         $this->withHeaders(previewAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42/logs")
@@ -184,7 +216,7 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
 
         expect($controller)
             ->toContain("\$request->route('pull_request_id')")
-            ->toContain('getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId)')
+            ->toContain('getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId, composeServiceName: $composeServiceName)')
             ->and($openApi['paths'])
             ->toHaveKey('/applications/{uuid}/previews/{pull_request_id}/logs');
     });

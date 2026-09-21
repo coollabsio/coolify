@@ -2451,6 +2451,13 @@ class ApplicationsController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false),
             ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Docker Compose service name (the key under `services:`) whose container logs to return. Only for Docker Compose applications. Defaults to the first container.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
@@ -2523,6 +2530,13 @@ class ApplicationsController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false),
             ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Docker Compose service name (the key under `services:`) whose container logs to return. Only for Docker Compose applications. Defaults to the first container.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
@@ -2568,7 +2582,22 @@ class ApplicationsController extends Controller
             }
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
+        $serviceName = $request->query('service_name');
+        if (filled($serviceName)) {
+            if (! is_string($serviceName) || ! preg_match(ValidationPatterns::CONTAINER_NAME_PATTERN, $serviceName)) {
+                return response()->json(['message' => 'Invalid service_name.'], 422);
+            }
+            if ($application->build_pack !== 'dockercompose') {
+                return response()->json(['message' => 'service_name is only supported for Docker Compose applications.'], 422);
+            }
+        }
+
+        $composeServiceName = filled($serviceName) ? addPreviewDeploymentSuffix($serviceName, $pullRequestId ?? 0) : null;
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId, composeServiceName: $composeServiceName);
+
+        if ($composeServiceName !== null && $containers->isEmpty()) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
 
         if ($containers->count() == 0) {
             return response()->json([
