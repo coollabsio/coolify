@@ -151,6 +151,22 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                     @can('update', $connection)
+                        @if ($connection->is_enabled)
+                            <button type="button" wire:click="syncNow" wire:loading.attr="disabled"
+                                wire:target="syncNow" class="button">
+                                <span wire:loading.remove wire:target="syncNow" class="flex items-center gap-1.5">
+                                    <x-reicon name="refresh3" class="size-3.5" />
+                                    Sync now
+                                </span>
+                                <span wire:loading wire:target="syncNow" class="flex items-center gap-1.5">
+                                    <x-loading wire:loading wire:target="syncNow" />
+                                    Syncing&hellip;
+                                </span>
+                            </button>
+                        @endif
+                    @endcan
+
+                    @can('update', $connection)
                         <x-modal-input title="{{ $connection->name }}" :closeOutside="false">
                             <x-slot:content>
                                 <button type="button" class="button">Edit connection</button>
