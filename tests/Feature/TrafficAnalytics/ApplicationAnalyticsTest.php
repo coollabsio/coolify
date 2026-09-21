@@ -150,6 +150,10 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
 
     $fake = new FakeAnalyticsTrafficClient($application->destination->server);
     $fake->responses = fakeAnalyticsResponses();
+    $fake->responses['/traffic/breakdown/referer'] = json_encode([
+        ['value' => 'https://www.google.com/search', 'requests' => 250, 'bytes_out' => 7000],
+        ['value' => 'http://google.com/news', 'requests' => 50, 'bytes_out' => 1000],
+    ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
     loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
@@ -160,7 +164,10 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
         ->assertSee('Error rate')
         ->assertSee('/')
         ->assertSee('United States')
-        ->assertSee('GeoIP data by MaxMind');
+        ->assertSee('GeoIP data by MaxMind')
+        ->assertSet('breakdowns.referer', [
+            ['value' => 'google.com', 'requests' => 300, 'bytesOut' => 8000],
+        ]);
 });
 
 it('loads the per-app status time series when Sentinel exposes the series endpoint', function () {

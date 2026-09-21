@@ -116,7 +116,7 @@
             'active' => $activeMenu === 'swarm',
             'icon' => 'layers',
             'group' => 'Networking',
-            'visible' => ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
+            'visible' => $server->team->usesSwarm() && ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
             'label' => 'Docker Cleanup',

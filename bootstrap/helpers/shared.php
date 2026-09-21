@@ -5048,6 +5048,31 @@ function refererHost(?string $referer): ?string
 }
 
 /**
+ * Group referrer breakdown rows by hostname and sum their metrics.
+ *
+ * @param  array<int, array{value?: string, requests?: int, bytesOut?: int}>  $rows
+ * @return array<int, array{value: string, requests: int, bytesOut: int}>
+ */
+function groupRefererBreakdownRows(array $rows): array
+{
+    $grouped = [];
+
+    foreach ($rows as $row) {
+        $value = (string) ($row['value'] ?? '');
+        $host = $value === '__other__' ? $value : (refererHost($value) ?? $value);
+
+        $grouped[$host] ??= ['value' => $host, 'requests' => 0, 'bytesOut' => 0];
+        $grouped[$host]['requests'] += (int) ($row['requests'] ?? 0);
+        $grouped[$host]['bytesOut'] += (int) ($row['bytesOut'] ?? 0);
+    }
+
+    $rows = array_values($grouped);
+    usort($rows, fn (array $left, array $right): int => $right['requests'] <=> $left['requests']);
+
+    return $rows;
+}
+
+/**
  * Favicon URL for a host, served by DuckDuckGo's icon proxy. Used to decorate
  * referrer rows in analytics.
  *

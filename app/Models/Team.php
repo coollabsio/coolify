@@ -311,6 +311,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(Server::class);
     }
 
+    public function usesSwarm(): bool
+    {
+        return $this->servers()
+            ->where(function ($query) {
+                $query->whereHas('settings', function ($settings) {
+                    $settings->where('is_swarm_manager', true)
+                        ->orWhere('is_swarm_worker', true);
+                })->orWhereHas('swarmDockers');
+            })
+            ->exists();
+    }
+
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);

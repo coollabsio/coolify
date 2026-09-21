@@ -62,8 +62,6 @@ class Index extends Component
 
     public ?string $remoteServerUser = 'root';
 
-    public bool $isSwarmManager = false;
-
     public bool $isCloudflareTunnel = false;
 
     public ?Server $createdServer = null;
@@ -328,7 +326,6 @@ class Index extends Component
             'private_key_id' => $this->createdPrivateKey->id,
             'team_id' => currentTeam()->id,
         ]);
-        $this->createdServer->settings->is_swarm_manager = $this->isSwarmManager;
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->selectedExistingServer = $this->createdServer->id;
