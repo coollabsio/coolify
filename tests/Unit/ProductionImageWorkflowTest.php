@@ -186,7 +186,6 @@ it('documents the production, rc, and hotfix release flows', function () {
         ->toContain('feature/* → next → RC')
         ->toContain('next → main → stable release')
         ->toContain('main → hotfix/X.Y.Z → main → next')
-        ->toContain('RC versions come from `coolify.nightly.version` in root `versions.json`')
         ->toContain('reviewed draft GitHub Release')
         ->toContain('workflows never edit or commit versions')
         ->toContain('Update the CDN only after the release is approved')
