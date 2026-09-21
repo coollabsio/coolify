@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\MicrosoftTeamsChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -38,6 +39,7 @@ class Test extends Notification implements ShouldQueue
                 'discord' => [DiscordChannel::class],
                 'telegram' => [TelegramChannel::class],
                 'slack' => [SlackChannel::class],
+                'microsoft_teams' => [MicrosoftTeamsChannel::class],
                 'pushover' => [PushoverChannel::class],
                 'webhook' => [WebhookChannel::class],
                 default => [],

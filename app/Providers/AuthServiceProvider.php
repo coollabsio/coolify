@@ -16,6 +16,7 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InfisicalConnection;
 use App\Models\InstanceSettings;
+use App\Models\MicrosoftTeamsNotificationSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
@@ -110,6 +111,7 @@ class AuthServiceProvider extends ServiceProvider
         DiscordNotificationSettings::class => NotificationPolicy::class,
         TelegramNotificationSettings::class => NotificationPolicy::class,
         SlackNotificationSettings::class => NotificationPolicy::class,
+        MicrosoftTeamsNotificationSettings::class => NotificationPolicy::class,
         PushoverNotificationSettings::class => NotificationPolicy::class,
         WebhookNotificationSettings::class => NotificationPolicy::class,
 

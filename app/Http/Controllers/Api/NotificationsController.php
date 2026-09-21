@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
+use App\Models\MicrosoftTeamsNotificationSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
@@ -103,6 +104,28 @@ class NotificationsController extends Controller
                     'server_unreachable_slack_notifications' => 'sometimes|boolean',
                     'server_patch_slack_notifications' => 'sometimes|boolean',
                     'traefik_outdated_slack_notifications' => 'sometimes|boolean',
+                ],
+            ],
+            'microsoft_teams' => [
+                'model' => MicrosoftTeamsNotificationSettings::class,
+                'rules' => [
+                    'microsoft_teams_enabled' => 'sometimes|boolean',
+                    'microsoft_teams_webhook_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'deployment_success_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'deployment_failure_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'status_change_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'backup_success_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'backup_failure_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'scheduled_task_success_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'scheduled_task_failure_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_success_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_failure_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'server_disk_usage_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'server_reachable_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'server_unreachable_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'server_patch_microsoft_teams_notifications' => 'sometimes|boolean',
+                    'traefik_outdated_microsoft_teams_notifications' => 'sometimes|boolean',
                 ],
             ],
             'telegram' => [
@@ -403,6 +426,44 @@ class NotificationsController extends Controller
     public function update_slack(Request $request): JsonResponse
     {
         return $this->updateChannel($request, 'slack');
+    }
+
+    #[OA\Get(
+        summary: 'Get Microsoft Teams notification settings',
+        description: 'Get the current team Microsoft Teams notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
+        path: '/notifications/microsoft-teams',
+        operationId: 'get-current-team-microsoft-teams-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Microsoft Teams notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+        ]
+    )]
+    public function microsoft_teams(Request $request): JsonResponse
+    {
+        return $this->showChannel('microsoft_teams');
+    }
+
+    #[OA\Patch(
+        summary: 'Update Microsoft Teams notification settings',
+        description: 'Update the current team Microsoft Teams notification settings.',
+        path: '/notifications/microsoft-teams',
+        operationId: 'update-current-team-microsoft-teams-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Updated Microsoft Teams notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function update_microsoft_teams(Request $request): JsonResponse
+    {
+        return $this->updateChannel($request, 'microsoft_teams');
     }
 
     #[OA\Get(

@@ -6,6 +6,7 @@ use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsMicrosoftTeams;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
@@ -37,7 +38,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsMicrosoftTeams, SendsPushover, SendsSlack
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
@@ -67,6 +68,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             ]);
             $team->discordNotificationSettings()->create();
             $team->slackNotificationSettings()->create();
+            $team->microsoftTeamsNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
             $team->webhookNotificationSettings()->create();
@@ -186,6 +188,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function routeNotificationForSlack()
     {
         return data_get($this, 'slack_webhook_url', null);
+    }
+
+    public function routeNotificationForMicrosoftTeams()
+    {
+        return data_get($this, 'microsoft_teams_webhook_url', null);
     }
 
     public function routeNotificationForPushover()
@@ -356,6 +363,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function slackNotificationSettings()
     {
         return $this->hasOne(SlackNotificationSettings::class);
+    }
+
+    public function microsoftTeamsNotificationSettings()
+    {
+        return $this->hasOne(MicrosoftTeamsNotificationSettings::class);
     }
 
     public function pushoverNotificationSettings()

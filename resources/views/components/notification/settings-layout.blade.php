@@ -4,6 +4,7 @@
         ['label' => 'Discord', 'route' => 'notifications.discord', 'brandIcon' => 'discord'],
         ['label' => 'Telegram', 'route' => 'notifications.telegram', 'brandIcon' => 'telegram'],
         ['label' => 'Slack', 'route' => 'notifications.slack', 'brandIcon' => 'slack'],
+        ['label' => 'Microsoft Teams', 'route' => 'notifications.microsoft-teams', 'icon' => 'teams'],
         ['label' => 'Pushover', 'route' => 'notifications.pushover', 'brandIcon' => 'pushover'],
         ['label' => 'Webhook', 'route' => 'notifications.webhook', 'icon' => 'destinations'],
     ];

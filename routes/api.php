@@ -78,6 +78,8 @@ Route::group([
     Route::patch('/notifications/discord', [NotificationsController::class, 'update_discord'])->middleware(['api.ability:write']);
     Route::get('/notifications/slack', [NotificationsController::class, 'slack'])->middleware(['api.ability:read']);
     Route::patch('/notifications/slack', [NotificationsController::class, 'update_slack'])->middleware(['api.ability:write']);
+    Route::get('/notifications/microsoft-teams', [NotificationsController::class, 'microsoft_teams'])->middleware(['api.ability:read']);
+    Route::patch('/notifications/microsoft-teams', [NotificationsController::class, 'update_microsoft_teams'])->middleware(['api.ability:write']);
     Route::get('/notifications/telegram', [NotificationsController::class, 'telegram'])->middleware(['api.ability:read']);
     Route::patch('/notifications/telegram', [NotificationsController::class, 'update_telegram'])->middleware(['api.ability:write']);
     Route::get('/notifications/pushover', [NotificationsController::class, 'pushover'])->middleware(['api.ability:read']);
