@@ -45,6 +45,53 @@ function makeApplication(int $environmentId, int $destinationId, ?string $gitCom
 }
 
 describe('queue_application_deployment commit resolution', function () {
+    test('rejects a commit with disallowed characters before creating a deployment', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        expect(fn () => queue_application_deployment(
+            application: $application,
+            deployment_uuid: 'invalid-queued-commit',
+            commit: 'abc;not-a-ref',
+            is_webhook: true,
+        ))->toThrow(Exception::class, 'Invalid deployment commit');
+
+        $this->assertDatabaseMissing('application_deployment_queue', [
+            'deployment_uuid' => 'invalid-queued-commit',
+        ]);
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+    });
+
+    test('validates the application fallback commit before creating a deployment', function () {
+        $application = makeApplication(
+            $this->environment->id,
+            $this->destination->id,
+            '$(not-a-ref)',
+        );
+
+        expect(fn () => queue_application_deployment(
+            application: $application,
+            deployment_uuid: 'invalid-fallback-commit',
+        ))->toThrow(Exception::class, 'Invalid deployment commit');
+
+        $this->assertDatabaseMissing('application_deployment_queue', [
+            'deployment_uuid' => 'invalid-fallback-commit',
+        ]);
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+    });
+
+    test('rejects a stored queue commit with disallowed characters', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        queue_application_deployment($application, 'stored-invalid-commit');
+
+        $deployment = ApplicationDeploymentQueue::query()
+            ->where('deployment_uuid', 'stored-invalid-commit')
+            ->sole();
+        $deployment->update(['commit' => "abc\nnot-a-ref"]);
+
+        expect(fn () => new ApplicationDeploymentJob($deployment->id))
+            ->toThrow(Exception::class, 'Invalid deployment commit');
+    });
+
     test('records a team audit event when a user queues a deployment', function () {
         $user = User::factory()->create();
         $this->team->members()->attach($user, ['role' => 'owner']);

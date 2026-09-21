@@ -237,7 +237,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
-        $this->commit = $this->application_deployment_queue->commit;
+        $this->commit = validateGitRef($this->application_deployment_queue->commit, 'deployment commit');
         $this->rollback = $this->application_deployment_queue->rollback;
         $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
