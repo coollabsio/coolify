@@ -30,6 +30,15 @@ class OauthLoginService
         Auth::login($user);
         $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
         session(['currentTeam' => $user->currentTeam = $team]);
+        auditLog('auth.user.oauth_login_succeeded', [
+            'team_id' => $team?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+            'provider' => $provider,
+        ]);
 
         return $user;
     }

@@ -81,7 +81,6 @@ use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -177,8 +176,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/oauth/{provider}', SettingsOauth::class)
         ->where('provider', '[A-Za-z0-9_-]+')
         ->name('settings.oauth.provider');
-    Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
-
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');

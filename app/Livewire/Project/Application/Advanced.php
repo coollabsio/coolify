@@ -123,7 +123,9 @@ class Advanced extends Component
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->inject_build_args_to_dockerfile = $this->injectBuildArgsToDockerfile;
             $this->application->settings->include_source_commit_in_build = $this->includeSourceCommitInBuild;
+            $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
             $this->isGzipEnabled = $this->application->isGzipEnabled();
@@ -301,7 +303,9 @@ class Advanced extends Component
             $this->application->settings->stop_grace_period = $validated['stopGracePeriod'] === null
                 ? null
                 : (int) $validated['stopGracePeriod'];
+            $changedFields = array_keys($this->application->settings->getDirty());
             $this->application->settings->save();
+            $this->auditSettingsUpdate($changedFields);
 
             $this->dispatch('success', 'Stop grace period updated.');
             $this->dispatch('configurationChanged');
@@ -330,5 +334,21 @@ class Advanced extends Component
     public function render()
     {
         return view('livewire.project.application.advanced');
+    }
+
+    /** @param array<int, string> $changedFields */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        $changedFields = array_values(array_diff($changedFields, ['updated_at']));
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.application.settings_updated', [
+            'team_id' => $this->application->team()?->id,
+            'application_uuid' => $this->application->uuid,
+            'application_name' => $this->application->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

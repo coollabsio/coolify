@@ -88,6 +88,7 @@ class TrafficAnalyticsSettings extends Component
             $this->dispatch('success', $enable
                 ? 'Traffic analytics enabled. Restarting proxy and Sentinel.'
                 : 'Traffic analytics disabled. Restarting proxy and Sentinel.');
+            auditLog($enable ? 'ui.server.traffic_analytics.enabled' : 'ui.server.traffic_analytics.disabled', $this->auditContext());
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -98,6 +99,9 @@ class TrafficAnalyticsSettings extends Component
         try {
             $this->authorize('update', $this->server);
             $this->syncData(true);
+            auditLog('ui.server.traffic_analytics.updated', $this->auditContext([
+                'changed_fields' => ['traffic_topn', 'traffic_sample_threshold', 'traffic_retention_1h_days', 'traffic_retention_1d_days', 'is_geoip_enabled', 'geoip_refresh_days', 'geoip_maxmind_license_key'],
+            ]));
             $this->dispatch('success', 'Traffic analytics settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -107,5 +111,14 @@ class TrafficAnalyticsSettings extends Component
     public function render(): View
     {
         return view('livewire.server.traffic-analytics-settings');
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 }

@@ -120,6 +120,7 @@ class Sentinel extends Component
             $this->setSentinelRestarting();
             $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
             $this->server->restartSentinel($customImage);
+            auditLog('ui.server.sentinel.restarted', $this->auditContext());
             $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -132,6 +133,7 @@ class Sentinel extends Component
             $this->authorize('manageSentinel', $this->server);
             $this->setSentinelRestarting();
             $this->server->settings->generateSentinelToken();
+            auditLog('ui.server.sentinel.token_regenerated', $this->auditContext());
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -150,6 +152,7 @@ class Sentinel extends Component
             $this->dispatch('sentinel-defaults-restored');
             $this->setSentinelRestarting();
             $this->server->restartSentinel();
+            auditLog('ui.server.sentinel.defaults_restored', $this->auditContext());
             $this->dispatch('success', 'Default Sentinel configuration restored. Restarting Sentinel.');
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -162,6 +165,9 @@ class Sentinel extends Component
             $this->authorize('update', $this->server);
             $this->setSentinelRestarting();
             $this->syncData(true);
+            auditLog('ui.server.sentinel.updated', $this->auditContext([
+                'changed_fields' => ['is_metrics_enabled', 'sentinel_token', 'sentinel_custom_url', 'is_sentinel_debug_enabled'],
+            ]));
             $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -182,5 +188,14 @@ class Sentinel extends Component
     public function render()
     {
         return view('livewire.server.sentinel');
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 }

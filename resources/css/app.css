@@ -3161,18 +3161,6 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
 }
 
-.scheduled-executions-table-grid {
-    grid-template-columns: 5.5rem minmax(9rem, 1fr) minmax(7rem, 0.7fr) 8.5rem 5rem minmax(12rem, 1.5fr);
-}
-
-.scheduler-runs-table-grid {
-    grid-template-columns: 9rem minmax(12rem, 1.5fr) 6rem 6rem 6rem;
-}
-
-.skipped-jobs-table-grid {
-    grid-template-columns: 9rem 7rem minmax(10rem, 1fr) minmax(12rem, 1.4fr);
-}
-
 .server-resources-managed-table-grid {
     grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 8rem 9.5rem;
 }
@@ -3242,15 +3230,6 @@ input[type="search"]::-webkit-search-results-decoration {
         display: none;
     }
 
-    .scheduled-executions-table-grid {
-        grid-template-columns: 5.5rem minmax(8rem, 1fr) 8.5rem minmax(10rem, 1.3fr);
-    }
-
-    .scheduled-executions-table-grid > :nth-child(3),
-    .scheduled-executions-table-grid > :nth-child(5) {
-        display: none;
-    }
-
     .server-resources-managed-table-grid {
         grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) 8rem 9.5rem;
     }
@@ -3301,32 +3280,6 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .api-tokens-table-grid > :nth-child(2) {
-        display: none;
-    }
-
-    .scheduled-executions-table-grid {
-        grid-template-columns: 5.5rem minmax(0, 1fr) 8.5rem;
-    }
-
-    .scheduled-executions-table-grid > :nth-child(6) {
-        display: none;
-    }
-
-    .scheduler-runs-table-grid {
-        grid-template-columns: 8.5rem minmax(0, 1fr) 5.5rem;
-    }
-
-    .scheduler-runs-table-grid > :nth-child(3),
-    .scheduler-runs-table-grid > :nth-child(4) {
-        display: none;
-    }
-
-    .skipped-jobs-table-grid {
-        grid-template-columns: 8.5rem minmax(0, 1fr);
-    }
-
-    .skipped-jobs-table-grid > :nth-child(2),
-    .skipped-jobs-table-grid > :nth-child(4) {
         display: none;
     }
 
