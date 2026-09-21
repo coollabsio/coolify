@@ -1,5 +1,15 @@
 # Infisical: instance-wide connection with a project per team
 
+> **NOT IMPLEMENTED — superseded by decision, 2026-09-21.**
+>
+> The per-team connection model in
+> `2026-09-21-infisical-single-connection-design.md` is retained: the operator
+> creates one Infisical project per team and configures each team's connection
+> directly. No code from this document was written.
+>
+> Kept only for the verified API research in "Project creation API (verified)",
+> which is accurate and would be the starting point if this is ever revisited.
+
 Amends `2026-09-21-infisical-single-connection-design.md`. Everything in that
 document stands except where contradicted here — the folder layout, the lock,
 the sync directions, the deletion policy and the scope mapping are unchanged.
