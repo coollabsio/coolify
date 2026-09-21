@@ -359,10 +359,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     });
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
-            'traefik.enable=true',
-            'traefik.http.routers.traefik.entrypoints=http',
-            'traefik.http.routers.traefik.service=api@internal',
-            'traefik.http.services.traefik.loadbalancer.server.port=8080',
+            'traefik.enable=false',
             'coolify.managed=true',
             'coolify.proxy=true',
         ];
