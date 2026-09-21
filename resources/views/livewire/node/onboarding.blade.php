@@ -67,6 +67,9 @@
     @else
         @php
             $currentStep = data_get($onboarding, 'step', 'queued'); $status = data_get($onboarding, 'status', 'queued');
+            if ($status === 'queued' || $currentStep === 'queued') {
+                $currentStep = 'preparing';
+            }
             $steps = ['preparing' => ['Preparing server', 'Checking the host and packages'], 'installing' => ['Installing Node components', 'Installing Podman and Sentinel'], 'connecting' => ['Connecting to Coolify', 'Starting the secure control channel'], 'networking' => ['Configuring network', 'Joining the private cluster mesh'], 'verifying' => ['Running final checks', 'Checking the Node connection']];
             $keys = array_keys($steps); $currentIndex = array_search($currentStep, $keys, true); $currentIndex = $currentIndex === false ? -1 : $currentIndex;
         @endphp

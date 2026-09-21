@@ -231,3 +231,21 @@ it('shows a notification when form validation blocks the connection check', func
         ->assertDispatched('error')
         ->assertSee('already been taken');
 });
+
+it('shows the first checkpoint as running while installation is queued', function () {
+    $cluster = NodeCluster::factory()->create(['team_id' => $this->team->id]);
+    $node = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->key->id,
+        'node_cluster_id' => $cluster->id,
+        'metadata' => [
+            'onboarding' => ['status' => 'queued', 'step' => 'queued', 'label' => 'Waiting to start'],
+        ],
+    ]);
+
+    Livewire::withQueryParams(['node' => $node->uuid])
+        ->test(Onboarding::class)
+        ->assertSet('step', 3)
+        ->assertSeeHtml('animate-spin')
+        ->assertSee('Preparing server');
+});
