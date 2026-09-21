@@ -23,7 +23,7 @@ compact divided list, not legacy green check SVGs or fixed-width status rows.
 > - Validate Blade with `docker exec coolify php artisan view:cache`, then clear
 >   it with `docker exec coolify php artisan view:clear`.
 > - Build frontend assets in the Vite container with
->   `docker exec coolify-vite npm run build`.
+>   `docker exec coolify-vite bun run build`.
 > - Use existing components before adding another styling abstraction.
 
 ---

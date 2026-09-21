@@ -15,7 +15,7 @@
 #   a  app 8000  db 5432  redis 6379  soketi 6001/6002  flux 6443
 #   b  app 8001  db 5433  redis 6380  soketi 6011/6012  flux 6444
 #
-# Frontend: multi-instance uses npm run build (shared public/build). Do not use
+# Frontend: multi-instance uses bun run build (shared public/build). Do not use
 # two Vite HMR servers — public/hot is a single shared file.
 #
 # Compose: docker-compose.dev-multi.yml
@@ -155,13 +155,13 @@ ensure_frontend_assets() {
     rm -f public/hot
   fi
   if [[ ! -d node_modules ]]; then
-    echo "Installing npm dependencies..."
-    npm install
+    echo "Installing dependencies with bun..."
+    bun install
   fi
   if [[ ! -f public/build/manifest.json ]]; then
-    echo "Building frontend assets (npm run build)..."
-    npm run build || {
-      echo "Warning: npm run build failed — UI will have no CSS/JS." >&2
+    echo "Building frontend assets (bun run build)..."
+    bun run build || {
+      echo "Warning: bun run build failed — UI will have no CSS/JS." >&2
       return 1
     }
     return
@@ -174,8 +174,8 @@ ensure_frontend_assets() {
     echo $f && is_file("public/build/".$f) ? "ok" : "missing";
   ' 2>/dev/null || echo missing)"
   if [[ "$css" != "ok" ]]; then
-    echo "Frontend build incomplete — running npm run build..."
-    npm run build || echo "Warning: npm run build failed." >&2
+    echo "Frontend build incomplete — running bun run build..."
+    bun run build || echo "Warning: bun run build failed." >&2
   fi
 }
 
@@ -193,7 +193,7 @@ filter_vite_profile() {
   if [[ $want_vite -eq 1 ]]; then
     if [[ ${#NAMES[@]} -gt 1 ]]; then
       echo "Note: ignoring --with vite (shared public/hot cannot serve two instances)."
-      echo "      Frontend uses npm run build. For HMR, run a single instance: $0 up a --with vite"
+      echo "      Frontend uses bun run build. For HMR, run a single instance: $0 up a --with vite"
     else
       kept+=("vite")
     fi

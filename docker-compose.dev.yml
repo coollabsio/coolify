@@ -92,7 +92,7 @@ services:
       timeout: 2s
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:24-alpine
+    image: oven/bun:1-alpine
     pull_policy: always
     container_name: coolify-vite
     working_dir: /var/www/html
@@ -105,7 +105,7 @@ services:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "bun install && bun run dev"
     networks:
       - coolify
   testing-host:
