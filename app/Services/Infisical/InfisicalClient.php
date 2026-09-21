@@ -49,7 +49,11 @@ class InfisicalClient
     }
 
     /**
-     * Infisical exposes no list-environments route; they live on the project.
+     * Infisical exposes no list-environments route; they live on the project
+     * object. Verified against a live self-hosted instance: the route is
+     * /api/v1/workspace/{id} returning {"workspace": {... "environments": []}}.
+     * /api/v1/projects/{id} does NOT exist, and /api/v2/workspace/{x} takes a
+     * SLUG rather than an id.
      *
      * @return array<int, string>
      *
@@ -57,9 +61,9 @@ class InfisicalClient
      */
     public function listEnvironmentSlugs(string $projectId): array
     {
-        $response = $this->send('get', "/api/v1/projects/{$projectId}", [], 'list environments');
+        $response = $this->send('get', "/api/v1/workspace/{$projectId}", [], 'list environments');
 
-        return collect($response->json('project.environments', []))
+        return collect($response->json('workspace.environments', []))
             ->pluck('slug')
             ->filter()
             ->values()
@@ -75,7 +79,7 @@ class InfisicalClient
      */
     public function createEnvironment(string $projectId, string $name, string $slug): bool
     {
-        $response = $this->raw('post', "/api/v1/projects/{$projectId}/environments", [
+        $response = $this->raw('post', "/api/v1/workspace/{$projectId}/environments", [
             'name' => $name,
             'slug' => $slug,
         ]);
@@ -96,8 +100,8 @@ class InfisicalClient
      */
     public function listFolderNames(string $projectId, string $environmentSlug, string $path): array
     {
-        $response = $this->send('get', '/api/v2/folders', [
-            'projectId' => $projectId,
+        $response = $this->send('get', '/api/v1/folders', [
+            'workspaceId' => $projectId,
             'environment' => $environmentSlug,
             'path' => $path,
         ], 'list folders');
@@ -114,8 +118,8 @@ class InfisicalClient
      */
     public function createFolder(string $projectId, string $environmentSlug, string $path, string $name): void
     {
-        $response = $this->raw('post', '/api/v2/folders', [
-            'projectId' => $projectId,
+        $response = $this->raw('post', '/api/v1/folders', [
+            'workspaceId' => $projectId,
             'environment' => $environmentSlug,
             'path' => $path,
             'name' => $name,
@@ -155,6 +159,11 @@ class InfisicalClient
      * One batch call with mode=upsert — creates what is missing, updates what
      * exists, no create-vs-update branching.
      *
+     * Verified against a live self-hosted instance: the route is
+     * PATCH /api/v3/secrets/batch/raw taking workspaceId. /api/v4/secrets/batch
+     * exists on Infisical Cloud but NOT on the self-hosted image, and folders
+     * are /api/v1/folders with workspaceId rather than /api/v2 with projectId.
+     *
      * @param  array<string, string>  $secrets
      *
      * @throws InfisicalApiException
@@ -170,8 +179,8 @@ class InfisicalClient
             $payload[] = ['secretKey' => (string) $key, 'secretValue' => (string) $value];
         }
 
-        $this->send('patch', '/api/v4/secrets/batch', [
-            'projectId' => $projectId,
+        $this->send('patch', '/api/v3/secrets/batch/raw', [
+            'workspaceId' => $projectId,
             'environment' => $environmentSlug,
             'secretPath' => $secretPath,
             'mode' => 'upsert',

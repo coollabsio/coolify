@@ -163,7 +163,7 @@ it('reports hidden secrets instead of throwing', function () {
 it('reads environment slugs from the project object', function () {
     Http::fake([
         '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
-        '*/api/v1/projects/proj' => Http::response(['project' => ['environments' => [
+        '*/api/v1/workspace/proj' => Http::response(['workspace' => ['environments' => [
             ['id' => '1', 'name' => 'Production', 'slug' => 'production'],
             ['id' => '2', 'name' => 'Staging', 'slug' => 'staging'],
         ]]]),
@@ -176,7 +176,7 @@ it('reads environment slugs from the project object', function () {
 it('returns false when environment creation is refused', function () {
     Http::fake([
         '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
-        '*/api/v1/projects/proj/environments' => Http::response(['message' => 'forbidden'], 403),
+        '*/api/v1/workspace/proj/environments' => Http::response(['message' => 'forbidden'], 403),
     ]);
 
     expect((new InfisicalClient(InfisicalConnection::factory()->create()))
@@ -186,8 +186,8 @@ it('returns false when environment creation is refused', function () {
 it('creates each folder level separately because the api does not recurse', function () {
     Http::fake([
         '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
-        '*/api/v2/folders?*' => Http::response(['folders' => []]),
-        '*/api/v2/folders' => Http::response(['folder' => ['id' => 'f']], 200),
+        '*/api/v1/folders?*' => Http::response(['folders' => []]),
+        '*/api/v1/folders' => Http::response(['folder' => ['id' => 'f']], 200),
     ]);
 
     (new InfisicalClient(InfisicalConnection::factory()->create()))
@@ -195,7 +195,7 @@ it('creates each folder level separately because the api does not recurse', func
 
     $creates = collect(Http::recorded())
         ->filter(fn ($pair) => $pair[0]->method() === 'POST'
-            && str_contains($pair[0]->url(), '/api/v2/folders'))
+            && str_contains($pair[0]->url(), '/api/v1/folders'))
         ->map(fn ($pair) => [$pair[0]['path'], $pair[0]['name']])
         ->values()
         ->all();
@@ -209,30 +209,30 @@ it('creates each folder level separately because the api does not recurse', func
 it('skips creating a folder level that already exists', function () {
     Http::fake([
         '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
-        '*/api/v2/folders?*' => Http::response(['folders' => [['name' => 'shop-api']]]),
-        '*/api/v2/folders' => Http::response(['folder' => ['id' => 'f']], 200),
+        '*/api/v1/folders?*' => Http::response(['folders' => [['name' => 'shop-api']]]),
+        '*/api/v1/folders' => Http::response(['folder' => ['id' => 'f']], 200),
     ]);
 
     (new InfisicalClient(InfisicalConnection::factory()->create()))
         ->ensureFolderPath('proj', 'production', '/shop-api/');
 
     Http::assertNotSent(fn ($request) => $request->method() === 'POST'
-        && str_contains($request->url(), '/api/v2/folders'));
+        && str_contains($request->url(), '/api/v1/folders'));
 });
 
 it('upserts secrets in one batch call', function () {
     Http::fake([
         '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
-        '*/api/v4/secrets/batch' => Http::response(['secrets' => []]),
+        '*/api/v3/secrets/batch/raw' => Http::response(['secrets' => []]),
     ]);
 
     (new InfisicalClient(InfisicalConnection::factory()->create()))
         ->upsertSecrets('proj', 'production', '/shop-api/', ['A' => '1', 'B' => '2']);
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
-        && str_contains($request->url(), '/api/v4/secrets/batch')
+        && str_contains($request->url(), '/api/v3/secrets/batch/raw')
         && $request['mode'] === 'upsert'
-        && $request['projectId'] === 'proj'
+        && $request['workspaceId'] === 'proj'
         && $request['environment'] === 'production'
         && $request['secretPath'] === '/shop-api/'
         && $request['secrets'] === [
