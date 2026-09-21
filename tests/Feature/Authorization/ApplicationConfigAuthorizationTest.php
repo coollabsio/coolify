@@ -247,6 +247,18 @@ test('member cannot submit application advanced settings', function () {
         ->assertDispatched('error');
 });
 
+test('member cannot save the application container name prefix', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApplicationAdvanced::class, ['application' => $this->application])
+        ->set('customContainerNamePrefix', 'member-prefix')
+        ->call('saveCustomNamePrefix')
+        ->assertDispatched('error');
+
+    expect($this->application->settings->fresh()->custom_container_name_prefix)->toBeNull();
+});
+
 test('the private application advanced syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);

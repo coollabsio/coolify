@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AuditEvent;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -47,6 +48,12 @@ class CleanupDatabase extends Command
         echo "Delete $count entries from activity_log.\n";
         if ($this->option('yes')) {
             $activity_log->delete();
+        }
+
+        $count = DB::table('audit_events')->where('created_at', '<', now()->subDays(90))->count();
+        echo "Delete $count entries from audit_events.\n";
+        if ($this->option('yes')) {
+            AuditEvent::pruneExpired();
         }
 
         // Cleanup application_deployment_queues table

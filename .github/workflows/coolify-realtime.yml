@@ -1,10 +1,12 @@
 name: Coolify Realtime
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
       - .github/workflows/coolify-realtime.yml
+      - config/constants.php
       - docker/coolify-realtime/**
 
 permissions:

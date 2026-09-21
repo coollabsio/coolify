@@ -17,6 +17,12 @@
             @include('livewire.destination.sidebar', ['destination' => $destination])
 
             <div class="min-w-0">
+                @if ($destination->getMorphClass() !== 'App\Models\StandaloneDocker')
+                    <x-callout type="warning" title="Docker Swarm support is deprecated" class="mb-6">
+                        {{ config('deprecations.swarm') }}
+                    </x-callout>
+                @endif
+
                 @if (request()->routeIs('destination.danger'))
                     <div class="application-settings-form">
                         <x-application.settings-section id="destination-danger-section" title="Danger zone"

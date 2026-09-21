@@ -4,9 +4,103 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
+
+function traefikAccessLogCommands(bool $enabled): array
+{
+    if (! $enabled) {
+        return [];
+    }
+
+    return [
+        '--accesslog=true',
+        '--accesslog.filepath=/traefik/access.log',
+        '--accesslog.format=json',
+        '--accesslog.fields.headers.names.Cf-Connecting-Ip=keep',
+        '--accesslog.fields.headers.names.Cf-Ipcountry=keep',
+        '--accesslog.fields.headers.names.Cf-Cache-Status=keep',
+        '--accesslog.fields.headers.names.Cf-Verified-Bot=keep',
+        '--accesslog.fields.headers.names.Cf-Ray=keep',
+        // Kept so Sentinel can resolve the real client IP behind a non-Cloudflare
+        // reverse proxy (leftmost X-Forwarded-For entry) and report User-Agents/referrers.
+        '--accesslog.fields.headers.names.X-Forwarded-For=keep',
+        '--accesslog.fields.headers.names.User-Agent=keep',
+        '--accesslog.fields.headers.names.Referer=keep',
+    ];
+}
+
+function applyTrafficAnalyticsToProxyConfiguration(Server $server, string $configuration): string
+{
+    $config = Yaml::parse($configuration);
+
+    if (! is_array($config)) {
+        throw new RuntimeException('Proxy configuration must be a YAML mapping.');
+    }
+
+    $config = applyTrafficAnalyticsToProxyConfigArray($server, $config);
+
+    return Yaml::dump($config, 12, 2);
+}
+
+function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config): array
+{
+    $enabled = $server->isTrafficAnalyticsEnabled();
+
+    if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
+        $managedCommands = traefikAccessLogCommands(true);
+        $commands = data_get($config, 'services.traefik.command', []);
+
+        if (! is_array($commands)) {
+            throw new RuntimeException('Traefik commands must be a YAML list.');
+        }
+
+        $commands = array_values(array_filter(
+            $commands,
+            fn (mixed $command): bool => ! in_array($command, $managedCommands, true)
+        ));
+
+        if ($enabled) {
+            $commands = [...$commands, ...$managedCommands];
+        }
+
+        data_set($config, 'services.traefik.command', $commands);
+        unset($config['services']['traefik-logrotate']);
+
+        if ($enabled && ! $server->isSwarm() && ! isDev()) {
+            $proxyPath = $server->proxyPath();
+            $config['services']['traefik-logrotate'] = [
+                'image' => 'alpine:3.20',
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "{$proxyPath}:/traefik",
+                ],
+                'labels' => [
+                    'coolify.managed=true',
+                ],
+                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+            ];
+        }
+    } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
+        $trafficVolume = $server->proxyPath().':/traffic';
+        $volumes = data_get($config, 'services.caddy.volumes', []);
+
+        if (! is_array($volumes)) {
+            throw new RuntimeException('Caddy volumes must be a YAML list.');
+        }
+
+        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => $volume !== $trafficVolume));
+        if ($enabled) {
+            $volumes[] = $trafficVolume;
+        }
+
+        data_set($config, 'services.caddy.volumes', $volumes);
+    }
+
+    return $config;
+}
 
 /**
  * Check if a network name is a Docker predefined system network.
@@ -20,6 +114,28 @@ function isDockerPredefinedNetwork(string $network): bool
     // Only filter 'default' and 'host' to match existing codebase patterns
     // See: bootstrap/helpers/parsers.php:891, bootstrap/helpers/shared.php:689,748
     return in_array($network, ['default', 'host'], true);
+}
+
+function isUsableDockerNetworkName(mixed $network): bool
+{
+    return is_string($network)
+        && $network !== ''
+        && ! isDockerPredefinedNetwork($network)
+        && ValidationPatterns::isValidDockerNetwork($network);
+}
+
+/**
+ * Create a Docker network when it does not exist. The network name is always a single escaped argument.
+ */
+function dockerNetworkEnsureCommand(string $network, bool $overlay = false, bool $quietCreate = false): string
+{
+    $safe = escapeshellarg($network);
+    $createFlags = $overlay
+        ? '--driver overlay --attachable'
+        : '--attachable';
+    $quiet = $quietCreate ? ' >/dev/null' : '';
+
+    return "docker network inspect {$safe} >/dev/null 2>&1 || docker network create {$createFlags} {$safe}{$quiet}";
 }
 
 function collectProxyDockerNetworksByServer(Server $server)
@@ -82,12 +198,8 @@ function collectDockerNetworksByServer(Server $server)
         $networks->push($network);
         $allNetworks->push($network);
     }
-    $networks = collect($networks)->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
-    $allNetworks = $allNetworks->flatten()->unique()->filter(function ($network) {
-        return ! isDockerPredefinedNetwork($network);
-    });
+    $networks = collect($networks)->flatten()->unique()->filter(fn ($network) => isUsableDockerNetworkName($network));
+    $allNetworks = $allNetworks->flatten()->unique()->filter(fn ($network) => isUsableDockerNetworkName($network));
     if ($server->isSwarm()) {
         if ($networks->count() === 0) {
             $networks = collect(['coolify-overlay']);
@@ -113,7 +225,7 @@ function connectProxyToNetworks(Server $server)
             $safe = escapeshellarg($network);
 
             return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                dockerNetworkEnsureCommand($network, overlay: true, quietCreate: true),
                 "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
@@ -145,25 +257,14 @@ function ensureProxyNetworksExist(Server $server)
 {
     ['allNetworks' => $networks] = collectDockerNetworksByServer($server);
 
-    if ($server->isSwarm()) {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
+    $commands = $networks->map(function ($network) use ($server) {
+        $safe = escapeshellarg($network);
 
-            return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
-            ];
-        });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
-
-            return [
-                "echo 'Ensuring network {$safe} exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
-            ];
-        });
-    }
+        return [
+            "echo 'Ensuring network {$safe} exists...'",
+            dockerNetworkEnsureCommand($network, overlay: $server->isSwarm()),
+        ];
+    });
 
     return $commands->flatten();
 }
@@ -266,10 +367,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
     });
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
-            'traefik.enable=true',
-            'traefik.http.routers.traefik.entrypoints=http',
-            'traefik.http.routers.traefik.service=api@internal',
-            'traefik.http.services.traefik.loadbalancer.server.port=8080',
+            'traefik.enable=false',
             'coolify.managed=true',
             'coolify.proxy=true',
         ];
@@ -279,7 +377,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'traefik' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'traefik:v3.6',
+                    'image' => 'traefik:v3.7',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
@@ -325,7 +423,6 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         if (isDev()) {
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
-            $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
             $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
         } else {
@@ -358,6 +455,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 $config['services']['traefik']['command'][] = $custom_command;
             }
         }
+
     } elseif ($proxy_type === 'CADDY') {
         $config = [
             'networks' => $array_of_networks->toArray(),
@@ -396,6 +494,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         return null;
     }
 
+    $config = applyTrafficAnalyticsToProxyConfigArray($server, $config);
     $config = Yaml::dump($config, 12, 2);
     SaveProxyConfiguration::run($server, $config);
 

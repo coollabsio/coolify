@@ -90,6 +90,7 @@
 
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
                     <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
+                        x-init="$wire.loadProxyConfiguration()"
                         helper="Edit the generated proxy compose configuration used on this server.">
                         <x-slot:actions>
                             @can('update', $server)
@@ -127,6 +128,11 @@
                                 </x-callout>
                             @endif
                         @endif
+
+                        <div wire:loading.flex wire:target="loadProxyConfiguration"
+                            class="min-h-32 items-center justify-center">
+                            <x-loading text="Loading proxy configuration…" />
+                        </div>
 
                         @if ($proxySettings)
                             <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"

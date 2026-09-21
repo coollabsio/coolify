@@ -94,6 +94,8 @@ it('prevents the stable realtime workflow from publishing an existing version', 
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-realtime.yml');
 
     expect($workflow)
+        ->toContain('workflow_dispatch:')
+        ->toContain('- config/constants.php')
         ->toContain('check-version:')
         ->toContain('needs: check-version')
         ->toContain('php bootstrap/getRealtimeVersion.php')

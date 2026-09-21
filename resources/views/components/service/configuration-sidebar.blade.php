@@ -46,27 +46,41 @@
             ->filter()
             ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
+
+    // Group that holds the current page — the only one expanded by default.
+    $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start">
     <nav aria-label="Service settings"
+        x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.service' })"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
-            <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
-            @foreach ($groupItems as $menuItem)
-                <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
-                    @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                    href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
-                    <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                    @if ($menuItem['hasWarning'] ?? false)
-                        <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
-                    @endif
-                </a>
-            @endforeach
+            <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
+                :aria-expanded="isOpen(@js($groupLabel))">
+                <span>{{ $groupLabel }}</span>
+                <svg class="size-3 shrink-0 opacity-60 transition-transform"
+                    :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+            </button>
+            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
+                @foreach ($groupItems as $menuItem)
+                    <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
+                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                        href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
+                        <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                        <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                        @if ($menuItem['hasWarning'] ?? false)
+                            <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
+                        @endif
+                    </a>
+                @endforeach
+            </div>
         @endforeach
     </nav>
 </aside>

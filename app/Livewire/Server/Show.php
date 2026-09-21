@@ -44,8 +44,10 @@ class Show extends Component
 
     public bool $isUsable;
 
+    #[Locked]
     public bool $isSwarmManager;
 
+    #[Locked]
     public bool $isSwarmWorker;
 
     public string $serverRole;
@@ -249,9 +251,7 @@ class Show extends Component
             $this->server->save();
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
-            $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
-            $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $role = ServerRole::from($this->serverRole);
             $this->server->settings->server_role = $role;
             $this->server->settings->is_build_server = $role === ServerRole::BUILD;
