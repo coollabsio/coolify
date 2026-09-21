@@ -2,10 +2,5 @@
 
 cd /var/www/html
 
-if grep -qE '^PUSHER_ENABLED=false' .env 2>/dev/null; then
-    echo "   INFO  Reverb is disabled, sleeping."
-    exec sleep infinity
-fi
-
-echo "   INFO  Reverb is enabled, starting..."
+echo "   INFO  Reverb is starting..."
 exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}

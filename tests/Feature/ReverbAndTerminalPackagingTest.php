@@ -26,6 +26,8 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
         ->toContain('npm ci --prefix /terminal')
         ->and(file_get_contents(base_path(dirname($dockerfile).'/etc/s6-overlay/s6-rc.d/reverb/run')))
         ->toContain('exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}')
+        ->not->toContain('PUSHER_ENABLED')
+        ->not->toContain('Reverb is disabled')
         ->and(file_get_contents(base_path(dirname($dockerfile).'/etc/s6-overlay/s6-rc.d/terminal-server/run')))
         ->toContain('exec node /terminal/terminal-server.js')
         ->and(file_exists(base_path(dirname($dockerfile)."/etc/s6-overlay/s6-rc.d/reverb/dependencies.d/{$dependencyService}")))->toBeTrue()
