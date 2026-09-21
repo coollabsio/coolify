@@ -189,13 +189,47 @@ Tests run under `QUEUE_CONNECTION=sync` (`phpunit.xml`), which hides queued-job
 races. Any code path that enqueues must be reasoned about explicitly, not
 assumed correct because tests pass.
 
-## Open risk: Infisical API capability
+## Infisical API surface (verified)
 
-Auto-creating environments and folders depends on endpoints not yet verified
-against a live Infisical instance, and environment creation requires
-project-admin rights on the machine identity. This must be verified before any
-code depends on it. If unavailable, the design degrades to skip-and-warn for
-missing environments, and the operator creates them in Infisical by hand.
+Verified against the live OpenAPI document at
+`https://app.infisical.com/api/docs/json`. Field names below are exact.
+
+| Operation | Endpoint | Body / query |
+|---|---|---|
+| Authenticate | `POST /api/v1/auth/universal-auth/login` | `clientId`, `clientSecret` |
+| Read secrets | `GET /api/v3/secrets/raw` | `workspaceId`, `environment`, `secretPath` |
+| **Upsert secrets** | `PATCH /api/v4/secrets/batch` | `projectId`, `environment`, `secretPath`, `secrets[]`, `mode: "upsert"` |
+| List environments | `GET /api/v1/projects/{projectId}` | read `project.environments[] = {id,name,slug}` |
+| Create environment | `POST /api/v1/projects/{projectId}/environments` | `name`, `slug`, optional `position` |
+| List folders | `GET /api/v2/folders` | `projectId`, `environment`, `path` (all required) |
+| Create folder | `POST /api/v2/folders` | `projectId`, `environment`, `name`, optional `path` |
+
+Three findings change the implementation:
+
+1. **`PATCH /api/v4/secrets/batch` with `mode: "upsert"` removes all
+   create-vs-update branching.** Every upward write uses this one call.
+2. **There is no list-environments endpoint.** Environments are read from the
+   project object, not a dedicated collection route.
+3. **Recursive parent-folder creation is NOT documented and must not be
+   assumed.** `ensureFolderPath()` walks the path segment by segment, creating
+   each level idempotently and tolerating an already-exists error.
+
+### Machine identity permissions
+
+The identity must be added to the Infisical project under Access Control and
+hold a role granting: `environments:create`, `secret-folders:create` and read,
+`secrets:create` / `secrets:edit`, and — critically — **`secrets:readValue`**,
+which is a distinct, newer permission from generic secret read. Without
+`readValue`, the API returns `secretValueHidden: true` and masks the value
+rather than failing, which is why that flag must be checked rather than
+assuming `secretValue` is populated.
+
+Environment creation is additionally subject to the organization's plan
+environment-count limit. Behaviour of that limit on self-hosted OSS
+deployments is unconfirmed; treat a creation failure as a degradation to
+skip-and-warn, never as a hard sync failure.
+
+Self-hosted instances expose the same API shape; only the base URL differs.
 
 ## Compatibility
 
