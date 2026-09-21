@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
@@ -92,8 +93,15 @@ class SentinelController extends Controller
 
         $data = $request->all();
 
+        $wasSentinelLive = $server->sentinel_updated_at !== null && $server->isSentinelLive();
+
         // Heartbeat MUST update on every push — drives isSentinelLive() and SSH-check skipping.
+        $server->sentinel_waiting_since = null;
         $server->sentinelHeartbeat();
+
+        if (! $wasSentinelLive) {
+            SentinelSynchronized::dispatch($server);
+        }
 
         if ($this->shouldDispatchUpdate($server, $data)) {
             PushServerUpdateJob::dispatch($server, $data);
@@ -138,7 +146,7 @@ class SentinelController extends Controller
     /**
      * Build a stable hash of container state.
      *
-     * Covers [name, state] only — metrics, filesystem_usage_root, and
+     * Covers [name, state, restart_count] only — metrics, filesystem_usage_root, and
      * health_status are excluded on purpose. Disk % churns constantly, and
      * health checks can flap between starting/healthy/unhealthy while the
      * container lifecycle state remains unchanged. Both would otherwise defeat
@@ -153,6 +161,7 @@ class SentinelController extends Controller
             ->map(fn ($c) => [
                 'name' => data_get($c, 'name'),
                 'state' => data_get($c, 'state'),
+                'restart_count' => data_get($c, 'restart_count'),
             ])
             ->sortBy('name')
             ->values()

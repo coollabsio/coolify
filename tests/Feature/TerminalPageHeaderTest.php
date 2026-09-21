@@ -90,7 +90,7 @@ it('uses the same padded themed canvas for the active terminal session', functio
     expect($view)
         ->toContain('data-terminal-session-canvas')
         ->toContain('p-3 sm:p-6')
-        ->toContain('terminal-session-panel mt-8')
+        ->toContain('terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6')
         ->and($styles)
         ->toContain('.terminal-session-panel')
         ->toContain('border-radius: 0.75rem;')
@@ -145,7 +145,7 @@ it('offers the console theme selector only while a session owns the canvas', fun
         ->and($selector)
         ->toContain('terminal-theme-trigger flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-medium')
         ->and($view)
-        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
+        ->toContain('terminal-session-toolbar flex items-center gap-3 text-white select-none')
         ->not->toContain('terminal-theme-trigger');
 });
 
@@ -177,7 +177,7 @@ it('keeps the theme selector in the floating session toolbar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 
     expect($view)
-        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
+        ->toContain('terminal-session-toolbar flex items-center gap-3 text-white select-none')
         ->toContain('<x-terminal.theme-selector')
         ->not->toContain('class="absolute top-3 right-3 z-20"');
 });
@@ -256,7 +256,7 @@ it('defaults to a system console theme that follows the page color mode', functi
         ->and($appCss)
         ->toContain('[data-console-theme="system"]')
         ->toContain('html:not(.dark) .application-console-shell[data-console-theme="system"]')
-        ->toContain('--console-theme-border: #d4d4d8')
+        ->toContain('--console-theme-border: oklch(87.11% 0.0055 286.29)')
         ->toContain('background: transparent')
         ->toContain('html.dark .application-console-shell[data-console-theme="system"]');
 });

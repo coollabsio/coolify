@@ -8,8 +8,11 @@ import {
     extractSshArgs,
     extractTargetHost,
     extractTimeout,
+    getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAuthorizedTargetHost,
+    sanitizeSshArgs,
+    validateSshArgs,
 } from './terminal-utils.js';
 
 async function postToCoolify(path, headers) {
@@ -384,12 +387,22 @@ async function handleCommand(ws, command, userId) {
         return;
     }
 
+    if (!validateSshArgs(sshArgs, userSession.authorizedIPs)) {
+        logTerminal('warn', 'Rejecting terminal command because its SSH arguments are not allowed.', {
+            userId,
+            targetHost,
+        });
+        ws.send('Invalid SSH command: Unsupported SSH arguments');
+        return;
+    }
+    const sanitizedSshArgs = sanitizeSshArgs(sshArgs);
+
     const options = {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
         cwd: process.env.HOME,
-        env: {},
+        env: getTerminalProcessEnv(),
     };
 
     // NOTE: - Initiates a process within the Terminal container
@@ -401,7 +414,7 @@ async function handleCommand(ws, command, userId) {
         commandTimeout,
         terminalSessionTimeout,
     });
-    const ptyProcess = pty.spawn('ssh', sshArgs.concat([hereDocContent]), options);
+    const ptyProcess = pty.spawn('ssh', sanitizedSshArgs.concat([hereDocContent]), options);
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;

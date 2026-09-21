@@ -11,8 +11,7 @@
                 x-transition:enter-start="translate-y-2" x-transition:enter-end="translate-y-0"
                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-y-0"
                 x-transition:leave-end="translate-y-2" x-cloak
-                class="absolute bottom-full mb-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl"
-                style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">
+                class="surface-popover absolute bottom-full mb-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl">
                 <div class="max-h-96 space-y-1 overflow-y-auto p-2 scrollbar">
                     @foreach ($this->deployments as $deployment)
                         @php
@@ -71,8 +70,7 @@
 
             {{-- Collapsed pill --}}
             <button type="button" @click="expanded = !expanded"
-                class="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50 dark:border-coolgray-300 dark:bg-surface dark:text-fg dark:hover:bg-raised"
-                style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal);"
+                class="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-neutral-800 shadow-dropdown transition-colors hover:bg-neutral-50 dark:border-coolgray-300 dark:bg-surface dark:text-fg dark:hover:bg-raised"
                 :aria-expanded="expanded.toString()" aria-label="Active deployments">
                 <svg class="loading-indicator size-3.5 shrink-0 animate-spin"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">

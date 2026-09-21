@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Shared\CheckDomainDns;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use Illuminate\Bus\Queueable;
@@ -23,7 +24,7 @@ class CheckDomainDnsJob implements ShouldBeEncrypted, ShouldQueue
     public int $timeout = 30;
 
     public function __construct(
-        public Application|ServiceApplication $resource,
+        public Application|ApplicationPreview|ServiceApplication $resource,
         public string $statusKey,
         public string $url,
         public ?Server $server,

@@ -56,6 +56,44 @@
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="request()->query()"
         wire:key="service-heading-volume-backup-index" />
 
+    @if ($selectedDatabaseBackup || $selectedVolumeBackup)
+        @php
+            $selectedSchedule = $selectedDatabaseBackup ?: $selectedVolumeBackup;
+        @endphp
+        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge fixedHeight
+            canGate="update" :canResource="$service">
+            <x-slot:content><span></span></x-slot:content>
+
+            <div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
+                <div>
+                    <h2 class="text-base font-semibold text-neutral-950 dark:text-fg">
+                        {{ $selectedDatabaseBackup
+                            ? ($selectedDatabaseBackup->database->human_name ?: $selectedDatabaseBackup->database->name)
+                            : $selectedVolumeBackup->targetName() }}
+                    </h2>
+                    <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">{{ $selectedSchedule->frequency }} schedule</p>
+                </div>
+
+                <x-backup-tabs context="service-schedule" :parameters="$parameters" section="general" />
+
+                @foreach (['general', 's3', 'retention', 'danger'] as $modalSection)
+                    <div x-show="activeSection === '{{ $modalSection }}'" x-cloak>
+                        @if ($selectedDatabaseBackup)
+                            <livewire:project.database.backup-edit :backup="$selectedDatabaseBackup"
+                                :available-s3-storages="$s3s" :status="data_get($selectedDatabaseBackup->database, 'status')"
+                                :section="$modalSection"
+                                wire:key="service-database-backup-modal-{{ $selectedDatabaseBackup->uuid }}-{{ $modalSection }}" />
+                        @else
+                            <livewire:project.shared.storages.volume-backups :storage="$selectedVolumeBackup->backupable"
+                                :resource="$service" :section="$modalSection"
+                                wire:key="service-volume-backup-modal-{{ $selectedVolumeBackup->uuid }}-{{ $modalSection }}" />
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </x-modal-input>
+    @endif
+
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-service.configuration-sidebar :service="$service"
@@ -190,9 +228,11 @@
         </div>
 
         <div @class([
-            'application-settings-section-body w-full',
+            'application-settings-section-body relative w-full',
             'is-flush' => $backups->isNotEmpty() || $databaseBackups->isNotEmpty(),
         ])>
+            <x-table.loading target="openSchedule" text="Loading schedule..." />
+
             <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
                 <x-empty size="sm" title="No backups found"
                     description="No scheduled backups match your search." />
@@ -200,6 +240,7 @@
 
             @if ($backups->isNotEmpty() || $databaseBackups->isNotEmpty())
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
+                    <div class="min-w-[64rem]">
                     <div class="data-table-header backup-table-grid service-backup-table-grid">
                         <span>Target</span>
                         <span>Type</span>
@@ -207,6 +248,7 @@
                         <span>Status</span>
                         <span>S3</span>
                         <span>Last run</span>
+                        <span class="text-right">Actions</span>
                     </div>
 
                     @foreach ($databaseBackups as $databaseBackup)
@@ -226,17 +268,15 @@
                                 default => 'neutral',
                             };
                             $databaseBackupId = 'database:'.$databaseBackup->id;
+                            $databaseS3 = $databaseBackup->s3?->team_id === currentTeam()->id ? $databaseBackup->s3 : null;
+                            $databaseS3Tooltip = ! $databaseBackup->save_s3 ? 'S3 storage: Not configured' : ($databaseS3 ? 'S3 storage: '.$databaseS3->name.' (bucket: '.$databaseS3->bucket.')' : 'S3 storage: Unavailable');
                         @endphp
-                        <a wire:key="database-backup-{{ $databaseBackup->uuid }}"
+                        <div wire:key="database-backup-{{ $databaseBackup->uuid }}"
                             x-show="isVisible(@js($databaseBackupId))"
                             x-bind:style="{ order: backupOrder(@js($databaseBackupId)) }"
-                            href="{{ route('project.service.database.backup.show', [
-                                ...$parameters,
-                                'stack_service_uuid' => $databaseBackup->database->uuid,
-                                'backup_uuid' => $databaseBackup->uuid,
-                            ]) }}"
-                            {{ wireNavigate() }}
-                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
+                            wire:click="openSchedule('{{ $databaseBackup->uuid }}')"
+                            wire:keydown.enter="openSchedule('{{ $databaseBackup->uuid }}')" role="button" tabindex="0"
+                            class="data-table-row backup-table-grid cursor-pointer text-left text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg">
                                 {{ $databaseBackup->database->human_name ?: $databaseBackup->database->name }}
                             </span>
@@ -244,16 +284,32 @@
                             <span>{{ $databaseBackup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
-                                <x-status-badge :status="$databaseBackup->save_s3 ? ($databaseBackup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$databaseBackup->save_s3 ? ($databaseBackup->s3 ? 'success' : 'error') : 'neutral'" />
+                                <x-status-badge :status="$databaseBackup->save_s3 ? ($databaseS3 ? 'Configured' : 'Unavailable') : 'Not set'"
+                                    :type="$databaseBackup->save_s3 ? ($databaseS3 ? 'success' : 'error') : 'neutral'"
+                                    :data-tooltip="$databaseS3Tooltip" :aria-label="$databaseS3Tooltip" tabindex="0" />
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
-                        </a>
+                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
+                                    :disabled="! str($databaseBackup->database->status)->startsWith('running')"
+                                    :tooltip="! str($databaseBackup->database->status)->startsWith('running') ? 'The database must be running to start a backup.' : null"
+                                    wire:click.stop="backupNow('database', '{{ $databaseBackup->uuid }}')"
+                                    wire:target="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-forms.button>
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
+                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
+                                    title="Edit backup schedule" aria-label="Edit backup schedule"
+                                    wire:click.stop="openSchedule('{{ $databaseBackup->uuid }}')">
+                                    <x-reicon name="settings" class="size-4" />
+                                </x-forms.button>
+                            </span>
+                        </div>
                     @endforeach
 
                     @foreach ($backups as $backup)
                         @php
                             $latestExecution = $backup->latestExecution;
+                            $volumeS3 = $backup->s3?->team_id === currentTeam()->id ? $backup->s3 : null;
+                            $volumeS3Tooltip = ! $backup->save_s3 ? 'S3 storage: Not configured' : ($volumeS3 ? 'S3 storage: '.$volumeS3->name.' (bucket: '.$volumeS3->bucket.')' : 'S3 storage: Unavailable');
                             $status = $latestExecution?->status;
                             $statusLabel = match ($status) {
                                 'running' => 'In progress',
@@ -268,12 +324,12 @@
                                 default => 'neutral',
                             };
                         @endphp
-                        <a wire:key="volume-backup-{{ $backup->uuid }}"
+                        <div wire:key="volume-backup-{{ $backup->uuid }}"
                             x-show="isVisible(@js('storage:'.$backup->id))"
                             x-bind:style="{ order: backupOrder(@js('storage:'.$backup->id)) }"
-                            href="{{ route('project.service.volume-backups.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}"
-                            {{ wireNavigate() }}
-                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
+                            wire:click="openSchedule('{{ $backup->uuid }}')"
+                            wire:keydown.enter="openSchedule('{{ $backup->uuid }}')" role="button" tabindex="0"
+                            class="data-table-row backup-table-grid cursor-pointer text-left text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
                                 title="{{ $backup->targetName() }}">
                                 {{ $backup->targetName() }}
@@ -281,15 +337,28 @@
                             <span>{{ $backup->targetType() }}</span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span title="{{ $backup->save_s3 ? ($backup->s3?->name ?? 'S3 storage unavailable') : 'S3 storage is not configured' }}">
-                                <x-status-badge :status="$backup->save_s3 ? ($backup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
-                                    :type="$backup->save_s3 ? ($backup->s3 ? 'success' : 'error') : 'neutral'" />
+                            <span>
+                                <x-status-badge :status="$backup->save_s3 ? ($volumeS3 ? 'Configured' : 'Unavailable') : 'Not set'"
+                                    :type="$backup->save_s3 ? ($volumeS3 ? 'success' : 'error') : 'neutral'"
+                                    :data-tooltip="$volumeS3Tooltip" :aria-label="$volumeS3Tooltip" tabindex="0" />
                             </span>
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
-                        </a>
+                            <span class="flex justify-end gap-2" x-on:keydown.enter.stop>
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
+                                    wire:click.stop="backupNow('storage', '{{ $backup->uuid }}')"
+                                    wire:target="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-forms.button>
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
+                                    defaultClass="icon-button shrink-0" :showLoadingIndicator="false"
+                                    title="Edit backup schedule" aria-label="Edit backup schedule"
+                                    wire:click.stop="openSchedule('{{ $backup->uuid }}')">
+                                    <x-reicon name="settings" class="size-4" />
+                                </x-forms.button>
+                            </span>
+                        </div>
                     @endforeach
+                    </div>
                 </div>
             @else
                 <x-empty size="sm" title="No scheduled backups"
@@ -297,6 +366,8 @@
                     icon-name="storages" />
             @endif
         </div>
+        <livewire:project.service.backup-executions :service="$service"
+            wire:key="service-backup-executions-{{ $service->id }}" />
             </div>
         </div>
     </section>

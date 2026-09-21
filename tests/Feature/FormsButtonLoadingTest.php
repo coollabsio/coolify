@@ -2,6 +2,33 @@
 
 use Illuminate\Support\Facades\Blade;
 
+it('marks error buttons with the shared error class', function () {
+    $html = Blade::render('<x-forms.button isError>Delete service</x-forms.button>');
+
+    expect($html)
+        ->toContain('class="button button-error"')
+        ->not->toContain('isError');
+});
+
+it('keeps unavailable destructive actions styled as error buttons', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/danger.blade.php'));
+
+    expect($view)->toContain('<x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">');
+});
+
+it('uses the shared error style for destructive form buttons', function (string $view, string $button) {
+    expect(file_get_contents(resource_path("views/{$view}")))->toContain($button);
+})->with([
+    'unavailable team deletion' => [
+        'livewire/team/danger-zone.blade.php',
+        '<x-forms.button isError disabled tooltip="Resolve the requirements shown before deleting this team.">',
+    ],
+    'tag removal' => [
+        'livewire/project/shared/tags.blade.php',
+        '<x-forms.button isError wire:click="deleteTag',
+    ],
+]);
+
 it('disables the button and targets the wire click action while loading', function () {
     $html = Blade::render(
         '<x-forms.button wire:click.prevent="checkConnection"><x-reicon name="refresh" class="size-3.5" />Check connection</x-forms.button>'

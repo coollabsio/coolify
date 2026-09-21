@@ -107,6 +107,9 @@ it('validates SSH URLs when allowed', function () {
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
         'git@bitbucket.org:user/repo.git',
+        'custom-user@git.example.com:organization/repository.git',
+        'custom-user@git.example.com:2222/organization/repository.git',
+        'enterprise-user@enterprise.ghe.com:organization/repository.git',
     ];
 
     foreach ($validUrls as $url) {
@@ -115,12 +118,21 @@ it('validates SSH URLs when allowed', function () {
     }
 });
 
+it('rejects non-SSH email-like repository URLs', function () {
+    $rule = new ValidGitRepositoryUrl;
+
+    $validator = Validator::make(['url' => 'custom-user@git.example.com'], ['url' => $rule]);
+
+    expect($validator->fails())->toBeTrue();
+});
+
 it('rejects SSH URLs when not allowed', function () {
     $rule = new ValidGitRepositoryUrl(allowSSH: false);
 
     $invalidUrls = [
         'git@github.com:user/repo.git',
         'git@gitlab.com:user/repo.git',
+        'custom-user@git.example.com:organization/repository.git',
     ];
 
     foreach ($invalidUrls as $url) {

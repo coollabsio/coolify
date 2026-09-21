@@ -76,7 +76,7 @@
                     </x-table.dropdown>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
+                        class="view-toggle">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
@@ -103,7 +103,7 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <template x-for="project in paginatedProjects" :key="project.uuid">
                         <article
-                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <a :href="project.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
                                 :aria-label="`Open ${project.name}`"></a>
                             <div class="flex items-start gap-3">
@@ -121,18 +121,23 @@
                                         class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                        x-text="project.description || 'No description'"></p>
+                                        x-text="project.description || ''"></p>
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    <span
-                                        x-text="`${project.environmentCount} ${project.environmentCount === 1 ? 'env' : 'envs'}`"></span>
-                                    <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                    <span
-                                        x-text="`${project.resourceCount} ${project.resourceCount === 1 ? 'resource' : 'resources'}`"></span>
-                                </p>
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
+                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                        aria-label="Environments">
+                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        <span x-text="project.environmentCount"></span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
+                                        aria-label="Resources">
+                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        <span x-text="project.resourceCount"></span>
+                                    </span>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="project.addResourceHref" :href="project.addResourceHref"
@@ -151,18 +156,18 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="viewMode === 'table'"
-                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Project</div>
-                    <div>Environments</div>
-                    <div>Resources</div>
+                    <div>Contents</div>
+                    <div>Created</div>
                     <div class="project-description">Description</div>
                     <div></div>
                 </div>
@@ -185,10 +190,19 @@
                                 x-text="project.name"></a>
                         </div>
 
-                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="project.environmentCount"></div>
-                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
-                            x-text="project.resourceCount"></div>
+                        <div class="flex items-center gap-3 text-[12px] font-medium text-neutral-600 dark:text-fg-dim">
+                            <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                aria-label="Environments">
+                                <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                <span x-text="project.environmentCount"></span>
+                            </span>
+                            <span class="inline-flex items-center gap-1" data-tooltip="Resources" aria-label="Resources">
+                                <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                <span x-text="project.resourceCount"></span>
+                            </span>
+                        </div>
+                        <div class="truncate text-[12px] text-neutral-500 dark:text-fg-dim"
+                            x-text="project.createdAt"></div>
                         <p class="project-description truncate text-[12px] text-neutral-500 dark:text-fg-dim"
                             x-text="project.description || '-'"></p>
 
@@ -212,7 +226,7 @@
             </div>
 
             <div x-show="filteredProjects.length === 0"
-                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
                 <p class="text-[13px] font-medium">No matching projects</p>
                 <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">

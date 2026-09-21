@@ -164,7 +164,6 @@ it('offers page size selection on client-side paginated tables', function (strin
 })->with([
     'team members' => 'livewire/team/member/index.blade.php',
     'api tokens' => 'livewire/security/api-tokens.blade.php',
-    'scheduled executions' => 'livewire/settings/scheduled-jobs.blade.php',
     'volume backup executions' => 'livewire/project/shared/storages/volume-backups/executions.blade.php',
     'environment resources' => 'livewire/project/resource/index.blade.php',
     'projects' => 'livewire/project/index.blade.php',
@@ -179,7 +178,6 @@ it('uses compact client pagination on collection views', function (string $view)
 })->with([
     'team members' => 'livewire/team/member/index.blade.php',
     'api tokens' => 'livewire/security/api-tokens.blade.php',
-    'scheduled jobs' => 'livewire/settings/scheduled-jobs.blade.php',
     'environment resources' => 'livewire/project/resource/index.blade.php',
     'projects' => 'livewire/project/index.blade.php',
     'project environments' => 'livewire/project/show.blade.php',

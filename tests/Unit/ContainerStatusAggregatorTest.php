@@ -70,12 +70,12 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('running:unknown');
     });
 
-    test('returns degraded:unhealthy for crash loop (exited with restart count)', function () {
+    test('returns exited for an exited container with a restart count', function () {
         $statuses = collect(['exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 5);
 
-        expect($result)->toBe('degraded:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns exited for exited containers without restart count', function () {
@@ -214,12 +214,12 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('prioritizes crash loop over running containers', function () {
+    test('returns exited when all containers are exited with restart counts', function () {
         $statuses = collect(['exited', 'exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 3);
 
-        expect($result)->toBe('degraded:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('prioritizes mixed state over healthy running', function () {
@@ -238,12 +238,12 @@ describe('aggregateFromStrings', function () {
         expect($result)->toBe('starting:unknown');
     });
 
-    test('prioritizes running over paused/exited when no starting', function () {
+    test('returns degraded for mixed running and exited containers', function () {
         $statuses = collect(['running:healthy', 'paused', 'exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses);
 
-        expect($result)->toBe('running:healthy');
+        expect($result)->toBe('degraded:unhealthy');
     });
 
     test('prioritizes dead over paused/starting/exited', function () {
@@ -357,7 +357,7 @@ describe('aggregateFromContainers', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('returns degraded:unhealthy for crash loop (exited with restart count)', function () {
+    test('returns exited for an exited container object with a restart count', function () {
         $containers = collect([
             (object) [
                 'State' => (object) [
@@ -368,7 +368,7 @@ describe('aggregateFromContainers', function () {
 
         $result = $this->aggregator->aggregateFromContainers($containers, maxRestartCount: 5);
 
-        expect($result)->toBe('degraded:unhealthy');
+        expect($result)->toBe('exited');
     });
 
     test('returns exited for exited containers without restart count', function () {
@@ -501,7 +501,7 @@ describe('state priority enforcement', function () {
         expect($result)->toBe('degraded:unhealthy');
     });
 
-    test('crash loop has third highest priority', function () {
+    test('mixed running and exited containers are degraded before paused or starting states', function () {
         $statuses = collect([
             'exited',
             'running:healthy',
@@ -602,31 +602,29 @@ describe('maxRestartCount validation', function () {
 
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 0);
 
-        // Zero is valid default - no crash loop detection
         expect($result)->toBe('exited');
     });
 
-    test('positive maxRestartCount works correctly', function () {
+    test('positive maxRestartCount does not override an exited state', function () {
         $statuses = collect(['exited']);
 
         $result = $this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 5);
 
-        // Positive value enables crash loop detection
-        expect($result)->toBe('degraded:unhealthy');
+        expect($result)->toBe('exited');
     });
 
-    test('crash loop detection still functions after validation', function () {
+    test('exited state is preserved for any positive restart count', function () {
         $statuses = collect(['exited']);
 
         // Test with various positive restart counts
         expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 1))
-            ->toBe('degraded:unhealthy');
+            ->toBe('exited');
 
         expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 100))
-            ->toBe('degraded:unhealthy');
+            ->toBe('exited');
 
         expect($this->aggregator->aggregateFromStrings($statuses, maxRestartCount: 999))
-            ->toBe('degraded:unhealthy');
+            ->toBe('exited');
     });
 
     test('default maxRestartCount parameter works', function () {

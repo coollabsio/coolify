@@ -2,7 +2,7 @@
 
 <div class="mx-auto mb-6 w-full max-w-3xl">
     <div
-        class="grid grid-cols-3 overflow-hidden rounded-[10px] border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.025]">
+        class="grid grid-cols-3 overflow-hidden rounded-[10px] border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.05]">
         @for ($i = 1; $i <= $totalSteps; $i++)
             <div @class([
                 'flex min-h-10 items-center justify-center gap-2 border-r border-neutral-200 px-3 text-[11px] font-medium last:border-r-0 dark:border-white/[0.08]',

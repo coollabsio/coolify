@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -16,6 +17,7 @@ class Gitea extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
     {
@@ -184,6 +186,15 @@ class Gitea extends Controller
                 if ($x_gitea_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronized' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
+                            if (! $this->isPreviewDeploymentRepositoryTrusted(
+                                data_get($payload, 'pull_request.head.repo.id'),
+                                data_get($payload, 'pull_request.base.repo.id'),
+                                data_get($payload, 'repository.id'),
+                                $application->settings->is_pr_deployments_public_enabled,
+                            )) {
+                                continue;
+                            }
+
                             if ($skip_deploy_pr ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,

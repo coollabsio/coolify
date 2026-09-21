@@ -3,6 +3,7 @@
 # category: backend
 # tags: backend, backend-as-a-service, platform
 # logo: svgs/appwrite.svg
+# port: 3003
 
 services:
   appwrite:

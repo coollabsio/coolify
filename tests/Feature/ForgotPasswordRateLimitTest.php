@@ -6,6 +6,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
+
     InstanceSettings::query()->forceCreate(['id' => 0]);
 });
 

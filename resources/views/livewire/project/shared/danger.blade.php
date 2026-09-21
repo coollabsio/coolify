@@ -10,27 +10,18 @@
     @endphp
     <x-application.settings-section id="danger-zone-section" title="Danger zone"
         helper="Destructive resource actions cannot be undone.">
-        <div
-            class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete {{ $resourceLabel }}</h4>
-                        <x-status-badge status="Permanent" type="error" />
-                    </div>
-                    <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+        <x-danger-zone title="Delete {{ $resourceLabel }}">
+                    <p>
                         Permanently delete
                         <strong class="font-semibold text-black dark:text-fg">{{ $resourceName }}</strong>,
                         stop its containers, and remove the selected Docker resources and configuration.
                     </p>
-                    <ul class="mt-3 space-y-1 text-xs text-neutral-500 dark:text-fg-dim">
+                    <ul class="space-y-1 text-xs">
                         <li>• Active deployments will be stopped.</li>
                         <li>• Selected volumes and stored data may be permanently removed.</li>
                         <li>• This {{ $resourceLabel }} cannot be restored from Coolify after deletion.</li>
                     </ul>
-                </div>
-
-                <div class="shrink-0">
+                <x-slot:action>
                     @if ($canDelete)
                         <x-modal-confirmation title="Delete {{ $resourceLabel }}?"
                             buttonTitle="Delete {{ $resourceLabel }}"
@@ -40,13 +31,12 @@
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
                     @else
-                        <x-forms.button disabled tooltip="You do not have permission to delete this resource.">
+                        <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
                             Delete {{ $resourceLabel }}
                         </x-forms.button>
                     @endif
-                </div>
-            </div>
-        </div>
+                </x-slot:action>
+        </x-danger-zone>
 
         @if (!$canDelete)
             <div class="mt-4">

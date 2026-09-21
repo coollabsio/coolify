@@ -132,23 +132,23 @@ test('dump-all PostgreSQL restore selects the client for the dump format', funct
 test('buildRestoreCommand handles MySQL without dumpAll', function () {
     $component = importFormWithResource('App\Models\StandaloneMysql');
     $component->dumpAll = false;
-    $component->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mysql -u $MYSQL_USER');
-    expect($result)->toContain("< '/tmp/test.dump'");
+    expect($result)->toContain("(gunzip -cf '/tmp/test.dump' 2>/dev/null || cat '/tmp/test.dump') | mysql");
+    expect($result)->not->toContain("< '/tmp/test.dump'");
 });
 
 test('buildRestoreCommand handles MariaDB without dumpAll', function () {
     $component = importFormWithResource('App\Models\StandaloneMariadb');
     $component->dumpAll = false;
-    $component->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
 
     $result = $component->buildRestoreCommand('/tmp/test.dump');
 
     expect($result)->toContain('mariadb -u $MARIADB_USER');
-    expect($result)->toContain("< '/tmp/test.dump'");
+    expect($result)->toContain("(gunzip -cf '/tmp/test.dump' 2>/dev/null || cat '/tmp/test.dump') | mariadb");
+    expect($result)->not->toContain("< '/tmp/test.dump'");
 });
 
 test('buildRestoreCommand always appends the MongoDB archive path', function (bool $dumpAll) {

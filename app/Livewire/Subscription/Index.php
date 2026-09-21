@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Subscription;
 
+use App\Actions\Stripe\UpdateSubscriptionQuantity;
+use App\Jobs\ServerLimitCheckJob;
 use App\Models\InstanceSettings;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 use Stripe\StripeClient;
 
@@ -49,12 +52,19 @@ class Index extends Component
         return redirect($session->url);
     }
 
-    public function getStripeStatus()
+    public function getStripeStatus(): mixed
     {
+        $team = currentTeam();
+        $user = auth()->user();
+        abort_unless($team && $user?->isAdminOfTeam($team->id), 403);
+
         try {
-            $subscription = currentTeam()->subscription;
+            $subscription = $team->subscription()->first();
+            if (! $subscription?->stripe_customer_id) {
+                return null;
+            }
             $stripe = app(StripeClient::class);
-            $customer = $stripe->customers->retrieve(currentTeam()->subscription->stripe_customer_id);
+            $customer = $stripe->customers->retrieve($subscription->stripe_customer_id);
             if ($customer) {
                 $subscriptions = $stripe->subscriptions->all(['customer' => $customer->id]);
                 $currentTeam = currentTeam()->id ?? null;
@@ -65,6 +75,26 @@ class Index extends Component
                         $subscription->update([
                             'stripe_subscription_id' => $foundSubscription->id,
                         ]);
+                        if ($status === 'active') {
+                            $subscription->update([
+                                'stripe_invoice_paid' => true,
+                                'stripe_past_due' => false,
+                                'stripe_plan_id' => data_get($foundSubscription, 'items.data.0.price.id'),
+                                'stripe_cancel_at_period_end' => data_get($foundSubscription, 'cancel_at_period_end', false),
+                            ]);
+                            if (str(data_get($foundSubscription, 'items.data.0.price.lookup_key'))->contains('dynamic')) {
+                                $quantity = max(
+                                    UpdateSubscriptionQuantity::MIN_SERVER_LIMIT,
+                                    min((int) data_get($foundSubscription, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT)
+                                );
+                                $team->update(['custom_server_limit' => $quantity]);
+                                ServerLimitCheckJob::dispatch($team);
+                            }
+                            $team->unsetRelation('subscription');
+                            Cache::forget('user:'.$user->id.':team:'.$team->id);
+
+                            return redirect()->route('subscription.show');
+                        }
                         if ($status === 'unpaid') {
                             $this->isUnpaid = true;
                         }
@@ -82,6 +112,8 @@ class Index extends Component
         } finally {
             $this->loading = false;
         }
+
+        return null;
     }
 
     public function render()

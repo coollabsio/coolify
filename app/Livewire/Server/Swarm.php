@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Swarm extends Component
@@ -18,21 +19,27 @@ class Swarm extends Component
 
     public bool $isSwarmWorker;
 
+    #[Locked]
+    public bool $canUseSwarm;
+
     public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();
+            $this->canUseSwarm = $this->server->team->usesSwarm();
             $this->syncData();
         } catch (\Throwable) {
             return redirect()->route('server.index');
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
+            if (! $this->server->team->usesSwarm()) {
+                throw new \Exception('Docker Swarm is deprecated and cannot be enabled for new teams.');
+            }
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->save();
@@ -45,6 +52,7 @@ class Swarm extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
         } catch (\Throwable $e) {

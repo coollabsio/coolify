@@ -152,6 +152,8 @@ class Show extends Component
      */
     public function loadValues(): void
     {
+        $this->authorize('update', $this->env);
+
         if ($this->valuesLoaded) {
             return;
         }
@@ -185,7 +187,8 @@ class Show extends Component
         );
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
+
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
@@ -320,6 +323,7 @@ class Show extends Component
             $this->syncData(true);
             $this->syncData(false);
             $this->dispatch('success', 'Environment variable updated.');
+            $this->dispatch('environment-variable-updated', envId: $this->env->id);
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
 

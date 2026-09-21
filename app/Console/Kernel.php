@@ -5,7 +5,7 @@ namespace App\Console;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
-use App\Jobs\CheckTraefikVersionJob;
+use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
@@ -16,6 +16,7 @@ use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -46,8 +47,18 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
+        $this->scheduleInstance->call(fn () => app(ScheduledJobDeliveryService::class)->deleteOldOccurrences())
+            ->name('cleanup:scheduled-job-occurrences')
+            ->dailyAt('04:00')
+            ->onOneServer();
+        $this->scheduleInstance->command('cleanup:stucked-resources')
+            ->dailyAt('03:17')
+            ->onOneServer()
+            ->withoutOverlapping(60)
+            ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
@@ -83,8 +94,6 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
-
-            $this->scheduleInstance->job(new CheckTraefikVersionJob)->weekly()->sundays()->at('00:00')->timezone($this->instanceTimezone)->onOneServer();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();

@@ -103,7 +103,6 @@ services:
       retries: 10
       timeout: 2s
 
-
 volumes:
   coolify-db:
     name: coolify-db

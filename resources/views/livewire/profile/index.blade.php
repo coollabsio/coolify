@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">
@@ -226,8 +226,9 @@
                     <h2>Two-factor authentication</h2>
                     <p>Add a time-based one-time password to protect your account.</p>
                 </div>
-                @if (! request()->user()->two_factor_confirmed_at
-                        && session('status') !== 'two-factor-authentication-enabled')
+                @if (request()->user()->two_factor_confirmed_at)
+                    <x-status-badge status="Enabled" type="success" />
+                @elseif (session('status') !== 'two-factor-authentication-enabled')
                     <form action="/user/two-factor-authentication" method="POST">
                         @csrf
                         <x-forms.button type="submit">Configure 2FA</x-forms.button>
@@ -249,9 +250,10 @@
                                 </p>
                             </div>
                             <form action="/user/confirmed-two-factor-authentication" method="POST"
-                                class="flex items-end gap-2">
+                                class="flex items-end gap-2"
+                                x-init="$nextTick(() => $el.querySelector('input[name=code]')?.focus())">
                                 @csrf
-                                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
+                                <x-forms.input name="code" type="text" inputmode="numeric" pattern="[0-9]*" id="code"
                                     label="One-time code" required />
                                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
                             </form>
@@ -283,7 +285,7 @@
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
                             <div
-                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.05] dark:text-fg-dim">
                                 @foreach (request()->user()->recoveryCodes() as $code)
                                     <div>{{ $code }}</div>
                                 @endforeach

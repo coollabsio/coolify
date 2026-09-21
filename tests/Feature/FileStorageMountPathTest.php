@@ -4,7 +4,6 @@ use App\Jobs\ServerStorageSaveJob;
 use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\Storages\All;
-use App\Livewire\Project\Shared\Storages\Show;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -135,11 +134,42 @@ test('livewire volume storage refreshes the storage list and configuration warni
         ->set('mount_path', '/app/data')
         ->call('submitPersistentVolume')
         ->assertDispatched('success')
-        ->assertDispatched('refreshStorages')
+        ->assertNotDispatched('refreshStorages')
+        ->assertNotDispatched('refreshVolumeList')
         ->assertDispatched('configurationChanged')
         ->assertSet('activeTab', 'volumes')
         ->assertSet('volumeCount', 1)
         ->assertSee($this->application->uuid.'-data');
+});
+
+test('adding another volume refreshes only the mounted volume list', function () {
+    LocalPersistentVolume::create([
+        'name' => $this->application->uuid.'-first',
+        'mount_path' => '/app/first',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->set('name', 'second')
+        ->set('mount_path', '/app/second')
+        ->call('submitPersistentVolume')
+        ->assertDispatched('refreshVolumeList')
+        ->assertNotDispatched('refreshStorages');
+});
+
+test('deleting a volume asks only the parent storage component to refresh its counts', function () {
+    $volume = LocalPersistentVolume::create([
+        'name' => $this->application->uuid.'-data',
+        'mount_path' => '/app/data',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+
+    Livewire::test(All::class, ['resource' => $this->application])
+        ->call('delete', $volume->id, 'password')
+        ->assertDispatched('storageCountsChanged')
+        ->assertNotDispatched('refreshStorages');
 });
 
 test('volume storage list shows volumes added after it was mounted', function () {
@@ -191,7 +221,9 @@ test('deleting a file mount refreshes the configuration warning', function () {
 
     Livewire::test(FileStorage::class, ['fileStorage' => $file])
         ->call('delete', 'password')
-        ->assertDispatched('configurationChanged');
+        ->assertDispatched('configurationChanged')
+        ->assertDispatched('storageCountsChanged')
+        ->assertNotDispatched('refreshStorages');
 
     expect($file->fresh())->toBeNull();
 });
@@ -214,8 +246,8 @@ test('deleting a volume mount refreshes the configuration warning', function () 
         'resource_type' => $database->getMorphClass(),
     ]);
 
-    Livewire::test(Show::class, ['storage' => $volume, 'resource' => $database])
-        ->call('delete', 'password')
+    Livewire::test(All::class, ['resource' => $database])
+        ->call('delete', $volume->id, 'password')
         ->assertDispatched('configurationChanged');
 
     expect($volume->fresh())->toBeNull();

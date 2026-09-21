@@ -15,6 +15,7 @@ use App\Rules\ValidHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
 class NotificationsController extends Controller
@@ -45,6 +46,7 @@ class NotificationsController extends Controller
                     'deployment_success_email_notifications' => 'sometimes|boolean',
                     'deployment_failure_email_notifications' => 'sometimes|boolean',
                     'status_change_email_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_email_notifications' => 'sometimes|boolean',
                     'backup_success_email_notifications' => 'sometimes|boolean',
                     'backup_failure_email_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_email_notifications' => 'sometimes|boolean',
@@ -66,6 +68,7 @@ class NotificationsController extends Controller
                     'deployment_success_discord_notifications' => 'sometimes|boolean',
                     'deployment_failure_discord_notifications' => 'sometimes|boolean',
                     'status_change_discord_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_discord_notifications' => 'sometimes|boolean',
                     'backup_success_discord_notifications' => 'sometimes|boolean',
                     'backup_failure_discord_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_discord_notifications' => 'sometimes|boolean',
@@ -88,6 +91,7 @@ class NotificationsController extends Controller
                     'deployment_success_slack_notifications' => 'sometimes|boolean',
                     'deployment_failure_slack_notifications' => 'sometimes|boolean',
                     'status_change_slack_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_slack_notifications' => 'sometimes|boolean',
                     'backup_success_slack_notifications' => 'sometimes|boolean',
                     'backup_failure_slack_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_slack_notifications' => 'sometimes|boolean',
@@ -110,6 +114,7 @@ class NotificationsController extends Controller
                     'deployment_success_telegram_notifications' => 'sometimes|boolean',
                     'deployment_failure_telegram_notifications' => 'sometimes|boolean',
                     'status_change_telegram_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_telegram_notifications' => 'sometimes|boolean',
                     'backup_success_telegram_notifications' => 'sometimes|boolean',
                     'backup_failure_telegram_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_telegram_notifications' => 'sometimes|boolean',
@@ -124,6 +129,7 @@ class NotificationsController extends Controller
                     'telegram_notifications_deployment_success_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_deployment_failure_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_status_change_thread_id' => 'sometimes|nullable|string|max:255',
+                    'telegram_notifications_restart_limit_reached_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_backup_success_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_backup_failure_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_scheduled_task_success_thread_id' => 'sometimes|nullable|string|max:255',
@@ -146,6 +152,7 @@ class NotificationsController extends Controller
                     'deployment_success_pushover_notifications' => 'sometimes|boolean',
                     'deployment_failure_pushover_notifications' => 'sometimes|boolean',
                     'status_change_pushover_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_pushover_notifications' => 'sometimes|boolean',
                     'backup_success_pushover_notifications' => 'sometimes|boolean',
                     'backup_failure_pushover_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_pushover_notifications' => 'sometimes|boolean',
@@ -167,6 +174,7 @@ class NotificationsController extends Controller
                     'deployment_success_webhook_notifications' => 'sometimes|boolean',
                     'deployment_failure_webhook_notifications' => 'sometimes|boolean',
                     'status_change_webhook_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_webhook_notifications' => 'sometimes|boolean',
                     'backup_success_webhook_notifications' => 'sometimes|boolean',
                     'backup_failure_webhook_notifications' => 'sometimes|boolean',
                     'scheduled_task_success_webhook_notifications' => 'sometimes|boolean',
@@ -249,7 +257,7 @@ class NotificationsController extends Controller
         $body = $request->json()->all();
         $config = $this->channelConfig($channel);
 
-        $validator = customApiValidator($body, $config['rules']);
+        $validator = Validator::make($body, $config['rules']);
 
         $extraFields = array_diff(array_keys($body), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {

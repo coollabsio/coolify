@@ -20,13 +20,15 @@ class Index extends Component
 
     public ?Service $service = null;
 
-    public ?ServiceApplication $serviceApplication = null;
+    public ServiceApplication|ServiceDatabase|null $serviceApplication = null;
 
     public ?ServiceDatabase $serviceDatabase = null;
 
     public ?string $resourceType = null;
 
     public ?string $currentRoute = null;
+
+    public bool $embedded = false;
 
     public array $parameters;
 
@@ -59,8 +61,6 @@ class Index extends Component
 
     public bool $isLogDrainEnabled = false;
 
-    public bool $isImportSupported = false;
-
     // Application-specific properties
     public $docker_cleanup = true;
 
@@ -84,6 +84,8 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
+    public mixed $maxRestartCount = 0;
+
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
 
     protected $rules = [
@@ -95,16 +97,57 @@ class Index extends Component
         'publicPortTimeout' => 'nullable|integer|min:1',
         'isPublic' => 'required|boolean',
         'isLogDrainEnabled' => 'required|boolean',
+        'maxRestartCount' => 'integer|min:0',
         // Application-specific rules
         'fqdn' => 'nullable',
         'isGzipEnabled' => 'nullable|boolean',
         'isStripprefixEnabled' => 'nullable|boolean',
     ];
 
-    public function mount()
-    {
+    public function mount(
+        ServiceApplication|ServiceDatabase|null $serviceApplication = null,
+        bool $embedded = false,
+    ) {
         try {
+            $this->embedded = $embedded;
             $this->services = collect([]);
+            if ($serviceApplication instanceof ServiceDatabase) {
+                $this->service = $serviceApplication->service;
+                $this->authorize('view', $this->service);
+                $this->parameters = [
+                    'project_uuid' => $this->service->environment->project->uuid,
+                    'environment_uuid' => $this->service->environment->uuid,
+                    'service_uuid' => $this->service->uuid,
+                    'stack_service_uuid' => $serviceApplication->uuid,
+                ];
+                $this->query = request()->query();
+                $this->currentRoute = 'project.service.index';
+                $this->serviceDatabase = $serviceApplication;
+                $this->serviceApplication = null;
+                $this->resourceType = 'database';
+                $this->initializeDatabaseProperties();
+                $this->s3s = currentTeam()->s3s;
+
+                return;
+            }
+            if ($serviceApplication) {
+                $this->service = $serviceApplication->service;
+                $this->authorize('view', $this->service);
+                $this->parameters = [
+                    'project_uuid' => $this->service->environment->project->uuid,
+                    'environment_uuid' => $this->service->environment->uuid,
+                    'service_uuid' => $this->service->uuid,
+                    'stack_service_uuid' => $serviceApplication->uuid,
+                ];
+                $this->query = request()->query();
+                $this->currentRoute = 'project.service.index';
+                $this->serviceApplication = $serviceApplication;
+                $this->resourceType = 'application';
+                $this->initializeApplicationProperties();
+                $this->s3s = currentTeam()->s3s;
+
+                return;
+            }
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
@@ -119,6 +162,12 @@ class Index extends Component
                 ->firstOrFail();
             $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
+            if (in_array($this->currentRoute, ['project.service.index', 'project.service.index.advanced'], true)) {
+                return redirect()->route(
+                    'project.service.configuration',
+                    collect($this->parameters)->except('stack_service_uuid')->all(),
+                );
+            }
             $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
                 $this->serviceApplication = $service;
@@ -153,10 +202,6 @@ class Index extends Component
         $this->refreshFileStorages();
         $this->syncDatabaseData(false);
 
-        // Check if import is supported for this database type
-        $dbType = $this->serviceDatabase->databaseType();
-        $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
-        $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
     }
 
     private function syncDatabaseData(bool $toModel = false): void
@@ -296,34 +341,46 @@ class Index extends Component
 
     public function instantSave()
     {
+        $this->authorize('update', $this->serviceDatabase);
         try {
-            $this->authorize('update', $this->serviceDatabase);
-            if ($this->isPublic && ! $this->publicPort) {
-                $this->dispatch('error', 'Public port is required.');
-                $this->isPublic = false;
-
-                return;
-            }
-            $this->syncDatabaseData(true);
-            if ($this->serviceDatabase->is_public) {
-                if (! str($this->serviceDatabase->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+            if ($this->isPublic) {
+                if (! $this->publicPort) {
+                    $this->dispatch('error', 'Public port is required.');
                     $this->isPublic = false;
-                    $this->serviceDatabase->is_public = false;
 
                     return;
                 }
+                if (! str($this->serviceDatabase->status)->startsWith('running')) {
+                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                    $this->isPublic = false;
+
+                    return;
+                }
+                $this->persistPublicAccess();
                 StartDatabaseProxy::run($this->serviceDatabase);
                 $this->db_url_public = $this->serviceDatabase->getServiceDatabaseUrl();
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
+                $this->persistPublicAccess();
                 StopDatabaseProxy::run($this->serviceDatabase);
                 $this->db_url_public = null;
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
         } catch (\Throwable $e) {
+            $this->isPublic = ! $this->isPublic;
+            $this->persistPublicAccess();
+
             return handleError($e, $this);
         }
+    }
+
+    private function persistPublicAccess(): void
+    {
+        $this->serviceDatabase->update([
+            'is_public' => $this->isPublic,
+            'public_port' => $this->publicPort ?: null,
+            'public_port_timeout' => $this->publicPortTimeout ?: null,
+        ]);
     }
 
     public function submitDatabase()
@@ -356,22 +413,41 @@ class Index extends Component
         if ($toModel) {
             $this->serviceApplication->human_name = $this->humanName;
             $this->serviceApplication->description = $this->description;
-            $this->serviceApplication->fqdn = $this->fqdn;
+            $this->serviceApplication->setEditableUrls($this->fqdn);
             $this->serviceApplication->image = $this->image;
             $this->serviceApplication->exclude_from_status = $this->excludeFromStatus;
             $this->serviceApplication->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->serviceApplication->is_gzip_enabled = $this->isGzipEnabled;
             $this->serviceApplication->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            if ($this->serviceApplication->max_restart_count !== (int) $this->maxRestartCount) {
+                $this->serviceApplication->restart_limit_reached = false;
+            }
+            $this->serviceApplication->max_restart_count = $this->maxRestartCount;
         } else {
             $this->humanName = $this->serviceApplication->human_name;
             $this->description = $this->serviceApplication->description;
-            $this->fqdn = $this->serviceApplication->fqdn;
+            $this->fqdn = $this->serviceApplication->url;
             $this->image = $this->serviceApplication->image;
             $this->excludeFromStatus = data_get($this->serviceApplication, 'exclude_from_status', false);
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
+            $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    public function saveMaxRestartCount(): void
+    {
+        $this->authorize('update', $this->serviceApplication);
+        $validated = $this->validate([
+            'maxRestartCount' => 'integer|min:0',
+        ]);
+
+        $this->serviceApplication->update([
+            'max_restart_count' => $validated['maxRestartCount'],
+            'restart_limit_reached' => false,
+        ]);
+        $this->dispatch('success', 'Max restart count saved.');
     }
 
     public function instantSaveApplication()
@@ -428,7 +504,7 @@ class Index extends Component
             $this->serviceApplication->delete();
             $this->dispatch('success', 'Application deleted.');
 
-            return redirect()->route('project.service.configuration', $this->parameters);
+            return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -462,7 +538,7 @@ class Index extends Component
                 $serviceApplication->delete();
             });
 
-            return redirect()->route('project.service.configuration', $redirectParams);
+            return redirectRoute($this, 'project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -491,6 +567,10 @@ class Index extends Component
     public function submitApplication()
     {
         try {
+            $persistedApplication = $this->serviceApplication->fresh();
+            $previousEditableUrls = $persistedApplication->url;
+            $previousFqdn = $persistedApplication->fqdn;
+            $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
             $this->validate([
                 'fqdn' => ValidationPatterns::applicationDomainRules(),
@@ -520,27 +600,20 @@ class Index extends Component
                 $requiredPort = $this->serviceApplication->getRequiredPort();
 
                 if ($requiredPort !== null) {
-                    $fqdns = str($this->fqdn)->trim()->explode(',');
-                    $missingPort = false;
-
-                    foreach ($fqdns as $fqdn) {
-                        $fqdn = trim($fqdn);
-                        if (empty($fqdn)) {
+                    foreach (str($this->fqdn)->trim()->explode(',') as $fqdn) {
+                        $fqdn = trim((string) $fqdn);
+                        if ($fqdn === '') {
                             continue;
                         }
 
-                        $port = ServiceApplication::extractPortFromUrl($fqdn);
-                        if ($port === null) {
-                            $missingPort = true;
-                            break;
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                            $this->requiredPort = $requiredPort;
+                            $this->showPortWarningModal = true;
+                            $this->serviceApplication->fqdn = $previousFqdn;
+                            $this->serviceApplication->domain_port_overrides = $previousPortOverrides;
+
+                            return;
                         }
-                    }
-
-                    if ($missingPort) {
-                        $this->requiredPort = $requiredPort;
-                        $this->showPortWarningModal = true;
-
-                        return;
                     }
                 }
             } else {

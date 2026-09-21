@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ServerRole;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use OpenApi\Attributes as OA;
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
-        'is_build_server' => ['type' => 'boolean'],
+        'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
@@ -27,6 +28,13 @@ use OpenApi\Attributes as OA;
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
+        'is_traffic_analytics_enabled' => ['type' => 'boolean'],
+        'traffic_topn' => ['type' => 'integer'],
+        'traffic_sample_threshold' => ['type' => 'integer'],
+        'traffic_retention_1h_days' => ['type' => 'integer'],
+        'traffic_retention_1d_days' => ['type' => 'integer'],
+        'is_geoip_enabled' => ['type' => 'boolean'],
+        'geoip_refresh_days' => ['type' => 'integer'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -60,11 +68,18 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
+
+    public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
+
+    public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
+
     protected $fillable = [
         'server_id',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
+        'server_role',
         'is_reachable',
         'is_usable',
         'wildcard_domain',
@@ -106,6 +121,14 @@ class ServerSetting extends Model
         'backup_compression_cpu_percentage',
         'disable_application_image_retention',
         'connection_timeout',
+        'is_traffic_analytics_enabled',
+        'traffic_topn',
+        'traffic_sample_threshold',
+        'traffic_retention_1h_days',
+        'traffic_retention_1d_days',
+        'is_geoip_enabled',
+        'geoip_refresh_days',
+        'geoip_maxmind_license_key',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
@@ -120,9 +143,18 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
+        'server_role' => ServerRole::class,
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'is_traffic_analytics_enabled' => 'boolean',
+        'traffic_topn' => 'integer',
+        'traffic_sample_threshold' => 'integer',
+        'traffic_retention_1h_days' => 'integer',
+        'traffic_retention_1d_days' => 'integer',
+        'is_geoip_enabled' => 'boolean',
+        'geoip_refresh_days' => 'integer',
+        'geoip_maxmind_license_key' => 'encrypted',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -134,12 +166,14 @@ class ServerSetting extends Model
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
+        'is_build_server',
         'sentinel_token',
         'sentinel_custom_url',
         'logdrain_newrelic_license_key',
         'logdrain_axiom_api_key',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'geoip_maxmind_license_key',
     ];
 
     protected static function booted()
@@ -162,11 +196,28 @@ class ServerSetting extends Model
                 $settings->wasChanged('sentinel_custom_url') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
-                $settings->wasChanged('sentinel_push_interval_seconds')
+                $settings->wasChanged('sentinel_push_interval_seconds') ||
+                $settings->wasChanged('traffic_topn') ||
+                $settings->wasChanged('traffic_sample_threshold') ||
+                $settings->wasChanged('traffic_retention_1h_days') ||
+                $settings->wasChanged('traffic_retention_1d_days') ||
+                $settings->wasChanged('is_geoip_enabled') ||
+                $settings->wasChanged('geoip_refresh_days') ||
+                $settings->wasChanged('geoip_maxmind_license_key')
             ) {
-                $settings->server->restartSentinel();
+                // Only recreate Sentinel when it is already enabled. Otherwise a change to a
+                // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
+                // StartSentinel unconditionally sets is_sentinel_enabled = true.
+                if ($settings->is_sentinel_enabled) {
+                    $settings->server->restartSentinel();
+                }
             }
         });
+    }
+
+    public function effectiveServerRole(): ServerRole
+    {
+        return $this->server_role ?? ($this->is_build_server ? ServerRole::BUILD : ServerRole::BOTH);
     }
 
     /**
@@ -236,6 +287,10 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
+        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+            $url = null;
+        }
+
         if (blank($url)) {
             $url = $this->generateSentinelUrl(ignoreEvent: true);
         }
@@ -247,12 +302,22 @@ class ServerSetting extends Model
         return $url;
     }
 
+    public function restoreDefaultSentinelConfiguration(): void
+    {
+        $this->generateSentinelUrl(save: false, ignoreEvent: true);
+        $this->sentinel_metrics_refresh_rate_seconds = self::DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS;
+        $this->sentinel_metrics_history_days = self::DEFAULT_SENTINEL_METRICS_HISTORY_DAYS;
+        $this->sentinel_push_interval_seconds = self::DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS;
+        $this->is_sentinel_debug_enabled = false;
+        $this->saveQuietly();
+    }
+
     public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
-            $domain = 'http://host.docker.internal:8000';
+            $domain = 'http://coolify:8080';
         } elseif ($settings->fqdn) {
             $domain = $settings->fqdn;
         } elseif ($settings->public_ipv4) {

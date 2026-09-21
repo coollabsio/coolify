@@ -7,6 +7,8 @@ it('keeps the volume backup executions table horizontally scrollable on mobile',
     expect($view)
         ->toContain('volume-backup-executions-grid')
         ->toContain('data-table w-full overflow-x-auto')
+        ->toContain('x-forms.copy-button')
+        ->not->toContain('volume-backup-execution-label')
         ->and($css)
         ->toContain('.volume-backup-executions-grid')
         ->toContain('min-width: 50rem;')
@@ -23,6 +25,17 @@ it('uses compact icon actions for volume backup executions', function () {
         ->toContain('<x-reicon name="trash" class="size-3.5" />');
 });
 
+it('keeps long volume backup errors inside the table without a separate background panel', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php'));
+
+    expect($view)
+        ->toContain('volume-backup-execution-message col-span-6 min-w-0 max-w-full')
+        ->toContain('max-h-20 overflow-y-auto overflow-x-hidden')
+        ->toContain('break-words whitespace-pre-wrap')
+        ->toContain('bg-transparent')
+        ->not->toContain('volume-backup-execution-message col-span-6 mt-2 max-h-32');
+});
+
 it('keeps storage backup schedule tables horizontally scrollable on mobile', function () {
     $applicationView = file_get_contents(resource_path('views/livewire/project/application/backup/index.blade.php'));
     $serviceView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
@@ -31,6 +44,16 @@ it('keeps storage backup schedule tables horizontally scrollable on mobile', fun
     expect($applicationView)->toContain('class="data-table w-full overflow-x-auto"')
         ->and($serviceView)->toContain('class="data-table w-full overflow-x-auto"')
         ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
+});
+
+it('keeps nested storage component keys stable when mounts are added or deleted', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+
+    expect($view)
+        ->toContain('wire:key="volumes-{{ $resource->id }}"')
+        ->toContain('wire:key="svc-volumes-{{ $resource->id }}"')
+        ->not->toContain('wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"')
+        ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
 });
 
 use App\Livewire\Project\Service\Storage;
@@ -129,7 +152,6 @@ function createApplicationWithVolume(array $applicationAttributes = [], array $v
 
 it('renders volumes as a data table with shared column headers', function () {
     $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
     $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
 
     expect($allView)
@@ -138,7 +160,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('volumes-table-grid')
         ->toContain('volumes-table-grid-readonly')
         ->toContain('Volume Name')
-        ->toContain('Source Path')
+        ->not->toContain('Source Path')
         ->toContain('Destination Path')
         ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
@@ -147,16 +169,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
         ->not->toContain('table-badge table-badge-success')
-        ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('x-status-badge')
         ->not->toContain('font-mono')
         ->not->toContain('Service volume mounts are read-only here.');
-
-    // Show remains available for isolated embeds/tests but is no longer nested from All.
-    expect($showView)
-        ->toContain('data-table-row')
-        ->toContain('volumes-table-grid')
-        ->not->toContain('font-mono');
 
     // Service stack page: one settings-section card per compose service/resource.
     expect($storageView)
@@ -202,9 +217,123 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('12rem')
         ->not->toContain('17.5rem');
 
+    expect($allView)
+        ->toContain("'table-badge', 'table-badge-success' => \$hasS3Backup")
+        ->not->toContain('<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />');
+
+    expect($css)->toMatch('/@media \(max-width: 768px\)[\s\S]*?\.volumes-col-backup\s*\{[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;/');
+
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('keeps source paths out of the Docker volume creation form', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+
+    expect($view)
+        ->not->toContain('id="host_path"')
+        ->not->toContain('label="Source Path"')
+        ->not->toContain('Swarm Mode detected');
+});
+
+it('creates named Docker volumes without a source path in swarm mode', function () {
+    [$application] = createApplicationWithVolume();
+    $application->persistentStorages()->delete();
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->set('isSwarm', true)
+        ->set('name', 'storage-app-data')
+        ->set('mount_path', '/data')
+        ->call('submitPersistentVolume')
+        ->assertHasNoErrors();
+
+    expect($application->persistentStorages()->first()->host_path)->toBeNull();
+});
+
+it('removes the source path column from Docker volume views', function () {
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($allView)
+        ->not->toContain('Source Path')
+        ->not->toContain('volumes-col-source')
+        ->not->toContain('forms.{{ $id }}.hostPath')
+        ->and(resource_path('views/livewire/project/shared/storages/show.blade.php'))
+        ->not->toBeFile();
+});
+
+it('renders volume actions and PR suffix controls as valid markup', function () {
+    [$application] = createApplicationWithVolume();
+    LocalPersistentVolume::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => $application->uuid.'-cache',
+        'mount_path' => '/cache',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+        'is_preview_suffix_enabled' => true,
+    ]);
+
+    $html = Livewire::test(All::class, ['resource' => $application])->html();
+    $document = new DOMDocument;
+    $previousState = libxml_use_internal_errors(true);
+    $loaded = $document->loadHTML($html);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previousState);
+    $xpath = new DOMXPath($document);
+    $helperText = 'Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews.';
+
+    expect($loaded)->toBeTrue()
+        ->and($xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' volumes-col-actions ')]//button[normalize-space(.)='Backup']"))->toHaveCount(2)
+        ->and($xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' volumes-col-actions ')]//button[normalize-space(.)='Backup']//svg"))->toHaveCount(0)
+        ->and($xpath->query("//button[@aria-label='More information']/following-sibling::*[@role='tooltip'][contains(normalize-space(.), '{$helperText}')]"))->toHaveCount(3)
+        ->and($xpath->query("//template[@x-teleport='body']/*[@role='listbox']"))->toHaveCount(2);
+});
+
+it('keeps editable volume actions on one line', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toMatch('/volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1\.5[\s\S]*?Update[\s\S]*?Backup[\s\S]*?Delete/');
+
+    expect($css)
+        ->toMatch('/\.volumes-table-grid\s*\{[^}]*grid-template-columns:[^;}]*15rem;/')
+        ->toMatch('/\.volumes-table-grid-with-pr\s*\{[^}]*grid-template-columns:[^;}]*15rem;/');
+});
+
+it('declares explicit authorization on the changed storage controls', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    preg_match(
+        '/<x-forms\.listbox\s+id="forms\.\{\{ \$id \}\}\.isPreviewSuffixEnabled"[\s\S]*?\/>/',
+        $view,
+        $previewSuffixListbox
+    );
+
+    expect($previewSuffixListbox[0] ?? '')
+        ->toContain('canGate="update"')
+        ->toContain(':canResource="$resource"');
+
+    preg_match_all('/<x-forms\.button\b[^>]*>\s*Backup\s*<\/x-forms\.button>/s', $view, $backupButtons);
+
+    expect($backupButtons[0])->toHaveCount(3);
+
+    foreach ($backupButtons[0] as $backupButton) {
+        expect($backupButton)
+            ->toContain('canGate="update"')
+            ->toContain(':canResource="$resource"');
+    }
+});
+
+it('uses valid block wrappers around PR suffix helpers', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($view)
+        ->not->toContain('<span class="volumes-col-pr flex items-center gap-1.5">')
+        ->not->toContain('<span class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">');
+
+    expect(substr_count($view, '<x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />'))
+        ->toBe(3);
 });
 
 it('keeps bind mount source paths out of the add volume form', function () {
@@ -422,16 +551,13 @@ it('hides PR deployment suffix for databases', function () {
 });
 
 it('uses a compact table badge for enabled backups instead of status-badge', function () {
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
 
-    expect($showView)
-        ->toContain('table-badge-success')
+    expect($allView)
+        ->toContain("'table-badge-success' => \$hasS3Backup")
         ->toContain('Volume backup is enabled')
         ->not->toContain('x-status-badge')
         ->not->toContain('status="Backup enabled"');
-
-    // Badge label is the short "Backup" text, not the old pill-with-label that broke the input row.
-    expect(preg_match('/table-badge-success[^>]*>\s*Backup\s*</', $showView))->toBeGreaterThan(0);
 });
 
 it('gates file storage PR suffix markup behind git_based applications', function () {

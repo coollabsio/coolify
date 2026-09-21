@@ -1,4 +1,4 @@
-@props(['status', 'title' => 'Application status', 'containerName' => 'Container'])
+@props(['status', 'title' => 'Application status', 'containerName' => 'Container', 'align' => 'left'])
 
 @php
     $rawStatus = str((string) $status)->lower()->trim()->value();
@@ -23,7 +23,7 @@
 
     $containerType = match (true) {
         str($containerStatus)->startsWith('running') => 'success',
-        str($containerStatus)->startsWith(['starting', 'restarting']) => 'warning',
+        str($containerStatus)->startsWith(['starting', 'restarting', 'degraded']) => 'warning',
         default => 'error',
     };
 
@@ -36,6 +36,7 @@
 
     [$summaryLabel, $summaryType] = match (true) {
         $containerType === 'error' => [$containerLabel, 'error'],
+        str($containerStatus)->startsWith('degraded') => ['Degraded', 'warning'],
         $healthType === 'error' => ['Degraded', 'error'],
         $containerType === 'warning' => [$containerLabel, 'warning'],
         $monitoringExcluded => ["{$containerLabel} (monitoring disabled)", 'warning'],
@@ -61,8 +62,12 @@
         </span>
     </x-status-badge>
 
-    <div x-cloak x-show="open" x-transition.origin.top.left
-        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-[min(16rem,calc(100vw-1.5rem))]! min-w-0! sm:w-64! sm:min-w-64!" role="menu">
+    <div x-cloak x-show="open" x-transition.origin.top.{{ $align === 'right' ? 'right' : 'left' }}
+        @class([
+            'listbox-panel top-8! z-[90]! w-[min(16rem,calc(100vw-1.5rem))]! min-w-0! sm:w-64! sm:min-w-64!',
+            'right-auto! left-0!' => $align !== 'right',
+            'left-auto! right-0!' => $align === 'right',
+        ]) role="menu">
         <div class="px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">{{ $title }}</div>
         <div class="listbox-option cursor-default! gap-2.5!">
             <span @class([

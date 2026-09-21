@@ -17,6 +17,13 @@ class BackupNow extends Component
         try {
             $this->authorize('manageBackups', $this->backup->database);
 
+            $database = $this->backup->database->refresh();
+            if ($database->id !== 0 && ! str($database->status)->startsWith('running')) {
+                $this->dispatch('error', 'The database must be running to start a backup.');
+
+                return;
+            }
+
             DatabaseBackupJob::dispatch($this->backup);
             $database = $this->backup->database;
             auditLog('ui.database.backup_started', [

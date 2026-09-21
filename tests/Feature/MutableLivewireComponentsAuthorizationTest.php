@@ -19,6 +19,19 @@ it('auto-disables listboxes when the gate denies access', function () {
     expect($html)->toMatch('/<button[^>]*id="status-trigger"[^>]*\sdisabled(?:[=\s>])/');
 });
 
+it('auto-disables checkboxes when the gate denies access', function () {
+    Gate::define('update-checkbox-test', fn (): bool => false);
+
+    $html = Blade::render(<<<'BLADE'
+        <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+            canGate="update-checkbox-test" :canResource="new stdClass" />
+    BLADE);
+
+    expect($html)
+        ->toMatch('/<input[^>]*type="checkbox"[^>]*\sdisabled(?:[=\s>])/')
+        ->not->toContain('canGate');
+});
+
 it('declares gate attributes on form controls with update permission checks', function () {
     $controlPattern = '/<x-forms\.(?:listbox|input|select|checkbox|textarea|button|toggle)\b.*?(?:\/>|<\/x-forms\.[^>]+>)/s';
 
@@ -52,6 +65,70 @@ it('hides resource action menus when the user cannot manage the resource', funct
     'database actions' => ['views/livewire/project/database/heading.blade.php', 'manage', 'database', 'database'],
     'server actions' => ['views/livewire/server/navbar.blade.php', 'manageProxy', 'server', 'server'],
 ]);
+
+it('declares deploy authorization on the application stop confirmation', function () {
+    $source = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+
+    expect($source)->toMatch(
+        '/<x-modal-confirmation\s+canGate="deploy" :canResource="\$application"/'
+    );
+});
+
+it('declares deploy authorization on the service container removal confirmation', function () {
+    $source = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($source)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Confirm Container Removal\?")(?=[^>]*canGate="deploy")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+});
+
+it('declares update authorization on application and service domain removal confirmations', function () {
+    $applicationRow = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
+    $serviceTable = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect($applicationRow)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/'
+    );
+
+    expect($serviceTable)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Remove domain\?")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+});
+
+it('declares update authorization on service backup mutation controls', function () {
+    $importBackupView = file_get_contents(resource_path('views/livewire/project/service/import-backup.blade.php'));
+    $volumeBackupView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($importBackupView)->toMatch(
+        '/<x-forms\.listbox(?=[^>]*id="selectedDatabaseUuid")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+
+    expect($volumeBackupView)
+        ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'database\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'storage\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/');
+});
+
+it('declares update authorization on application port controls', function () {
+    $domainsView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+    $previewDomainsView = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+    $generalView = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+
+    expect($domainsView)
+        ->toMatch('/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>\s*Cancel/s')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="confirmUseUnknownPort")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/s');
+
+    expect($previewDomainsView)
+        ->toMatch('/<x-forms\.button[^\n]*canGate="update" :canResource="\$preview->application"[\s\S]{0,150}?Cancel/')
+        ->toMatch('/<x-forms\.button[^\n]*wire:click="confirmUseUnknownPort" canGate="update"\s+:canResource="\$preview->application"/');
+
+    $portsExposesControls = str($generalView)
+        ->after("@if (\$isStatic || \$buildPack === 'static')")
+        ->before('<p class="mt-1.5 text-xs');
+
+    expect($portsExposesControls->substrCount('id="portsExposes"'))->toBe(3)
+        ->and($portsExposesControls->substrCount('canGate="update" :canResource="$application"'))->toBe(3);
+});
 
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));

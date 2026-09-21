@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\CloudInitScript;
@@ -137,6 +138,16 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             'destination_id' => $this->destination->id,
             'destination_type' => $this->destination->getMorphClass(),
         ]);
+        $backup = $database->scheduledBackups()->create([
+            'team_id' => $this->team->id,
+            'enabled' => true,
+            'frequency' => '0 0 * * *',
+            'save_s3' => false,
+        ]);
+        $backup->forceFill([
+            'last_execution_at' => now()->subDay(),
+            'missing_backup_notification_sent_at' => now(),
+        ])->save();
 
         $response = $this->withHeaders($this->headers)
             ->postJson("/api/v1/databases/{$database->uuid}/clone", [
@@ -148,11 +159,14 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             ->assertJsonPath('message', 'Database cloned.');
 
         $cloned = StandalonePostgresql::where('uuid', $response->json('uuid'))->first();
+        $clonedBackup = $cloned->scheduledBackups()->sole();
         expect($cloned)->not->toBeNull()
             ->and($cloned->name)->toBe('cloned-db')
             ->and($cloned->environment_id)->toBe($database->environment_id)
             ->and($cloned->destination_id)->toBe($this->destination->id)
-            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue();
+            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue()
+            ->and($clonedBackup->last_execution_at)->toBeNull()
+            ->and($clonedBackup->missing_backup_notification_sent_at)->toBeNull();
     });
 
     test('creates renamed volumes when cloning a database with clone_volumes', function () {
@@ -273,6 +287,60 @@ describe('POST /api/v1/services/{uuid}/clone', function () {
                 'destination_uuid' => $this->destination->uuid,
             ])
             ->assertNotFound();
+    });
+});
+
+describe('DELETE resource endpoints', function () {
+    test('soft deletes an application before queuing cleanup', function () {
+        Queue::fake();
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/applications/{$this->application->uuid}")
+            ->assertOk();
+
+        expect(Application::find($this->application->id))->toBeNull()
+            ->and(Application::withTrashed()->find($this->application->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
+    });
+
+    test('soft deletes a service before queuing cleanup', function () {
+        Queue::fake();
+        $service = Service::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'server_id' => $this->server->id,
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/services/{$service->uuid}")
+            ->assertOk();
+
+        expect(Service::find($service->id))->toBeNull()
+            ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
+    });
+
+    test('soft deletes a database before queuing cleanup', function () {
+        Queue::fake();
+        $database = StandalonePostgresql::create([
+            'name' => 'database-to-delete',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/databases/{$database->uuid}")
+            ->assertOk();
+
+        expect(StandalonePostgresql::find($database->id))->toBeNull()
+            ->and(StandalonePostgresql::withTrashed()->find($database->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
     });
 });
 

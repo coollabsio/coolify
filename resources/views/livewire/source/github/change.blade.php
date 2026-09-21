@@ -170,27 +170,18 @@
                             <div class="application-settings-form">
                                 <x-application.settings-section id="github-app-danger-section" title="Danger zone"
                                     helper="Destructive actions for this GitHub App source cannot be undone.">
-                                    <div
-                                        class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
-                                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                            <div class="min-w-0">
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete GitHub App</h4>
-                                                    <x-status-badge status="Permanent" type="error" />
-                                                </div>
-                                                <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                    <x-danger-zone title="Delete GitHub App">
+                                                <p>
                                                     Permanently delete
                                                     <strong class="font-semibold text-black dark:text-fg">{{ $name ?: 'this GitHub App' }}</strong>
                                                     from Coolify. Applications using this source will need another Git provider configured.
                                                 </p>
-                                                <ul class="mt-3 space-y-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                <ul class="space-y-1 text-xs">
                                                     <li>• The App registration on GitHub is not removed automatically.</li>
                                                     <li>• Linked applications keep their Git settings until you change them.</li>
                                                     <li>• This source cannot be restored from Coolify after deletion.</li>
                                                 </ul>
-                                            </div>
-
-                                            <div class="shrink-0">
+                                            <x-slot:action>
                                                 @can('delete', $github_app)
                                                     <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
                                                         buttonTitle="Delete" submitAction="delete"
@@ -200,13 +191,12 @@
                                                         shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
                                                         step2ButtonText="Permanently Delete" />
                                                 @else
-                                                    <x-forms.button disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                    <x-forms.button isError disabled tooltip="You do not have permission to delete this GitHub App.">
                                                         Delete
                                                     </x-forms.button>
                                                 @endcan
-                                            </div>
-                                        </div>
-                                    </div>
+                                            </x-slot:action>
+                                    </x-danger-zone>
 
                                     @cannot('delete', $github_app)
                                         <div class="mt-4">
@@ -300,7 +290,7 @@
                             @endif
 
                             <div
-                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+                                class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-dim">
                                 <p class="font-medium text-black dark:text-fg">Mandatory permissions</p>
                                 <p class="mt-1">Contents: read · Metadata: read · Email: read</p>
                             </div>

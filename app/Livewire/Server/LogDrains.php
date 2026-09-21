@@ -52,7 +52,7 @@ class LogDrains extends Component
         }
     }
 
-    public function syncDataNewRelic(bool $toModel = false)
+    private function syncDataNewRelic(bool $toModel = false): void
     {
         if ($toModel) {
             $this->server->settings->is_logdrain_newrelic_enabled = $this->isLogDrainNewRelicEnabled;
@@ -65,7 +65,7 @@ class LogDrains extends Component
         }
     }
 
-    public function syncDataAxiom(bool $toModel = false)
+    private function syncDataAxiom(bool $toModel = false): void
     {
         if ($toModel) {
             $this->server->settings->is_logdrain_axiom_enabled = $this->isLogDrainAxiomEnabled;
@@ -78,7 +78,7 @@ class LogDrains extends Component
         }
     }
 
-    public function syncDataCustom(bool $toModel = false)
+    private function syncDataCustom(bool $toModel = false): void
     {
         if ($toModel) {
             $this->server->settings->is_logdrain_custom_enabled = $this->isLogDrainCustomEnabled;
@@ -91,7 +91,7 @@ class LogDrains extends Component
         }
     }
 
-    public function syncData(bool $toModel = false, ?string $type = null)
+    private function syncData(bool $toModel = false, ?string $type = null): void
     {
         if ($toModel) {
             $this->customValidation();
@@ -106,6 +106,7 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
             }
+            $this->auditLogDrain('updated');
             $this->server->settings->save();
         } else {
             if ($type === 'newrelic') {
@@ -119,6 +120,7 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
             }
+            $this->auditLogDrain($this->{$enabledProperty} ? 'enabled' : 'disabled', $type);
         }
     }
 
@@ -165,6 +167,7 @@ class LogDrains extends Component
         try {
             $this->authorize('update', $this->server);
             $this->syncData(true);
+            $this->auditLogDrain('updated');
             if ($this->server->isLogDrainEnabled()) {
                 StartLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service started.');
@@ -244,6 +247,16 @@ class LogDrains extends Component
             'custom' => 'isLogDrainCustomEnabled',
             default => throw new \InvalidArgumentException('Unknown log drain type.'),
         };
+    }
+
+    private function auditLogDrain(string $action, ?string $type = null): void
+    {
+        auditLog("ui.server.log_drain.{$action}", [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'provider' => $type,
+        ]);
     }
 
     private function validateLogDrainSettings(string $type): void

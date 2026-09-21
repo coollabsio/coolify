@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IntegrationToken extends BaseModel
 {
+    use HasFactory;
+
     public const SECRET_MANAGER_PROVIDERS = ['doppler', 'infisical', 'vault'];
 
     public const PROVIDER_NAMES = [
@@ -48,6 +51,16 @@ class IntegrationToken extends BaseModel
         return $this->hasMany(SecretManagerLink::class);
     }
 
+    public function dnsZones(): HasMany
+    {
+        return $this->hasMany(DnsProviderZone::class);
+    }
+
+    public function managedDnsRecords(): HasMany
+    {
+        return $this->hasMany(ManagedDnsRecord::class);
+    }
+
     public function isSecretManager(): bool
     {
         return in_array($this->provider, self::SECRET_MANAGER_PROVIDERS, true);
@@ -56,6 +69,11 @@ class IntegrationToken extends BaseModel
     public function providerName(): string
     {
         return self::PROVIDER_NAMES[$this->provider] ?? ucfirst($this->provider);
+    }
+
+    public function automaticDnsEnabled(): bool
+    {
+        return $this->provider === 'cloudflare' && data_get($this->metadata, 'automatic_dns', true) !== false;
     }
 
     public function dopplerTokenType(): ?string

@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
@@ -37,6 +38,7 @@ use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
+use App\Livewire\Project\Service\ImportBackup as ServiceImportBackup;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Service\VolumeBackup\Index;
 use App\Livewire\Project\Service\VolumeBackup\Show;
@@ -51,7 +53,9 @@ use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\IntegrationTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
+use App\Livewire\SelectTeam;
 use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\Analytics\Show as ServerAnalytics;
 use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnel;
@@ -77,7 +81,6 @@ use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -156,6 +159,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/analytics', Analytics::class)->name('analytics');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
@@ -172,8 +176,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/oauth/{provider}', SettingsOauth::class)
         ->where('provider', '[A-Za-z0-9_-]+')
         ->name('settings.oauth.provider');
-    Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
-
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
@@ -290,6 +292,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 
@@ -328,6 +331,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/import-backup', ServiceImportBackup::class)->name('project.service.import-backup')->middleware('can.update.resource');
+        Route::get('/import-backup/{stack_service_uuid}', ServiceImportBackup::class)->name('project.service.import-backup.database')->middleware('can.update.resource');
         Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
         Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
         Route::get('/storage-backups/{backup_uuid}/s3', Show::class)->name('project.service.volume-backups.s3');
@@ -346,7 +351,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/retention', ServiceDatabaseBackups::class)->name('project.service.database.backup.retention');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
         Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
-        Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
+        Route::get('/{stack_service_uuid}/import', ServiceImportBackup::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
@@ -372,6 +377,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.metrics');
+        Route::get('/analytics', ServerAnalytics::class)->name('server.analytics');
         Route::get('/danger', DeleteServer::class)->name('server.delete');
         Route::get('/transfer', ServerTransfer::class)->name('server.transfer');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
@@ -402,6 +408,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/select-team', SelectTeam::class)->name('team.select');
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
 

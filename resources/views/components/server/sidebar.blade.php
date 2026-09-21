@@ -2,6 +2,15 @@
 
 @php
     $serverRouteParameters = ['server_uuid' => $server->uuid];
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelStatusStartedAt = $server->sentinel_waiting_since ?? \Illuminate\Support\Carbon::parse($server->sentinel_updated_at);
+    $sentinelTimeoutSeconds = $server->sentinel_waiting_since !== null
+        ? $server->firstSentinelReportTimeoutSeconds()
+        : $server->waitBeforeDoingSshCheck();
+    $sentinelExpiresInMilliseconds = max(
+        0,
+        ($sentinelStatusStartedAt->copy()->addSeconds($sentinelTimeoutSeconds)->timestamp - now()->timestamp) * 1000,
+    );
     $serverMenuItems = [
         [
             'label' => 'General',
@@ -54,7 +63,7 @@
             'active' => $activeMenu === 'proxy',
             'icon' => 'network',
             'group' => 'Platform',
-            'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
+            'visible' => ! $server->isSwarmWorker() && $server->canHostResources(),
             'warning' => $server->hasCurrentTraefikOutdatedInfo(),
             'tracks_proxy_configuration' => true,
             'children' => [
@@ -69,8 +78,9 @@
             'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
             'icon' => 'shield-star',
             'group' => 'Platform',
-            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
-            'warning' => $server->isSentinelEnabled() && ! $server->isSentinelLive(),
+            'visible' => $server->isFunctional() && ! $server->isSwarm() && $server->canHostResources() && auth()->user()?->can('viewSentinel', $server),
+            'warning' => $server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
+            'tracks_sentinel_status' => true,
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
                 ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
@@ -106,7 +116,7 @@
             'active' => $activeMenu === 'swarm',
             'icon' => 'layers',
             'group' => 'Networking',
-            'visible' => ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
+            'visible' => $server->team->usesSwarm() && ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
             'label' => 'Docker Cleanup',
@@ -131,6 +141,14 @@
             'icon' => 'graph',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
+        ],
+        [
+            'label' => 'Analytics',
+            'route' => 'server.analytics',
+            'active' => $activeMenu === 'analytics',
+            'icon' => 'analytics',
+            'group' => 'Operations',
+            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->isBuildServer(),
         ],
         [
             'label' => 'Security',
@@ -168,25 +186,55 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
+
+    // Group that holds the current page (item or nested child) — the only one
+    // expanded by default.
+    $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
+        fn ($item) => ($item['active'] ?? false)
+            || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)
+    ));
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start"
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
-        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())
+        traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
+        sentinelOutOfSync: @js($server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync'),
+        sentinelExpiryTimer: null,
+        scheduleSentinelExpiry(delay) {
+            clearTimeout(this.sentinelExpiryTimer);
+            if (!this.sentinelOutOfSync) {
+                this.sentinelExpiryTimer = setTimeout(() => this.sentinelOutOfSync = true, delay);
+            }
+        }
     }"
+    x-init="scheduleSentinelExpiry(@js($sentinelExpiresInMilliseconds))"
     @proxy-configuration-state-changed.window="
         proxyConfigurationPending = $event.detail.pending;
         traefikOutdated = $event.detail.traefikOutdated;
+    "
+    @sentinel-status-changed.window="
+        sentinelOutOfSync = $event.detail.outOfSync;
+        scheduleSentinelExpiry($event.detail.expiresInMilliseconds);
     ">
     <nav aria-label="Server configuration sections"
+        x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.server' })"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
                     aria-hidden="true"></div>
             @endunless
-            <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
+            <button type="button" class="nav-section-toggle hidden xl:flex" @click="toggle(@js($groupLabel))"
+                :aria-expanded="isOpen(@js($groupLabel))">
+                <span>{{ $groupLabel }}</span>
+                <svg class="size-3 shrink-0 opacity-60 transition-transform"
+                    :class="!isOpen(@js($groupLabel)) && '-rotate-90'" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+            </button>
+            <div class="contents" :class="isOpen(@js($groupLabel)) ? 'xl:block' : 'xl:hidden'">
             @foreach ($groupItems as $menuItem)
                 <a wire:key="server-settings-link-{{ str($menuItem['label'])->slug() }}"
                     @class([
@@ -200,6 +248,9 @@
                     @if ($menuItem['tracks_proxy_configuration'] ?? false)
                         <x-reicon name="alert-triangle" x-cloak
                             x-show="proxyConfigurationPending || traefikOutdated"
+                            class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['tracks_sentinel_status'] ?? false)
+                        <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
                     @elseif ($menuItem['warning'] ?? false)
                         <x-reicon name="alert-triangle"
@@ -220,6 +271,7 @@
                     </div>
                 @endif
             @endforeach
+            </div>
         @endforeach
     </nav>
 </aside>

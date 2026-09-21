@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
+use App\Support\DomainPortOverrides;
 use Illuminate\Support\Arr;
 
 class ApplicationConfigurationSnapshot
@@ -169,6 +170,7 @@ class ApplicationConfigurationSnapshot
             $this->item('custom_network_aliases', 'Network aliases', $this->application->custom_network_aliases, 'redeploy'),
             $this->item('connect_to_docker_network', 'Connect to Docker network', data_get($this->application, 'settings.connect_to_docker_network'), 'redeploy'),
             $this->item('custom_internal_name', 'Custom container name', data_get($this->application, 'settings.custom_internal_name'), 'redeploy'),
+            $this->item('custom_container_name_prefix', 'Container name prefix', data_get($this->application, 'settings.custom_container_name_prefix'), 'redeploy'),
             $this->item('is_consistent_container_name_enabled', 'Consistent container name', data_get($this->application, 'settings.is_consistent_container_name_enabled'), 'redeploy'),
             $this->item('is_container_label_escape_enabled', 'Escape container labels', data_get($this->application, 'settings.is_container_label_escape_enabled'), 'redeploy'),
             $this->item('is_container_label_readonly_enabled', 'Read-only container labels', data_get($this->application, 'settings.is_container_label_readonly_enabled'), 'redeploy'),
@@ -194,6 +196,7 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('domain_port_overrides', 'Domain port overrides', DomainPortOverrides::sorted($this->application->domain_port_overrides), 'redeploy'),
             $this->item('noindex_domains', 'Search engine indexing', $this->application->noindexDomains()->all(), 'redeploy'),
             $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),

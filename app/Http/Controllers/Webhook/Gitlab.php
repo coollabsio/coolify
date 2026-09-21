@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -21,6 +22,7 @@ class Gitlab extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
     {
@@ -242,6 +244,15 @@ class Gitlab extends Controller
                                 'message' => 'Preview deployments disabled',
                             ]);
 
+                            continue;
+                        }
+
+                        if (! $this->isPreviewDeploymentRepositoryTrusted(
+                            data_get($payload, 'object_attributes.source_project_id'),
+                            data_get($payload, 'object_attributes.target_project_id'),
+                            data_get($payload, 'project.id'),
+                            $application->settings->is_pr_deployments_public_enabled,
+                        )) {
                             continue;
                         }
 
@@ -532,6 +543,15 @@ class Gitlab extends Controller
                 if ($x_gitlab_event === 'merge_request') {
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                         if ($application->isPRDeployable()) {
+                            if (! $this->isPreviewDeploymentRepositoryTrusted(
+                                data_get($payload, 'object_attributes.source_project_id'),
+                                data_get($payload, 'object_attributes.target_project_id'),
+                                data_get($payload, 'project.id'),
+                                $application->settings->is_pr_deployments_public_enabled,
+                            )) {
+                                continue;
+                            }
+
                             if ($skip_deploy_pr ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,

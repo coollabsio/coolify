@@ -66,7 +66,10 @@ class RegenerateSslCertJob implements ShouldBeEncrypted, ShouldQueue
                     caCert: $caCert->ssl_certificate,
                     caKey: $caCert->ssl_private_key,
                 );
-                $regenerated->push($certificate);
+                $resource = $certificate->database;
+                if ($resource) {
+                    $regenerated->push($resource);
+                }
             } catch (\Exception $e) {
                 Log::error('Failed to regenerate SSL certificate: '.$e->getMessage());
             }

@@ -43,7 +43,7 @@ class Show extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -85,7 +85,7 @@ class Show extends Component
             }
             $this->destination->delete();
 
-            return redirect()->route('destination.index');
+            return redirectRoute($this, 'destination.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

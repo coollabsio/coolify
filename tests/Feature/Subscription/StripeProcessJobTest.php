@@ -55,8 +55,12 @@ describe('customer.subscription.created does not fall through to updated', funct
         expect($subscription->stripe_invoice_paid)->toBeFalsy();
     });
 
-    test('created event updates existing subscription instead of duplicating', function () {
+    test('created event cannot overwrite a different recorded subscription', function () {
         Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
 
         Subscription::create([
             'team_id' => $this->team->id,
@@ -84,8 +88,46 @@ describe('customer.subscription.created does not fall through to updated', funct
 
         expect(Subscription::where('team_id', $this->team->id)->count())->toBe(1);
         $subscription = Subscription::where('team_id', $this->team->id)->first();
-        expect($subscription->stripe_subscription_id)->toBe('sub_new_123');
-        expect($subscription->stripe_customer_id)->toBe('cus_new_123');
+        expect($subscription->stripe_subscription_id)->toBe('sub_old');
+        expect($subscription->stripe_customer_id)->toBe('cus_old');
+        expect($subscription->stripe_invoice_paid)->toBeTruthy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_old')
+                && str_contains($notification->message, 'cus_new_123');
+        });
+    });
+
+    test('created event rejects a pending record with a different stripe customer id', function () {
+        Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_pending',
+            'stripe_invoice_paid' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.created', 'data' => ['object' => [
+            'id' => 'sub_other',
+            'customer' => 'cus_other',
+            'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+        ]]]))->handle();
+
+        $subscription = $this->team->subscription()->first();
+        expect($subscription->stripe_subscription_id)->toBeNull()
+            ->and($subscription->stripe_customer_id)->toBe('cus_pending')
+            ->and($subscription->stripe_invoice_paid)->toBeFalsy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_pending')
+                && str_contains($notification->message, 'cus_other');
+        });
     });
 });
 
@@ -337,4 +379,33 @@ describe('missing subscription Stripe webhooks are ignored', function () {
             ],
         ]],
     ]);
+});
+
+test('late repeated subscription created events preserve confirmed payment', function () {
+    Queue::fake();
+    $completed = ['type' => 'checkout.session.completed', 'data' => ['object' => [
+        'client_reference_id' => $this->user->id.':'.$this->team->id,
+        'subscription' => 'sub_paid', 'customer' => 'cus_paid',
+    ]]];
+    (new StripeProcessJob($completed))->handle();
+    $created = ['type' => 'customer.subscription.created', 'data' => ['object' => [
+        'id' => 'sub_paid', 'customer' => 'cus_paid',
+        'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+    ]]];
+    foreach (range(1, 2) as $attempt) {
+        (new StripeProcessJob($created))->handle();
+        expect($this->team->subscription()->first()->stripe_invoice_paid)->toBeTruthy();
+    }
+    expect($this->team->subscription()->count())->toBe(1);
+});
+
+test('created event fills a pending customer record without granting access', function () {
+    Queue::fake();
+    Subscription::create(['team_id' => $this->team->id, 'stripe_customer_id' => 'cus_pending', 'stripe_invoice_paid' => false]);
+    (new StripeProcessJob(['type' => 'customer.subscription.created', 'data' => ['object' => [
+        'id' => 'sub_pending', 'customer' => 'cus_pending',
+        'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+    ]]]))->handle();
+    expect($this->team->subscription()->first()->stripe_subscription_id)->toBe('sub_pending')
+        ->and($this->team->subscription()->first()->stripe_invoice_paid)->toBeFalsy();
 });

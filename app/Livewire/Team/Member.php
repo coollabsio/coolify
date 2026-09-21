@@ -92,6 +92,7 @@ class Member extends Component
             DB::transaction(function () use ($teamId): void {
                 $this->member->teams()->detach($teamId);
                 RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
+                $this->member->clearStoredTeamIfMatches($teamId);
             });
             auditLog('ui.team_member.removed', [
                 'team_id' => $teamId,

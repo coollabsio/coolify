@@ -33,7 +33,7 @@ class Index extends Component
         if (session('impersonating')) {
             session()->forget('impersonating');
             $user = User::find(0);
-            $team_to_switch_to = $user->teams->first();
+            $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
             Auth::login($user);
             refreshSession($team_to_switch_to);
 
@@ -69,7 +69,7 @@ class Index extends Component
         if (! $user) {
             abort(404);
         }
-        $team_to_switch_to = $user->teams->first();
+        $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
         Auth::login($user);
         refreshSession($team_to_switch_to);
 

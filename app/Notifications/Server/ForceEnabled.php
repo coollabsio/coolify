@@ -65,4 +65,16 @@ class ForceEnabled extends CustomEmailNotification
             color: SlackMessage::successColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => true,
+            'message' => "Server ({$this->server->name}) enabled again!",
+            'event' => 'server_force_enabled',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => base_url().'/server/'.$this->server->uuid,
+        ];
+    }
 }

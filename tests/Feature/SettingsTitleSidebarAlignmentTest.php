@@ -20,7 +20,6 @@ test('instance settings pages use one shared sidebar workspace', function () {
         resource_path('views/livewire/settings-oauth.blade.php'),
         resource_path('views/livewire/settings-backup.blade.php'),
         resource_path('views/livewire/settings-email.blade.php'),
-        resource_path('views/livewire/settings/scheduled-jobs.blade.php'),
     ];
 
     foreach ($pages as $path) {

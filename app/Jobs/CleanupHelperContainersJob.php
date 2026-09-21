@@ -19,6 +19,11 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
 
     public function __construct(public Server $server) {}
 
+    private static function helperContainersCommand(): string
+    {
+        return 'docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image|test("(^|/)coollabsio/coolify-helper(:|@)")))\'';
+    }
+
     public function handle(): void
     {
         try {
@@ -36,7 +41,7 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 'active_deployment_uuids' => $activeDeployments,
             ]);
 
-            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.coolifyRegistryUrl().'/coollabsio/coolify-helper")))\''], $this->server, false);
+            $containers = instant_remote_process_with_timeout([self::helperContainersCommand()], $this->server, false);
             $helperContainers = collect(json_decode($containers));
 
             if ($helperContainers->count() > 0) {

@@ -69,7 +69,7 @@
                     </x-table.dropdown>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="view-toggle">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
@@ -96,7 +96,7 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <template x-for="tag in paginatedTags" :key="tag.id">
                         <article
-                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                             <a :href="tag.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
                                 :aria-label="`Open ${tag.name}`"></a>
 
@@ -121,15 +121,15 @@
                         </article>
                     </template>
                 </div>
-                <x-client-pagination x-show="filteredTags.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                <x-client-pagination x-show="filteredTags.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
                     summary="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`" page-size-model="pageSize"
                     storage-key="coolify.page-size.tags" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="viewMode === 'table'"
-                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
-                    class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                     <div>Tag</div>
                     <div>Resources</div>
                     <div>Applications</div>
@@ -161,7 +161,7 @@
             </div>
 
             <div x-show="filteredTags.length === 0"
-                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
                 <p class="text-[13px] font-medium">No matching tags</p>
                 <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
@@ -250,7 +250,7 @@
         <div class="flex flex-col gap-6">
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Resources</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ $resourceCount }}
@@ -260,7 +260,7 @@
                     </p>
                 </div>
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Applications</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ $applications?->count() ?? 0 }}
@@ -270,7 +270,7 @@
                     </p>
                 </div>
                 <div
-                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
                     <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Active deployments</p>
                     <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
                         {{ collect($deploymentsPerTagPerServer ?? [])->flatten(1)->count() }}
@@ -308,7 +308,7 @@
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($applications ?? [] as $application)
                             <a {{ wireNavigate() }} href="{{ $application->link() }}"
-                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
                                         class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -332,7 +332,7 @@
 
                         @foreach ($services ?? [] as $service)
                             <a {{ wireNavigate() }} href="{{ $service->link() }}"
-                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                                 <div class="flex items-start gap-2.5">
                                     <div
                                         class="flex size-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -374,7 +374,7 @@
                         </div>
                     @else
                         <div
-                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
                             <div>Resource</div>
                             <div>Server</div>
                             <div>Status</div>

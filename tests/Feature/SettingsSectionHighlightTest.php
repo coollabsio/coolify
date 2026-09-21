@@ -45,6 +45,18 @@ test('configuration sidebar subitems trigger section highlight on scroll', funct
         ->toContain('stableFrames');
 });
 
+test('application configuration subitems scroll without navigating the active page', function () {
+    $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
+
+    expect($sidebar)
+        ->toContain("@if (\$menuItem['active'])")
+        ->toContain('<button type="button" class="menu-subitem"')
+        ->toContain("window.scrollToSettingsSection?.('{{ \$section['id'] }}')")
+        ->toContain('@else')
+        ->toContain("href=\"{{ route(\$menuItem['route'], \$applicationRouteParameters) }}#{{ \$section['id'] }}\"")
+        ->not->toContain("if (document.getElementById('{{ \$section['id'] }}'))");
+});
+
 test('postgresql general navigation lists each in-page settings section', function () {
     $sidebar = file_get_contents(resource_path('views/components/database/configuration-sidebar.blade.php'));
     $general = file_get_contents(resource_path('views/livewire/project/database/postgresql/general.blade.php'));
