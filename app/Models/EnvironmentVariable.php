@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Infisical\PushGeneratedSecret;
 use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Services\Infisical\InfisicalLock;
@@ -147,6 +148,28 @@ class EnvironmentVariable extends BaseModel
 
         static::deleting(function (self $variable): void {
             self::guardInfisicalLock($variable);
+        });
+
+        // Only Coolify's OWN generated writes go up. A human write never
+        // reaches here (the saving guard rejected it), and a pull write must
+        // not be echoed back up — without that second condition the two sync
+        // directions feed each other forever.
+        //
+        // The key/value test is not an optimisation. parse() uses
+        // firstOrCreate, so a repeat parse() must not produce a repeat push;
+        // and the push job stamps is_infisical_managed / infisical_path back
+        // onto the rows it pushed, which is itself a system write that would
+        // otherwise re-enter here forever.
+        static::saved(function (self $row): void {
+            if (! InfisicalLock::isSystemWrite() || InfisicalLock::isInfisicalPull()) {
+                return;
+            }
+
+            if (! $row->wasRecentlyCreated && ! $row->wasChanged('key') && ! $row->wasChanged('value')) {
+                return;
+            }
+
+            PushGeneratedSecret::run($row);
         });
     }
 

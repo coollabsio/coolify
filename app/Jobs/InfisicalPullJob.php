@@ -25,7 +25,12 @@ class InfisicalPullJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public InfisicalConnection $connection)
+    /**
+     * NOT named $connection: Illuminate\Bus\Queueable already defines a
+     * $connection property (the queue connection name), and a promoted
+     * constructor property of that name is a fatal trait-composition conflict.
+     */
+    public function __construct(public InfisicalConnection $infisicalConnection)
     {
         $this->onQueue(crons_queue());
     }
@@ -37,24 +42,24 @@ class InfisicalPullJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function middleware(): array
     {
-        return [new WithoutOverlapping('infisical-pull-'.$this->connection->id)];
+        return [new WithoutOverlapping('infisical-pull-'.$this->infisicalConnection->id)];
     }
 
     public function handle(): void
     {
         try {
-            PullTeamSecrets::run($this->connection);
+            PullTeamSecrets::run($this->infisicalConnection);
         } catch (InfisicalApiException|InfisicalPathCollisionException $e) {
             // A scheduled pull must not leave stored values in a broken state,
             // and one broken connection must not fail the whole batch. Record
             // the failure and return.
-            $this->connection->forceFill([
+            $this->infisicalConnection->forceFill([
                 'last_sync_status' => InfisicalConnection::STATUS_FAILED,
                 'last_sync_error' => $e->getMessage(),
             ])->save();
 
             Log::warning('Infisical pull failed', [
-                'connection_id' => $this->connection->id,
+                'connection_id' => $this->infisicalConnection->id,
                 'message' => $e->getMessage(),
             ]);
         }
