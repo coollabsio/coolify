@@ -2275,6 +2275,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
                 }
                 if ($this->container_name) {
+                    $escapedContainerName = escapeshellarg($this->container_name);
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                     if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
@@ -2290,13 +2291,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     while ($counter <= $this->application->health_check_retries) {
                         $this->execute_remote_command(
                             [
-                                "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
+                                "docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}",
                                 'hidden' => true,
                                 'save' => 'health_check',
                                 'append' => false,
                             ],
                             [
-                                "docker inspect --format='{{json .State.Health.Log}}' {$this->container_name}",
+                                "docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}",
                                 'hidden' => true,
                                 'save' => 'health_check_logs',
                                 'append' => false,
@@ -2343,11 +2344,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function query_logs()
     {
+        $escapedContainerName = escapeshellarg($this->container_name);
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Container logs:');
         $this->execute_remote_command(
             [
-                'command' => "docker logs -n 100 {$this->container_name}",
+                'command' => "docker logs -n 100 {$escapedContainerName}",
                 'type' => 'stderr',
                 'ignore_errors' => true,
             ],
@@ -4273,11 +4275,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             if ($skipRemove) {
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
             } else {
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
                 $this->removeContainerWithTimeout($containerName);
             }

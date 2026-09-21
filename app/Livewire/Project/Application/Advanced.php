@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationSetting;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -67,7 +68,7 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConsistentContainerNameEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['nullable', 'string', 'max:255', 'regex:'.ValidationPatterns::CONTAINER_NAME_PATTERN])]
     public ?string $customInternalName = null;
 
     #[Validate(['string', 'nullable', 'max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH])]
