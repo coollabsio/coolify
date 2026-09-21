@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SharedEnvironmentVariable extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         // Core identification
         'key',
@@ -31,7 +33,8 @@ class SharedEnvironmentVariable extends Model
         'version',
 
         // Provenance
-        'infisical_binding_id',
+        'is_infisical_managed',
+        'infisical_path',
     ];
 
     protected $hidden = [
@@ -41,6 +44,7 @@ class SharedEnvironmentVariable extends Model
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
+        'is_infisical_managed' => 'boolean',
     ];
 
     /**
@@ -76,10 +80,5 @@ class SharedEnvironmentVariable extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
-    }
-
-    public function infisicalBinding(): BelongsTo
-    {
-        return $this->belongsTo(InfisicalBinding::class, 'infisical_binding_id');
     }
 }

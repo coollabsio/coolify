@@ -5,11 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InfisicalConnection extends BaseModel
 {
     use HasFactory;
+
+    public const STATUS_SUCCESS = 'success';
+
+    public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
         'team_id',
@@ -17,6 +20,12 @@ class InfisicalConnection extends BaseModel
         'host',
         'client_id',
         'client_secret',
+        'infisical_project_id',
+        'is_enabled',
+        'adopted_at',
+        'last_synced_at',
+        'last_sync_status',
+        'last_sync_error',
     ];
 
     protected $hidden = [
@@ -52,17 +61,15 @@ class InfisicalConnection extends BaseModel
         return [
             'client_id' => 'encrypted',
             'client_secret' => 'encrypted',
+            'is_enabled' => 'boolean',
+            'adopted_at' => 'datetime',
+            'last_synced_at' => 'datetime',
         ];
     }
 
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
-    }
-
-    public function bindings(): HasMany
-    {
-        return $this->hasMany(InfisicalBinding::class);
     }
 
     /**

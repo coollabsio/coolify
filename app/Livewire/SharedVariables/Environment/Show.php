@@ -79,15 +79,15 @@ class Show extends Component
     /**
      * User-owned rows: the only ones this screen may edit or delete.
      *
-     * Rows carrying an infisical_binding_id belong to an Infisical binding and
-     * are replaced wholesale by the next sync, so they are excluded from both
+     * Rows flagged is_infisical_managed are owned by Infisical and are refreshed
+     * by the next sync, so they are excluded from both
      * the normal-view table and the developer-view textarea.
      *
      * @return Collection<int, SharedEnvironmentVariable>
      */
     public function getEditableVariablesProperty(): Collection
     {
-        return $this->environment->environment_variables->whereNull('infisical_binding_id')->values();
+        return $this->environment->environment_variables->where('is_infisical_managed', false)->values();
     }
 
     /**
@@ -97,7 +97,7 @@ class Show extends Component
      */
     public function getInheritedVariablesProperty(): Collection
     {
-        return $this->environment->environment_variables->whereNotNull('infisical_binding_id')->sortBy('key')->values();
+        return $this->environment->environment_variables->where('is_infisical_managed', true)->sortBy('key')->values();
     }
 
     private function formatEnvironmentVariables($variables)
@@ -160,14 +160,14 @@ class Show extends Component
     /**
      * Delete user-owned rows the admin dropped from the bulk textarea.
      *
-     * Binding-owned rows are never in the textarea, so they must never be
-     * reachable here: the whereNull guard is the control that keeps a missing
-     * key from hard-deleting a secret a running deployment depends on.
+     * Infisical-owned rows are never in the textarea, so they must never be
+     * reachable here: the is_infisical_managed guard is the control that keeps a
+     * missing key from hard-deleting a secret a running deployment depends on.
      */
     private function deleteRemovedVariables($variables)
     {
         $variablesToDelete = $this->environment->environment_variables()
-            ->whereNull('infisical_binding_id')
+            ->where('is_infisical_managed', false)
             ->whereNotIn('key', array_keys($variables))
             ->get();
 
@@ -176,7 +176,7 @@ class Show extends Component
         }
 
         $this->environment->environment_variables()
-            ->whereNull('infisical_binding_id')
+            ->where('is_infisical_managed', false)
             ->whereNotIn('key', array_keys($variables))
             ->delete();
 
@@ -190,11 +190,11 @@ class Show extends Component
             $value = is_array($data) ? ($data['value'] ?? '') : $data;
 
             $found = $this->environment->environment_variables()
-                ->whereNull('infisical_binding_id')
+                ->where('is_infisical_managed', false)
                 ->where('key', $key)
                 ->first();
 
-            if ($found === null && $this->environment->environment_variables()->whereNotNull('infisical_binding_id')->where('key', $key)->exists()) {
+            if ($found === null && $this->environment->environment_variables()->where('is_infisical_managed', true)->where('key', $key)->exists()) {
                 // An Infisical-owned row already holds this key. Never shadow it
                 // with a second row from the textarea.
                 continue;

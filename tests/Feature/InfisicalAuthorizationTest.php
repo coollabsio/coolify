@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\InfisicalBinding;
 use App\Models\InfisicalConnection;
 use App\Models\Team;
 use App\Models\User;
@@ -72,54 +71,7 @@ test('a user with no team membership at all may not touch any connection', funct
     expect($unaffiliated->can('delete', $connection))->toBeFalse();
 });
 
-// --- InfisicalBinding ---
-
-test('an owner may view and manage bindings on their team connection', function () {
-    $team = Team::factory()->create();
-    $owner = User::factory()->create();
-    $team->members()->attach($owner->id, ['role' => 'owner']);
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-
-    session(['currentTeam' => ['id' => $team->id]]);
-
-    expect($owner->can('viewAny', InfisicalBinding::class))->toBeTrue();
-    expect($owner->can('create', InfisicalBinding::class))->toBeTrue();
-    expect($owner->can('view', $binding))->toBeTrue();
-    expect($owner->can('update', $binding))->toBeTrue();
-    expect($owner->can('delete', $binding))->toBeTrue();
-});
-
-test('a member may not view or manage bindings', function () {
-    $team = Team::factory()->create();
-    $member = User::factory()->create();
-    $team->members()->attach($member->id, ['role' => 'member']);
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-
-    session(['currentTeam' => ['id' => $team->id]]);
-
-    expect($member->can('viewAny', InfisicalBinding::class))->toBeFalse();
-    expect($member->can('create', InfisicalBinding::class))->toBeFalse();
-    expect($member->can('view', $binding))->toBeFalse();
-    expect($member->can('update', $binding))->toBeFalse();
-    expect($member->can('delete', $binding))->toBeFalse();
-});
-
-test('an owner of another team may not touch this team binding', function () {
-    $connection = InfisicalConnection::factory()->create();
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-
-    $otherTeam = Team::factory()->create();
-    $outsider = User::factory()->create();
-    $otherTeam->members()->attach($outsider->id, ['role' => 'owner']);
-
-    expect($outsider->can('view', $binding))->toBeFalse();
-    expect($outsider->can('update', $binding))->toBeFalse();
-    expect($outsider->can('delete', $binding))->toBeFalse();
-});
-
-test('an admin in one team may not touch another team connection or binding where they are only a member', function () {
+test('an admin in one team may not touch another team connection where they are only a member', function () {
     $teamA = Team::factory()->create();
     $teamB = Team::factory()->create();
     $user = User::factory()->create();
@@ -127,15 +79,10 @@ test('an admin in one team may not touch another team connection or binding wher
     $teamB->members()->attach($user->id, ['role' => 'member']);
 
     $connection = InfisicalConnection::factory()->create(['team_id' => $teamB->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
 
     session(['currentTeam' => ['id' => $teamA->id]]);
 
     expect($user->can('view', $connection))->toBeFalse();
     expect($user->can('update', $connection))->toBeFalse();
     expect($user->can('delete', $connection))->toBeFalse();
-
-    expect($user->can('view', $binding))->toBeFalse();
-    expect($user->can('update', $binding))->toBeFalse();
-    expect($user->can('delete', $binding))->toBeFalse();
 });

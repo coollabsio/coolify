@@ -19,6 +19,9 @@ class Form extends Component
     #[Validate(['required', 'url', 'max:255'])]
     public string $host = 'https://app.infisical.com';
 
+    #[Validate(['required', 'string', 'max:255'])]
+    public string $infisical_project_id = '';
+
     /**
      * Never repopulated from the model: `client_id`/`client_secret` are
      * `encrypted`-cast, so setting them from `$this->connection` would put
@@ -41,6 +44,7 @@ class Form extends Component
         $rules = [
             'name' => ['required', 'string', 'max:128'],
             'host' => ['required', 'url', 'max:255'],
+            'infisical_project_id' => ['required', 'string', 'max:255'],
             'client_id' => [$requiredOnCreate, 'string', 'max:255'],
             'client_secret' => [$requiredOnCreate, 'string', 'max:512'],
         ];
@@ -71,6 +75,7 @@ class Form extends Component
             'name.required' => 'The Name field is required.',
             'host.required' => 'The Host field is required.',
             'host.url' => 'The Host must be a valid URL.',
+            'infisical_project_id.required' => 'The Infisical Project ID field is required.',
             'client_id.required' => 'The Client ID field is required.',
             'client_secret.required' => 'The Client Secret field is required.',
         ];
@@ -93,9 +98,11 @@ class Form extends Component
         if ($toModel) {
             $this->connection->name = $this->name;
             $this->connection->host = $this->host;
+            $this->connection->infisical_project_id = $this->infisical_project_id;
         } else {
             $this->name = $this->connection->name;
             $this->host = $this->connection->host;
+            $this->infisical_project_id = $this->connection->infisical_project_id;
         }
     }
 
@@ -140,6 +147,7 @@ class Form extends Component
                 'team_id' => currentTeam()->id,
                 'name' => $this->name,
                 'host' => $this->host,
+                'infisical_project_id' => $this->infisical_project_id,
                 'client_id' => trim($this->client_id),
                 'client_secret' => trim($this->client_secret),
             ]);

@@ -18,6 +18,8 @@ class InfisicalConnectionFactory extends Factory
             'host' => 'https://app.infisical.com',
             'client_id' => $this->faker->uuid(),
             'client_secret' => $this->faker->sha256(),
+            'infisical_project_id' => $this->faker->uuid(),
+            'is_enabled' => false,
         ];
     }
 }

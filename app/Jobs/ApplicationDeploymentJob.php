@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Infisical\ResolveInheritedSecrets;
-use App\Actions\Infisical\SyncBindingSafely;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Events\ApplicationConfigurationChanged;
@@ -16,7 +15,6 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\InfisicalBinding;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -83,10 +81,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     public static int $batch_counter = 0;
 
     private bool $newVersionIsHealthy = false;
-
-    private ?InfisicalBinding $infisicalBinding = null;
-
-    private bool $infisicalBindingResolved = false;
 
     /** @var Collection<string, string>|null */
     private ?Collection $inheritedSecrets = null;
@@ -387,7 +381,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->build_server = $this->server;
             }
             $this->detectBuildKitCapabilities();
-            $this->syncInheritedSecrets();
             $this->decide_what_to_do();
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
@@ -1369,35 +1362,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Refresh this environment's Infisical-owned variables before generating env files.
-     *
-     * Never fatal: an Infisical outage falls back to the last-synced values.
-     */
-    private function syncInheritedSecrets(): void
-    {
-        SyncBindingSafely::run($this->infisicalBinding());
-    }
-
-    /**
-     * The enabled Infisical binding for this deployment's environment, if any.
-     *
-     * Memoised: deployments without a binding must not pay for this lookup twice.
-     */
-    private function infisicalBinding(): ?InfisicalBinding
-    {
-        if ($this->infisicalBindingResolved) {
-            return $this->infisicalBinding;
-        }
-
-        $this->infisicalBindingResolved = true;
-
-        return $this->infisicalBinding = InfisicalBinding::query()
-            ->where('environment_id', $this->application->environment_id)
-            ->where('is_enabled', true)
-            ->first();
-    }
-
-    /**
      * Infisical-owned variables inherited from this deployment's environment, as key => value.
      *
      * Memoised: the runtime and build-time generators each ask for these, and every
@@ -1409,10 +1373,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->inheritedSecrets !== null) {
             return $this->inheritedSecrets;
-        }
-
-        if ($this->infisicalBinding() === null) {
-            return $this->inheritedSecrets = collect();
         }
 
         return $this->inheritedSecrets = ResolveInheritedSecrets::run($this->application);

@@ -1,12 +1,10 @@
 <?php
 
-use App\Actions\Infisical\SyncEnvironmentSecrets;
 use App\Livewire\Project\Shared\EnvironmentVariable\All as EnvironmentVariableAll;
 use App\Livewire\Security\Infisical\Form as InfisicalForm;
 use App\Livewire\Security\Infisical\Index as InfisicalIndex;
 use App\Models\Application;
 use App\Models\Environment;
-use App\Models\InfisicalBinding;
 use App\Models\InfisicalConnection;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -17,7 +15,6 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -90,6 +87,7 @@ test('an owner can create an infisical connection scoped to their team', functio
     Livewire::test(InfisicalForm::class)
         ->set('name', 'Production Infisical')
         ->set('host', 'https://infisical.test')
+        ->set('infisical_project_id', 'proj-123')
         ->set('client_id', 'client-abc')
         ->set('client_secret', 'secret-xyz')
         ->call('submit')
@@ -100,6 +98,7 @@ test('an owner can create an infisical connection scoped to their team', functio
 
     expect($connection)->not->toBeNull();
     expect($connection->team_id)->toBe($team->id);
+    expect($connection->infisical_project_id)->toBe('proj-123');
     expect($connection->client_secret)->toBe('secret-xyz');
 });
 
@@ -109,6 +108,7 @@ test('creating still requires both client id and client secret', function () {
     Livewire::test(InfisicalForm::class)
         ->set('name', 'Production Infisical')
         ->set('host', 'https://infisical.test')
+        ->set('infisical_project_id', 'proj-123')
         ->set('client_id', '')
         ->set('client_secret', '')
         ->call('submit')
@@ -121,6 +121,7 @@ test('submit validation rejects a missing host', function () {
     Livewire::test(InfisicalForm::class)
         ->set('name', 'Production Infisical')
         ->set('host', '')
+        ->set('infisical_project_id', 'proj-123')
         ->set('client_id', 'client-abc')
         ->set('client_secret', 'secret-xyz')
         ->call('submit')
@@ -243,6 +244,7 @@ test('creating with a whitespace-only client secret is a validation error, not a
     Livewire::test(InfisicalForm::class)
         ->set('name', 'Production Infisical')
         ->set('host', 'https://infisical.test')
+        ->set('infisical_project_id', 'proj-123')
         ->set('client_id', ' ')
         ->set('client_secret', ' ')
         ->call('submit')
@@ -289,61 +291,9 @@ test('syncData never copies credential fields from the model', function () {
     expect($form->client_secret)->toBe('');
 });
 
-// --- Sync now ---
-
-test('sync now is authorized against update, not an undefined ability', function () {
-    [$team] = actingAsTeamRole('owner');
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $environment = Environment::factory()->create();
-    $binding = InfisicalBinding::factory()->create([
-        'infisical_connection_id' => $connection->id,
-        'environment_id' => $environment->id,
-    ]);
-
-    Livewire::test(InfisicalIndex::class)
-        ->call('syncNow', $binding->uuid)
-        ->assertHasNoErrors();
-});
-
-test('sync now refuses a binding uuid belonging to another team', function () {
-    actingAsTeamRole('owner');
-
-    $otherConnection = InfisicalConnection::factory()->create();
-    $otherEnvironment = Environment::factory()->create();
-    $otherBinding = InfisicalBinding::factory()->create([
-        'infisical_connection_id' => $otherConnection->id,
-        'environment_id' => $otherEnvironment->id,
-    ]);
-
-    expect(fn () => Livewire::test(InfisicalIndex::class)->call('syncNow', $otherBinding->uuid))
-        ->toThrow(ModelNotFoundException::class);
-});
-
 // --- Inherited variable badges on the environment variable list ---
 
-test('an inherited Infisical variable renders read-only with a badge', function () {
-    actingAsTeamRole('owner');
-
-    $binding = InfisicalBinding::factory()->create();
-    SharedEnvironmentVariable::create([
-        'key' => 'DB_PASSWORD',
-        'value' => 'from-infisical',
-        'type' => 'environment',
-        'team_id' => $binding->connection->team_id,
-        'environment_id' => $binding->environment_id,
-        'infisical_binding_id' => $binding->id,
-    ]);
-
-    $application = Application::factory()->create(['environment_id' => $binding->environment_id]);
-
-    Livewire::test(EnvironmentVariableAll::class, ['resource' => $application])
-        ->call('loadEnvironmentVariables')
-        ->assertSee('DB_PASSWORD')
-        ->assertSee('Infisical')
-        ->assertDontSee('from-infisical');
-});
-
-test('a resource without an Infisical binding shows no inherited section', function () {
+test('a resource on a team without Infisical shows no inherited section', function () {
     actingAsTeamRole('owner');
 
     $application = Application::factory()->create();
@@ -358,18 +308,15 @@ test('a standalone database never shows an inherited Infisical section', functio
 
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create([
-        'infisical_connection_id' => $connection->id,
-        'environment_id' => $environment->id,
-    ]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
     SharedEnvironmentVariable::create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-infisical',
         'type' => 'environment',
         'team_id' => $team->id,
         'environment_id' => $environment->id,
-        'infisical_binding_id' => $binding->id,
+        'is_infisical_managed' => true,
+        'infisical_path' => '/',
     ]);
 
     $server = Server::factory()->create(['team_id' => $team->id]);
@@ -396,105 +343,35 @@ test('a standalone database never shows an inherited Infisical section', functio
 test('an application still shows the inherited Infisical section', function () {
     [$team] = actingAsTeamRole('owner');
 
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
     SharedEnvironmentVariable::create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-infisical',
         'type' => 'environment',
         'team_id' => $team->id,
-        'environment_id' => $binding->environment_id,
-        'infisical_binding_id' => $binding->id,
+        'environment_id' => $environment->id,
+        'is_infisical_managed' => true,
+        'infisical_path' => '/',
     ]);
 
-    $application = Application::factory()->create(['environment_id' => $binding->environment_id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
 
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $application])
         ->call('loadEnvironmentVariables')
         ->assertSee('Inherited from Infisical');
 });
 
-// --- Binding lifecycle: disable and delete ---
+// --- Connection lifecycle ---
 
-test('an owner can disable and re-enable a binding', function () {
+test('an owner can delete a connection', function () {
     [$team] = actingAsTeamRole('owner');
     $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-
-    Livewire::test(InfisicalIndex::class)->call('toggleBinding', $binding->uuid);
-    expect($binding->fresh()->is_enabled)->toBeFalse();
-
-    Livewire::test(InfisicalIndex::class)->call('toggleBinding', $binding->uuid);
-    expect($binding->fresh()->is_enabled)->toBeTrue();
-});
-
-test('an owner can delete a binding and its synced rows cascade away', function () {
-    [$team] = actingAsTeamRole('owner');
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-    SharedEnvironmentVariable::create([
-        'key' => 'DB_PASSWORD',
-        'value' => 'from-infisical',
-        'type' => 'environment',
-        'team_id' => $team->id,
-        'environment_id' => $binding->environment_id,
-        'infisical_binding_id' => $binding->id,
-    ]);
-
-    Livewire::test(InfisicalIndex::class)->call('deleteBinding', $binding->uuid);
-
-    expect(InfisicalBinding::find($binding->id))->toBeNull();
-    expect(SharedEnvironmentVariable::where('key', 'DB_PASSWORD')->exists())->toBeFalse();
-});
-
-test('a user owned shared variable survives the deletion of a binding in the same environment', function () {
-    [$team] = actingAsTeamRole('owner');
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-    SharedEnvironmentVariable::create([
-        'key' => 'USER_OWNED',
-        'value' => 'keep-me',
-        'type' => 'environment',
-        'team_id' => $team->id,
-        'environment_id' => $binding->environment_id,
-    ]);
-
-    Livewire::test(InfisicalIndex::class)->call('deleteBinding', $binding->uuid);
-
-    expect(SharedEnvironmentVariable::where('key', 'USER_OWNED')->exists())->toBeTrue();
-});
-
-test('an owner can delete a connection, cascading its bindings', function () {
-    [$team] = actingAsTeamRole('owner');
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
 
     Livewire::test(InfisicalIndex::class)->call('deleteConnection', $connection->uuid);
 
     expect(InfisicalConnection::find($connection->id))->toBeNull();
-    expect(InfisicalBinding::find($binding->id))->toBeNull();
-});
-
-test('deleting a binding owned by another team is not possible', function () {
-    actingAsTeamRole('owner');
-
-    $otherBinding = InfisicalBinding::factory()->create();
-
-    expect(fn () => Livewire::test(InfisicalIndex::class)->call('deleteBinding', $otherBinding->uuid))
-        ->toThrow(ModelNotFoundException::class);
-
-    expect(InfisicalBinding::find($otherBinding->id))->not->toBeNull();
-});
-
-test('toggling a binding owned by another team is not possible', function () {
-    actingAsTeamRole('owner');
-
-    $otherBinding = InfisicalBinding::factory()->create(['is_enabled' => true]);
-
-    expect(fn () => Livewire::test(InfisicalIndex::class)->call('toggleBinding', $otherBinding->uuid))
-        ->toThrow(ModelNotFoundException::class);
-
-    expect($otherBinding->fresh()->is_enabled)->toBeTrue();
 });
 
 test('deleting a connection owned by another team is not possible', function () {
@@ -518,20 +395,4 @@ test('the infisical index renders inside the security settings layout with a men
         ->assertSee('Private Keys')
         ->assertSee('API Tokens')
         ->assertSee(route('security.infisical.index'));
-});
-
-// --- syncNow does not leak exception text ---
-
-test('syncNow shows a bounded message for an unexpected exception', function () {
-    [$team] = actingAsTeamRole('owner');
-    $connection = InfisicalConnection::factory()->create(['team_id' => $team->id]);
-    $binding = InfisicalBinding::factory()->create(['infisical_connection_id' => $connection->id]);
-
-    SyncEnvironmentSecrets::partialMock()
-        ->shouldReceive('handle')
-        ->andThrow(new QueryException('pgsql', 'select * from secrets where id = ?', [1], new Exception('SQLSTATE[42P01] relation does not exist')));
-
-    Livewire::test(InfisicalIndex::class)
-        ->call('syncNow', $binding->uuid)
-        ->assertDispatched('error', 'Failed to sync secrets.', 'An unexpected error occurred. Check the instance logs for details.');
 });

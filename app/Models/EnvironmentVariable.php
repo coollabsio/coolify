@@ -6,6 +6,7 @@ use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -34,6 +35,8 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    use HasFactory;
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     protected $attributes = [
@@ -64,6 +67,10 @@ class EnvironmentVariable extends BaseModel
         // Metadata
         'version',
         'order',
+
+        // Provenance
+        'is_infisical_managed',
+        'infisical_path',
     ];
 
     protected $casts = [
@@ -76,6 +83,7 @@ class EnvironmentVariable extends BaseModel
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
+        'is_infisical_managed' => 'boolean',
     ];
 
     protected $appends = ['real_value', 'is_shared', 'is_really_required', 'is_buildpack_control', 'is_coolify'];

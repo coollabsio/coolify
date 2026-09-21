@@ -19,9 +19,15 @@ return new class extends Migration
             $table->string('host')->default('https://app.infisical.com');
             $table->text('client_id');
             $table->text('client_secret');
+            $table->string('infisical_project_id');
+            $table->boolean('is_enabled')->default(false);
+            $table->timestampTz('adopted_at')->nullable();
+            $table->timestampTz('last_synced_at')->nullable();
+            $table->string('last_sync_status')->nullable();
+            $table->text('last_sync_error')->nullable();
             $table->timestampsTz();
 
-            $table->index('team_id');
+            $table->unique('team_id');
         });
     }
 

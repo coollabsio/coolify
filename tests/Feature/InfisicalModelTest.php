@@ -1,9 +1,9 @@
 <?php
 
-use App\Models\Environment;
-use App\Models\InfisicalBinding;
+use App\Models\EnvironmentVariable;
 use App\Models\InfisicalConnection;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\Team;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -38,35 +38,36 @@ test('credentials are trimmed on save', function () {
     expect($connection->client_secret)->toBe('secret-xyz');
 });
 
-test('a binding belongs to a connection and an environment', function () {
-    $binding = InfisicalBinding::factory()->create();
+it('allows only one connection per team', function () {
+    $team = Team::factory()->create();
+    InfisicalConnection::factory()->create(['team_id' => $team->id]);
 
-    expect($binding->connection)->toBeInstanceOf(InfisicalConnection::class);
-    expect($binding->environment)->toBeInstanceOf(Environment::class);
-    expect($binding->secret_path)->toBe('/');
-    expect($binding->is_enabled)->toBeTrue();
+    expect(fn () => InfisicalConnection::factory()->create(['team_id' => $team->id]))
+        ->toThrow(QueryException::class);
 });
 
-test('only one binding may exist per environment', function () {
-    $binding = InfisicalBinding::factory()->create();
+it('defaults to disabled and unadopted', function () {
+    $connection = InfisicalConnection::factory()->create();
 
-    expect(fn () => InfisicalBinding::factory()->create([
-        'environment_id' => $binding->environment_id,
-    ]))->toThrow(QueryException::class);
+    expect($connection->is_enabled)->toBeFalse()
+        ->and($connection->adopted_at)->toBeNull();
 });
 
-test('a shared variable can be owned by a binding', function () {
-    $binding = InfisicalBinding::factory()->create();
+it('marks variables as infisical managed on both variable tables', function () {
+    $team = Team::factory()->create();
 
-    $variable = SharedEnvironmentVariable::create([
-        'key' => 'DB_PASSWORD',
-        'value' => 'hunter2',
-        'type' => 'environment',
-        'team_id' => $binding->connection->team_id,
-        'environment_id' => $binding->environment_id,
-        'infisical_binding_id' => $binding->id,
+    $resourceVar = EnvironmentVariable::factory()->create([
+        'is_infisical_managed' => true,
+        'infisical_path' => '/shop-api/api-server/',
+    ]);
+    $sharedVar = SharedEnvironmentVariable::factory()->create([
+        'team_id' => $team->id,
+        'is_infisical_managed' => true,
+        'infisical_path' => '/shop-api/',
     ]);
 
-    expect($variable->infisicalBinding->id)->toBe($binding->id);
-    expect($binding->sharedVariables()->pluck('key')->all())->toBe(['DB_PASSWORD']);
+    expect($resourceVar->fresh()->is_infisical_managed)->toBeTrue()
+        ->and($resourceVar->fresh()->infisical_path)->toBe('/shop-api/api-server/')
+        ->and($sharedVar->fresh()->is_infisical_managed)->toBeTrue()
+        ->and($sharedVar->fresh()->infisical_path)->toBe('/shop-api/');
 });

@@ -14,7 +14,6 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\InfisicalBinding;
 use App\Models\InfisicalConnection;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -53,7 +52,6 @@ use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
-use App\Policies\InfisicalBindingPolicy;
 use App\Policies\InfisicalConnectionPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\NotificationPolicy;
@@ -141,7 +139,6 @@ class AuthServiceProvider extends ServiceProvider
 
         // Infisical secret sync policies
         InfisicalConnection::class => InfisicalConnectionPolicy::class,
-        InfisicalBinding::class => InfisicalBindingPolicy::class,
 
     ];
 

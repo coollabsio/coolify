@@ -8,6 +8,9 @@
                 label="Name" id="name" />
             <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection" required
                 label="Host" id="host" placeholder="https://app.infisical.com" />
+            <x-forms.input :canGate="$connection ? 'update' : null" :canResource="$connection" required
+                label="Infisical project ID" id="infisical_project_id"
+                helper="The Infisical project this team's secrets live in." />
             @if ($isPasswordHiddenForMember)
                 <x-forms.input label="Client ID" disabled value="Hidden (only admins can view)" />
                 <x-forms.input label="Client Secret" disabled value="Hidden (only admins can view)" />

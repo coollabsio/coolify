@@ -2,7 +2,6 @@
 
 use App\Livewire\SharedVariables\Environment\Show;
 use App\Models\Environment;
-use App\Models\InfisicalBinding;
 use App\Models\InfisicalConnection;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -26,10 +25,9 @@ beforeEach(function () {
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 
-    $connection = InfisicalConnection::factory()->create(['team_id' => $this->team->id]);
-    $this->binding = InfisicalBinding::factory()->create([
-        'infisical_connection_id' => $connection->id,
-        'environment_id' => $this->environment->id,
+    InfisicalConnection::factory()->create([
+        'team_id' => $this->team->id,
+        'is_enabled' => true,
     ]);
 
     $this->actingAs($this->user);
@@ -40,7 +38,7 @@ afterEach(function () {
     request()->setRouteResolver(fn () => null);
 });
 
-function bindingOwnedVariable(string $key = 'DB_PASSWORD', string $value = 'from-infisical', array $extra = []): SharedEnvironmentVariable
+function infisicalOwnedVariable(string $key = 'DB_PASSWORD', string $value = 'from-infisical', array $extra = []): SharedEnvironmentVariable
 {
     return SharedEnvironmentVariable::create(array_merge([
         'key' => $key,
@@ -48,7 +46,8 @@ function bindingOwnedVariable(string $key = 'DB_PASSWORD', string $value = 'from
         'type' => 'environment',
         'team_id' => test()->team->id,
         'environment_id' => test()->environment->id,
-        'infisical_binding_id' => test()->binding->id,
+        'is_infisical_managed' => true,
+        'infisical_path' => '/',
     ], $extra));
 }
 
@@ -60,8 +59,8 @@ function environmentShow(): Testable
     ]);
 }
 
-test('a binding owned row is excluded from the developer view textarea', function () {
-    bindingOwnedVariable();
+test('an Infisical owned row is excluded from the developer view textarea', function () {
+    infisicalOwnedVariable();
     SharedEnvironmentVariable::create([
         'key' => 'USER_OWNED',
         'value' => 'mine',
@@ -76,8 +75,8 @@ test('a binding owned row is excluded from the developer view textarea', functio
     expect($component->get('variables'))->not->toContain('DB_PASSWORD');
 });
 
-test('saving the bulk textarea cannot delete a binding owned row', function () {
-    $inherited = bindingOwnedVariable();
+test('saving the bulk textarea cannot delete an Infisical owned row', function () {
+    $inherited = infisicalOwnedVariable();
 
     environmentShow()
         ->set('variables', 'USER_OWNED=mine')
@@ -87,11 +86,11 @@ test('saving the bulk textarea cannot delete a binding owned row', function () {
     $inherited->refresh();
     expect($inherited->exists)->toBeTrue();
     expect($inherited->value)->toBe('from-infisical');
-    expect($inherited->infisical_binding_id)->toBe($this->binding->id);
+    expect($inherited->is_infisical_managed)->toBeTrue();
 });
 
-test('saving the bulk textarea cannot overwrite the value of a binding owned row', function () {
-    $inherited = bindingOwnedVariable();
+test('saving the bulk textarea cannot overwrite the value of an Infisical owned row', function () {
+    $inherited = infisicalOwnedVariable();
 
     environmentShow()
         ->set('variables', 'DB_PASSWORD=hijacked')
@@ -102,21 +101,21 @@ test('saving the bulk textarea cannot overwrite the value of a binding owned row
     expect(SharedEnvironmentVariable::where('key', 'DB_PASSWORD')->count())->toBe(1);
 });
 
-test('an empty bulk textarea leaves every binding owned row intact', function () {
-    bindingOwnedVariable('DB_PASSWORD');
-    bindingOwnedVariable('API_KEY', 'abc');
+test('an empty bulk textarea leaves every Infisical owned row intact', function () {
+    infisicalOwnedVariable('DB_PASSWORD');
+    infisicalOwnedVariable('API_KEY', 'abc');
 
     environmentShow()
         ->set('variables', '')
         ->call('submit')
         ->assertHasNoErrors();
 
-    expect(SharedEnvironmentVariable::where('infisical_binding_id', $this->binding->id)->count())->toBe(2);
+    expect(SharedEnvironmentVariable::where('is_infisical_managed', true)->count())->toBe(2);
 });
 
 test('a multiline PEM synced from Infisical is not mangled by a bulk save', function () {
     $pem = "-----BEGIN PRIVATE KEY-----\nabc\ndef\n-----END PRIVATE KEY-----";
-    $inherited = bindingOwnedVariable('TLS_KEY', $pem);
+    $inherited = infisicalOwnedVariable('TLS_KEY', $pem);
 
     $component = environmentShow();
 
@@ -128,8 +127,8 @@ test('a multiline PEM synced from Infisical is not mangled by a bulk save', func
     expect($inherited->fresh()->value)->toBe($pem);
 });
 
-test('the binding owned row renders read-only with an Infisical badge', function () {
-    bindingOwnedVariable();
+test('the Infisical owned row renders read-only with an Infisical badge', function () {
+    infisicalOwnedVariable();
 
     environmentShow()
         ->assertSee('DB_PASSWORD')
@@ -138,14 +137,12 @@ test('the binding owned row renders read-only with an Infisical badge', function
         ->assertDontSee('from-infisical');
 });
 
-test('an environment without a binding renders no inherited section', function () {
-    $this->binding->delete();
-
+test('an environment with no Infisical owned rows renders no inherited section', function () {
     environmentShow()->assertDontSee('Inherited from Infisical');
 });
 
 test('a user owned variable is still editable and deletable', function () {
-    bindingOwnedVariable();
+    infisicalOwnedVariable();
     $userOwned = SharedEnvironmentVariable::create([
         'key' => 'USER_OWNED',
         'value' => 'mine',
