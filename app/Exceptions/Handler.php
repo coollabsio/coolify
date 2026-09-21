@@ -113,6 +113,12 @@ class Handler extends ExceptionHandler
      */
     public function register(): void
     {
+        $this->renderable(function (InfisicalManagedVariableException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 409);
+            }
+        });
+
         $this->reportable(function (Throwable $e) {
             if (isDev()) {
                 return;

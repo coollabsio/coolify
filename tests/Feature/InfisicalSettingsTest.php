@@ -14,6 +14,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -309,7 +310,9 @@ test('a standalone database never shows an inherited Infisical section', functio
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
-    SharedEnvironmentVariable::create([
+    // The connection above is enabled, so the managed-variable lock rejects
+    // this as a human edit. It stands in for a row Coolify pulled down.
+    InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-infisical',
         'type' => 'environment',
@@ -317,11 +320,11 @@ test('a standalone database never shows an inherited Infisical section', functio
         'environment_id' => $environment->id,
         'is_infisical_managed' => true,
         'infisical_path' => '/',
-    ]);
+    ]));
 
     $server = Server::factory()->create(['team_id' => $team->id]);
     $destination = StandaloneDocker::where('server_id', $server->id)->first();
-    $database = StandalonePostgresql::create([
+    $database = InfisicalLock::asSystem(fn () => StandalonePostgresql::create([
         'name' => 'inherited-check',
         'image' => 'postgres:15-alpine',
         'postgres_user' => 'postgres',
@@ -330,7 +333,7 @@ test('a standalone database never shows an inherited Infisical section', functio
         'environment_id' => $environment->id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
-    ]);
+    ]));
 
     $component = Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
         ->call('loadEnvironmentVariables');
@@ -346,7 +349,9 @@ test('an application still shows the inherited Infisical section', function () {
     $project = Project::factory()->create(['team_id' => $team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
-    SharedEnvironmentVariable::create([
+    // The connection above is enabled, so the managed-variable lock rejects
+    // this as a human edit. It stands in for a row Coolify pulled down.
+    InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-infisical',
         'type' => 'environment',
@@ -354,9 +359,11 @@ test('an application still shows the inherited Infisical section', function () {
         'environment_id' => $environment->id,
         'is_infisical_managed' => true,
         'infisical_path' => '/',
-    ]);
+    ]));
 
-    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    $application = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environment->id])
+    );
 
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $application])
         ->call('loadEnvironmentVariables')

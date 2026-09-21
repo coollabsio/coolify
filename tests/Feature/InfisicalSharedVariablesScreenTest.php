@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -40,7 +41,10 @@ afterEach(function () {
 
 function infisicalOwnedVariable(string $key = 'DB_PASSWORD', string $value = 'from-infisical', array $extra = []): SharedEnvironmentVariable
 {
-    return SharedEnvironmentVariable::create(array_merge([
+    // The team's connection is enabled in beforeEach, so the managed-variable
+    // lock rejects this as a human edit. These rows stand in for values Coolify
+    // pulled down from Infisical, so create them as system writes.
+    return InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create(array_merge([
         'key' => $key,
         'value' => $value,
         'type' => 'environment',
@@ -48,7 +52,7 @@ function infisicalOwnedVariable(string $key = 'DB_PASSWORD', string $value = 'fr
         'environment_id' => test()->environment->id,
         'is_infisical_managed' => true,
         'infisical_path' => '/',
-    ], $extra));
+    ], $extra)));
 }
 
 function environmentShow(): Testable
@@ -61,13 +65,13 @@ function environmentShow(): Testable
 
 test('an Infisical owned row is excluded from the developer view textarea', function () {
     infisicalOwnedVariable();
-    SharedEnvironmentVariable::create([
+    InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([
         'key' => 'USER_OWNED',
         'value' => 'mine',
         'type' => 'environment',
         'team_id' => $this->team->id,
         'environment_id' => $this->environment->id,
-    ]);
+    ]));
 
     $component = environmentShow();
 
@@ -141,8 +145,36 @@ test('an environment with no Infisical owned rows renders no inherited section',
     environmentShow()->assertDontSee('Inherited from Infisical');
 });
 
-test('a user owned variable is still editable and deletable', function () {
+// Superseded by the managed-variable lock. While a team's Infisical connection
+// is enabled, EVERY non-server-scoped variable is read-only in Coolify — not
+// only the rows Infisical owns. This test used to assert that a user-owned row
+// stayed editable; that premise contradicts the spec's "The lock" section, so
+// it now asserts the rejection instead. Task 9 makes the surface render the
+// read-only state; the hook is the control either way.
+test('a user owned variable is not editable while the lock is armed', function () {
     infisicalOwnedVariable();
+    $userOwned = InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create([
+        'key' => 'USER_OWNED',
+        'value' => 'mine',
+        'type' => 'environment',
+        'team_id' => $this->team->id,
+        'environment_id' => $this->environment->id,
+    ]));
+
+    environmentShow()->set('variables', 'USER_OWNED=changed')->call('submit');
+    expect($userOwned->fresh()->value)->toBe('mine');
+
+    // KNOWN LIMIT, characterised rather than hidden: the bulk-delete path is a
+    // relation query-builder mass delete, which fires no model events, so the
+    // deleting hook never sees it. The hook cannot close this; the surface
+    // needs an explicit check (Task 9). See InfisicalLock's class docblock.
+    environmentShow()->set('variables', '')->call('submit');
+    expect(SharedEnvironmentVariable::find($userOwned->id))->toBeNull();
+});
+
+test('a user owned variable is editable when no connection is enabled', function () {
+    InfisicalConnection::query()->update(['is_enabled' => false]);
+
     $userOwned = SharedEnvironmentVariable::create([
         'key' => 'USER_OWNED',
         'value' => 'mine',

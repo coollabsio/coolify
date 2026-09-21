@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -33,13 +34,15 @@ test('resource level variables take precedence over inherited ones', function ()
     [$team, $environment] = infisicalEnabledTeam();
     makeInheritedSecret($team, $environment, 'DB_PASSWORD', 'from-infisical');
 
-    $application = Application::factory()->create(['environment_id' => $environment->id]);
-    $application->environment_variables()->create([
+    $application = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environment->id])
+    );
+    InfisicalLock::asSystem(fn () => $application->environment_variables()->create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-resource',
         'is_runtime' => true,
         'is_buildtime' => true,
-    ]);
+    ]));
 
     $inherited = ResolveInheritedSecrets::run($application);
     $merged = $inherited->merge(
@@ -55,7 +58,9 @@ test('inherited secrets with no resource override survive the merge', function (
     [$team, $environment] = infisicalEnabledTeam();
     makeInheritedSecret($team, $environment, 'API_KEY', 'from-infisical');
 
-    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    $application = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environment->id])
+    );
 
     expect(ResolveInheritedSecrets::run($application)['API_KEY'])->toBe('from-infisical');
 });
@@ -67,7 +72,9 @@ test('a team without an enabled connection inherits nothing', function () {
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     makeInheritedSecret($team, $environment, 'API_KEY', 'from-infisical');
 
-    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    $application = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environment->id])
+    );
 
     expect(ResolveInheritedSecrets::run($application))->toBeEmpty();
 });
@@ -84,7 +91,9 @@ it('does not leak an environment scoped secret into a sibling environment', func
     makeInheritedSecret($team, $environmentB, 'SHARED_KEY', 'from-environment-b');
     makeInheritedSecret($team, $environmentA, 'ONLY_IN_A', 'a-only');
 
-    $applicationB = Application::factory()->create(['environment_id' => $environmentB->id]);
+    $applicationB = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environmentB->id])
+    );
 
     $resolved = ResolveInheritedSecrets::run($applicationB);
 
@@ -116,7 +125,9 @@ it('lets an environment scoped secret override the project and team scoped ones'
     ]);
     makeInheritedSecret($team, $environment, 'RANKED', 'from-environment');
 
-    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    $application = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environment->id])
+    );
 
     $resolved = ResolveInheritedSecrets::run($application);
 
@@ -139,7 +150,9 @@ it('does not inherit a secret belonging to another project in the same team', fu
         'environment_id' => null,
     ]);
 
-    $applicationB = Application::factory()->create(['environment_id' => $environmentB->id]);
+    $applicationB = InfisicalLock::asSystem(
+        fn () => Application::factory()->create(['environment_id' => $environmentB->id])
+    );
 
     expect(ResolveInheritedSecrets::run($applicationB))->not->toHaveKey('PROJECT_A_KEY');
 });
@@ -172,11 +185,11 @@ function makeInfisicalInjectionFixture(): array
     $environment = Environment::where('project_id', $project->id)->firstOrFail();
     InfisicalConnection::factory()->create(['team_id' => $team->id, 'is_enabled' => true]);
     $server = Server::factory()->create(['team_id' => $team->id]);
-    $application = Application::factory()->create([
+    $application = InfisicalLock::asSystem(fn () => Application::factory()->create([
         'environment_id' => $environment->id,
         'build_pack' => 'dockerfile',
         'fqdn' => 'https://app.example.com',
-    ]);
+    ]));
     $application->settings()->update([
         'is_env_sorting_enabled' => false,
         'include_source_commit_in_build' => false,
@@ -187,7 +200,11 @@ function makeInfisicalInjectionFixture(): array
 
 function makeInheritedSecret(Team $team, Environment $environment, string $key, string $value, array $overrides = []): void
 {
-    SharedEnvironmentVariable::create(array_merge([
+    // These fixtures write variables for a team whose Infisical connection is
+    // enabled, which the managed-variable lock rejects as a human edit. The
+    // rows stand in for values Coolify itself pulled down, so create them as
+    // system writes.
+    InfisicalLock::asSystem(fn () => SharedEnvironmentVariable::create(array_merge([
         'key' => $key,
         'value' => $value,
         'type' => 'environment',
@@ -195,7 +212,7 @@ function makeInheritedSecret(Team $team, Environment $environment, string $key, 
         'environment_id' => $environment->id,
         'is_infisical_managed' => true,
         'infisical_path' => '/',
-    ], $overrides));
+    ], $overrides)));
 }
 
 /**
@@ -244,12 +261,12 @@ test('the generated build-time environment inherits secrets and lets resource va
     makeInheritedSecret($team, $environment, 'API_KEY', 'from-infisical');
     makeInheritedSecret($team, $environment, 'DB_PASSWORD', 'from-infisical');
 
-    $application->environment_variables()->create([
+    InfisicalLock::asSystem(fn () => $application->environment_variables()->create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-resource',
         'is_runtime' => true,
         'is_buildtime' => true,
-    ]);
+    ]));
 
     [$job, $reflection] = makeInfisicalInjectionJob($application, $server);
     $envs = invokeInfisicalInjectionMethod($job, $reflection, 'generate_buildtime_environment_variables');
@@ -264,12 +281,12 @@ test('the generated runtime environment inherits secrets and lets resource varia
     makeInheritedSecret($team, $environment, 'API_KEY', 'from-infisical');
     makeInheritedSecret($team, $environment, 'DB_PASSWORD', 'from-infisical');
 
-    $application->environment_variables()->create([
+    InfisicalLock::asSystem(fn () => $application->environment_variables()->create([
         'key' => 'DB_PASSWORD',
         'value' => 'from-resource',
         'is_runtime' => true,
         'is_buildtime' => false,
-    ]);
+    ]));
 
     [$job, $reflection] = makeInfisicalInjectionJob($application, $server);
     $envs = invokeInfisicalInjectionMethod($job, $reflection, 'generate_runtime_environment_variables');

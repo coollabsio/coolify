@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Exceptions\InfisicalManagedVariableException;
+use App\Services\Infisical\InfisicalLock;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -47,6 +49,17 @@ class SharedEnvironmentVariable extends Model
         'is_infisical_managed' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $variable): void {
+            self::guardInfisicalLock($variable);
+        });
+
+        static::deleting(function (self $variable): void {
+            self::guardInfisicalLock($variable);
+        });
+    }
+
     /**
      * Scope shared environment variables to a team (API token team_id).
      */
@@ -80,5 +93,26 @@ class SharedEnvironmentVariable extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    private static function guardInfisicalLock(self $variable): void
+    {
+        if (InfisicalLock::isSystemWrite()) {
+            return;
+        }
+
+        // Server-scoped variables are out of scope per the spec: servers are
+        // orthogonal to the project/environment tree, so they are neither
+        // synced nor locked. Without this they WOULD be locked, since server
+        // rows carry a team_id like every other scope.
+        if ($variable->type === 'server') {
+            return;
+        }
+
+        if (! InfisicalLock::armedForTeam($variable->team_id)) {
+            return;
+        }
+
+        throw InfisicalManagedVariableException::forKey($variable->key);
     }
 }

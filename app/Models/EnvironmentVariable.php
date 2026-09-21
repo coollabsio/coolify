@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Services\Infisical\InfisicalLock;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -134,6 +136,51 @@ class EnvironmentVariable extends BaseModel
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
             $environmentVariable->updateIsShared();
         });
+
+        static::saving(function (self $variable): void {
+            self::guardInfisicalLock($variable);
+        });
+
+        static::deleting(function (self $variable): void {
+            self::guardInfisicalLock($variable);
+        });
+    }
+
+    private static function guardInfisicalLock(self $variable): void
+    {
+        if (InfisicalLock::isSystemWrite()) {
+            return;
+        }
+
+        if (! InfisicalLock::anyConnectionEnabled()) {
+            return;
+        }
+
+        // Resolving the owner is a READ, but some owners write during a read:
+        // StandaloneRedis::retrieved() touches redis_username, whose accessor
+        // creates a REDIS_USERNAME row when one is missing. Left unguarded that
+        // nested create re-enters this method, reloads the owner, and recurses
+        // until the stack blows. Any write incurred while resolving the owner
+        // is Coolify's own, so resolve inside asSystem().
+        $teamId = InfisicalLock::asSystem(function () use ($variable) {
+            $resource = $variable->resourceable;
+
+            if ($resource === null) {
+                return null;
+            }
+
+            // Application, Service and all eight Standalone* models expose
+            // environment(). ServiceApplication does NOT, so without the team()
+            // fallback the lock would fail silently OPEN for that type.
+            return $resource->environment?->project?->team_id
+                ?? $resource->team()?->id;
+        });
+
+        if (! InfisicalLock::armedForTeam($teamId)) {
+            return;
+        }
+
+        throw InfisicalManagedVariableException::forKey($variable->key);
     }
 
     public function service()
