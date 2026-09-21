@@ -73,6 +73,37 @@ class InfisicalConnection extends BaseModel
     }
 
     /**
+     * Deep link to this project's secrets in Infisical, optionally narrowed to
+     * one native environment. Presentation only — it is never the control.
+     */
+    public function secretsUrl(?string $environmentSlug = null): ?string
+    {
+        if (blank($this->host) || blank($this->infisical_project_id)) {
+            return null;
+        }
+
+        $url = rtrim($this->host, '/')."/project/{$this->infisical_project_id}/secrets";
+
+        return blank($environmentSlug) ? $url : $url."/{$environmentSlug}";
+    }
+
+    /**
+     * The team's enabled connection, or null. Used by the read-only surfaces to
+     * render a badge and a deep link.
+     */
+    public static function enabledForTeam(?int $teamId): ?self
+    {
+        if ($teamId === null) {
+            return null;
+        }
+
+        return static::query()
+            ->where('team_id', $teamId)
+            ->where('is_enabled', true)
+            ->first();
+    }
+
+    /**
      * Scope connections to the acting team.
      */
     public static function ownedByCurrentTeam(array $select = ['*']): Builder

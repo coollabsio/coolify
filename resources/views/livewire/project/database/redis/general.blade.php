@@ -21,6 +21,13 @@
 
         <x-application.settings-section title="Credentials"
             description="Keep these values aligned with the credentials configured inside Redis.">
+            @if ($this->isInfisicalLocked)
+                <x-callout type="info" title="Managed by Infisical">
+                    REDIS_USERNAME and REDIS_PASSWORD are environment variables, so they are managed in Infisical for
+                    this team and cannot be changed here. Change them in Infisical and Coolify picks them up on the next
+                    sync. As always, a password change takes effect on redeploy and does not rotate a running database.
+                </x-callout>
+            @endif
             <x-callout type="warning" title="{{ $database->started_at ? 'Keep credentials synchronized' : 'Verify the initial credentials' }}">
                 @if ($database->started_at)
                     Changing values here does not update Redis. Update Redis first, then synchronize the values here so
@@ -33,7 +40,7 @@
                 @if (version_compare($redisVersion, '6.0', '>='))
                     <x-forms.input label="Username" id="redisUsername" :required="!$database->started_at"
                         helper="{{ $database->started_at ? 'You can only change this in the database.' : 'Shared REDIS_USERNAME values make this field read-only.' }}"
-                        :disabled="!$database->started_at && $this->isSharedVariable('REDIS_USERNAME')"
+                        :disabled="$this->isInfisicalLocked || (!$database->started_at && $this->isSharedVariable('REDIS_USERNAME'))"
                         canGate="update" :canResource="$database" />
                 @endif
                 @if ($isPasswordHiddenForMember)
@@ -42,7 +49,7 @@
                     <x-forms.input label="Password" id="redisPassword" type="password"
                         :required="!$database->started_at"
                         helper="{{ $database->started_at ? 'You can only change this in the database.' : 'Shared REDIS_PASSWORD values make this field read-only.' }}"
-                        :disabled="!$database->started_at && $this->isSharedVariable('REDIS_PASSWORD')"
+                        :disabled="$this->isInfisicalLocked || (!$database->started_at && $this->isSharedVariable('REDIS_PASSWORD'))"
                         canGate="update" :canResource="$database" />
                 @endif
             </div>

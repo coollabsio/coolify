@@ -164,12 +164,13 @@ test('a user owned variable is not editable while the lock is armed', function (
     environmentShow()->set('variables', 'USER_OWNED=changed')->call('submit');
     expect($userOwned->fresh()->value)->toBe('mine');
 
-    // KNOWN LIMIT, characterised rather than hidden: the bulk-delete path is a
-    // relation query-builder mass delete, which fires no model events, so the
-    // deleting hook never sees it. The hook cannot close this; the surface
-    // needs an explicit check (Task 9). See InfisicalLock's class docblock.
+    // The bulk-delete path is a relation query-builder mass delete, which fires
+    // no model events, so the deleting hook never sees it. The hook cannot close
+    // this; handleBulkSubmit() carries an explicit armedForTeam() check instead.
+    // This assertion used to record the hole (toBeNull()); it now proves it is
+    // closed. See InfisicalLock's class docblock.
     environmentShow()->set('variables', '')->call('submit');
-    expect(SharedEnvironmentVariable::find($userOwned->id))->toBeNull();
+    expect(SharedEnvironmentVariable::find($userOwned->id))->not->toBeNull();
 });
 
 test('a user owned variable is editable when no connection is enabled', function () {

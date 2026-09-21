@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Service;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
@@ -42,6 +44,15 @@ class DockerCompose extends Component
 
             // Validate for command injection BEFORE saving to database
             validateDockerComposeForInjection($this->dockerComposeRaw);
+
+            // The env-file rows below are created after the Service row and
+            // outside a transaction. If the lock rejects them the Service is
+            // already saved and the user is left with an empty orphan, so refuse
+            // before anything is written. An empty env file is still allowed:
+            // creating a service is not itself a variable edit.
+            if (filled($this->envFile) && InfisicalLock::armedForTeam(currentTeam()?->id)) {
+                throw InfisicalManagedVariableException::forBulkEdit();
+            }
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();

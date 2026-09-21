@@ -6,10 +6,12 @@ use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Models\InfisicalConnection;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Services\Infisical\InfisicalPath;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
@@ -69,6 +71,15 @@ class Show extends Component
     public bool $is_redis_credential = false;
 
     public bool $isValueHidden = false;
+
+    /** This row's value is owned by Infisical and is refreshed by the next sync. */
+    public bool $isInfisicalManaged = false;
+
+    /** The team's Infisical lock is armed, so this row cannot be edited here. */
+    public bool $isInfisicalLocked = false;
+
+    /** Deep link to the secret in Infisical. Presentation only. */
+    public ?string $infisicalUrl = null;
 
     /**
      * Decrypted value / real_value are only needed in the edit modal (or after save).
@@ -247,6 +258,11 @@ class Show extends Component
         $this->isDisabled = false;
         $this->isMagicVariable = false;
 
+        $this->checkInfisical();
+        if ($this->isInfisicalLocked) {
+            $this->isDisabled = true;
+        }
+
         if (str($this->env->key)->startsWith('SERVICE_FQDN') || str($this->env->key)->startsWith('SERVICE_URL') || str($this->env->key)->startsWith('SERVICE_NAME')) {
             $this->isDisabled = true;
             $this->isMagicVariable = true;
@@ -257,6 +273,49 @@ class Show extends Component
         }
     }
 
+    /**
+     * Read-only state for Infisical-locked rows.
+     *
+     * Presentation only. The Eloquent hooks on EnvironmentVariable and
+     * SharedEnvironmentVariable are the control; disabling an input here just
+     * stops a user from filling in a form that could only ever be rejected.
+     *
+     * Server-scoped shared variables are deliberately excluded: servers are
+     * orthogonal to the project/environment tree, so they are neither synced nor
+     * locked, and the model guard exempts them the same way.
+     */
+    private function checkInfisical(): void
+    {
+        $this->isInfisicalManaged = (bool) ($this->env->is_infisical_managed ?? false);
+        $this->isInfisicalLocked = false;
+        $this->infisicalUrl = null;
+
+        if ($this->isSharedVariable && $this->env->type === 'server') {
+            return;
+        }
+
+        $connection = InfisicalConnection::enabledForTeam(currentTeam()?->id);
+        if ($connection === null) {
+            return;
+        }
+
+        $this->isInfisicalLocked = true;
+        $this->infisicalUrl = $connection->secretsUrl(
+            $this->environmentSlugForInfisical()
+        );
+    }
+
+    private function environmentSlugForInfisical(): ?string
+    {
+        $environmentName = $this->isSharedVariable
+            ? $this->env->environment?->name
+            : $this->env->resourceable?->environment?->name;
+
+        return filled($environmentName)
+            ? InfisicalPath::environmentSlug($environmentName)
+            : null;
+    }
+
     public function serialize()
     {
         data_forget($this->env, 'real_value');
@@ -264,16 +323,23 @@ class Show extends Component
 
     public function lock()
     {
-        $this->authorize('update', $this->env);
+        try {
+            $this->authorize('update', $this->env);
 
-        $this->env->is_shown_once = true;
-        if ($this->isSharedVariable) {
-            unset($this->env->is_required);
+            $this->env->is_shown_once = true;
+            if ($this->isSharedVariable) {
+                unset($this->env->is_required);
+            }
+            $this->serialize();
+            $this->env->save();
+            $this->checkEnvs();
+            $this->dispatch('refreshEnvs');
+        } catch (\Throwable $e) {
+            $this->env->refresh();
+            $this->syncData();
+
+            return handleError($e, $this);
         }
-        $this->serialize();
-        $this->env->save();
-        $this->checkEnvs();
-        $this->dispatch('refreshEnvs');
     }
 
     public function instantSave()
@@ -306,8 +372,8 @@ class Show extends Component
             if ($this->is_required && $this->resource instanceof Service) {
                 event(new ApplicationConfigurationChanged($this->resource->team()->id));
             }
-        } catch (\Exception $e) {
-            return handleError($e);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
@@ -473,8 +539,8 @@ class Show extends Component
             $this->env->delete();
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
-        } catch (\Exception $e) {
-            return handleError($e);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 }

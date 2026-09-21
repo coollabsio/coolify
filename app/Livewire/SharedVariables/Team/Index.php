@@ -2,7 +2,9 @@
 
 namespace App\Livewire\SharedVariables\Team;
 
+use App\Exceptions\InfisicalManagedVariableException;
 use App\Models\Team;
+use App\Services\Infisical\InfisicalLock;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -100,6 +102,14 @@ class Index extends Component
 
     private function handleBulkSubmit()
     {
+        // The deletes below go through the relation query builder, which fires
+        // no model events, so the deleting hook on the model never sees them. Without
+        // this check a locked team's variables can still be removed by deleting
+        // lines from the textarea and submitting.
+        if (InfisicalLock::armedForTeam(currentTeam()?->id)) {
+            throw InfisicalManagedVariableException::forBulkEdit();
+        }
+
         $variables = parseEnvFormatToArray($this->variables);
         $changesMade = false;
 

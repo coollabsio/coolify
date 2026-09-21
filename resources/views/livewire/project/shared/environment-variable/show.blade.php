@@ -1,7 +1,7 @@
 @php
     $rowScope = $isSharedVariable ? 'shared' : (data_get($env, 'is_preview') ? 'preview' : 'production');
     $rowScopeLabel = $isSharedVariable ? str($type)->headline() : ($rowScope === 'preview' ? 'Preview' : 'Production');
-    $canUpdate = auth()->user()?->can('update', $this->env) ?? false;
+    $canUpdate = (auth()->user()?->can('update', $this->env) ?? false) && !$isInfisicalLocked;
     $canEditValue = $canUpdate && !$isLocked && !$isDisabled && !$isValueHidden;
     $showValueType = !$is_redis_credential && !$isMagicVariable;
     $showInterpolation = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
@@ -35,6 +35,16 @@
             @endif
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
+            @endif
+            @if ($isInfisicalManaged || $isInfisicalLocked)
+                @if ($infisicalUrl)
+                    <a href="{{ $infisicalUrl }}" target="_blank" rel="noopener noreferrer"
+                        class="table-badge shrink-0"
+                        title="{{ $isInfisicalManaged ? 'Synced from Infisical. Edit it there.' : 'This team is connected to Infisical. Edit this variable there.' }}">Infisical</a>
+                @else
+                    <span class="table-badge shrink-0"
+                        title="{{ $isInfisicalManaged ? 'Synced from Infisical. Edit it there.' : 'This team is connected to Infisical. Edit this variable there.' }}">Infisical</span>
+                @endif
             @endif
         </div>
         @if (! $isSharedVariable)
@@ -97,6 +107,21 @@
 
                 <form wire:submit="submit" class="flex w-full flex-col gap-4"
                     x-data="{ isMultiline: $wire.entangle('is_multiline') }">
+                    @if ($isInfisicalLocked)
+                        <div
+                            class="rounded-lg border border-neutral-200 px-3 py-2 text-[12px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-dim">
+                            Managed by Infisical &mdash; this variable is read-only here.
+                            @if ($infisicalUrl)
+                                <a href="{{ $infisicalUrl }}" target="_blank" rel="noopener noreferrer"
+                                    class="underline">Edit it in Infisical</a>
+                            @else
+                                Edit it in Infisical
+                            @endif
+                            and Coolify picks the change up on the next sync.
+                            Deleting a secret in Infisical does <strong>not</strong> delete it from Coolify; that stays a
+                            separate, manual step here.
+                        </div>
+                    @endif
                     <div class="grid items-end gap-4 sm:grid-cols-2">
                         <x-forms.input id="key" label="Name" :required="$is_redis_credential"
                             :disabled="!$canEditValue || $is_redis_credential" />
@@ -223,7 +248,7 @@
                             class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                             <div data-environment-variable-delete-action>
                                 @can('delete', $this->env)
-                                    @if (!$isMagicVariable)
+                                    @if (!$isMagicVariable && !$isInfisicalLocked)
                                         <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
                                             buttonTitle="Delete" submitAction="delete"
                                             :actions="['The selected environment variable will be permanently deleted.']"
