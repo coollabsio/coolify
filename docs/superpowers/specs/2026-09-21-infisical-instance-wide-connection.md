@@ -120,17 +120,77 @@ The per-team screen must make inheritance visible: an operator should be able
 to tell at a glance whether this team is using the instance connection or its
 own.
 
-## Open risk: project creation permissions
+## Project creation API (verified)
 
-Creating a project is an **organization-level** operation, and a machine
-identity may additionally need to be granted access to each project it creates
-before it can write secrets there. Neither is confirmed at the time of writing.
+Verified against the live OpenAPI document. A Universal Auth machine identity
+**can** create projects, given the org-level `project:create` permission (the
+built-in org **Admin** role has it).
 
-If a machine identity cannot create projects, step 3 above is dropped and the
-design degrades to **adopt-by-name only**: the operator creates one Infisical
-project per team by hand, named to match, and Coolify binds to it. That is
-still a single set of credentials for the whole instance, which is the main
-goal — only the auto-creation is lost.
+| Operation | Endpoint | Notes |
+|---|---|---|
+| Create project | `POST /api/v2/workspace` | Field is **`projectName`**, not `name`. Max 64 chars. No `organizationId` — the org is derived from the token. |
+| Grant self access | `POST /api/v1/projects/{projectId}/identity-memberships/{identityId}` | Body `{"role": "admin"}`. **Required second call.** |
+| List projects | `GET /api/v1/projects` | Returns only projects the identity is a **member of**. |
 
-Nothing in this spec may assume auto-creation works until it is verified
-against a live instance.
+### Creation is a two-call sequence, and the order is load-bearing
+
+**The creating identity does NOT automatically get access to the project it
+created.** It must add itself via the identity-memberships endpoint before it
+can read or write any secret there.
+
+This produces a trap that must be designed around: `GET /api/v1/projects`
+returns only projects the identity is a *member* of. So if `POST
+/api/v2/workspace` succeeds and the membership call then fails, the project
+exists but is **invisible to us forever** — and the next sync, finding nothing
+by name, creates another one. Left unguarded this creates a new orphaned
+Infisical project on every single sync cycle.
+
+Mitigations, all required:
+
+1. Write the `infisical_team_projects` row **immediately after creation**,
+   before attempting the membership call. The local mapping, not the remote
+   list, is the source of truth for "we already made one".
+2. If the membership call fails, keep the mapping, record the failure in
+   `last_sync_error` naming the permission, and **do not retry creation**.
+3. A resumable repair path: if a mapping exists but secrets calls return 403,
+   retry only the membership call.
+
+### Project names are not guaranteed unique
+
+The API documents no uniqueness constraint on `projectName` and no 409 on
+duplicates. Name-based idempotency must therefore be enforced in application
+code — list, match, then create — and never rely on the server rejecting a
+duplicate.
+
+### Create projects WITHOUT default environments
+
+`POST /api/v2/workspace` defaults `shouldCreateDefaultEnvs: true`, which
+creates Development/Staging/Production with slugs **`dev`, `staging`, `prod`**.
+
+Those slugs do **not** match Coolify's environment names. Coolify's default
+environment is `production`, which slugs to `production`, not `prod` — so every
+auto-created project would arrive with three unusable environments and Coolify
+would then create a fourth alongside them.
+
+Therefore: **pass `shouldCreateDefaultEnvs: false`** and let Coolify create
+environments named after its own, which it already does. This removes the
+mismatch entirely for auto-created projects.
+
+Projects **adopted by name** still carry whatever environments their creator
+made, so the separate environment-mapping feature remains necessary for them.
+
+### Unresolved: how to obtain the identity's own id
+
+The membership call needs `{identityId}` — the machine identity's own id. It is
+not currently stored, and whether the Universal Auth login response returns it
+(or whether it must be decoded from the JWT, or fetched from a separate
+endpoint) is **NOT CONFIRMED**. This must be resolved before implementation;
+without it, auto-creation cannot complete its second call.
+
+### Plan limits
+
+Third-party sources report the Infisical Cloud free tier caps at roughly 3
+projects and 5 identities. One project per Coolify team reaches that quickly.
+Self-hosted is believed unlimited but this is **NOT CONFIRMED**. The UI should
+surface a project-creation failure clearly enough to distinguish a quota from a
+permission problem.
