@@ -161,7 +161,7 @@
                     @foreach ($dashboardServers as $server)
                         @php
                             $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-                            $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
+                            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
                             [$serverStatus, $serverStatusType] = match (true) {
                                 $server->settings->force_disabled => ['Disabled', 'error'],

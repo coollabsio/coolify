@@ -16,7 +16,13 @@
         $traefikUpdateAvailable => 'Update available',
         default => str($proxyStatus ?: 'unknown')->headline(),
     };
-    $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
+    $sentinelStatus = $server->sentinelStatus();
+    $sentinelNeedsAttention = $showSentinelStatus && $sentinelStatus === 'out_of_sync';
+    $sentinelStatusLabel = match ($sentinelStatus) {
+        'waiting' => 'Waiting for first report',
+        'in_sync' => 'In sync',
+        default => 'Out of sync',
+    };
 
     [$summaryLabel, $summaryType] = match (true) {
         ! $serverReady => ['Unavailable', 'error'],
@@ -80,11 +86,12 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => ! $sentinelNeedsAttention,
-                    'bg-warning' => $sentinelNeedsAttention,
+                    'bg-success' => $sentinelStatus === 'in_sync',
+                    'bg-neutral-400 dark:bg-fg-faint' => $sentinelStatus === 'waiting',
+                    'bg-warning' => $sentinelStatus === 'out_of_sync',
                 ])></span>
                 <span class="flex-1">Sentinel</span>
-                <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
+                <span>{{ $sentinelStatusLabel }}</span>
             </a>
         @endif
     </div>

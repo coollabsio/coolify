@@ -35,7 +35,7 @@
                 && ! $isTransferredAway;
             $proxyNeedsAttention = $isReady && $server->proxySet()
                 && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-            $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive();
+            $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
                 $isTransferredAway => 'Transferred away',
