@@ -184,6 +184,24 @@ it('rejects linking an unverified oidc email to an existing local account', func
     ]);
 });
 
+it('rejects linking a new oidc identity to an account with another provider identity', function () {
+    $user = User::factory()->create(['email' => 'shared@example.com']);
+    OauthIdentity::create([
+        'user_id' => $user->id,
+        'provider' => 'github',
+        'issuer' => 'github',
+        'provider_user_id' => 'github-user-id',
+        'email' => $user->email,
+    ]);
+
+    fakeOidcProvider(['email' => $user->email, 'email_verified' => true]);
+
+    $this->from('/login')->get(route('auth.callback', 'oidc'))->assertRedirect('/login');
+
+    $this->assertGuest();
+    expect(OauthIdentity::count())->toBe(1);
+});
+
 it('rejects new oidc users when neither normal nor provider registration is enabled', function () {
     fakeOidcProvider(['email' => 'blocked@example.com']);
 
