@@ -314,7 +314,6 @@ class SyncBunny extends Command
                 $upgrade_script_location = "$parent_dir/other/nightly/$upgrade_script";
                 $upgrade_postgres_script_location = "$parent_dir/other/nightly/$upgrade_postgres_script";
                 $install_script_location = "$parent_dir/other/nightly/$install_script";
-                $versions_location = "$parent_dir/other/nightly/$versions";
             }
             if ($only_bunny) {
                 $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';

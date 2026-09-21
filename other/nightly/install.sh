@@ -316,9 +316,10 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-# Fetch versions.json once and parse all values from it
+# Fetch versions.json once and parse helper and realtime versions from it
 VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
-LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
+# The moving next tag is the published nightly channel.
+LATEST_VERSION=next
 LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
 LATEST_REALTIME_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $8}' | tr -d ',')
 

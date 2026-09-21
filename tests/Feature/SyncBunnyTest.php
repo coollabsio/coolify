@@ -111,6 +111,8 @@ SH);
 });
 
 it('selects the environment and release files to sync to GitHub', function (string $targetDirectory, string $environment, array $selectedBasenames) {
+    expect(base_path('other/nightly/versions.json'))->not->toBeFile();
+
     Http::fake([
         'api.github.com/repos/coollabsio/coolify/releases*' => Http::response([], 200),
     ]);

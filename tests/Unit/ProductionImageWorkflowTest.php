@@ -5,7 +5,6 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
     $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
-    $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
@@ -25,10 +24,10 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.23'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.23')
-        ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
-        ->and($nightlyVersions)->toBe($versions);
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '{$versions['coolify']['v4']['version']}'")
+        ->and($versions['coolify']['v4']['version'])->toMatch('/^\d+\.\d+(?:\.\d+)?$/')
+        ->and($versions['coolify']['nightly']['version'])->toMatch('/^\d+\.\d+-rc\.\d+$/')
+        ->and(file_exists(dirname(__DIR__, 2).'/other/nightly/versions.json'))->toBeFalse();
 });
 
 it('orders a maintenance development build before its stable release', function () {
@@ -187,9 +186,11 @@ it('documents the production, rc, and hotfix release flows', function () {
         ->toContain('feature/* → next → RC')
         ->toContain('next → main → stable release')
         ->toContain('main → hotfix/X.Y.Z → main → next')
+        ->toContain('RC versions come from `coolify.nightly.version` in root `versions.json`')
         ->toContain('reviewed draft GitHub Release')
         ->toContain('workflows never edit or commit versions')
         ->toContain('Update the CDN only after the release is approved')
+        ->not->toContain('other/nightly/versions.json')
         ->not->toContain('`edge`')
         ->not->toContain('promotes the existing SHA image');
 });
