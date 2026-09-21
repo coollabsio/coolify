@@ -110,22 +110,44 @@ it('uses Pusher environment keys for self-hosted Reverb compatibility', function
     }
 });
 
-it('defaults the public Pusher websocket port to Reverb instead of the HTTP app port', function () {
+it('keeps the public websocket port adaptive and configures only the internal Reverb port', function () {
     expect(file_get_contents(base_path('.env.production')))
         ->not->toContain('PUSHER_PORT=')
         ->not->toContain('PUSHER_BACKEND_PORT=')
         ->and(file_get_contents(base_path('.env.windows-docker-desktop.example')))
-        ->toContain('PUSHER_PORT=6001')
+        ->not->toContain('PUSHER_PORT=')
         ->toContain('PUSHER_BACKEND_PORT=6001')
         ->and(file_get_contents(base_path('scripts/install.sh')))
-        ->toContain('update_env_var "PUSHER_PORT" "6001"')
+        ->not->toContain('update_env_var "PUSHER_PORT"')
         ->toContain('update_env_var "PUSHER_BACKEND_PORT" "6001"')
-        ->toContain('normalize_pusher_port')
         ->and(file_get_contents(base_path('scripts/upgrade.sh')))
-        ->toContain('update_env_var "PUSHER_PORT" "6001"')
-        ->toContain('update_env_var "PUSHER_BACKEND_PORT" "6001"')
-        ->toContain('normalize_pusher_port');
+        ->not->toContain('update_env_var "PUSHER_PORT"')
+        ->toContain('update_env_var "PUSHER_BACKEND_PORT" "6001"');
 });
+
+it('does not use the browser websocket port as the Docker host port', function (string $composeFile) {
+    expect(file_get_contents(base_path($composeFile)))
+        ->toContain('"${SOKETI_PORT:-6001}:6001"')
+        ->not->toContain('"${PUSHER_PORT:-6001}:6001"');
+})->with([
+    'production compose' => ['docker-compose.prod.yml'],
+    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
+    'windows compose' => ['docker-compose.windows.yml'],
+    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
+]);
+
+it('preserves existing public websocket port overrides during install and upgrade', function (string $script) {
+    $contents = file_get_contents(base_path($script));
+
+    expect($contents)
+        ->not->toContain('normalize_pusher_port')
+        ->not->toMatch('/(?:set|update)_env_var "PUSHER_PORT"/');
+})->with([
+    'install script' => ['scripts/install.sh'],
+    'upgrade script' => ['scripts/upgrade.sh'],
+    'nightly install script' => ['other/nightly/install.sh'],
+    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
+]);
 
 it('stops publishing or preserving the obsolete realtime image', function () {
     $productionInstallScript = file_get_contents(base_path('scripts/install.sh'));

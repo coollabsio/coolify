@@ -133,13 +133,6 @@ update_env_var() {
     fi
 }
 
-normalize_pusher_port() {
-    if grep -q "^PUSHER_PORT=8080$" "$ENV_FILE"; then
-        sed -i "s|^PUSHER_PORT=8080$|PUSHER_PORT=6001|" "$ENV_FILE"
-        log "Updated PUSHER_PORT from app HTTP port 8080 to Reverb port 6001"
-    fi
-}
-
 set_env_var() {
     local key="$1"
     local value="$2"
@@ -158,8 +151,6 @@ set_env_var "REGISTRY_URL" "$REGISTRY_URL"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
-update_env_var "PUSHER_PORT" "6001"
-normalize_pusher_port
 update_env_var "PUSHER_BACKEND_PORT" "6001"
 log "Environment variables check complete"
 echo "     Done."

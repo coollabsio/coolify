@@ -25,11 +25,11 @@ services:
       - /data/coolify/source/.env
     ports:
       - "${APP_PORT:-8000}:8080"
-      - "${PUSHER_PORT:-6001}:6001"
+      - "${SOKETI_PORT:-6001}:6001"
       - "${TERMINAL_PORT:-6002}:6002"
     expose:
       - "${APP_PORT:-8000}"
-      - "${PUSHER_PORT:-6001}"
+      - "6001"
       - "${TERMINAL_PORT:-6002}"
     healthcheck:
       test: curl --fail http://127.0.0.1:8080/api/health || exit 1
