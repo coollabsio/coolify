@@ -43,16 +43,13 @@
             <div wire:key="infisical-connection-{{ $connection->uuid }}" class="flex flex-col gap-4">
                 <div class="data-table w-full">
                     <div class="data-table-row flex w-full items-center gap-2 px-3 py-2.5 text-[13px]">
-                        <x-modal-input title="{{ $connection->name }}" :closeOutside="false">
-                            <x-slot:content>
-                                <button type="button"
-                                    class="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
-                                    <span class="truncate font-medium text-black dark:text-fg">{{ $connection->name }}</span>
-                                    <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $connection->host }}</span>
-                                </button>
-                            </x-slot:content>
-                            <livewire:security.infisical.form :connection="$connection" :key="'infisical-connection-form-'.$connection->uuid" />
-                        </x-modal-input>
+                        {{-- Plain text, not a second modal: mounting the form twice for
+                             one connection makes Livewire lose a snapshot. Editing
+                             lives on the Edit connection button below. --}}
+                        <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
+                            <span class="truncate font-medium text-black dark:text-fg">{{ $connection->name }}</span>
+                            <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $connection->host }}</span>
+                        </div>
 
                         <div class="ml-auto flex shrink-0 items-center gap-2">
                             @if ($connection->is_enabled && $connection->last_sync_status === App\Models\InfisicalConnection::STATUS_FAILED)
