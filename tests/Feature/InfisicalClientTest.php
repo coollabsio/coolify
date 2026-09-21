@@ -26,7 +26,7 @@ test('it logs in and returns secrets as a key value map', function () {
 
     $secrets = (new InfisicalClient($connection))->fetchSecrets('proj-1', 'prod', '/');
 
-    expect($secrets)->toBe(['DB_PASSWORD' => 'hunter2', 'API_KEY' => 'abc']);
+    expect($secrets->values)->toBe(['DB_PASSWORD' => 'hunter2', 'API_KEY' => 'abc']);
 
     Http::assertSent(fn ($request) => $request->url() === 'https://infisical.test/api/v1/auth/universal-auth/login'
         && $request['clientId'] === $connection->client_id);
@@ -111,29 +111,7 @@ test('it throws an InfisicalApiException when the secrets request cannot connect
         ->toThrow(InfisicalApiException::class);
 });
 
-test('it throws when a secret value is hidden, naming the key but not any value', function () {
-    Http::fake([
-        'https://infisical.test/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
-        'https://infisical.test/api/v3/secrets/raw*' => Http::response([
-            'secrets' => [
-                ['secretKey' => 'DB_PASSWORD', 'secretValue' => 'hunter2', 'secretValueHidden' => false],
-                ['secretKey' => 'SUPER_SECRET', 'secretValue' => '', 'secretValueHidden' => true],
-            ],
-        ]),
-    ]);
-
-    $connection = InfisicalConnection::factory()->create(['host' => 'https://infisical.test']);
-
-    try {
-        (new InfisicalClient($connection))->fetchSecrets('proj-1', 'prod', '/');
-        $this->fail('expected InfisicalApiException');
-    } catch (InfisicalApiException $e) {
-        expect($e->getMessage())->toContain('SUPER_SECRET')
-            ->and($e->getMessage())->not->toContain('hunter2');
-    }
-});
-
-test('a truthy but non-boolean secretValueHidden still aborts the fetch', function () {
+test('a truthy but non-boolean secretValueHidden still hides the value', function () {
     Http::fake([
         'https://infisical.test/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'token-123']),
         'https://infisical.test/api/v3/secrets/raw*' => Http::response([
@@ -145,8 +123,10 @@ test('a truthy but non-boolean secretValueHidden still aborts the fetch', functi
 
     $connection = InfisicalConnection::factory()->create(['host' => 'https://infisical.test']);
 
-    expect(fn () => (new InfisicalClient($connection))->fetchSecrets('proj-1', 'prod', '/'))
-        ->toThrow(InfisicalApiException::class);
+    $secrets = (new InfisicalClient($connection))->fetchSecrets('proj-1', 'prod', '/');
+
+    expect($secrets->hiddenKeys)->toBe(['SUPER_SECRET'])
+        ->and($secrets->values)->toBe([]);
 });
 
 test('it authenticates only once across multiple fetchSecrets calls', function () {
@@ -162,4 +142,110 @@ test('it authenticates only once across multiple fetchSecrets calls', function (
     $client->fetchSecrets('proj-1', 'prod', '/');
 
     Http::assertSentCount(3);
+});
+
+it('reports hidden secrets instead of throwing', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v3/secrets/raw*' => Http::response(['secrets' => [
+            ['secretKey' => 'VISIBLE', 'secretValue' => 'yes', 'secretValueHidden' => false],
+            ['secretKey' => 'MASKED', 'secretValue' => '', 'secretValueHidden' => true],
+        ]]),
+    ]);
+
+    $result = (new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->fetchSecrets('proj', 'production', '/');
+
+    expect($result->values)->toBe(['VISIBLE' => 'yes'])
+        ->and($result->hiddenKeys)->toBe(['MASKED']);
+});
+
+it('reads environment slugs from the project object', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v1/projects/proj' => Http::response(['project' => ['environments' => [
+            ['id' => '1', 'name' => 'Production', 'slug' => 'production'],
+            ['id' => '2', 'name' => 'Staging', 'slug' => 'staging'],
+        ]]]),
+    ]);
+
+    expect((new InfisicalClient(InfisicalConnection::factory()->create()))->listEnvironmentSlugs('proj'))
+        ->toBe(['production', 'staging']);
+});
+
+it('returns false when environment creation is refused', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v1/projects/proj/environments' => Http::response(['message' => 'forbidden'], 403),
+    ]);
+
+    expect((new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->createEnvironment('proj', 'UAT', 'uat'))->toBeFalse();
+});
+
+it('creates each folder level separately because the api does not recurse', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v2/folders?*' => Http::response(['folders' => []]),
+        '*/api/v2/folders' => Http::response(['folder' => ['id' => 'f']], 200),
+    ]);
+
+    (new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->ensureFolderPath('proj', 'production', '/shop-api/api-server/');
+
+    $creates = collect(Http::recorded())
+        ->filter(fn ($pair) => $pair[0]->method() === 'POST'
+            && str_contains($pair[0]->url(), '/api/v2/folders'))
+        ->map(fn ($pair) => [$pair[0]['path'], $pair[0]['name']])
+        ->values()
+        ->all();
+
+    expect($creates)->toBe([
+        ['/', 'shop-api'],
+        ['/shop-api', 'api-server'],
+    ]);
+});
+
+it('skips creating a folder level that already exists', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v2/folders?*' => Http::response(['folders' => [['name' => 'shop-api']]]),
+        '*/api/v2/folders' => Http::response(['folder' => ['id' => 'f']], 200),
+    ]);
+
+    (new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->ensureFolderPath('proj', 'production', '/shop-api/');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/api/v2/folders'));
+});
+
+it('upserts secrets in one batch call', function () {
+    Http::fake([
+        '*/api/v1/auth/universal-auth/login' => Http::response(['accessToken' => 'tok']),
+        '*/api/v4/secrets/batch' => Http::response(['secrets' => []]),
+    ]);
+
+    (new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->upsertSecrets('proj', 'production', '/shop-api/', ['A' => '1', 'B' => '2']);
+
+    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
+        && str_contains($request->url(), '/api/v4/secrets/batch')
+        && $request['mode'] === 'upsert'
+        && $request['projectId'] === 'proj'
+        && $request['environment'] === 'production'
+        && $request['secretPath'] === '/shop-api/'
+        && $request['secrets'] === [
+            ['secretKey' => 'A', 'secretValue' => '1'],
+            ['secretKey' => 'B', 'secretValue' => '2'],
+        ]);
+});
+
+it('does not call the api at all when there is nothing to upsert', function () {
+    Http::fake(['*' => Http::response([])]);
+
+    (new InfisicalClient(InfisicalConnection::factory()->create()))
+        ->upsertSecrets('proj', 'production', '/', []);
+
+    Http::assertNothingSent();
 });

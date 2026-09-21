@@ -4,6 +4,8 @@ namespace App\Services\Infisical;
 
 use App\Models\InfisicalConnection;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class InfisicalClient
@@ -15,36 +17,19 @@ class InfisicalClient
     public function __construct(private readonly InfisicalConnection $connection) {}
 
     /**
-     * Fetch every secret at the given path as a key => value map.
-     *
-     * @return array<string, string>
-     *
      * @throws InfisicalApiException
      */
-    public function fetchSecrets(string $projectId, string $environmentSlug, string $secretPath): array
+    public function fetchSecrets(string $projectId, string $environmentSlug, string $secretPath): FetchedSecrets
     {
-        try {
-            $response = Http::timeout(self::TIMEOUT_SECONDS)
-                ->withToken($this->accessToken())
-                ->get($this->connection->host.'/api/v3/secrets/raw', [
-                    'workspaceId' => $projectId,
-                    'environment' => $environmentSlug,
-                    'secretPath' => $secretPath,
-                ]);
-        } catch (ConnectionException $e) {
-            throw new InfisicalApiException(
-                "Could not connect to Infisical host {$this->connection->host} to fetch secrets: {$e->getMessage()}"
-            );
-        }
+        $response = $this->send('get', '/api/v3/secrets/raw', [
+            'workspaceId' => $projectId,
+            'environment' => $environmentSlug,
+            'secretPath' => $secretPath,
+        ], 'fetch secrets');
 
-        if ($response->failed()) {
-            throw new InfisicalApiException(
-                "Infisical secret fetch failed with status {$response->status()}."
-            );
-        }
-
+        $values = [];
         $hiddenKeys = [];
-        $secrets = [];
+
         foreach ($response->json('secrets', []) as $secret) {
             $key = data_get($secret, 'secretKey');
             if ($key === null) {
@@ -57,23 +42,196 @@ class InfisicalClient
                 continue;
             }
 
-            $secrets[$key] = (string) data_get($secret, 'secretValue', '');
+            $values[$key] = (string) data_get($secret, 'secretValue', '');
         }
 
-        if ($hiddenKeys !== []) {
-            $keys = implode(', ', $hiddenKeys);
-
-            throw new InfisicalApiException(
-                "Infisical machine identity lacks permission to read the value of secret(s): {$keys}."
-            );
-        }
-
-        return $secrets;
+        return new FetchedSecrets($values, $hiddenKeys);
     }
 
     /**
-     * Authenticate with Universal Auth. The token is held in memory for the
-     * lifetime of this instance only and is never persisted.
+     * Infisical exposes no list-environments route; they live on the project.
+     *
+     * @return array<int, string>
+     *
+     * @throws InfisicalApiException
+     */
+    public function listEnvironmentSlugs(string $projectId): array
+    {
+        $response = $this->send('get', "/api/v1/projects/{$projectId}", [], 'list environments');
+
+        return collect($response->json('project.environments', []))
+            ->pluck('slug')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Returns false when Infisical refuses — insufficient project role, or the
+     * organisation's environment limit. Callers degrade to skip-and-warn
+     * rather than failing the whole sync.
+     *
+     * @throws InfisicalApiException
+     */
+    public function createEnvironment(string $projectId, string $name, string $slug): bool
+    {
+        $response = $this->raw('post', "/api/v1/projects/{$projectId}/environments", [
+            'name' => $name,
+            'slug' => $slug,
+        ]);
+
+        if ($response->status() === 403 || $response->status() === 402) {
+            return false;
+        }
+
+        $this->throwUnlessSuccessful($response, 'create environment');
+
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     *
+     * @throws InfisicalApiException
+     */
+    public function listFolderNames(string $projectId, string $environmentSlug, string $path): array
+    {
+        $response = $this->send('get', '/api/v2/folders', [
+            'projectId' => $projectId,
+            'environment' => $environmentSlug,
+            'path' => $path,
+        ], 'list folders');
+
+        return collect($response->json('folders', []))
+            ->pluck('name')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @throws InfisicalApiException
+     */
+    public function createFolder(string $projectId, string $environmentSlug, string $path, string $name): void
+    {
+        $response = $this->raw('post', '/api/v2/folders', [
+            'projectId' => $projectId,
+            'environment' => $environmentSlug,
+            'path' => $path,
+            'name' => $name,
+        ]);
+
+        // A concurrent sync may have created it between our list and our create.
+        if ($response->status() === 409) {
+            return;
+        }
+
+        $this->throwUnlessSuccessful($response, 'create folder');
+    }
+
+    /**
+     * Walks the path one level at a time. The Infisical API does not document
+     * recursive parent creation, so it must not be assumed.
+     *
+     * @throws InfisicalApiException
+     */
+    public function ensureFolderPath(string $projectId, string $environmentSlug, string $path): void
+    {
+        $segments = array_values(array_filter(explode('/', $path), fn ($s) => $s !== ''));
+
+        $parent = '/';
+        foreach ($segments as $segment) {
+            $existing = $this->listFolderNames($projectId, $environmentSlug, $parent);
+
+            if (! in_array($segment, $existing, true)) {
+                $this->createFolder($projectId, $environmentSlug, $parent, $segment);
+            }
+
+            $parent = $parent === '/' ? "/{$segment}" : "{$parent}/{$segment}";
+        }
+    }
+
+    /**
+     * One batch call with mode=upsert — creates what is missing, updates what
+     * exists, no create-vs-update branching.
+     *
+     * @param  array<string, string>  $secrets
+     *
+     * @throws InfisicalApiException
+     */
+    public function upsertSecrets(string $projectId, string $environmentSlug, string $secretPath, array $secrets): void
+    {
+        if ($secrets === []) {
+            return;
+        }
+
+        $payload = [];
+        foreach ($secrets as $key => $value) {
+            $payload[] = ['secretKey' => (string) $key, 'secretValue' => (string) $value];
+        }
+
+        $this->send('patch', '/api/v4/secrets/batch', [
+            'projectId' => $projectId,
+            'environment' => $environmentSlug,
+            'secretPath' => $secretPath,
+            'mode' => 'upsert',
+            'secrets' => $payload,
+        ], 'upsert secrets');
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws InfisicalApiException
+     */
+    private function send(string $method, string $path, array $payload, string $describe): Response
+    {
+        $response = $this->raw($method, $path, $payload);
+
+        $this->throwUnlessSuccessful($response, $describe);
+
+        return $response;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws InfisicalApiException
+     */
+    private function raw(string $method, string $path, array $payload): Response
+    {
+        try {
+            return $this->request()->{$method}($this->connection->host.$path, $payload);
+        } catch (ConnectionException $e) {
+            throw new InfisicalApiException(
+                "Could not connect to Infisical host {$this->connection->host}: {$e->getMessage()}"
+            );
+        }
+    }
+
+    /**
+     * @throws InfisicalApiException
+     */
+    private function throwUnlessSuccessful(Response $response, string $describe): void
+    {
+        if ($response->failed()) {
+            throw new InfisicalApiException(
+                "Infisical request to {$describe} failed with status {$response->status()}."
+            );
+        }
+    }
+
+    /**
+     * @throws InfisicalApiException
+     */
+    private function request(): PendingRequest
+    {
+        return Http::timeout(self::TIMEOUT_SECONDS)->withToken($this->accessToken());
+    }
+
+    /**
+     * Universal Auth. The token is held in memory for the lifetime of this
+     * instance only and is never persisted.
      *
      * @throws InfisicalApiException
      */
