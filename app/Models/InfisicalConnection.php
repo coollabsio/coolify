@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Infisical\InfisicalClient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,6 +71,14 @@ class InfisicalConnection extends BaseModel
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * An API client bound to this connection's credentials.
+     */
+    public function client(): InfisicalClient
+    {
+        return new InfisicalClient($this);
     }
 
     /**
