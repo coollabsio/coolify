@@ -179,6 +179,7 @@ it('uses the cached immutable rolling target and nightly upgrade script', functi
     Http::assertNothingSent();
     expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
         "curl -fsSL https://cdn.coollabs.io/coolify-nightly/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
+        "grep -qxF 'COOLIFY_NIGHTLY_UPGRADE_SCRIPT_VERSION=2' /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.5-rc.1.def5678' '1.0.14' 'docker.io'"
     );
 });
@@ -207,6 +208,7 @@ it('resolves a rolling target directly for a manual update when the cache is una
     expect($action->latestVersion)->toBe('4.5-rc.1.def5678');
     Http::assertNothingSent();
     expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toContain(
+        "grep -qxF 'COOLIFY_NIGHTLY_UPGRADE_SCRIPT_VERSION=2' /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.5-rc.1.def5678'"
     );
 });

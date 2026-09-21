@@ -33,18 +33,20 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 $resolver = app(CoolifyUpdateTargetResolver::class);
 
                 if ($resolver->isRollingChannel()) {
-                    $server = Server::find(0);
-                    if (! $server) {
-                        throw new \RuntimeException('Cannot resolve the rolling Coolify target without the localhost server.');
+                    try {
+                        $server = Server::find(0);
+                        if (! $server) {
+                            throw new \RuntimeException('Cannot resolve the rolling Coolify target without the localhost server.');
+                        }
+
+                        $latest_version = $resolver->resolve($server);
+                        data_set($versions, 'coolify.v4.version', $latest_version);
+
+                        $this->persistVersions($versions);
+                        $settings->update(['new_version_available' => $latest_version !== $current_version]);
+                    } catch (\Throwable $e) {
+                        $this->persistVersionsAfterRollingResolutionFailure($versions, $e, $settings);
                     }
-
-                    $latest_version = $resolver->resolve($server);
-                    data_set($versions, 'coolify.v4.version', $latest_version);
-
-                    File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
-                    invalidate_versions_cache();
-                    CheckTraefikVersionJob::dispatch();
-                    $settings->update(['new_version_available' => $latest_version !== $current_version]);
 
                     return;
                 }
@@ -106,10 +108,51 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             if (config('constants.coolify.latest_image') === 'next') {
+                try {
+                    instanceSettings()->update(['new_version_available' => false]);
+                } catch (\Throwable) {
+                    // Keep the original update-resolution failure as the logged error.
+                }
+
                 Log::warning('Failed to resolve the rolling Coolify update target', [
                     'error' => $e->getMessage(),
                 ]);
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $versions
+     */
+    private function persistVersions(array $versions): void
+    {
+        File::put(base_path('versions.json'), json_encode($versions, JSON_PRETTY_PRINT));
+        invalidate_versions_cache();
+        CheckTraefikVersionJob::dispatch();
+    }
+
+    /**
+     * @param array<string, mixed> $versions
+     */
+    private function persistVersionsAfterRollingResolutionFailure(array $versions, \Throwable $exception, mixed $settings): void
+    {
+        $cachedVersion = null;
+        if (File::exists(base_path('versions.json'))) {
+            $cachedVersions = json_decode(File::get(base_path('versions.json')), true);
+            $cachedVersion = data_get($cachedVersions, 'coolify.v4.version');
+        }
+
+        if (CoolifyUpdateTargetResolver::isRollingBuildVersion($cachedVersion)) {
+            data_set($versions, 'coolify.v4.version', $cachedVersion);
+        } else {
+            data_forget($versions, 'coolify.v4.version');
+        }
+
+        $this->persistVersions($versions);
+        $settings->update(['new_version_available' => false]);
+
+        Log::warning('Failed to resolve the rolling Coolify update target', [
+            'error' => $exception->getMessage(),
+        ]);
     }
 }

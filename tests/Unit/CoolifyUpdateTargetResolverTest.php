@@ -23,7 +23,7 @@ beforeEach(function () {
 it('resolves the immutable version from the selected remote platform without pulling', function () {
     $command = null;
     $resolver = new CoolifyUpdateTargetResolver(function (array $commands, Server $server) use (&$command): string {
-        $command = $commands[0];
+        $command = implode("\n", $commands);
 
         return json_encode([
             'linux/amd64' => [
@@ -41,11 +41,16 @@ it('resolves the immutable version from the selected remote platform without pul
 
     expect($resolver->resolve($server))->toBe('4.5-rc.1.abc1234')
         ->and($command)
+        ->toContain('docker run --rm')
+        ->toContain('docker.io/coollabsio/coolify-helper:1.0.17')
+        ->toContain('/root/.docker/config.json:/root/.docker/config.json:ro')
         ->toContain("docker buildx imagetools inspect 'docker.io/coollabsio/coolify:next'")
         ->toContain("--format '{{json .Image}}'")
         ->toContain("--arg platform 'linux/arm64'")
         ->toContain('jq')
-        ->not->toContain('docker pull');
+        ->not->toContain('docker pull')
+        ->and(strpos($command, 'coolify-helper:1.0.17'))
+        ->toBeLessThan(strpos($command, 'docker buildx imagetools inspect'));
 });
 
 it('accepts only versions produced by the rolling next workflow', function () {

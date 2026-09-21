@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-function checkForUpdatesRollingCreateRootServer(): void
+function checkForUpdatesRollingCreateRootServer(bool $newVersionAvailable = false): void
 {
     Team::forceCreate(['id' => 0, 'name' => 'root']);
     Server::forceCreate([
@@ -28,7 +28,7 @@ function checkForUpdatesRollingCreateRootServer(): void
     ]);
     InstanceSettings::forceCreate([
         'id' => 0,
-        'new_version_available' => false,
+        'new_version_available' => $newVersionAvailable,
     ]);
 }
 
@@ -65,18 +65,33 @@ it('uses the published rolling target identity instead of the stable manifest ve
     Queue::assertPushed(\App\Jobs\CheckTraefikVersionJob::class);
 });
 
-it('does not replace a failed rolling resolution with the stable manifest version', function () {
-    checkForUpdatesRollingCreateRootServer();
+it('preserves non-Coolify metadata and clears stale availability after rolling resolution fails', function () {
+    checkForUpdatesRollingCreateRootServer(newVersionAvailable: true);
     config([
         'constants.coolify.latest_image' => 'next',
         'constants.coolify.version' => '4.5-rc.1.abc1234',
     ]);
     Http::fake(['*' => Http::response([
         'coolify' => ['v4' => ['version' => '4.5.1']],
+        'helper' => ['version' => '1.0.18'],
+        'traefik' => ['v3.5' => '3.5.6'],
     ])]);
     Queue::fake();
-    File::shouldReceive('put')->never();
-    Cache::shouldReceive('forget')->never();
+    File::shouldReceive('exists')->once()->with(base_path('versions.json'))->andReturn(true);
+    File::shouldReceive('get')->once()->with(base_path('versions.json'))->andReturn(json_encode([
+        'coolify' => ['v4' => ['version' => '4.5-rc.1.def5678']],
+    ]));
+    File::shouldReceive('put')
+        ->once()
+        ->with(base_path('versions.json'), Mockery::on(function (string $json): bool {
+            $versions = json_decode($json, true);
+
+            return data_get($versions, 'coolify.v4.version') === '4.5-rc.1.def5678'
+                && data_get($versions, 'helper.version') === '1.0.18'
+                && data_get($versions, 'traefik.v3.5') === '3.5.6';
+        }))
+        ->andReturn(true);
+    Cache::shouldReceive('forget')->once();
     Log::shouldReceive('warning')
         ->once()
         ->with('Failed to resolve the rolling Coolify update target', Mockery::type('array'));
@@ -88,4 +103,44 @@ it('does not replace a failed rolling resolution with the stable manifest versio
     (new CheckForUpdatesJob)->handle();
 
     expect((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
+    Queue::assertPushed(\App\Jobs\CheckTraefikVersionJob::class);
+});
+
+it('does not retain a stable Coolify version when rolling resolution fails without a valid cache', function () {
+    checkForUpdatesRollingCreateRootServer(newVersionAvailable: true);
+    config([
+        'constants.coolify.latest_image' => 'next',
+        'constants.coolify.version' => '4.5-rc.1.abc1234',
+    ]);
+    Http::fake(['*' => Http::response([
+        'coolify' => ['v4' => ['version' => '4.5.1']],
+        'sentinel' => ['version' => '1.0.5'],
+    ])]);
+    Queue::fake();
+    File::shouldReceive('exists')->once()->with(base_path('versions.json'))->andReturn(true);
+    File::shouldReceive('get')->once()->with(base_path('versions.json'))->andReturn(json_encode([
+        'coolify' => ['v4' => ['version' => '4.5.0']],
+    ]));
+    File::shouldReceive('put')
+        ->once()
+        ->with(base_path('versions.json'), Mockery::on(function (string $json): bool {
+            $versions = json_decode($json, true);
+
+            return ! array_key_exists('version', data_get($versions, 'coolify.v4', []))
+                && data_get($versions, 'sentinel.version') === '1.0.5';
+        }))
+        ->andReturn(true);
+    Cache::shouldReceive('forget')->once();
+    Log::shouldReceive('warning')
+        ->once()
+        ->with('Failed to resolve the rolling Coolify update target', Mockery::type('array'));
+
+    $this->app->instance(CoolifyUpdateTargetResolver::class, new CoolifyUpdateTargetResolver(
+        fn (array $commands, Server $server): string => '4.5.1'
+    ));
+
+    (new CheckForUpdatesJob)->handle();
+
+    expect((bool) InstanceSettings::findOrFail(0)->new_version_available)->toBeFalse();
+    Queue::assertPushed(\App\Jobs\CheckTraefikVersionJob::class);
 });

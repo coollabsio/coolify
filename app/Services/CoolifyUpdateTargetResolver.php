@@ -41,9 +41,16 @@ class CoolifyUpdateTargetResolver
         }
 
         $platform = $this->platformFor($server);
-        $output = ($this->remoteProcess)([
-            $this->buildInspectCommand($this->rollingImageReference(), $platform),
-        ], $server);
+        $command = preg_split(
+            '/\R/',
+            $this->buildInspectCommand($this->rollingImageReference(), $platform, $server->isNonRoot()),
+            flags: PREG_SPLIT_NO_EMPTY
+        );
+        if ($command === false) {
+            throw new RuntimeException('Unable to build the rolling Coolify image inspection command.');
+        }
+
+        $output = ($this->remoteProcess)($command, $server);
         $version = trim((string) $output);
         if (! self::isRollingBuildVersion($version)) {
             $version = $this->versionFromInspectJson((string) $output, $platform) ?? $version;
@@ -56,7 +63,7 @@ class CoolifyUpdateTargetResolver
         return $version;
     }
 
-    public function buildInspectCommand(string $image, string $platform): string
+    public function buildInspectCommand(string $image, string $platform, bool $nonRoot = false): string
     {
         $filter = <<<'JQ'
 def normalized_platform:
@@ -72,9 +79,20 @@ def normalized_platform:
 | first(.[] | select(startswith("COOLIFY_VERSION=")) | sub("^COOLIFY_VERSION="; ""))
 JQ;
 
-        return 'docker buildx imagetools inspect '.escapeshellarg($image).
-            ' --format '.escapeshellarg('{{json .Image}}').
-            ' | jq -r --arg platform '.escapeshellarg($platform).' '.escapeshellarg($filter);
+        $helperImage = escapeshellarg(coolifyHelperImage().':'.getHelperVersion());
+        $inspectOutput = '/tmp/coolify-update-target-$$.json';
+        $dockerConfigTest = $nonRoot ? 'sudo test' : 'test';
+        $dockerRun = 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock';
+        $inspectArguments = $helperImage.' docker buildx imagetools inspect '.escapeshellarg($image).
+            ' --format '.escapeshellarg('{{json .Image}}');
+
+        return 'if '.$dockerConfigTest.' -f /root/.docker/config.json; then'.PHP_EOL.
+            '    '.$dockerRun.' -v /root/.docker/config.json:/root/.docker/config.json:ro '.$inspectArguments.' > '.$inspectOutput.PHP_EOL.
+            'else'.PHP_EOL.
+            '    '.$dockerRun.' '.$inspectArguments.' > '.$inspectOutput.PHP_EOL.
+            'fi'.PHP_EOL.
+            'jq -r --arg platform '.escapeshellarg($platform).' '.escapeshellarg($filter).' '.$inspectOutput.PHP_EOL.
+            'rm -f '.$inspectOutput;
     }
 
     public function rollingImageReference(): string

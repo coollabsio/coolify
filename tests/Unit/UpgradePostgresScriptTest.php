@@ -104,6 +104,7 @@ it('resolves the nightly image version while preserving its rolling channel', fu
     $script = file_get_contents(getcwd().'/other/nightly/upgrade.sh');
 
     expect($script)
+        ->toContain('COOLIFY_NIGHTLY_UPGRADE_SCRIPT_VERSION=2')
         ->toContain('PERSISTED_LATEST_IMAGE="$LATEST_IMAGE"')
         ->toContain('if [ "$EXISTING_LATEST_IMAGE" = "next" ]; then')
         ->toContain("docker image inspect \"\$COOLIFY_IMAGE\" --format '{{json .Config.Env}}'")

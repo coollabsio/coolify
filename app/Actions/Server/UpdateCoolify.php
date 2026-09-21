@@ -11,6 +11,8 @@ use Lorisleiva\Actions\Concerns\AsAction;
 
 class UpdateCoolify
 {
+    private const NIGHTLY_UPGRADE_SCRIPT_MARKER = 'COOLIFY_NIGHTLY_UPGRADE_SCRIPT_VERSION=2';
+
     use AsAction;
 
     public ?Server $server = null;
@@ -148,13 +150,21 @@ class UpdateCoolify
         $latestHelperImageVersion = getHelperVersion();
         $upgradeScriptUrl = config('constants.coolify.upgrade_script_url');
         $registryUrl = coolifyRegistryUrl();
+        $upgradeScriptPath = '/data/coolify/source/upgrade.sh';
 
-        remote_process([
-            "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",
-            'bash /data/coolify/source/upgrade.sh '.
-                escapeshellarg($this->latestVersion).' '.
-                escapeshellarg($latestHelperImageVersion).' '.
-                escapeshellarg($registryUrl),
-        ], $this->server);
+        $commands = [
+            "curl -fsSL {$upgradeScriptUrl} -o {$upgradeScriptPath}",
+        ];
+
+        if (config('constants.coolify.latest_image') === 'next') {
+            $commands[] = "grep -qxF '".self::NIGHTLY_UPGRADE_SCRIPT_MARKER."' {$upgradeScriptPath}";
+        }
+
+        $commands[] = 'bash '.$upgradeScriptPath.' '.
+            escapeshellarg($this->latestVersion).' '.
+            escapeshellarg($latestHelperImageVersion).' '.
+            escapeshellarg($registryUrl);
+
+        remote_process($commands, $this->server);
     }
 }
