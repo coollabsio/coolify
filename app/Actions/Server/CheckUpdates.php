@@ -50,6 +50,7 @@ class CheckUpdates
                 case 'manjaro':
                 case 'manjaro-arm':
                 case 'endeavouros':
+                case 'cachyos':
                     $osType = 'arch';
                     break;
                 case 'pop':
