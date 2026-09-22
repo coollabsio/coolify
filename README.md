@@ -8,6 +8,11 @@
 
 Open source & free forever, backed by our [philosophy](https://coolify.io/philosophy).
 
+<p>
+  <b>English</b> ·
+  <a href="README.ru.md">Русский</a>
+</p>
+
 ![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
 )
 
