@@ -166,6 +166,44 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 }
 
 /**
+ * Build the remote mkdir command for a raw Compose bind volume source.
+ *
+ * Keep volume paths as single arguments when creating bind directories.
+ *
+ * Compose environment interpolations are left to Docker Compose. They are
+ * not expanded by the destination server shell.
+ *
+ * @throws Exception If the source is invalid
+ */
+function rawComposeBindMkdirCommand(string $source): ?string
+{
+    if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
+        throw new Exception('Invalid volume source: contains a control character.');
+    }
+
+    $source = trim($source);
+    if ($source === '') {
+        throw new Exception('Invalid volume source: path is empty.');
+    }
+
+    $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source) === 1;
+    $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}(?:\/[\w.\-]+)*\/?$/', $source) === 1;
+    if ($isSimpleEnvVar || $isEnvVarWithPath) {
+        return null;
+    }
+
+    if (preg_match('/^\$\{([a-zA-Z_][a-zA-Z0-9_]*):-(.*)\}$/', $source, $matches) === 1) {
+        validateShellSafePath($matches[2], 'volume source');
+
+        return null;
+    }
+
+    validateShellSafePath($source, 'volume source');
+
+    return 'mkdir -p -- '.escapeshellarg($source).' > /dev/null 2>&1 || true';
+}
+
+/**
  * Validate that a filename is safe for use as a plain file name (no path components).
  *
  * Prevents unsafe parent directory paths by rejecting directory separators, parent directory

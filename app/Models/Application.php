@@ -2103,6 +2103,7 @@ class Application extends BaseModel
                         $source = data_get_str($volume, 'source');
                     }
                     if ($type?->value() === 'bind') {
+                        $source = str($source);
                         if ($source->value() === '/var/run/docker.sock') {
                             continue;
                         }
@@ -2110,10 +2111,12 @@ class Application extends BaseModel
                             continue;
                         }
                         if ($source->startsWith('.')) {
-                            $source = $source->after('.');
-                            $source = $workdir.$source;
+                            $source = str($workdir.$source->after('.'));
                         }
-                        $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
+                        $mkdirCommand = rawComposeBindMkdirCommand($source->value());
+                        if ($mkdirCommand !== null) {
+                            $commands->push($mkdirCommand);
+                        }
                     }
                 }
             }
