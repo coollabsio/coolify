@@ -88,7 +88,7 @@ const SUPPORTED_OS = [
     'ubuntu debian raspbian pop',
     'centos fedora rhel ol rocky amzn almalinux',
     'sles opensuse-leap opensuse-tumbleweed',
-    'arch',
+    'arch cachyos',
     'alpine',
 ];
 
