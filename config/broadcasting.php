@@ -1,5 +1,15 @@
 <?php
 
+/*
+ * Server-side host for the bundled Reverb server. Older installs could set
+ * PUSHER_BACKEND_HOST to the removed "coolify-realtime" container, so that
+ * value is treated as unset. The browser-facing PUSHER_HOST must never be used here.
+ */
+$backendHost = env('PUSHER_BACKEND_HOST');
+if (blank($backendHost) || $backendHost === 'coolify-realtime') {
+    $backendHost = '127.0.0.1';
+}
+
 return [
 
     /*
@@ -36,11 +46,11 @@ return [
             'secret' => env('PUSHER_APP_SECRET', 'coolify'),
             'app_id' => env('PUSHER_APP_ID', 'coolify'),
             'options' => [
-                'host' => env('PUSHER_HOST', 'coolify'),
+                'host' => $backendHost,
                 'port' => env('PUSHER_BACKEND_PORT', 6001),
-                'scheme' => env('PUSHER_SCHEME', 'http'),
+                'scheme' => env('PUSHER_BACKEND_SCHEME', 'http'),
                 'encrypted' => true,
-                'useTLS' => env('PUSHER_SCHEME', 'http') === 'https',
+                'useTLS' => env('PUSHER_BACKEND_SCHEME', 'http') === 'https',
                 'path' => '',
             ],
             'client_options' => [
@@ -48,17 +58,19 @@ return [
             ],
         ],
 
+        // Legacy connection name (BROADCAST_DRIVER=pusher). Reverb speaks the Pusher
+        // protocol, so this keeps pointing at the bundled server like it did before.
         'pusher' => [
             'driver' => 'pusher',
             'key' => env('PUSHER_APP_KEY', 'coolify'),
             'secret' => env('PUSHER_APP_SECRET', 'coolify'),
             'app_id' => env('PUSHER_APP_ID', 'coolify'),
             'options' => [
-                'host' => env('PUSHER_HOST'),
-                'port' => env('PUSHER_PORT', 443),
-                'scheme' => env('PUSHER_SCHEME', 'https'),
+                'host' => $backendHost,
+                'port' => env('PUSHER_BACKEND_PORT', 6001),
+                'scheme' => env('PUSHER_BACKEND_SCHEME', 'http'),
                 'encrypted' => true,
-                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+                'useTLS' => env('PUSHER_BACKEND_SCHEME', 'http') === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html

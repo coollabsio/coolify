@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Str;
+
 it('uses Reverb as the first-party broadcast server', function () {
     expect(file_get_contents(base_path('composer.json')))
         ->toContain('"laravel/reverb"')
@@ -9,10 +11,83 @@ it('uses Reverb as the first-party broadcast server', function () {
         ->toContain("'key' => env('PUSHER_APP_KEY', 'coolify')")
         ->toContain("'secret' => env('PUSHER_APP_SECRET', 'coolify')")
         ->toContain("'app_id' => env('PUSHER_APP_ID', 'coolify')")
-        ->toContain("'host' => env('PUSHER_HOST', 'coolify')")
+        ->toContain("'host' => \$backendHost")
         ->toContain("'port' => env('PUSHER_BACKEND_PORT', 6001)")
+        ->toContain("'scheme' => env('PUSHER_BACKEND_SCHEME', 'http')")
         ->and(file_exists(config_path('reverb.php')))->toBeTrue();
 });
+
+it('does not send server-side broadcasts to the browser-facing Pusher host', function () {
+    $reverbConnection = Str::between(file_get_contents(config_path('broadcasting.php')), "'reverb' => [", "'pusher' => [");
+
+    expect($reverbConnection)
+        ->not->toContain('PUSHER_HOST')
+        ->not->toContain("env('PUSHER_SCHEME'");
+});
+
+it('keeps working with environment variables from installs that used the realtime container', function (array $environment, string $connection, string $expectedHost) {
+    $previous = [];
+
+    foreach ($environment as $key => $value) {
+        $previous[$key] = $_SERVER[$key] ?? null;
+        $_SERVER[$key] = $value;
+    }
+
+    try {
+        $broadcasting = require config_path('broadcasting.php');
+    } finally {
+        foreach ($previous as $key => $value) {
+            if ($value === null) {
+                unset($_SERVER[$key]);
+            } else {
+                $_SERVER[$key] = $value;
+            }
+        }
+    }
+
+    $options = $broadcasting['connections'][$connection]['options'];
+
+    expect($options['host'])->toBe($expectedHost)
+        ->and($options['port'])->toBe(6001)
+        ->and($options['scheme'])->toBe('http')
+        ->and($options['useTLS'])->toBeFalse();
+})->with([
+    'legacy realtime backend host' => [['PUSHER_BACKEND_HOST' => 'coolify-realtime'], 'reverb', '127.0.0.1'],
+    'legacy pusher driver' => [['BROADCAST_DRIVER' => 'pusher', 'PUSHER_BACKEND_HOST' => 'coolify-realtime'], 'pusher', '127.0.0.1'],
+    'public browser host and scheme' => [['PUSHER_HOST' => 'coolify.example.com', 'PUSHER_SCHEME' => 'https', 'PUSHER_PORT' => '443'], 'reverb', '127.0.0.1'],
+    'custom backend host' => [['PUSHER_BACKEND_HOST' => 'coolify'], 'reverb', 'coolify'],
+]);
+
+it('rewrites the legacy realtime backend host during upgrades', function (string $script) {
+    expect(file_get_contents(base_path($script)))
+        ->toContain('if grep -q \'^PUSHER_BACKEND_HOST=coolify-realtime$\' "$ENV_FILE"; then')
+        ->toContain('set_env_var "PUSHER_BACKEND_HOST" "127.0.0.1"');
+})->with([
+    'upgrade script' => ['scripts/upgrade.sh'],
+    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
+]);
+
+it('includes Reverb but not the terminal server in the Coolify container healthcheck', function (string $composeFile) {
+    $composeContents = file_get_contents(base_path($composeFile));
+
+    expect($composeContents)
+        ->toContain('/api/health && curl --fail http://')
+        ->toContain(':${PUSHER_BACKEND_PORT:-6001}/up || exit 1')
+        ->not->toContain('6002/ready');
+})->with([
+    'production compose' => ['docker-compose.prod.yml'],
+    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
+    'windows compose' => ['docker-compose.windows.yml'],
+    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
+]);
+
+it('removes the legacy realtime container during upgrades', function (string $script) {
+    expect(file_get_contents(base_path($script)))
+        ->toContain('for container in coolify coolify-db coolify-redis coolify-realtime; do');
+})->with([
+    'upgrade script' => ['scripts/upgrade.sh'],
+    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
+]);
 
 it('runs Reverb and terminal websocket services inside the Coolify containers', function (string $dockerfile, string $dependencyService) {
     $dockerfileContents = file_get_contents(base_path($dockerfile));
@@ -48,7 +123,7 @@ it('removes the dedicated realtime service from bundled compose files', function
         ->not->toContain('SOKETI_DEFAULT_APP_ID')
         ->toContain('6001')
         ->toContain('6002')
-        ->not->toContain('REVERB_');
+        ->not->toMatch('/REVERB_(?!PORT\b)/');
 
     if ($hasRuntimeEnvironment) {
         expect($composeContents)->toContain('PUSHER_BACKEND_PORT');
@@ -108,7 +183,7 @@ it('uses Pusher environment keys for self-hosted Reverb compatibility', function
     foreach ($files as $file) {
         expect(file_get_contents(base_path($file)))
             ->toContain('PUSHER_')
-            ->not->toContain('REVERB_');
+            ->not->toMatch('/REVERB_(?!PORT\b)/');
     }
 });
 

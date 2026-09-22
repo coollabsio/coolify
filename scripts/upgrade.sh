@@ -152,6 +152,10 @@ update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_BACKEND_PORT" "6001"
+# The realtime container no longer exists; point older installs at the bundled Reverb server
+if grep -q '^PUSHER_BACKEND_HOST=coolify-realtime$' "$ENV_FILE"; then
+    set_env_var "PUSHER_BACKEND_HOST" "127.0.0.1"
+fi
 log "Environment variables check complete"
 echo "     Done."
 
@@ -262,7 +266,8 @@ nohup bash -c "
     }
 
     # Stop and remove containers
-    for container in coolify coolify-db coolify-redis; do
+    # coolify-realtime is kept for upgrades from versions that still ran the separate realtime container
+    for container in coolify coolify-db coolify-redis coolify-realtime; do
         if docker ps -a --format '{{.Names}}' | grep -q \"^\${container}\$\"; then
             log \"Stopping container: \${container}\"
             docker stop \"\$container\" >>\"\$LOGFILE\" 2>&1 || true

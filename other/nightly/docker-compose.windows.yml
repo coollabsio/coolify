@@ -57,7 +57,7 @@ services:
       - "6001"
       - "${TERMINAL_PORT:-6002}"
     healthcheck:
-      test: curl --fail http://localhost:8080/api/health || exit 1
+      test: curl --fail http://localhost:8080/api/health && curl --fail http://localhost:${PUSHER_BACKEND_PORT:-6001}/up || exit 1
       interval: 5s
       retries: 10
       timeout: 2s
