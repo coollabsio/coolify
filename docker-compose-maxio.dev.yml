@@ -16,7 +16,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
-      PUSHER_HOST: "${PUSHER_HOST:-coolify}"
+      PUSHER_HOST: "${PUSHER_HOST:-}"
       PUSHER_PORT: "${PUSHER_PORT:-6001}"
       PUSHER_BACKEND_PORT: "${PUSHER_BACKEND_PORT:-6001}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"

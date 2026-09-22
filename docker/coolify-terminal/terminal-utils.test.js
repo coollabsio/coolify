@@ -119,6 +119,22 @@ test('validateSshArgs rejects unknown SSH options and key paths', () => {
 
     assert.equal(validateSshArgs(['-F', '/tmp/config', ...baseArgs], ['10.0.0.5']), false);
     assert.equal(validateSshArgs(['-i', '/tmp/attacker-key', ...baseArgs.slice(2)], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs(['-i', '/var/www/html/storage/app/ssh/keys/../ssh_key@victim', ...baseArgs.slice(2)], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs(['-o', 'Include=/tmp/config', ...baseArgs], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs(['-o', 'IdentityFile=/tmp/key', ...baseArgs], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs(['-o', 'PermitLocalCommand=yes', ...baseArgs], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs(['-o', 'LocalCommand=id', ...baseArgs], ['10.0.0.5']), false);
+});
+
+test('validateSshArgs rejects repeated flags and option-like connection values', () => {
+    const baseArgs = extractSshArgs(
+        "timeout 3600 ssh -i /var/www/html/storage/app/ssh/keys/ssh_key@cm123 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PasswordAuthentication=no -o ConnectTimeout=10 -o ServerAliveInterval=20 -o RequestTTY=no -o LogLevel=ERROR -p 22 root@10.0.0.5 'bash -se' << \\$abc\necho hi\nabc"
+    );
+
+    assert.equal(validateSshArgs(['-i', baseArgs[1], ...baseArgs], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs([...baseArgs.slice(0, -1), '-p', '22', 'root@10.0.0.5'], ['10.0.0.5']), false);
+    assert.equal(validateSshArgs([...baseArgs.slice(0, -1), 'root@-oProxyCommand=id'], ['-oproxycommand=id']), false);
+    assert.equal(validateSshArgs([...baseArgs.slice(0, -1), '-root@10.0.0.5'], ['10.0.0.5']), false);
 });
 
 test('validateSshArgs rejects a destination that begins with an option prefix', () => {

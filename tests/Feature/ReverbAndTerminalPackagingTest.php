@@ -148,6 +148,20 @@ it('keeps the internal Reverb listen port separate from the public Pusher port',
         ->toContain('exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}');
 });
 
+it('uses the browser host and page TLS mode for development Reverb connections', function () {
+    $baseLayout = file_get_contents(resource_path('views/layouts/base.blade.php'));
+
+    expect(file_get_contents(base_path('docker-compose.dev.yml')))
+        ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"')
+        ->and(file_get_contents(base_path('docker-compose-maxio.dev.yml')))
+        ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"')
+        ->and(file_get_contents(base_path('docker-compose.dev-multi.yml')))
+        ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"')
+        ->and($baseLayout)
+        ->toContain("forceTLS: window.location.protocol === 'https:'")
+        ->not->toContain('forceTLS: false');
+});
+
 it('proxies Reverb and terminal websocket traffic to the Coolify app container', function () {
     $serverModel = file_get_contents(app_path('Models/Server.php'));
 

@@ -111,6 +111,8 @@ use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
+use App\Services\TerminalSessionService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 
@@ -251,6 +253,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return response()->json(['ipAddresses' => []], 401);
     })->name('terminal.auth.ips')->middleware('can.access.terminal');
+
+    Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
+        $request->validate(['token' => ['required', 'string', 'size:64']]);
+
+        return response()->json([
+            'command' => $terminalSessionService->redeem($request->user(), $request->string('token')->toString()),
+        ]);
+    })->name('terminal.session')->middleware('can.access.terminal');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');
