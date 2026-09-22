@@ -129,7 +129,7 @@ it('keeps the public websocket port adaptive and configures only the internal Re
 
 it('does not use the browser websocket port as the Docker host port', function (string $composeFile) {
     expect(file_get_contents(base_path($composeFile)))
-        ->toContain('"${SOKETI_PORT:-6001}:6001"')
+        ->toContain('"${REVERB_PORT:-${SOKETI_PORT:-6001}}:6001"')
         ->not->toContain('"${PUSHER_PORT:-6001}:6001"');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
@@ -166,8 +166,15 @@ it('stops publishing or preserving the obsolete realtime image', function () {
         ->and(is_dir(base_path('docker/coolify-realtime')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime.yml')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime-next.yml')))->toBeFalse()
+        ->and(file_get_contents(base_path('.github/workflows/coolify-next-build.yml')))->not->toContain('coolify-realtime')
         ->and($productionInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
         ->not->toContain('| Realtime')
         ->and($nightlyInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
         ->not->toContain('| Realtime');
+});
+
+it('uses current Reverb and terminal names in development tooling', function () {
+    expect(file_get_contents(base_path('scripts/dev-instances')))
+        ->toContain('"REVERB" "TERMINAL"')
+        ->not->toContain('"SOKETI"');
 });
