@@ -289,7 +289,7 @@
                 wsHost: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
-                forceTLS: false,
+                forceTLS: window.location.protocol === 'https:',
                 encrypted: true,
                 enableStats: false,
                 enableLogging: true,

@@ -232,6 +232,9 @@ export function validateSshArgs(sshArgs, authorizedHosts = []) {
 
         if (/^[a-zA-Z0-9_][a-zA-Z0-9._-]*@[^@]+$/.test(argument) && targetHost === null) {
             targetHost = extractTargetHost([argument]);
+            if (!/^(?:[a-zA-Z0-9]|\[)/.test(targetHost ?? '')) {
+                return false;
+            }
             continue;
         }
 

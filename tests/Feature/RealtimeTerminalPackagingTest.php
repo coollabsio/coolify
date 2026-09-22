@@ -297,13 +297,15 @@ it('exits fullscreen when the terminal process exits', function () {
                     this.terminalActive = false;');
 });
 
-it('replays the last command on reconnect so the PTY respawns automatically', function () {
+it('does not replay single-use terminal tokens after reconnect', function () {
     $terminalClient = file_get_contents(base_path('resources/js/terminal.js'));
 
     expect($terminalClient)
-        ->toContain('lastSentCommand')
-        ->toContain('Replaying last command after reconnect.')
-        ->toContain('this.lastSentCommand = null;');
+        ->toContain('terminalToken')
+        ->toContain("this.\$wire.on('send-terminal-token', ([token]) =>")
+        ->toContain('tokens are single-use and must never be replayed')
+        ->not->toContain('lastSentCommand')
+        ->not->toContain('Replaying last command after reconnect.');
 });
 
 it('buffers messages received before the realtime server finishes auth so the replay is not lost', function () {
