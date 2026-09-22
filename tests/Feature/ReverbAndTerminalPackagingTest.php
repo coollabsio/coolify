@@ -140,7 +140,8 @@ it('removes the dedicated realtime service from bundled compose files', function
 it('keeps the internal Reverb listen port separate from the public Pusher port', function () {
     expect(file_get_contents(config_path('reverb.php')))
         ->toContain("'port' => env('PUSHER_BACKEND_PORT', 6001)")
-        ->toContain("'port' => env('PUSHER_PORT', 6001)")
+        ->not->toContain('PUSHER_PORT')
+        ->not->toContain("env('PUSHER_HOST', 'coolify')")
         ->and(file_get_contents(base_path('docker/production/etc/s6-overlay/s6-rc.d/reverb/run')))
         ->toContain('exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}')
         ->and(file_get_contents(base_path('docker/development/etc/s6-overlay/s6-rc.d/reverb/run')))

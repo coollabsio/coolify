@@ -76,12 +76,6 @@ return [
                 'key' => env('PUSHER_APP_KEY', 'coolify'),
                 'secret' => env('PUSHER_APP_SECRET', 'coolify'),
                 'app_id' => env('PUSHER_APP_ID', 'coolify'),
-                'options' => [
-                    'host' => env('PUSHER_HOST', 'coolify'),
-                    'port' => env('PUSHER_PORT', 6001),
-                    'scheme' => env('PUSHER_SCHEME', 'http'),
-                    'useTLS' => env('PUSHER_SCHEME', 'http') === 'https',
-                ],
                 'allowed_origins' => ['*'],
                 'ping_interval' => 60,
                 'activity_timeout' => 30,
