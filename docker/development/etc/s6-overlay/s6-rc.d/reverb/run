@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd /var/www/html
+
+echo "   INFO  Reverb is starting..."
+exec php artisan reverb:start --host=0.0.0.0 --port=${PUSHER_BACKEND_PORT:-6001}

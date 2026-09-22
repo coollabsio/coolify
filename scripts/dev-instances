@@ -12,8 +12,8 @@
 #   ./scripts/dev-instances exec a php artisan migrate --force
 #
 # Ports (fixed):
-#   a  app 8000  db 5432  redis 6379  soketi 6001/6002  flux 6443
-#   b  app 8001  db 5433  redis 6380  soketi 6011/6012  flux 6444
+#   a  app 8000  db 5432  redis 6379  Reverb 6001/6002  flux 6443
+#   b  app 8001  db 5433  redis 6380  Reverb 6011/6012  flux 6444
 #
 # Frontend: multi-instance uses npm run build (shared public/build). Do not use
 # two Vite HMR servers — public/hot is a single shared file.
@@ -94,8 +94,8 @@ APP_KEY=${existing_key}
 APP_PORT=${app_port}
 FORWARD_DB_PORT=$((5432 + offset))
 FORWARD_REDIS_PORT=$((6379 + offset))
-FORWARD_SOKETI_PORT=$((6001 + offset * 10))
-FORWARD_SOKETI_PORT_ALT=$((6002 + offset * 10))
+FORWARD_PUSHER_PORT=$((6001 + offset * 10))
+FORWARD_TERMINAL_PORT=$((6002 + offset * 10))
 FORWARD_FLUX_PORT=$((6443 + offset))
 VITE_PORT=$((5173 + offset))
 FORWARD_MAILPIT_PORT=$((1025 + offset * 100))
@@ -276,7 +276,7 @@ cmd_urls() {
       "$(grep -E '^APP_URL=' "$envf" | cut -d= -f2-)" \
       "$(grep -E '^FORWARD_DB_PORT=' "$envf" | cut -d= -f2-)" \
       "$(grep -E '^FORWARD_REDIS_PORT=' "$envf" | cut -d= -f2-)" \
-      "$(grep -E '^FORWARD_SOKETI_PORT=' "$envf" | cut -d= -f2-)"
+      "$(grep -E '^FORWARD_PUSHER_PORT=' "$envf" | cut -d= -f2-)"
   done
 }
 
