@@ -109,9 +109,10 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * Build HTTP client options that pin the validated host to the resolved IPs.
      *
+     * @param  (Closure(string): array<int, string>)|null  $resolver
      * @return array<string, mixed>
      */
-    public static function httpClientOptions(string $url, array $trustedInternalHosts = []): array
+    public static function httpClientOptions(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null): array
     {
         $options = ['allow_redirects' => false];
 
@@ -119,7 +120,7 @@ class SafeWebhookUrl implements ValidationRule
             throw new \RuntimeException('Webhook URL DNS pinning is unavailable.');
         }
 
-        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts, $resolver);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return $options;
@@ -186,9 +187,13 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = []): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null): array
     {
-        $rule = new self(trustedInternalHosts: $trustedInternalHosts);
+        $rule = new self(resolver: $resolver, trustedInternalHosts: $trustedInternalHosts);
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new \RuntimeException('Webhook URL is invalid.');
+        }
+
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || $host === '') {
             throw new \RuntimeException('Webhook URL host could not be resolved.');
@@ -199,6 +204,10 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?? '');
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            throw new \RuntimeException('Webhook URL scheme is unsafe.');
+        }
+
         $port = parse_url($url, PHP_URL_PORT) ?: ($scheme === 'https' ? 443 : 80);
         $hostForDns = rtrim($rule->normalizeHostForIpCheck(strtolower($host)), '.');
 
@@ -219,6 +228,10 @@ class SafeWebhookUrl implements ValidationRule
             if (! $rule->isAllowedIp($resolvedIp, $hostForDns)) {
                 throw new \RuntimeException('Webhook URL resolved to an unsafe IP address.');
             }
+        }
+
+        if ($rule->isBlockedHostname($hostForDns) && ! $rule->isAllowedHostname($hostForDns)) {
+            throw new \RuntimeException('Webhook URL host is unsafe.');
         }
 
         return ['host' => $hostForDns, 'port' => $port, 'ips' => $resolvedIps];

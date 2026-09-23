@@ -50,7 +50,7 @@ class Gitlab extends Controller
 
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 
-            $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+            $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
                 'client_id' => $gitlabApp->client_id,
                 'client_secret' => $gitlabApp->client_secret,
                 'code' => $code,
