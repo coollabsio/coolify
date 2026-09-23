@@ -74,7 +74,9 @@ it('builds proxy ensure commands with inspect and escaped create arguments', fun
     $safeFrontend = escapeshellarg('frontend');
 
     expect($commands)
-        ->toContain("docker network inspect {$safeFrontend} >/dev/null 2>&1 || docker network create --attachable {$safeFrontend}")
+        ->toContain("if ! docker network inspect {$safeFrontend} >/dev/null 2>&1; then")
+        ->toContain("docker network create --attachable --ipv6 {$safeFrontend}")
+        ->toContain('EnableIPv6')
         ->not->toContain('| grep');
 });
 
