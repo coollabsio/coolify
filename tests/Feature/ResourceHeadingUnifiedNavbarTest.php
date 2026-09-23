@@ -682,6 +682,15 @@ it('shows application Links as a compact badge beside the mobile status', functi
         ->toContain('<x-reicon name="chevron-down"');
 });
 
+it('opens the mobile application status dropdown from the left edge of its badge', function () {
+    $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $mobileApplicationTitle = str($application)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+
+    expect($mobileApplicationTitle)
+        ->toContain('<x-status-summary :status="$application->status" />')
+        ->not->toContain('align="right"');
+});
+
 it('shows service Links as a compact badge beside the mobile status', function () {
     $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
