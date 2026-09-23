@@ -20,6 +20,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,7 +39,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteVolumes = true,
         public bool $deleteConnectedNetworks = true,
         public bool $deleteConfigurations = true,
-        public bool $dockerCleanup = true
+        public bool $dockerCleanup = true,
+        public bool $deleteFromCoolifyOnly = false,
     ) {
         $this->onQueue('high');
     }
@@ -47,6 +49,12 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->resource instanceof ApplicationPreview) {
             $this->deleteApplicationPreview();
+
+            return;
+        }
+
+        if ($this->deleteFromCoolifyOnly && $this->resource instanceof Service) {
+            $this->deleteLocalResource();
 
             return;
         }
@@ -89,6 +97,19 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
+            if ($this->resource instanceof Service) {
+                if ($this->resource->trashed()) {
+                    $this->resource->restore();
+                }
+
+                $this->resource->server?->team?->notify(new GeneralNotification(
+                    "Service deletion failed for '{$this->resource->name}'. Docker resources may still exist on server '{$this->resource->server?->name}'. You can retry the cleanup or select 'Remove from Coolify only' in the deletion dialog. Error: {$e->getMessage()}",
+                    success: false,
+                ));
+
+                throw $e;
+            }
+
             Log::warning('Remote cleanup failed while deleting resource; continuing with local deletion.', [
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->type(),
@@ -106,6 +127,12 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
+        $this->deleteLocalResource();
+
+    }
+
+    private function deleteLocalResource(): void
+    {
         DB::transaction(function (): void {
             if ($this->resource instanceof Service) {
                 app(DeleteService::class)->deleteLocal($this->resource);
@@ -126,7 +153,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $this->resource->environment_variables()->delete();
             $this->resource->forceDelete();
         });
-
     }
 
     private function isDatabase(): bool

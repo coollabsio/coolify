@@ -15,14 +15,21 @@ import {
     validateSshArgs,
 } from './terminal-utils.js';
 
-async function postToCoolify(path, headers) {
+async function postToCoolify(path, headers, body = null) {
     return new Promise((resolve, reject) => {
+        const requestBody = body === null ? '' : JSON.stringify(body);
         const request = http.request({
-            hostname: 'coolify',
+            hostname: process.env.TERMINAL_AUTH_HOST || '127.0.0.1',
             port: 8080,
             path,
             method: 'POST',
-            headers,
+            headers: {
+                ...headers,
+                ...(body === null ? {} : {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(requestBody),
+                }),
+            },
         }, (response) => {
             let responseText = '';
 
@@ -43,7 +50,7 @@ async function postToCoolify(path, headers) {
         });
 
         request.on('error', reject);
-        request.end();
+        request.end(requestBody);
     });
 }
 
@@ -167,6 +174,7 @@ wss.on('connection', async (ws, req) => {
 
     const userId = generateUserId();
     ws.userId = userId;
+    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
     const userSession = {
         ws,
         userId,
@@ -176,8 +184,11 @@ wss.on('connection', async (ws, req) => {
         authReady: false,
         pendingMessages: [],
         terminalSessionTimer: null,
+        authHeaders: {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken,
+        },
     };
-    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
     const connectionContext = {
         userId,
         remoteAddress: req.socket?.remoteAddress,
@@ -289,7 +300,7 @@ const messageHandlers = {
             session.ws.send(session.isActive);
         }
     },
-    command: (session, data) => handleCommand(session.ws, data, session.userId)
+    terminalToken: (session, token) => handleTerminalToken(session, token)
 };
 
 function handleMessage(userSession, message) {
@@ -304,7 +315,7 @@ function handleMessage(userSession, message) {
 
     Object.entries(parsed).forEach(([key, value]) => {
         const handler = messageHandlers[key];
-        if (handler && (userSession.isActive || key === 'checkActive' || key === 'command' || key === 'ping')) {
+        if (handler && (userSession.isActive || key === 'checkActive' || key === 'terminalToken' || key === 'ping')) {
             handler(userSession, value);
         } else if (!handler) {
             logTerminal('warn', 'Ignoring websocket message with unknown handler key.', {
@@ -444,6 +455,29 @@ async function handleCommand(ws, command, userId) {
     userSession.terminalSessionTimer = setTimeout(async () => {
         await killPtyProcess(userId);
     }, terminalSessionTimeout * 1000);
+}
+
+async function handleTerminalToken(userSession, token) {
+    if (typeof token !== 'string' || !/^[a-zA-Z0-9]{64}$/.test(token)) {
+        userSession.ws.send('Unauthorized: Invalid terminal token');
+        return;
+    }
+
+    try {
+        const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
+        if (response.status !== 200 || typeof response.data?.command !== 'string') {
+            userSession.ws.send('Unauthorized: Terminal token was rejected');
+            return;
+        }
+
+        await handleCommand(userSession.ws, [response.data.command], userSession.userId);
+    } catch (error) {
+        logTerminal('error', 'Failed to redeem terminal token.', {
+            userId: userSession.userId,
+            error: error.message,
+        });
+        userSession.ws.send('Unauthorized: Terminal token was rejected');
+    }
 }
 
 async function handleError(err, userId) {

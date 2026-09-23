@@ -111,7 +111,33 @@ class Danger extends Component
                 $this->delete_volumes,
                 $this->delete_connected_networks,
                 $this->delete_configurations,
-                $this->docker_cleanup
+                $this->docker_cleanup,
+            )->afterResponse();
+
+            return redirectRoute($this, 'project.resource.index', [
+                'project_uuid' => $this->projectUuid,
+                'environment_uuid' => $this->environmentUuid,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function deleteFromCoolifyOnly(string $password): mixed
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
+        if (! $this->resource instanceof Service) {
+            return 'Service not found.';
+        }
+
+        try {
+            $this->authorize('delete', $this->resource);
+            DeleteResourceJob::dispatch(
+                resource: $this->resource,
+                deleteFromCoolifyOnly: true,
             )->afterResponse();
 
             return redirectRoute($this, 'project.resource.index', [

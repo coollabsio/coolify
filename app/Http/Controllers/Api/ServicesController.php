@@ -972,6 +972,7 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_from_coolify_only', in: 'query', required: false, description: 'Remove only Coolify metadata without deleting Docker resources.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1021,22 +1022,28 @@ class ServicesController extends Controller
 
         $service->delete();
 
+        $deleteFromCoolifyOnly = $request->boolean('delete_from_coolify_only') || ! $service->server?->isFunctional();
+
         DeleteResourceJob::dispatch(
             resource: $service,
             deleteVolumes: $request->boolean('delete_volumes', true),
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
-            dockerCleanup: $request->boolean('docker_cleanup', true)
+            dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteFromCoolifyOnly: $deleteFromCoolifyOnly,
         );
 
         auditLog('api.service.deleted', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
+            'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
         return response()->json([
-            'message' => 'Service deletion request queued.',
+            'message' => $deleteFromCoolifyOnly
+                ? 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.'
+                : 'Service deletion request queued.',
         ]);
     }
 
@@ -2551,11 +2558,16 @@ class ServicesController extends Controller
                 ], 422);
             }
 
-            $fsPath = str($request->fs_path)->trim()->start('/')->value();
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($fsPath, 'storage source path');
-            validateShellSafePath($mountPath, 'storage destination path');
+            try {
+                $fsPath = confinePathToBase(service_configuration_dir().'/'.$service->uuid, $request->fs_path, 'storage source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
+                LocalFileVolume::assertRemotePathIsConfined($service->workdir(), $fsPath, $service->server);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,
