@@ -3163,7 +3163,6 @@ class ApplicationsController extends Controller
         $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
-            'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_domains.*' => 'array:name,domain,redirect',

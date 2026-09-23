@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
+use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
@@ -3322,7 +3323,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : $this->production_image_name;
 
         if ($this->application->settings->is_static && $this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
 
         $build_command = $this->railpack_build_command($image_name, $railpackVariables);
@@ -3353,7 +3354,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $publishDir = trim($this->application->publish_directory, '/');
         $publishDir = $publishDir ? "/{$publishDir}" : '';
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from={$this->build_image_name} /app{$publishDir} .
@@ -3885,12 +3886,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return $default;
     }
 
-    private function pull_latest_image($image)
+    private function staticImage(): string
     {
+        return StaticImageTypes::from($this->application->static_image)->value;
+    }
+
+    private function pull_latest_image(string $image): void
+    {
+        $image = StaticImageTypes::from($image)->value;
         $this->application_deployment_queue->addLogEntry("Pulling latest image ($image) from the registry.");
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "docker pull {$image}"),
+                executeInDocker($this->deployment_uuid, 'docker pull '.escapeshellarg($image)),
                 'hidden' => true,
             ]
         );
@@ -3901,9 +3908,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         if ($this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
         WORKDIR /usr/share/nginx/html/
         LABEL coolify.deploymentId={$this->deployment_uuid}
         COPY . .
@@ -3998,7 +4005,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application->settings->is_static) {
             if ($this->application->static_image) {
-                $this->pull_latest_image($this->application->static_image);
+                $this->pull_latest_image($this->staticImage());
                 $this->application_deployment_queue->addLogEntry('Continuing with the building process.');
             }
             if ($this->application->build_pack === 'nixpacks') {
@@ -4104,7 +4111,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
             $publishDir = trim($this->application->publish_directory, '/');
             $publishDir = $publishDir ? "/{$publishDir}" : '';
-            $dockerfile = base64_encode("FROM {$this->application->static_image}
+            $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from=$this->build_image_name /app{$publishDir} .

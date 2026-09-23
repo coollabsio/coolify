@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
@@ -11,6 +12,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 
@@ -156,7 +158,7 @@ class General extends Component
             'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
             'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
-            'staticImage' => 'required',
+            'staticImage' => ['required', Rule::enum(StaticImageTypes::class)],
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
             'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
