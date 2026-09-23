@@ -520,7 +520,7 @@ class Github extends Controller
         abort_if($this->githubAppHasManifestCredentials($github_app), 403, 'GitHub App credentials are already configured.');
 
         $api_url = data_get($github_app, 'api_url');
-        $data = Http::withBody(null)
+        $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
             ->connectTimeout(5)
@@ -612,7 +612,7 @@ class Github extends Controller
 
         try {
             $jwt = generateGithubJwt($github_app);
-            $response = Http::withHeaders([
+            $response = Http::GitSource($github_app->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github+json',
             ])
