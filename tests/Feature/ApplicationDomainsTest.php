@@ -3537,3 +3537,64 @@ it('prevents members from cancelling protected application redirect conflict sta
         ->set('showDomainConflictModal', false)
         ->assertForbidden();
 });
+
+it('restarts a dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $url = 'https://dns-recheck.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect($this->application->fresh()->domain_dns_statuses[$url]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('does not overwrite a completed dns result with stale checking state', function () {
+    $url = 'https://dns-stale.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'stale-check',
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $this->application->update([
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'check_id' => 'completed-check',
+            ],
+        ],
+    ]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDomainDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($this->application->fresh()->domain_dns_statuses[$url])
+        ->toMatchArray([
+            'status' => 'ok',
+            'message' => 'DNS looks correct.',
+            'check_id' => 'completed-check',
+        ]);
+});
