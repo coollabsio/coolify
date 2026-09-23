@@ -7,7 +7,7 @@
 
 services:
   plausible:
-    image: "ghcr.io/plausible/community-edition:v3.0.1"
+    image: "ghcr.io/plausible/community-edition:v3.2.1"
     command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
       - SERVICE_URL_PLAUSIBLE

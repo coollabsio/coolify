@@ -14,6 +14,7 @@ use Spatie\Url\Url;
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
 {
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
+    $commit = validateGitRef($commit, 'deployment commit');
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
@@ -83,6 +84,15 @@ function queue_application_deployment(Application $application, string $deployme
         'git_type' => $git_type,
         'only_this_server' => $only_this_server,
     ]);
+
+    if (auth()->check() && ! $is_webhook && ! $is_api && ! $rollback) {
+        auditLog($restart_only ? 'ui.application.restarted' : 'ui.application.deployed', [
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'deployment_uuid' => $deployment_uuid,
+            'force_rebuild' => $force_rebuild,
+        ]);
+    }
 
     if ($no_questions_asked) {
         $deployment->update([

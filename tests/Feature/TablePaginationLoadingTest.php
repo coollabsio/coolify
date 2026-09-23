@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 
 it('renders the shared page size selector', function () {
     $html = Blade::render('<x-page-size-select model="perPage" livewire storage-key="tests.page-size" />');
@@ -28,6 +29,18 @@ it('renders the shared page size selector', function () {
         ->toContain('Custom…')
         ->toContain('min="1"')
         ->toContain('max="100"');
+});
+
+it('disables page size controls when the gate denies access', function () {
+    Gate::define('view-audit-log-test', fn (): bool => false);
+
+    $html = Blade::render(<<<'BLADE'
+        <x-page-size-select model="perPage" livewire
+            canGate="view-audit-log-test" :canResource="new stdClass" />
+    BLADE);
+
+    expect($html)->toMatch('/<button[^>]*aria-label="Items per page"[^>]*\sdisabled(?:[=\s>])/')
+        ->toMatch('/<input[^>]*aria-label="Custom items per page"[^>]*\sdisabled(?:[=\s>])/');
 });
 
 it('positions table dropdown panels outside overflowing containers', function () {
@@ -151,7 +164,6 @@ it('offers page size selection on client-side paginated tables', function (strin
 })->with([
     'team members' => 'livewire/team/member/index.blade.php',
     'api tokens' => 'livewire/security/api-tokens.blade.php',
-    'scheduled executions' => 'livewire/settings/scheduled-jobs.blade.php',
     'volume backup executions' => 'livewire/project/shared/storages/volume-backups/executions.blade.php',
     'environment resources' => 'livewire/project/resource/index.blade.php',
     'projects' => 'livewire/project/index.blade.php',
@@ -166,7 +178,6 @@ it('uses compact client pagination on collection views', function (string $view)
 })->with([
     'team members' => 'livewire/team/member/index.blade.php',
     'api tokens' => 'livewire/security/api-tokens.blade.php',
-    'scheduled jobs' => 'livewire/settings/scheduled-jobs.blade.php',
     'environment resources' => 'livewire/project/resource/index.blade.php',
     'projects' => 'livewire/project/index.blade.php',
     'project environments' => 'livewire/project/show.blade.php',

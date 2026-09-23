@@ -312,13 +312,20 @@ describe('DELETE resource endpoints', function () {
             'server_id' => $this->server->id,
         ]);
 
-        $this->withHeaders($this->headers)
+        $response = $this->withHeaders($this->headers)
             ->deleteJson("/api/v1/services/{$service->uuid}")
             ->assertOk();
 
+        $response->assertJson([
+            'message' => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+        ]);
+
         expect(Service::find($service->id))->toBeNull()
             ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
-        Queue::assertPushed(DeleteResourceJob::class);
+        Queue::assertPushed(
+            DeleteResourceJob::class,
+            fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly
+        );
     });
 
     test('soft deletes a database before queuing cleanup', function () {

@@ -78,6 +78,7 @@ class Storage extends Component
         $this->activeTab = $this->resolveDefaultTab();
         $this->fileStorage = collect();
         $this->loadFileStorageForActiveTab();
+        $this->name = $this->generateDefaultVolumeName();
     }
 
     public function refreshStoragesFromEvent()
@@ -311,14 +312,17 @@ class Storage extends Component
                 'file_storage_directory_destination' => 'required|string',
             ]);
 
-            $this->file_storage_directory_source = trim($this->file_storage_directory_source);
-            $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
-            $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
-            $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
-
-            // Validate paths to prevent command injection
-            validateShellSafePath($this->file_storage_directory_source, 'storage source path');
-            validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
+            $this->file_storage_directory_source = confinePathToBase(
+                $this->fileStorageHostPath(),
+                $this->file_storage_directory_source,
+                'storage source path'
+            );
+            $this->file_storage_directory_destination = validateFileMountPath(
+                $this->file_storage_directory_destination,
+                'storage destination path'
+            );
+            $server = $this->resource->service?->server ?? $this->resource->destination->server;
+            LocalFileVolume::assertRemotePathIsConfined($this->fileStorageHostPath(), $this->file_storage_directory_source, $server);
 
             LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
@@ -341,7 +345,7 @@ class Storage extends Component
 
     public function clearForm()
     {
-        $this->name = '';
+        $this->name = $this->generateDefaultVolumeName();
         $this->mount_path = '';
         $this->host_path = null;
         $this->file_storage_path = '';
@@ -372,6 +376,13 @@ class Storage extends Component
         }
 
         throw new \Exception('No valid resource type for file mount storage type!');
+    }
+
+    private function generateDefaultVolumeName(): string
+    {
+        $name = str($this->resource->name)->slug()->value();
+
+        return ($name ?: 'volume').'-data';
     }
 
     public function fileStoragePreviewPath(): string

@@ -12,9 +12,72 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 
 uses(RefreshDatabase::class);
+
+it('does not persist environment write commands or generated Dockerfiles in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_SECRET',
+        'value' => 'sensitive-value',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'configuration_dir' => '/data/coolify/applications/test-app',
+        'remote_secrets_cache' => [],
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'save_runtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $writeCommands = collect($job->recordedCommands)
+        ->flatMap(fn (array $commands): array => $commands)
+        ->filter(function (mixed $command): bool {
+            if (! is_array($command)) {
+                return false;
+            }
+
+            $commandString = $command['command'] ?? $command[0] ?? null;
+
+            return is_string($commandString) && str_contains($commandString, 'base64 -d | tee');
+        })
+        ->values();
+
+    expect($writeCommands)->toHaveCount(4)
+        ->each->toHaveKey('skip_command_log', true);
+});
+
+it('redacts resolved remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['API_TOKEN' => 'remote-secret-value'],
+    ]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'token=remote-secret-value'))
+        ->toBe('token='.REDACTED);
+});
+
+it('ignores empty and non-string remote secrets when redacting command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [
+            'EMPTY_SECRET' => '',
+            'NULL_SECRET' => null,
+            'NUMERIC_SECRET' => 123,
+            'API_TOKEN' => 'remote-secret-value',
+        ],
+    ]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'id=123 token=remote-secret-value'))
+        ->toBe('id=123 token='.REDACTED);
+});
 
 class TestableControlVarFilteringDeploymentJob extends ApplicationDeploymentJob
 {
@@ -377,7 +440,7 @@ it('uses BuildKit secrets for dotted Nixpacks variables instead of invalid Docke
     invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
 
     expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeTrue();
-    expect(readDeploymentJobProperty($job, $reflection, 'build_secrets'))->toContain('--secret id=X.VALUE,env=X.VALUE');
+    expect(readDeploymentJobProperty($job, $reflection, 'build_secrets'))->toContain("--secret 'id=X.VALUE,env=X.VALUE'");
 
     invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/.nixpacks/Dockerfile');
 
@@ -748,6 +811,7 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
     ]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [],
         'saved_outputs' => [
             'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
         ],
@@ -755,10 +819,117 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
 
     invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
 
-    expect($job->writtenDockerfile)->toContain('ARG APP_ENV=production');
+    expect($job->writtenDockerfile)->toContain('ARG APP_ENV');
+    expect($job->writtenDockerfile)->toContain('ARG COOLIFY_BUILD_SECRETS_HASH=');
     expect($job->writtenDockerfile)->not->toContain('ARG NIXPACKS_NODE_VERSION=');
     expect($job->writtenDockerfile)->not->toContain('ARG RAILPACK_NODE_VERSION=');
 });
+
+it('does not write environment values into generated Dockerfile ARG declarations', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => "value\nRUN touch /tmp/injected",
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => [],
+        'saved_outputs' => ['dockerfile' => 'FROM alpine'],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG SAFE_KEY')
+        ->not->toContain('RUN touch /tmp/injected')
+        ->not->toContain('value');
+});
+
+it('rejects unsafe keys before generating Railpack secret flags', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    expect(fn () => invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'railpack_build_secret_flags',
+        collect(['BAD$(id)' => 'x']),
+    ))->toThrow(DeploymentException::class, 'Invalid environment variable name from the Railpack environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects unsafe legacy keys before generating BuildKit secret flags', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    expect(fn () => invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_build_secrets',
+        collect(['BAD$(id)' => 'secret']),
+    ))->toThrow(DeploymentException::class, 'Invalid environment variable name from the build secret environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects an unsafe stored key before running a deployment command', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'BAD$(id)']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('injects raw escaped remote secrets into Dockerfile args and hashes the same values', function (int $pullRequestId, bool $isPreview) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SECRET_TOKEN',
+        'value' => '{{vault.API_TOKEN}}',
+        'is_preview' => $isPreview,
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    $secret = "secret\$value'quoted";
+    $escapedSecret = escapeBashEnvValue($secret);
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => $pullRequestId,
+        'remote_secrets_cache' => ['API_TOKEN' => $secret],
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $expectedHash = invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_secrets_hash',
+        collect(['SECRET_TOKEN' => $escapedSecret]),
+    );
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG SECRET_TOKEN')
+        ->not->toContain($secret)
+        ->toContain("ARG COOLIFY_BUILD_SECRETS_HASH={$expectedHash}")
+        ->not->toContain('$$');
+})->with([
+    'production' => [0, false],
+    'preview' => [99, true],
+]);
 
 it('builds railpack variables from generic buildtime vars railpack vars and coolify vars only', function () {
     [$application, $server] = makeDeploymentControlVarFixture([

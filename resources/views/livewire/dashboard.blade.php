@@ -11,10 +11,15 @@
         $dashboardItemLimit = 8;
         $dashboardProjects = $projects->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
         $dashboardServers = $servers->sortBy('name', SORT_NATURAL)->take($dashboardItemLimit);
+        $hasTrafficAnalytics = $servers->contains(fn ($server) => $server->isTrafficAnalyticsEnabled());
     @endphp
 
     <div class="flex min-w-0 flex-col gap-8">
         <livewire:dashboard.active-deployments />
+
+        @if ($hasTrafficAnalytics)
+            <livewire:dashboard.traffic-analytics />
+        @endif
 
         <section class="mb-0! min-w-0">
             <x-section-heading title="Projects" subtitle="Your deployment workspaces"
@@ -71,13 +76,19 @@
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    {{ $project->environments->count() }}
-                                    {{ str('env')->plural($project->environments->count()) }}
-                                    <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                                    {{ $resourceCount }} {{ str('resource')->plural($resourceCount) }}
-                                </p>
+                            <div class="mt-auto flex items-center justify-between gap-3 border-t border-neutral-100 pt-2.5 dark:border-white/[0.06]">
+                                <div class="relative z-10 flex min-w-0 items-center gap-3 text-[11px] font-medium text-neutral-500 dark:text-fg-dim">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Environments"
+                                        aria-label="Environments">
+                                        <x-reicon name="layers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        {{ $project->environments->count() }}
+                                    </span>
+                                    <span class="inline-flex items-center gap-1" data-tooltip="Resources"
+                                        aria-label="Resources">
+                                        <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                                        {{ $resourceCount }}
+                                    </span>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     @if ($firstEnvironment)
@@ -150,7 +161,7 @@
                     @foreach ($dashboardServers as $server)
                         @php
                             $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
-                            $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
+                            $sentinelNeedsAttention = $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
                             [$serverStatus, $serverStatusType] = match (true) {
                                 $server->settings->force_disabled => ['Disabled', 'error'],

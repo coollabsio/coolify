@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -222,6 +223,58 @@ class TeamController extends Controller
         return response()->json(
             $this->removeSensitiveData($team),
         );
+    }
+
+    #[OA\Patch(
+        summary: 'Update authenticated team',
+        description: 'Update settings for the team bound to the API token.',
+        path: '/team',
+        operationId: 'update-token-team',
+        security: [['bearerAuth' => []]],
+        tags: ['Teams'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['is_build_server_fallback_enabled'],
+                    properties: [
+                        'is_build_server_fallback_enabled' => [
+                            'type' => 'boolean',
+                            'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.',
+                        ],
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated team.', content: new OA\JsonContent(ref: '#/components/schemas/Team')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function update_current_team(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $team = auth()->user()->teams->where('id', $teamId)->first();
+        if (is_null($team)) {
+            return response()->json(['message' => 'Team not found.'], 404);
+        }
+
+        $this->authorize('update', $team);
+        $validated = $request->validate([
+            'is_build_server_fallback_enabled' => ['required', 'boolean'],
+        ]);
+
+        $team->update($validated);
+
+        return response()->json($this->removeSensitiveData($team));
     }
 
     #[OA\Get(

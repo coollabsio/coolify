@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
@@ -18,7 +19,7 @@ use OpenApi\Attributes as OA;
 )]
 class Tag extends BaseModel
 {
-    use HasSafeStringAttribute;
+    use Auditable, HasSafeStringAttribute;
 
     protected $fillable = [
         'name',

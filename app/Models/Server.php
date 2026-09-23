@@ -8,6 +8,7 @@ use App\Actions\Server\InstallPrerequisites;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\ValidatePrerequisites;
 use App\Enums\ProxyTypes;
+use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
@@ -21,6 +22,7 @@ use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
@@ -111,7 +113,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
 
     /**
      * Sentinel IP for servers that do not have a real address yet
@@ -262,7 +264,6 @@ class Server extends BaseModel
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
         'unreachable_notification_sent' => 'boolean',
-        'is_build_server' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
     ];
@@ -522,17 +523,24 @@ class Server extends BaseModel
 
     private static function usableByBuildServerStatus(bool $isBuildServer): Builder
     {
-        return Server::ownedByCurrentTeam()
+        $query = Server::ownedByCurrentTeam()
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'is_build_server', $isBuildServer)
             ->whereRelation('settings', 'force_disabled', false);
+
+        return $isBuildServer
+            ? $query->whereHas('settings', fn (Builder $settings) => $settings
+                ->where('server_role', '!=', ServerRole::DEPLOYMENT->value)
+                ->orWhereNull('server_role'))
+            : $query->whereHas('settings', fn (Builder $settings) => $settings
+                ->where('server_role', '!=', ServerRole::BUILD->value)
+                ->orWhereNull('server_role'));
     }
 
     public function canHostResources(): bool
     {
-        return ! $this->isBuildServer();
+        return $this->settings->effectiveServerRole()->canDeploy();
     }
 
     public function settings()
@@ -547,7 +555,7 @@ class Server extends BaseModel
 
     public function proxySet()
     {
-        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && ! $this->settings->is_build_server;
+        return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && $this->canHostResources();
     }
 
     public function setupDefaultRedirect()
@@ -684,12 +692,19 @@ class Server extends BaseModel
                                 'service' => 'coolify',
                                 'rule' => "Host(`{$host}`)",
                             ],
-                            'coolify-realtime-ws' => [
+                            'coolify-reverb-ws' => [
                                 'entryPoints' => [
                                     0 => 'http',
                                 ],
-                                'service' => 'coolify-realtime',
+                                'service' => 'coolify-reverb',
                                 'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                            ],
+                            'coolify-reverb-api' => [
+                                'entryPoints' => [
+                                    0 => 'http',
+                                ],
+                                'service' => 'coolify-reverb',
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
                             ],
                             'coolify-terminal-ws' => [
                                 'entryPoints' => [
@@ -709,11 +724,11 @@ class Server extends BaseModel
                                     ],
                                 ],
                             ],
-                            'coolify-realtime' => [
+                            'coolify-reverb' => [
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify-realtime:6001',
+                                            'url' => 'http://coolify:6001',
                                         ],
                                     ],
                                 ],
@@ -722,7 +737,7 @@ class Server extends BaseModel
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify-realtime:6002',
+                                            'url' => 'http://coolify:6002',
                                         ],
                                     ],
                                 ],
@@ -747,12 +762,22 @@ class Server extends BaseModel
                             'certresolver' => 'letsencrypt',
                         ],
                     ];
-                    $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss'] = [
+                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-wss'] = [
                         'entryPoints' => [
                             0 => 'https',
                         ],
-                        'service' => 'coolify-realtime',
+                        'service' => 'coolify-reverb',
                         'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
+                        'tls' => [
+                            'certresolver' => 'letsencrypt',
+                        ],
+                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
+                        'entryPoints' => [
+                            0 => 'https',
+                        ],
+                        'service' => 'coolify-reverb',
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
                         'tls' => [
                             'certresolver' => 'letsencrypt',
                         ],
@@ -796,10 +821,13 @@ class Server extends BaseModel
 $siteAddress {
     encode zstd gzip
     handle /app/* {
-        reverse_proxy coolify-realtime:6001
+        reverse_proxy coolify:6001
+    }
+    handle /apps* {
+        reverse_proxy coolify:6001
     }
     handle /terminal/ws {
-        reverse_proxy coolify-realtime:6002
+        reverse_proxy coolify:6002
     }
     reverse_proxy coolify:8080
 }";
@@ -903,7 +931,14 @@ $siteAddress {
 
     public static function buildServers($teamId)
     {
-        return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
+        return Server::whereTeamId($teamId)
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereHas('settings', fn (Builder $settings) => $settings
+                ->where('server_role', '!=', ServerRole::DEPLOYMENT->value)
+                ->orWhereNull('server_role'))
+            ->whereRelation('settings', 'force_disabled', false);
     }
 
     public function isForceDisabled()
@@ -1000,6 +1035,11 @@ $siteAddress {
     public function isMetricsEnabled(): bool
     {
         return $this->settings->is_metrics_enabled;
+    }
+
+    public function isTrafficAnalyticsEnabled(): bool
+    {
+        return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
     }
 
     public function isServerApiEnabled(): bool
@@ -1650,7 +1690,7 @@ $siteAddress {
         }
         $this->settings->is_usable = true;
         $this->settings->save();
-        $this->validateCoolifyNetwork(isSwarm: false, isBuildServer: $this->settings->is_build_server);
+        $this->validateCoolifyNetwork(isSwarm: false, isBuildServer: $this->isBuildServer());
 
         return true;
     }
@@ -1761,7 +1801,12 @@ $siteAddress {
 
     public function isBuildServer()
     {
-        return $this->settings->is_build_server;
+        return $this->settings->effectiveServerRole() === ServerRole::BUILD;
+    }
+
+    public function canBuildApplications(): bool
+    {
+        return $this->settings->effectiveServerRole()->canBuild();
     }
 
     public static function createWithPrivateKey(array $data, PrivateKey $privateKey)

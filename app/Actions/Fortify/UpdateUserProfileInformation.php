@@ -17,6 +17,10 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
      */
     public function update(User $user, array $input): void
     {
+        $changedFields = collect(['name', 'email'])
+            ->filter(fn (string $field): bool => $user->{$field} !== $input[$field])
+            ->values()
+            ->all();
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
 
@@ -39,6 +43,15 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
                 'name' => $input['name'],
                 'email' => $input['email'],
             ])->save();
+        }
+
+        if ($changedFields !== []) {
+            auditLog('ui.user.profile_updated', [
+                'team_id' => $user->currentTeam()?->id,
+                'resource' => 'user',
+                'user_name' => $user->name,
+                'changed_fields' => $changedFields,
+            ]);
         }
     }
 

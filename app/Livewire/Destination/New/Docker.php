@@ -29,9 +29,6 @@ class Docker extends Component
     #[Validate(['required', 'string'])]
     public string $serverId;
 
-    #[Validate(['required', 'boolean'])]
-    public bool $isSwarm = false;
-
     public function mount(?string $server_id = null): void
     {
         $this->network = new_public_id();
@@ -74,9 +71,10 @@ class Docker extends Component
     public function submit(): mixed
     {
         try {
-            $this->authorize('create', $this->isSwarm ? SwarmDocker::class : StandaloneDocker::class);
+            $isSwarm = $this->selectedServer->isSwarm();
+            $this->authorize('create', $isSwarm ? SwarmDocker::class : StandaloneDocker::class);
             $this->validate();
-            if ($this->isSwarm) {
+            if ($isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
                 if ($found) {
                     throw new \Exception('Network already added to this server.');
