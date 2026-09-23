@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Application;
 
-use App\Actions\Application\GenerateConfig;
 use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
@@ -902,19 +901,6 @@ class General extends Component
         } finally {
             $this->dispatch('configurationChanged');
         }
-    }
-
-    public function downloadConfig()
-    {
-        $config = GenerateConfig::run($this->application, true);
-        $fileName = str($this->application->name)->slug()->append('_config.json');
-
-        return response()->streamDownload(function () use ($config) {
-            echo $config;
-        }, $fileName, [
-            'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
-        ]);
     }
 
     public function getDetectedPortInfoProperty(): ?array
