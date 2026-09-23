@@ -286,11 +286,15 @@ class Show extends Component
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
             $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
-            $this->sentinelToken = $this->server->settings->sentinel_token;
+            $this->sentinelToken = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->sentinel_token
+                : '';
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
             $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
-            $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+            $this->sentinelCustomUrl = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->sentinel_custom_url
+                : null;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
