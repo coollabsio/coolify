@@ -3,23 +3,30 @@
 namespace App\Traits;
 
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
 trait HasMetrics
 {
-    public function getCpuMetrics(int $mins = 5): ?array
+    /**
+     * @param  string|null  $container  Sentinel container name to read, defaults to the resource UUID. Not used for server metrics.
+     */
+    public function getCpuMetrics(int $mins = 5, ?string $container = null): ?array
     {
-        return $this->getMetrics('cpu', $mins, 'percent');
+        return $this->getMetrics('cpu', $mins, 'percent', $container);
     }
 
-    public function getMemoryMetrics(int $mins = 5): ?array
+    /**
+     * @param  string|null  $container  Sentinel container name to read, defaults to the resource UUID. Not used for server metrics.
+     */
+    public function getMemoryMetrics(int $mins = 5, ?string $container = null): ?array
     {
         if ($this->isServerMetrics()) {
             return $this->getMetrics('memory', $mins, 'usedPercent');
         }
 
-        $metrics = $this->getMetrics('memory', $mins, 'used');
+        $metrics = $this->getMetrics('memory', $mins, 'used', $container);
         if ($metrics === null) {
             return null;
         }
@@ -27,7 +34,7 @@ trait HasMetrics
         return convertContainerMemoryBytesToMegabytes($metrics);
     }
 
-    private function getMetrics(string $type, int $mins, string $valueField): ?array
+    private function getMetrics(string $type, int $mins, string $valueField, ?string $container = null): ?array
     {
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
@@ -35,7 +42,7 @@ trait HasMetrics
         }
 
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $endpoint = $this->getMetricsEndpoint($type, $from);
+        $endpoint = $this->getMetricsEndpoint($type, $from, $container);
 
         $previousToken = null;
         try {
@@ -84,13 +91,18 @@ trait HasMetrics
         return $this->isServerMetrics() ? $this : $this->destination->server;
     }
 
-    private function getMetricsEndpoint(string $type, string $from): string
+    private function getMetricsEndpoint(string $type, string $from, ?string $container = null): string
     {
         $base = 'http://localhost:8888/api';
         if ($this->isServerMetrics()) {
             return "{$base}/{$type}/history?from={$from}";
         }
 
-        return "{$base}/container/{$this->uuid}/{$type}/history?from={$from}";
+        $container ??= $this->uuid;
+        if (! ValidationPatterns::isValidContainerName($container)) {
+            throw new \InvalidArgumentException('Invalid container name.');
+        }
+
+        return "{$base}/container/{$container}/{$type}/history?from={$from}";
     }
 }

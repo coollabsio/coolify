@@ -1,19 +1,8 @@
 <div class="flex flex-col gap-6"
-    @if (
-        $resource->getMorphClass() !== 'App\Models\Application' ||
-            ($resource->build_pack !== 'dockercompose' &&
-                $resource->destination->server->isMetricsEnabled() &&
-                str($resource->status)->contains('running'))) x-init="$wire.loadData()"
+    @if ($resource->destination->server->isMetricsEnabled() && $this->isRunning()) x-init="$wire.loadData()"
         @if ($poll) wire:poll.5000ms="pollData" @endif
     @endif>
-    @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
-        <x-application.settings-section id="metrics-overview-section" title="Metrics"
-            helper="Inspect CPU and memory usage for this application.">
-            <x-empty size="sm" title="Metrics unavailable"
-                description="Container metrics are not currently available for Docker Compose applications."
-                icon-name="dashboard" />
-        </x-application.settings-section>
-    @elseif (!$resource->destination->server->isMetricsEnabled())
+    @if (!$resource->destination->server->isMetricsEnabled())
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect CPU and memory usage for this application.">
             <x-slot:actions>
@@ -28,7 +17,7 @@
                 description="Enable metrics for this server before collecting application usage data."
                 icon-name="dashboard" />
         </x-application.settings-section>
-    @elseif (!str($resource->status)->contains('running'))
+    @elseif (!$this->isRunning())
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect CPU and memory usage for this application.">
             <x-slot:actions>
@@ -45,16 +34,23 @@
                 <x-status-badge :status="$poll ? 'Live updates' : 'Historical range'"
                     :type="$poll ? 'success' : 'neutral'" />
             </x-slot:actions>
-            <div class="max-w-xs">
-                <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
-                    ['value' => 5, 'label' => 'Last 5 minutes · live'],
-                    ['value' => 10, 'label' => 'Last 10 minutes · live'],
-                    ['value' => 30, 'label' => 'Last 30 minutes'],
-                    ['value' => 60, 'label' => 'Last hour'],
-                    ['value' => 720, 'label' => 'Last 12 hours'],
-                    ['value' => 10080, 'label' => 'Last week'],
-                    ['value' => 43200, 'label' => 'Last 30 days'],
-                ]" />
+            <div class="flex flex-wrap gap-4">
+                @if (count($containerOptions) > 1)
+                    <div class="w-full max-w-xs">
+                        <x-forms.listbox id="container" label="Service" onChange="loadData" :options="$containerOptions" />
+                    </div>
+                @endif
+                <div class="w-full max-w-xs">
+                    <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
+                        ['value' => 5, 'label' => 'Last 5 minutes · live'],
+                        ['value' => 10, 'label' => 'Last 10 minutes · live'],
+                        ['value' => 30, 'label' => 'Last 30 minutes'],
+                        ['value' => 60, 'label' => 'Last hour'],
+                        ['value' => 720, 'label' => 'Last 12 hours'],
+                        ['value' => 10080, 'label' => 'Last week'],
+                        ['value' => 43200, 'label' => 'Last 30 days'],
+                    ]" />
+                </div>
             </div>
             <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
                 Five and ten minute ranges refresh automatically every five seconds.

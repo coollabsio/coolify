@@ -1314,7 +1314,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         $defaultLabels = defaultLabels(
             id: $resource->id,
-            name: $containerName,
+            name: generateComposeContainerMetricsName($resource, $serviceName, $pullRequestId),
             projectName: $resource->project()->name,
             resourceName: $resource->name,
             pull_request_id: $pullRequestId,
