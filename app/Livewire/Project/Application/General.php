@@ -426,7 +426,9 @@ class General extends Component
             $this->customNginxConfiguration = $this->application->custom_nginx_configuration;
             $this->isHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
             $this->httpBasicAuthUsername = $this->application->http_basic_auth_username;
-            $this->httpBasicAuthPassword = $this->application->http_basic_auth_password;
+            $this->httpBasicAuthPassword = auth()->user()->can('update', $this->application)
+                ? $this->application->http_basic_auth_password
+                : null;
             $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 
