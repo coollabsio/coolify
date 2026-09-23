@@ -39,10 +39,12 @@
                                     <code
                                         class="truncate rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ $network }}</code>
                                 </div>
-                                <x-forms.button canGate="update" :canResource="$resource"
-                                    wire:click="disconnectNetwork('{{ $network }}')">
-                                    Disconnect
-                                </x-forms.button>
+                                @if($allowedNetworks->contains($network))
+                                    <x-forms.button canGate="update" :canResource="$resource"
+                                        wire:click="disconnectNetwork('{{ $network }}')">
+                                        Disconnect
+                                    </x-forms.button>
+                                @endif
                             </div>
                         @endforeach
                     </div>
