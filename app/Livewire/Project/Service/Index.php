@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Service\DeleteService;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -254,6 +255,7 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            app(DeleteService::class)->removeSubresourceContainer($this->serviceDatabase);
             $this->serviceDatabase->delete();
             $this->dispatch('success', 'Database deleted.');
 
@@ -501,6 +503,7 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            app(DeleteService::class)->removeSubresourceContainer($this->serviceApplication);
             $this->serviceApplication->delete();
             $this->dispatch('success', 'Application deleted.');
 

@@ -127,7 +127,6 @@ Thank you so much!
 <a href="https://www.movavi.com/mac.html?utm_source=coolify.io"><img width="60px" alt="Movavi" src="https://cdn.coollabs.io/sponsors/movavi.png"/></a>
 <a href="https://usefoil.com/"><img width="60px" alt="ABXY" src="https://usefoil.com/favicon.svg"/></a>
 <a href="https://www.launchfa.st/?utm_source=coolify.io"><img width="60px" alt="LaunchFast Boilerplates" src="https://github.com/LaunchFast-Boilerplates.png"/></a>
-<a href="https://vanaways.co.uk/?utm_source=coolify.io"><img width="60px" alt="Vanaways" src="https://github.com/Vanaways.png"/></a>
 <a href="https://www.netrouting.com/?utm_source=coolify.io"><img width="60px" alt="Netrouting" src="https://github.com/netroutingcom.png"/></a>
 <a href="https://github.com/mindedtech"><img width="60px" alt="MindEd Tech" src="https://github.com/mindedtech.png"/></a>
 <a href="https://youstable.com/?utm_source=coolify.io"><img width="60px" alt="YouStable" src="https://github.com/youstable.png"/></a>
