@@ -9,6 +9,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -127,6 +128,22 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
 
         expect($backup->databases_to_backup)->toBe('analytics')
             ->and($backup->database_type)->toBe(StandaloneClickhouse::class);
+    });
+
+    test('defaults sqlite backups to every configured database file', function () {
+        $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('app.db,jobs.db')
+            ->and($backup->database_type)->toBe(StandaloneSqlite::class);
     });
 
     test('creates backup configuration with valid frequency', function () {
