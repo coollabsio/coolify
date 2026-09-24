@@ -153,6 +153,7 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - Apply authorization consistently across Livewire actions, API and web controllers, actions, downloads, exports, search, event listeners, and any other path that exposes or changes protected data.
 - Default to denying access when a policy or ownership relationship is missing or ambiguous. Members must not gain access to administrative, credential, security, billing, or instance-wide data merely because they belong to the team.
 - Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
+- Do not add a `TRUSTED_PROXIES` setting or change `TrustProxies` to use one. This caused problems in supported Coolify deployments. Fix IP-based rate limits and allow-lists at their call sites instead of changing proxy trust as a shortcut.
 
 ### Event Broadcasting
 - Laravel Reverb WebSocket server for real-time updates (port 6001) and a Node terminal WebSocket server (port 6002), both run inside the `coolify` container as s6 services

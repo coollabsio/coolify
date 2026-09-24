@@ -235,11 +235,7 @@ class Show extends Component
                 ->first();
             if ($foundServer) {
                 $this->ip = $this->server->ip;
-                if ($foundServer->team_id === currentTeam()->id) {
-                    throw new \Exception('A server with this IP/Domain already exists in your team.');
-                }
-
-                throw new \Exception('A server with this IP/Domain is already in use by another team.');
+                throw new \Exception('A server with this IP/Domain already exists.');
             }
 
             $this->server->name = $this->name;

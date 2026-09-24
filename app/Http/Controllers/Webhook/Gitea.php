@@ -69,13 +69,13 @@ class Gitea extends Controller
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
+                    return response([$this->unauthenticatedManualWebhookFailurePayload()]);
                 }
             }
             if ($x_gitea_event === 'pull_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with branch '$base_branch'.");
+                    return response([$this->unauthenticatedManualWebhookFailurePayload()]);
                 }
             }
             foreach ($applications as $application) {
@@ -281,7 +281,7 @@ class Gitea extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads);
         } catch (Exception $e) {
             return handleError($e);
         }

@@ -23,7 +23,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],

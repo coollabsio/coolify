@@ -60,7 +60,14 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            return Limit::perMinute(5)->by((string) $request->email.'|'.auth_rate_limit_ip($request));
+            $email = $request->input('email');
+            $emailIdentity = normalize_email_identity(is_string($email) ? $email : null);
+            $limits = [Limit::perMinute(5)->by((is_string($email) ? $email : '').'|'.auth_rate_limit_ip($request))];
+            if ($emailIdentity !== null) {
+                $limits[] = Limit::perMinute(5)->by('login:email-identity:'.sha1($emailIdentity));
+            }
+
+            return $limits;
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
