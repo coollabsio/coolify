@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\LocalFileVolume;
@@ -168,4 +169,28 @@ it('defaults new service bind mounts to directories', function () {
 
     expect($fileVolume->content)->toBeNull()
         ->and($fileVolume->is_directory)->toBeTrue();
+});
+
+it('queues a new application mount once without loading its service relation', function () {
+    $application = makeComposeApplication(DATA_DIR_COMPOSE);
+
+    applicationParser($application);
+    applicationParser($application);
+
+    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
+    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
+        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
+    });
+});
+
+it('queues a new service mount once without loading its service relation', function () {
+    [$service] = makeComposeService(DATA_DIR_COMPOSE);
+
+    serviceParser($service);
+    serviceParser($service);
+
+    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
+    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
+        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
+    });
 });
