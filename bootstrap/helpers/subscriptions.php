@@ -80,6 +80,7 @@ function allowedPathsForUnsubscribedAccounts()
         'logout',
         'force-password-reset',
         'two-factor-challenge',
+        'email/verify',
         'livewire/update',
         'admin',
         // Account basics stay available without a paid plan.
@@ -100,6 +101,7 @@ function allowedPathsForInvalidAccounts()
     return [
         'logout',
         'verify',
+        'email/verify',
         'force-password-reset',
         'two-factor-challenge',
         'livewire/update',

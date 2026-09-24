@@ -117,6 +117,14 @@ test('MCP endpoint rejects unauthenticated requests', function () {
     $response->assertStatus(401);
 });
 
+test('MCP endpoint rejects a token from an IP outside the API allow-list', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '192.0.2.10']);
+    Once::flush();
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    mcpListTools($token)->assertForbidden();
+});
+
 test('MCP endpoint lists tools for an authenticated token', function () {
     $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
 

@@ -308,11 +308,7 @@ class Index extends Component
         $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
-            if ($foundServer->team_id === currentTeam()->id) {
-                return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-            }
-
-            return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+            return $this->dispatch('error', 'A server with this IP/Domain already exists.');
         }
         $privateKeyId = $this->createdPrivateKey?->id ?? $this->selectedExistingPrivateKey;
         $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);

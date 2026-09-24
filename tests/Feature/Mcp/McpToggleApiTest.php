@@ -20,6 +20,8 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $rootTeam->members()->attach($this->user->id, ['role' => 'owner']);
     session(['currentTeam' => $this->team]);
 });
 
@@ -89,6 +91,17 @@ test('non-root token cannot disable MCP server', function () {
 
     $response->assertStatus(403);
     expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeTrue();
+});
+
+test('root token cannot enable MCP server from an IP outside the API allow-list', function () {
+    InstanceSettings::query()->where('id', 0)->update(['allowed_ips' => '192.0.2.10']);
+    $token = makeRootMcpToken($this->user);
+
+    test()->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson('/api/v1/mcp/enable')
+        ->assertForbidden();
+
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeFalse();
 });
 
 test('unauthenticated request to /api/v1/mcp/enable returns 401', function () {

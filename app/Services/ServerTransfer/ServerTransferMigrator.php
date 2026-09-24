@@ -3,8 +3,10 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Server;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 use RuntimeException;
 use Throwable;
 
@@ -95,17 +97,12 @@ class ServerTransferMigrator
     {
         $targetUrl = rtrim(trim($targetUrl), '/');
         if ($targetUrl === '' || ! filter_var($targetUrl, FILTER_VALIDATE_URL)) {
-            throw new RuntimeException('A valid target instance URL is required (e.g. http://localhost:8001).');
+            throw new RuntimeException('A valid target instance URL is required (e.g. https://coolify.example.com).');
         }
 
-        // From inside Docker, localhost is this container — use the host gateway for peer instances.
-        if (file_exists('/.dockerenv') || is_file('/run/.containerenv')) {
-            $targetUrl = (string) preg_replace(
-                '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
-                '$1host.docker.internal',
-                $targetUrl
-            );
-        }
+        Validator::make(['target_url' => $targetUrl], [
+            'target_url' => ['required', new SafeWebhookUrl],
+        ])->validate();
 
         return $targetUrl;
     }
@@ -140,6 +137,7 @@ class ServerTransferMigrator
 
         try {
             $response = Http::timeout(120)
+                ->withOptions(SafeWebhookUrl::httpClientOptions($importUrl))
                 ->acceptJson()
                 ->withToken($token)
                 ->asJson()

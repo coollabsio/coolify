@@ -58,13 +58,14 @@ Route::group([
     Route::get('/disable', [OtherController::class, 'post_required']);
     Route::post('/enable', [OtherController::class, 'enable_api']);
     Route::post('/disable', [OtherController::class, 'disable_api']);
-    Route::post('/mcp/enable', [OtherController::class, 'enable_mcp']);
-    Route::post('/mcp/disable', [OtherController::class, 'disable_mcp']);
 });
 Route::group([
     'middleware' => ['auth:sanctum', 'api.token.team', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
+
+    Route::post('/mcp/enable', [OtherController::class, 'enable_mcp'])->middleware('api.ability:write');
+    Route::post('/mcp/disable', [OtherController::class, 'disable_mcp'])->middleware('api.ability:write');
 
     Route::get('/version', [OtherController::class, 'version'])->middleware(['api.ability:read']);
     Route::get('/audit-events', [AuditEventsController::class, 'index'])->middleware(['api.ability:read']);

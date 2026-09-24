@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Auth\Oidc\OidcUser;
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\Team;
@@ -73,6 +74,10 @@ class OauthLoginService
         }
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
+
+        if ($provider === 'google' && filled($oauthSetting->tenant) && data_get($rawClaims, 'hd') !== $oauthSetting->tenant) {
+            throw new HttpException(403, 'Google account is not in the configured Workspace');
+        }
 
         $identityKey = [
             'provider' => $provider,
@@ -205,7 +210,7 @@ class OauthLoginService
                         throw new HttpException(403, 'Registration is disabled');
                     }
 
-                    $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
+                    $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting, $emailVerified);
                 }
 
                 OauthIdentity::create([
@@ -230,7 +235,7 @@ class OauthLoginService
         return instanceSettings()->is_registration_enabled || $oauthSetting->allow_registration;
     }
 
-    private function createUser(string $name, string $email, OauthSetting $oauthSetting): User
+    private function createUser(string $name, string $email, OauthSetting $oauthSetting, bool $emailVerified = true): User
     {
         if (User::count() === 0) {
             $user = (new User)->forceFill([
@@ -240,6 +245,7 @@ class OauthLoginService
                 'password' => Hash::make(Str::random(64)),
             ]);
             $user->save();
+            $this->verifyOrNotifyNewUser($user, $emailVerified);
 
             $team = $user->teams()->first() ?? Team::find(0);
             if ($team !== null && ! $user->teams()->where('team_id', $team->id)->exists()) {
@@ -252,19 +258,23 @@ class OauthLoginService
         }
 
         if ($oauthSetting->auto_join_root_team) {
-            return $this->createRootTeamOnlyUser($name, $email);
+            return $this->createRootTeamOnlyUser($name, $email, $emailVerified);
         }
 
-        return User::create([
+        $user = User::create([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make(Str::random(64)),
         ]);
+
+        $this->verifyOrNotifyNewUser($user, $emailVerified);
+
+        return $user;
     }
 
-    private function createRootTeamOnlyUser(string $name, string $email): User
+    private function createRootTeamOnlyUser(string $name, string $email, bool $emailVerified): User
     {
-        return DB::transaction(function () use ($name, $email) {
+        return DB::transaction(function () use ($name, $email, $emailVerified) {
             $rootTeam = Team::find(0);
             if ($rootTeam === null) {
                 throw new HttpException(403, 'Root team is not available for OAuth user provisioning');
@@ -275,10 +285,22 @@ class OauthLoginService
                 'email' => $email,
                 'password' => Hash::make(Str::random(64)),
             ]));
+            $this->verifyOrNotifyNewUser($user, $emailVerified);
 
             $user->teams()->attach($rootTeam, ['role' => 'member']);
 
             return $user;
         });
+    }
+
+    private function verifyOrNotifyNewUser(User $user, bool $emailVerified): void
+    {
+        if ($emailVerified) {
+            $user->markEmailAsVerified();
+
+            return;
+        }
+
+        SendVerificationEmailJob::dispatch($user)->afterCommit();
     }
 }

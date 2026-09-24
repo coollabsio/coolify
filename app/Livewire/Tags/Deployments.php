@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tags;
 
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use Livewire\Component;
 
@@ -19,7 +20,8 @@ class Deployments extends Component
     public function getDeployments()
     {
         try {
-            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $this->resourceIds)->get([
+            $applicationIds = Application::ownedByCurrentTeam()->whereIn('id', $this->resourceIds)->pluck('id');
+            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $applicationIds)->get([
                 'id',
                 'application_id',
                 'application_name',

@@ -1079,6 +1079,22 @@ class ServerTransferImporter
     {
         foreach ($storages as $storage) {
             LocalFileVolume::withoutEvents(function () use ($storage, $resource) {
+                $isHostFile = (bool) data_get($storage, 'is_host_file', false);
+                $fsPath = data_get($storage, 'fs_path');
+                if (! is_string($fsPath)) {
+                    throw new RuntimeException('Invalid imported file storage path.');
+                }
+                if ($isHostFile) {
+                    $fsPath = validateHostFileMountPath($fsPath, 'imported host file source path');
+                }
+                $chown = data_get($storage, 'chown');
+                $chmod = data_get($storage, 'chmod');
+                if (filled($chown) && (! is_string($chown) || ! preg_match('/\A(?:[A-Za-z_][A-Za-z0-9_.-]*|[0-9]+)(?::(?:[A-Za-z_][A-Za-z0-9_.-]*|[0-9]+))?\z/', $chown))) {
+                    throw new RuntimeException('Invalid imported file owner.');
+                }
+                if (filled($chmod) && (! is_string($chmod) || ! preg_match('/\A[0-7]{3,4}\z/', $chmod))) {
+                    throw new RuntimeException('Invalid imported file mode.');
+                }
                 $uuid = filled(data_get($storage, 'uuid')) ? (string) data_get($storage, 'uuid') : new_public_id();
                 if (LocalFileVolume::where('uuid', $uuid)->exists()) {
                     $uuid = new_public_id();
@@ -1087,13 +1103,13 @@ class ServerTransferImporter
                 // uuid is not fillable and withoutEvents skips BaseModel's creating hook.
                 $file = new LocalFileVolume;
                 $file->forceFill([
-                    'fs_path' => data_get($storage, 'fs_path'),
+                    'fs_path' => $fsPath,
                     'mount_path' => data_get($storage, 'mount_path'),
                     'content' => data_get($storage, 'content'),
                     'is_directory' => (bool) data_get($storage, 'is_directory', false),
-                    'is_host_file' => (bool) data_get($storage, 'is_host_file', false),
-                    'chown' => data_get($storage, 'chown'),
-                    'chmod' => data_get($storage, 'chmod'),
+                    'is_host_file' => $isHostFile,
+                    'chown' => $chown,
+                    'chmod' => $chmod,
                     'is_based_on_git' => (bool) data_get($storage, 'is_based_on_git', false),
                     'is_preview_suffix_enabled' => (bool) data_get($storage, 'is_preview_suffix_enabled', false),
                     'resource_type' => $resource->getMorphClass(),
