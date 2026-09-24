@@ -18,12 +18,14 @@ it('limits login attempts by normalized email independent of IP', function () {
         ->and($firstLimits[1]->key)->toBe($secondLimits[1]->key);
 });
 
-it('applies the API access check to MCP and its switch routes', function () {
+it('keeps MCP independent from the REST API access check', function () {
     $mcp = Route::getRoutes()->match(Request::create('/mcp', 'POST'));
     $enable = Route::getRoutes()->match(Request::create('/api/v1/mcp/enable', 'POST'));
     $disable = Route::getRoutes()->match(Request::create('/api/v1/mcp/disable', 'POST'));
 
-    expect($mcp->gatherMiddleware())->toContain(ApiAllowed::class)
-        ->and($enable->gatherMiddleware())->toContain(ApiAllowed::class, 'api.ability:write')
-        ->and($disable->gatherMiddleware())->toContain(ApiAllowed::class, 'api.ability:write');
+    expect($mcp->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($enable->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($enable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', 'api.ability:write')
+        ->and($disable->gatherMiddleware())->toContain('auth:sanctum', 'api.token.team', 'api.ability:write');
 });

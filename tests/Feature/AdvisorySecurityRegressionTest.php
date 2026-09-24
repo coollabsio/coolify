@@ -49,15 +49,15 @@ it('does not require email verification for protected web routes', function () {
     $this->actingAs($user)->get('/analytics')->assertOk();
 });
 
-it('applies the API allowlist to MCP and MCP switch routes', function () {
+it('does not apply the REST API allowlist to MCP and MCP switch routes', function () {
     $mcp = Route::getRoutes()->match(Request::create('/mcp', 'POST'));
     $enable = Route::getRoutes()->match(Request::create('/api/v1/mcp/enable', 'POST'));
     $disable = Route::getRoutes()->match(Request::create('/api/v1/mcp/disable', 'POST'));
 
     expect($mcp)->not->toBeNull()
-        ->and($mcp->gatherMiddleware())->toContain(ApiAllowed::class)
-        ->and($enable->gatherMiddleware())->toContain(ApiAllowed::class)
-        ->and($disable->gatherMiddleware())->toContain(ApiAllowed::class);
+        ->and($mcp->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($enable->gatherMiddleware())->not->toContain(ApiAllowed::class)
+        ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class);
 });
 
 it('throttles every manual webhook route', function (string $provider) {
