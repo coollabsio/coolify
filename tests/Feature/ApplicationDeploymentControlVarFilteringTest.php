@@ -10,6 +10,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,75 @@ it('redacts resolved remote secrets from command output', function () {
 
     expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'token=remote-secret-value'))
         ->toBe('token='.REDACTED);
+});
+
+it('does not retain locked values from generated build-time debug logs', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'SINGLE_MARKER',
+        'value' => 'harmless-single-marker',
+        'is_shown_once' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_MARKER',
+        'value' => "harmless-first-marker\nharmless-second-marker",
+        'is_multiline' => true,
+        'is_shown_once' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $deployment = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'harmless-debug-log-deployment',
+        'application_id' => $application->id,
+        'server_id' => $server->id,
+    ]);
+    foreach ($job->recordedLogEntries as $entry) {
+        $deployment->addLogEntry($entry);
+    }
+
+    $retainedLogs = $deployment->fresh()->logs;
+    expect($retainedLogs)
+        ->not->toContain('harmless-single-marker')
+        ->not->toContain('harmless-first-marker')
+        ->not->toContain('harmless-second-marker')
+        ->toContain(REDACTED);
+
+    $member = User::factory()->create();
+    $application->team()->members()->attach($member->id, ['role' => 'member']);
+    $application->settings->update(['is_debug_enabled' => true]);
+    $this->actingAs($member);
+
+    $visibleLines = decode_remote_command_output($deployment->fresh())->pluck('line')->implode("\n");
+    expect($visibleLines)
+        ->toContain('[DEBUG]')
+        ->not->toContain('harmless-first-marker')
+        ->not->toContain('harmless-second-marker');
+});
+
+it('redacts generated multiline forms in remote command and output logging', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_MARKER',
+        'value' => "harmless-first-marker\nharmless-second-marker",
+        'is_multiline' => true,
+        'is_shown_once' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    $generated = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables')
+        ->first(fn (string $line): bool => str_starts_with($line, 'MULTILINE_MARKER='));
+
+    foreach ([$generated, str_replace("\n", '\\n', $generated), 'harmless-second-marker'] as $loggedForm) {
+        $redacted = invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'output: '.$loggedForm);
+        expect($redacted)
+            ->not->toContain('harmless-first-marker')
+            ->not->toContain('harmless-second-marker')
+            ->toContain('output: ');
+    }
 });
 
 it('ignores empty and non-string remote secrets when redacting command output', function () {

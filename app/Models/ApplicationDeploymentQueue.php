@@ -192,7 +192,7 @@ class ApplicationDeploymentQueue extends Model
             $lockedVars = $lockedVars->merge(
                 $app->environment_variables
                     ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
+                    ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
                     ->filter()
             );
         }
@@ -201,7 +201,7 @@ class ApplicationDeploymentQueue extends Model
             $lockedVars = $lockedVars->merge(
                 $app->environment_variables_preview
                     ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
+                    ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
                     ->filter()
             );
         }

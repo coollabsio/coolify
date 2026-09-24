@@ -5,6 +5,7 @@ namespace App\Traits;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -33,7 +34,7 @@ trait ExecuteRemoteCommand
             $lockedVars = $lockedVars->merge(
                 $this->application->environment_variables
                     ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
+                    ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
                     ->filter()
             );
         }
@@ -42,7 +43,7 @@ trait ExecuteRemoteCommand
             $lockedVars = $lockedVars->merge(
                 $this->application->environment_variables_preview
                     ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
+                    ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
                     ->filter()
             );
         }
