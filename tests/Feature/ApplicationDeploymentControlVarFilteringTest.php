@@ -134,6 +134,36 @@ it('redacts generated multiline forms in remote command and output logging', fun
     }
 });
 
+it('keeps deployment logging available if value formatting fails', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $variable = new class extends EnvironmentVariable
+    {
+        public function logRedactionValues(): array
+        {
+            throw new RuntimeException('Harmless formatting failure');
+        }
+    };
+    $variable->is_shown_once = true;
+
+    $application->setRelation('environment_variables', collect([$variable]));
+    $deployment = ApplicationDeploymentQueue::create([
+        'deployment_uuid' => 'harmless-formatting-failure',
+        'application_id' => $application->id,
+        'server_id' => $server->id,
+    ]);
+    $deployment->setRelation('application', $application);
+    $deployment->addLogEntry('Harmless log text');
+
+    expect(json_decode($deployment->fresh()->logs, true)[0]['output'])->toBe(REDACTED);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    readDeploymentJobProperty($job, $reflection, 'application')
+        ->setRelation('environment_variables', collect([$variable]));
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'Harmless command text'))
+        ->toBe(REDACTED);
+});
+
 it('ignores empty and non-string remote secrets when redacting command output', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
