@@ -41,8 +41,6 @@ class LocalFileVolume extends BaseModel
         'resource_id',
         'is_directory',
         'is_host_file',
-        'chown',
-        'chmod',
         'is_based_on_git',
         'is_preview_suffix_enabled',
     ];
@@ -318,10 +316,10 @@ class LocalFileVolume extends BaseModel
             }
             $commands->push("chmod +x {$escapedPath}");
             if ($chown) {
-                $commands->push("chown $chown {$escapedPath}");
+                $commands->push('chown -- '.escapeshellarg($chown)." {$escapedPath}");
             }
             if ($chmod) {
-                $commands->push("chmod $chmod {$escapedPath}");
+                $commands->push('chmod -- '.escapeshellarg($chmod)." {$escapedPath}");
             }
         } elseif ($isDir === 'NOK' && $this->is_directory) {
             $commands->push("mkdir -p {$escapedPath} > /dev/null 2>&1 || true");
