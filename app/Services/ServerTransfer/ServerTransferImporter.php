@@ -35,6 +35,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Models\Team;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -208,6 +209,8 @@ class ServerTransferImporter
         }
 
         $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, &$created) {
+            Team::ensureServerCapacity($teamId);
+
             $this->privateKeyMap = [];
             $this->githubAppMap = [];
             $this->gitlabAppMap = [];
