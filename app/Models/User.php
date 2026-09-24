@@ -212,7 +212,7 @@ class User extends Authenticatable implements SendsEmail
      */
     public function deleteIfNotVerifiedAndForcePasswordReset()
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
+        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true && ! TeamInvitation::whereEmail($this->email)->exists()) {
             $this->delete();
         }
     }
