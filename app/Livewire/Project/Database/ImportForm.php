@@ -14,6 +14,7 @@ use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
@@ -175,6 +176,8 @@ class ImportForm extends Component
     public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
 
     public string $mongodbRestoreCommand = 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive=';
+
+    public string $sqliteRestoreCommand = '';
 
     // S3 Restore properties
     public array $availableS3Storages = [];
@@ -340,6 +343,9 @@ EOD;
         // Store IDs for Livewire serialization
         $this->resourceId = $resource->id;
         $this->resourceType = get_class($resource);
+        if ($resource instanceof StandaloneSqlite) {
+            $this->sqliteRestoreCommand = $this->buildRestoreCommand('<temp_backup_file>');
+        }
 
         // Store view-friendly properties
         $this->resourceStatus = $resource->status ?? '';

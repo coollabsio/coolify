@@ -88,13 +88,18 @@
                             <x-forms.input label="Import command" wire:model="mariadbRestoreCommand"
                                 canGate="update" :canResource="$this->resource" />
                 @endif
+            @elseif ($resourceDbType === 'standalone-sqlite')
+                            <x-forms.input label="Import command" readonly wire:model="sqliteRestoreCommand"
+                                canGate="update" :canResource="$this->resource" />
             @endif
+                    @if ($resourceDbType !== 'standalone-sqlite')
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
                             ['value' => true, 'label' => 'Backup contains all databases'],
                             ['value' => false, 'label' => 'Backup contains one database'],
                         ]" />
                     </div>
+                    @endif
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
                             <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"

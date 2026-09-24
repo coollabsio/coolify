@@ -22,8 +22,16 @@ class DatabaseImportCommandBuilder
                 ? $this->mysqlDumpAll('mariadb', 'MARIADB', $path)
                 : '(gunzip -cf '.$path.' 2>/dev/null || cat '.$path.') | mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE',
             'mongodb' => 'mongorestore --authenticationDatabase=admin --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --uri mongodb://localhost:27017 --gzip --archive='.$path,
+            'sqlite' => $this->sqliteRestore($resource->databaseFilePath(), $path),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };
+    }
+
+    private function sqliteRestore(string $file, string $path): string
+    {
+        $file = escapeshellarg($file);
+
+        return "backup={$path}; gunzip -c \"\$backup\" > \"\$backup.db\" && sqlite3 -bail {$file} '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status";
     }
 
     public function buildPostgresRestoreScanScript(object $resource, string $path): ?string
@@ -82,7 +90,7 @@ SH;
 
     public function supports(object $resource): bool
     {
-        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb'], true);
+        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb', 'sqlite'], true);
     }
 
     public function databaseType(object $resource): string
@@ -97,6 +105,7 @@ SH;
             str_contains($type, 'mariadb') => 'mariadb',
             str_contains($type, 'mysql') => 'mysql',
             str_contains($type, 'mongo') => 'mongodb',
+            str_contains($type, 'sqlite') => 'sqlite',
             default => 'unsupported',
         };
     }
