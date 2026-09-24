@@ -5,6 +5,7 @@
 - When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
 - Test old reports against the current branch because later changes can make the report obsolete.
 - Use the same regression test before and after the production change so the result shows the behavior difference.
+- Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -49,3 +50,6 @@
 
 ## Fail closed at public webhook boundaries
 - Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.
+
+## Pass identities to Livewire actions
+- Pass record IDs to Livewire actions instead of display values, and resolve team-scoped records on the server. When JavaScript needs text, use `@js()` or `Js::from()`.
