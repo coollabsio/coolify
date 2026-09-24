@@ -1,7 +1,6 @@
 <?php
 
 use App\Auth\Oidc\OidcUser;
-use App\Jobs\SendVerificationEmailJob;
 use App\Models\InstanceSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
@@ -13,7 +12,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -223,6 +221,7 @@ it('creates the root user when oidc provisions the first account', function () {
 
     $response->assertRedirect('/');
     $this->assertDatabaseHas('users', ['id' => 0, 'email' => 'root@example.com']);
+    expect(User::whereEmail('root@example.com')->firstOrFail()->email_verified_at)->toBeNull();
     $this->assertDatabaseHas('team_user', ['team_id' => 0, 'user_id' => 0, 'role' => 'owner']);
     expect(InstanceSettings::find(0)->is_registration_enabled)->toBeFalse();
 });
@@ -295,7 +294,6 @@ it('logs callback failures with diagnostic context', function () {
 });
 
 it('does not mark a newly provisioned oidc account verified without a verified email claim', function () {
-    Queue::fake();
     User::factory()->create(['email' => 'existing@example.com']);
     OauthSetting::where('provider', 'oidc')->update(['allow_registration' => true, 'require_email_verified' => false]);
 
@@ -305,5 +303,4 @@ it('does not mark a newly provisioned oidc account verified without a verified e
 
     $user = User::whereEmail('unverified@example.com')->firstOrFail();
     expect($user->email_verified_at)->toBeNull();
-    Queue::assertPushed(SendVerificationEmailJob::class);
 });

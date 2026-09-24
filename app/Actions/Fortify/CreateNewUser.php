@@ -58,7 +58,6 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => Hash::make($input['password']),
             ]);
             $user->save();
-            $user->markEmailAsVerified();
             $team = $user->teams()->first() ?? Team::find(0);
             if ($team !== null && ! $user->teams()->where('team_id', $team->id)->exists()) {
                 $user->teams()->attach($team, ['role' => 'owner']);

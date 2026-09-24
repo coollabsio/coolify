@@ -216,6 +216,7 @@ it('registers a new user from a verified provider identity', function () {
     ], OauthSetting::where('provider', 'google')->firstOrFail());
 
     expect($user->email)->toBe('verified@example.com');
+    expect($user->email_verified_at)->toBeNull();
     $this->assertAuthenticatedAs($user);
     $this->assertDatabaseHas('oauth_identities', [
         'user_id' => $user->id,
