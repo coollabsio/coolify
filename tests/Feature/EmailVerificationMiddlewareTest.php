@@ -5,6 +5,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Route;
 
 uses(RefreshDatabase::class);
 
@@ -15,4 +16,9 @@ it('lets unverified users access protected web routes without email delivery', f
     Cache::flush();
 
     $this->actingAs($user)->get('/analytics')->assertOk();
+});
+
+it('does not register an email verification notice route', function () {
+    expect(Route::has('verification.notice'))->toBeFalse()
+        ->and(Route::has('verify.verify'))->toBeTrue();
 });
