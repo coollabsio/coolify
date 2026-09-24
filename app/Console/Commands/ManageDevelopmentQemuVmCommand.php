@@ -9,7 +9,7 @@ use function Laravel\Prompts\multiselect;
 
 class ManageDevelopmentQemuVmCommand extends Command
 {
-    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php}';
+    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php} {--as-localhost : Use the VM for the localhost server (id 0)}';
 
     protected $description = 'Recreate selected development QEMU VMs and seed their Coolify servers';
 
@@ -28,7 +28,13 @@ class ManageDevelopmentQemuVmCommand extends Command
             required: true,
         );
 
-        ManageDevelopmentQemuVm::run($profileNames);
+        if ($this->option('as-localhost') && count($profileNames) !== 1) {
+            $this->error('Select exactly one QEMU profile for localhost.');
+
+            return self::FAILURE;
+        }
+
+        ManageDevelopmentQemuVm::run($profileNames, (bool) $this->option('as-localhost'));
 
         foreach ($profileNames as $profileName) {
             $profile = $profiles[$profileName];

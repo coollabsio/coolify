@@ -11,7 +11,7 @@ class ManageDevelopmentQemuVm
     use AsAction;
 
     /** @param string|array<int, string> $profileNames */
-    public function handle(string|array $profileNames): void
+    public function handle(string|array $profileNames, bool $asLocalhost = false): void
     {
         $profileNames = is_array($profileNames) ? array_values(array_unique($profileNames)) : [$profileNames];
 
@@ -19,10 +19,11 @@ class ManageDevelopmentQemuVm
             StartDevelopmentQemuVm::run($profileName, $index === 0);
 
             try {
-                SeedDevelopmentQemuServer::run($profileName, $index === 0);
+                SeedDevelopmentQemuServer::run($profileName, $index === 0, $asLocalhost);
             } catch (QueryException $exception) {
                 $keepOthers = $index === 0 ? '' : ' --keep-others';
-                $result = Process::run('docker exec coolify php artisan dev:qemu:seed '.escapeshellarg($profileName).$keepOthers);
+                $localhostOption = $asLocalhost ? ' --as-localhost' : '';
+                $result = Process::run('docker exec coolify php artisan dev:qemu:seed '.escapeshellarg($profileName).$keepOthers.$localhostOption);
 
                 if ($result->failed()) {
                     throw $exception;

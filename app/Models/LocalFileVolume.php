@@ -54,8 +54,7 @@ class LocalFileVolume extends BaseModel
                 return;
             }
 
-            $fileVolume->load(['service']);
-            dispatch(new ServerStorageSaveJob($fileVolume));
+            ServerStorageSaveJob::dispatch($fileVolume)->afterCommit();
         });
 
         static::deleting(function (LocalFileVolume $fileVolume): void {

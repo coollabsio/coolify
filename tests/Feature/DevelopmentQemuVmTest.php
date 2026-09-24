@@ -7,7 +7,9 @@ use App\Actions\Development\StartDevelopmentQemuVm;
 use App\Console\Commands\ManageDevelopmentQemuVmCommand;
 use App\Console\Commands\SeedDevelopmentQemuServerCommand;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Database\Seeders\PrivateKeySeeder;
+use Database\Seeders\ServerSeeder;
 use Database\Seeders\TeamSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Console\Command;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Validator;
 
 uses(RefreshDatabase::class);
 
@@ -32,6 +35,17 @@ it('registers the interactive qemu command', function () {
         ->and(Artisan::all()['dev:qemu'])->toBeInstanceOf(ManageDevelopmentQemuVmCommand::class)
         ->and(Artisan::all()['dev:qemu']->getDefinition()->getArgument('profiles')->isArray())->toBeTrue()
         ->and(Artisan::all()['dev:qemu:seed'])->toBeInstanceOf(SeedDevelopmentQemuServerCommand::class);
+});
+
+it('requires one profile when a qemu vm is selected as localhost', function () {
+    Process::fake();
+
+    expect(Artisan::call('dev:qemu', [
+        'profiles' => ['ubuntu-root', 'debian-root'],
+        '--as-localhost' => true,
+    ]))->toBe(Command::FAILURE);
+
+    Process::assertNothingRan();
 });
 
 it('prevents qemu commands from running outside development', function () {
@@ -121,10 +135,48 @@ it('seeds one predefined root qemu server', function () {
     $server = SeedDevelopmentQemuServer::run('ubuntu-root');
 
     expect($server->uuid)->toBe('development-qemu-ubuntu-root')
+        ->and($server->description)->toBe('Development QEMU virtual machine')
+        ->and(Validator::make(['description' => $server->description], ['description' => ValidationPatterns::descriptionRules()])->passes())->toBeTrue()
         ->and($server->ip)->toBe('192.168.122.10')
         ->and($server->user)->toBe('root')
         ->and($server->team_id)->toBe(0)
         ->and(Server::query()->where('uuid', 'like', 'development-qemu-%')->count())->toBe(1);
+});
+
+it('uses a qemu vm as the localhost sentinel without changing its identity', function () {
+    $this->seed(ServerSeeder::class);
+
+    $server = SeedDevelopmentQemuServer::run('ubuntu-root', true, true);
+
+    expect($server->id)->toBe(0)
+        ->and($server->uuid)->toBe('localhost')
+        ->and($server->name)->toBe('localhost')
+        ->and($server->description)->toBe('Development QEMU virtual machine')
+        ->and($server->ip)->toBe('192.168.122.10')
+        ->and($server->user)->toBe('root')
+        ->and($server->private_key_id)->toBe(1)
+        ->and(Server::query()->count())->toBe(1);
+});
+
+it('can change the localhost qemu profile without adding a server', function () {
+    $this->seed(ServerSeeder::class);
+    SeedDevelopmentQemuServer::run('ubuntu-root', true, true);
+
+    SeedDevelopmentQemuServer::run('ubuntu-non-root', true, true);
+
+    expect(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.11')
+        ->and(Server::query()->findOrFail(0)->user)->toBe('coolify')
+        ->and(Server::query()->count())->toBe(1);
+});
+
+it('seeds localhost through the container command', function () {
+    $this->seed(ServerSeeder::class);
+
+    expect(Artisan::call('dev:qemu:seed', [
+        'profile' => 'ubuntu-root',
+        '--as-localhost' => true,
+    ]))->toBe(Command::SUCCESS)
+        ->and(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.10');
 });
 
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {
@@ -221,6 +273,23 @@ it('seeds through the coolify container when the host database is unavailable', 
     ManageDevelopmentQemuVm::run('ubuntu-root');
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec coolify php artisan dev:qemu:seed') && str_contains($process->command, 'ubuntu-root'));
+});
+
+it('passes localhost mode to the container when the host database is unavailable', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-localhost-fallback-test-'.uniqid()]);
+    SeedDevelopmentQemuServer::mock()
+        ->shouldReceive('handle')
+        ->once()
+        ->andThrow(new QueryException('pgsql', 'select 1', [], new Exception('unavailable')));
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '*' => Process::result(),
+    ]);
+
+    ManageDevelopmentQemuVm::run('ubuntu-root', true);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'dev:qemu:seed') && str_contains($process->command, '--as-localhost'));
 });
 
 it('starts and seeds root and non-root profiles together', function () {
