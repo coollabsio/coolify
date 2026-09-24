@@ -164,7 +164,7 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - **Server** — A managed host connected via SSH. Has settings, proxy config, and destinations.
 - **Application** — A deployed app (from Git or Docker image) with environment variables, previews, deployment queue.
 - **Service** — A pre-configured service stack from templates (`templates/service-templates-latest.json`).
-- **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly).
+- **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly, SQLite).
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
 
