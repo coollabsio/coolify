@@ -189,9 +189,28 @@ class Proxy extends Component
     {
         try {
             $this->proxySettings = GetProxyConfiguration::run($this->server);
+            $this->clearAppliedTraefikBranchWarning();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function getTraefikVersionForWarningProperty(): ?string
+    {
+        if ($this->server->detected_traefik_version) {
+            return $this->server->detected_traefik_version;
+        }
+
+        if ($this->server->proxy->get('status') !== 'running' || $this->server->hasPendingProxyConfiguration()) {
+            return null;
+        }
+
+        $configuration = $this->server->proxy->get('last_saved_proxy_configuration');
+        if (! is_string($configuration) || ! preg_match('/^\s*image:\s*[\'\"]?traefik:(v?\d+\.\d+(?:\.\d+)?|latest)[\'\"]?\s*$/mi', $configuration, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     /**
@@ -211,7 +230,7 @@ class Proxy extends Component
             }
 
             // Get this server's current version
-            $currentVersion = $this->server->detected_traefik_version;
+            $currentVersion = $this->traefikVersionForWarning;
 
             // If we have a current version, try to find matching branch
             if ($currentVersion && $currentVersion !== 'latest') {
@@ -244,7 +263,7 @@ class Proxy extends Component
             return false;
         }
 
-        $currentVersion = $this->server->detected_traefik_version;
+        $currentVersion = $this->traefikVersionForWarning;
         if (! $currentVersion || $currentVersion === 'latest') {
             return false;
         }
@@ -273,7 +292,7 @@ class Proxy extends Component
             }
 
             // Get this server's current version
-            $currentVersion = $this->server->detected_traefik_version;
+            $currentVersion = $this->traefikVersionForWarning;
             if (! $currentVersion || $currentVersion === 'latest') {
                 return null;
             }
@@ -333,6 +352,14 @@ class Proxy extends Component
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    public function getLatestNewerTraefikVersionProperty(): ?string
+    {
+        $branch = $this->newerTraefikBranchAvailable;
+        $version = $branch ? ($this->getTraefikVersions()[$branch] ?? null) : null;
+
+        return $version ? 'v'.ltrim($version, 'v') : null;
     }
 
     private function getConfiguredTraefikBranch(): ?string

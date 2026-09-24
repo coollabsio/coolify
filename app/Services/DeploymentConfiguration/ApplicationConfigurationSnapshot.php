@@ -237,7 +237,7 @@ class ApplicationConfigurationSnapshot
 
                 return $this->item(
                     key: 'volume_'.$volume->id,
-                    label: 'Volume mount',
+                    label: filled($volume->host_path) ? 'Directory mount' : 'Volume mount',
                     value: ['source' => $source, 'destination' => $volume->mount_path],
                     impact: 'redeploy',
                     displayValue: "{$source} → {$volume->mount_path}",
