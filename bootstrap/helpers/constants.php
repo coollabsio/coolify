@@ -8,9 +8,10 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 
 const REDACTED = '<REDACTED>';
-const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'sqlite'];
 const STANDALONE_DATABASE_MODELS = [
     'postgresql' => StandalonePostgresql::class,
     'redis' => StandaloneRedis::class,
@@ -20,6 +21,7 @@ const STANDALONE_DATABASE_MODELS = [
     'keydb' => StandaloneKeydb::class,
     'dragonfly' => StandaloneDragonfly::class,
     'clickhouse' => StandaloneClickhouse::class,
+    'sqlite' => StandaloneSqlite::class,
 ];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',

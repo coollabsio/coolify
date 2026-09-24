@@ -1194,6 +1194,7 @@ $siteAddress {
         $keydbs = StandaloneKeydb::where($destinationCondition)->get();
         $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
         $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+        $sqlites = StandaloneSqlite::where($destinationCondition)->get();
 
         return $postgresqls
             ->concat($redis)
@@ -1203,6 +1204,7 @@ $siteAddress {
             ->concat($keydbs)
             ->concat($dragonflies)
             ->concat($clickhouses)
+            ->concat($sqlites)
             ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
     }
 
