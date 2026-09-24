@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
 
@@ -88,6 +89,55 @@ function seedFileVolume($resource, string $baseDir, string $fileName, string $mo
         'resource_type' => $resource->getMorphClass(),
     ]);
 }
+
+it('preserves comments in a service source Compose when parsing', function () {
+    $source = "# Service notes\nservices:\n  app:\n    # Keep this image note\n    image: nginx:latest # pinned by operator\n";
+    [$service] = makeComposeService($source);
+
+    serviceParser($service);
+
+    expect($service->fresh()->docker_compose_raw)->toBe($source)
+        ->and($service->fresh()->docker_compose)->toContain('services:');
+});
+
+it('preserves comments in an application source Compose when parsing', function () {
+    $source = "# Application notes\nservices:\n  app:\n    # Keep this image note\n    image: nginx:latest # pinned by operator\n";
+    $application = makeComposeApplication($source);
+
+    applicationParser($application);
+
+    expect($application->fresh()->docker_compose_raw)->toBe($source)
+        ->and($application->fresh()->docker_compose)->toContain('services:');
+});
+
+it('removes one-time volume fields without losing service source comments', function () {
+    $source = "# Service note\nservices:\n  app:\n    image: nginx:latest # Image note\n    command: |\n      volumes:\n        - type: bind\n          content: keep-this-command\n    volumes:\n      # Volume note\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        content: |\n          first line\n          second line\n        isDirectory: false\n        # After content\n";
+    [$service] = makeComposeService($source);
+
+    serviceParser($service);
+
+    expect($service->fresh()->docker_compose_raw)->toBe("# Service note\nservices:\n  app:\n    image: nginx:latest # Image note\n    command: |\n      volumes:\n        - type: bind\n          content: keep-this-command\n    volumes:\n      # Volume note\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        # After content\n");
+});
+
+it('removes one-time volume fields without losing application source comments', function () {
+    $source = "# Application note\nservices:\n  app:\n    image: nginx:latest # Image note\n    volumes:\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        content: initial\n        is_directory: false\n        # After content\n";
+    $application = makeComposeApplication($source);
+
+    applicationParser($application);
+
+    expect($application->fresh()->docker_compose_raw)->toBe("# Application note\nservices:\n  app:\n    image: nginx:latest # Image note\n    volumes:\n      - type: bind\n        source: ./config.txt\n        target: /app/config.txt\n        # After content\n");
+});
+
+it('keeps valid Compose when one-time fields use flow syntax', function () {
+    $source = "# Flow-style volume\nservices:\n  app:\n    image: nginx:latest\n    volumes: [{type: bind, source: ./config.txt, target: /app/config.txt, content: initial}]\n";
+    $cleanedYaml = Yaml::parse($source);
+    unset($cleanedYaml['services']['app']['volumes'][0]['content']);
+
+    $cleanedSource = removeComposeVolumeFieldsPreservingComments($source, $cleanedYaml, ['content']);
+
+    expect(Yaml::parse($cleanedSource))->toBe($cleanedYaml)
+        ->and($cleanedSource)->not->toContain('content: initial');
+});
 
 it('preserves existing application file volume content when reparsing compose bind mounts', function () {
     $application = makeComposeApplication(TWO_FILE_COMPOSE);
