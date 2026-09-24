@@ -227,9 +227,12 @@
                                             </span>
                                         </template>
                                     </div>
-                                    <div class="min-w-0 flex-1">
+                                    <div class="flex min-w-0 flex-1 items-center gap-2">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
                                             x-text="database.name"></h3>
+                                        <template x-if="database.experimental">
+                                            <x-status-badge status="Experimental" type="warning" class="shrink-0" />
+                                        </template>
                                     </div>
                                 </div>
 
@@ -415,6 +418,10 @@
                             clickhouse: {
                                 docs: 'https://clickhouse.com/docs',
                                 website: 'https://clickhouse.com/'
+                            },
+                            sqlite: {
+                                docs: 'https://sqlite.org/docs.html',
+                                website: 'https://sqlite.org/'
                             }
                         },
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }

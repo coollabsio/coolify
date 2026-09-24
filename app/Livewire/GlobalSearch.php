@@ -15,6 +15,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
@@ -199,6 +200,7 @@ class GlobalSearch extends Component
             'new redis' => 'redis',
             'new keydb' => 'keydb',
             'new dragonfly' => 'dragonfly',
+            'new sqlite' => 'sqlite',
             'new mongodb' => 'mongodb',
             'new mongo' => 'mongodb',
             'new clickhouse' => 'clickhouse',
@@ -237,7 +239,7 @@ class GlobalSearch extends Component
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
-            'dragonfly', 'mongodb', 'clickhouse',
+            'dragonfly', 'mongodb', 'clickhouse', 'sqlite',
         ]) || str_starts_with($type, 'one-click-service-')) {
             return $user->can('createAnyResource');
         }
@@ -509,6 +511,27 @@ class GlobalSearch extends Component
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
                             'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
+                        ];
+                    })
+            );
+
+            // SQLite
+            $databases = $databases->merge(
+                StandaloneSqlite::ownedByCurrentTeam()
+                    ->with(['environment.project'])
+                    ->get()
+                    ->map(function ($db) {
+                        return [
+                            'id' => $db->id,
+                            'name' => $db->name,
+                            'type' => 'database',
+                            'subtype' => 'sqlite',
+                            'uuid' => $db->uuid,
+                            'description' => $db->description,
+                            'link' => $db->link(),
+                            'project' => $db->environment->project->name ?? null,
+                            'environment' => $db->environment->name ?? null,
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' sqlite '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -1122,6 +1145,16 @@ class GlobalSearch extends Component
                 'type' => 'clickhouse',
                 'category' => 'Databases',
                 'logo' => 'svgs/clickhouse-icon.svg',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'SQLite',
+                'description' => 'Lightweight file-based relational database',
+                'quickcommand' => '(type: new sqlite)',
+                'type' => 'sqlite',
+                'category' => 'Databases',
+                'logo' => 'svgs/resources/sqlite.svg',
                 'resourceType' => 'database',
             ]);
         }
