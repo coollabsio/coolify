@@ -233,6 +233,29 @@ describe('POST /api/v1/servers/import', function () {
             ->assertStatus(422)
             ->assertJsonPath('message', fn ($m) => str_contains($m, 'already exists') || str_contains(json_encode($m), 'already exists') || true);
     });
+
+    test('rejects import when the destination team is at its cloud server limit', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        $this->team->update(['custom_server_limit' => 1]);
+
+        $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/export")
+            ->json();
+
+        $this->server->forceDelete();
+        Server::factory()->create([
+            'team_id' => $this->team->id,
+            'private_key_id' => $this->privateKey->id,
+            'ip' => '10.66.0.21',
+        ]);
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export, 'claim' => false])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.server.0', 'Server limit reached for your subscription.');
+
+        expect(Server::where('team_id', $this->team->id)->count())->toBe(1);
+    });
 });
 
 describe('POST /api/v1/servers/{uuid}/claim', function () {

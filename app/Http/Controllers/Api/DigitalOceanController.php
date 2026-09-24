@@ -16,6 +16,7 @@ use App\Services\DigitalOceanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 class DigitalOceanController extends Controller
@@ -316,7 +317,7 @@ class DigitalOceanController extends Controller
             $dropletId = (int) $droplet['id'];
 
             $server = DB::transaction(function () use ($normalizedServerName, $teamId, $privateKey, $token, $dropletId, $droplet): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit($teamId, [
                     'name' => $normalizedServerName,
                     'ip' => Server::PLACEHOLDER_IP,
                     'user' => 'root',
@@ -366,6 +367,13 @@ class DigitalOceanController extends Controller
                 'digitalocean_droplet_id' => $dropletId,
                 'ip' => $server->ip,
             ])->setStatusCode(201);
+        } catch (ValidationException $e) {
+            if (! isset($e->errors()['server'])) {
+                throw $e;
+            }
+            $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
+
+            return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
         } catch (RateLimitException $e) {
             $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
 
