@@ -235,7 +235,7 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
