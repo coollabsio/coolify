@@ -1617,7 +1617,7 @@ function sanitizeLogsForExport(string $text): string
     return remove_iip($text);
 }
 
-function getTopLevelNetworks(Service|Application $resource)
+function getTopLevelNetworks(Service|Application $resource): Collection
 {
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
@@ -1743,6 +1743,8 @@ function getTopLevelNetworks(Service|Application $resource)
 
         return $topLevelNetworks->keys();
     }
+
+    return collect();
 }
 function sourceIsLocal(Stringable $source)
 {
