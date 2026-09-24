@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
-use App\Actions\Application\GenerateConfig;
+use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
@@ -11,6 +11,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 
@@ -156,7 +157,7 @@ class General extends Component
             'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
             'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
-            'staticImage' => 'required',
+            'staticImage' => ['required', Rule::enum(StaticImageTypes::class)],
             'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
             'publishDirectory' => ValidationPatterns::directoryPathRules(),
             'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
@@ -425,7 +426,9 @@ class General extends Component
             $this->customNginxConfiguration = $this->application->custom_nginx_configuration;
             $this->isHttpBasicAuthEnabled = $this->application->is_http_basic_auth_enabled;
             $this->httpBasicAuthUsername = $this->application->http_basic_auth_username;
-            $this->httpBasicAuthPassword = $this->application->http_basic_auth_password;
+            $this->httpBasicAuthPassword = auth()->user()->can('update', $this->application)
+                ? $this->application->http_basic_auth_password
+                : null;
             $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 
@@ -900,19 +903,6 @@ class General extends Component
         } finally {
             $this->dispatch('configurationChanged');
         }
-    }
-
-    public function downloadConfig()
-    {
-        $config = GenerateConfig::run($this->application, true);
-        $fileName = str($this->application->name)->slug()->append('_config.json');
-
-        return response()->streamDownload(function () use ($config) {
-            echo $config;
-        }, $fileName, [
-            'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
-        ]);
     }
 
     public function getDetectedPortInfoProperty(): ?array

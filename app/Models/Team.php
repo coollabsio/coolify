@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -125,9 +127,27 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers->count();
+        $servers = $team->servers()->count();
 
         return $servers >= $serverLimit;
+    }
+
+    public static function createServerWithinLimit(int $teamId, array $attributes): Server
+    {
+        return DB::transaction(function () use ($teamId, $attributes): Server {
+            self::ensureServerCapacity($teamId);
+
+            return Server::create($attributes);
+        });
+    }
+
+    /** Call within a transaction so the team lock lasts through the server insert. */
+    public static function ensureServerCapacity(int $teamId): void
+    {
+        $team = self::query()->lockForUpdate()->findOrFail($teamId);
+        if (self::serverLimitReached($team)) {
+            throw ValidationException::withMessages(['server' => 'Server limit reached for your subscription.']);
+        }
     }
 
     public function subscriptionPastOverDue()

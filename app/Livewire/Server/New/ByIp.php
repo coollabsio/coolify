@@ -168,7 +168,7 @@ class ByIp extends Component
             if ($this->server_role === ServerRole::BUILD->value) {
                 data_forget($payload, 'proxy');
             }
-            $server = Server::create($payload);
+            $server = Team::createServerWithinLimit(currentTeam()->id, $payload);
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();

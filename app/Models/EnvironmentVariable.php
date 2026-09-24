@@ -309,6 +309,30 @@ class EnvironmentVariable extends BaseModel
         return $real_value;
     }
 
+    /** @return array<int, string> */
+    public function logRedactionValues(): array
+    {
+        $value = $this->real_value;
+        if (! is_string($value) || $value === '') {
+            return [];
+        }
+
+        $values = [$value];
+        if ($this->is_multiline || $this->is_literal) {
+            $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
+                ? substr($value, 1, -1)
+                : $value;
+            $values[] = $unquoted;
+            $values[] = escapeBashEnvValue($unquoted);
+            $values[] = str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $unquoted);
+            if ($this->is_multiline) {
+                $values = array_merge($values, preg_split('/\r\n|\r|\n/', $unquoted) ?: []);
+            }
+        }
+
+        return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
+    }
+
     public function resolveReferencedValue(): ?string
     {
         $value = $this->value;
