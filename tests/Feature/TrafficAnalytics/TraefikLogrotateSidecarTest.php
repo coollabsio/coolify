@@ -111,6 +111,7 @@ it('adds a traefik-logrotate sidecar with copytruncate and the proxy mount when 
     $config = Yaml::parse($yaml);
     $sidecar = $config['services']['traefik-logrotate'];
 
+    expect($sidecar['container_name'])->toBe('coolify-proxy-logrotate');
     expect($sidecar['image'])->toBe('alpine:3.20');
     expect($sidecar['volumes'])->toContain($server->proxyPath().':/traefik');
     expect($sidecar['labels'])->toContain('coolify.managed=true');

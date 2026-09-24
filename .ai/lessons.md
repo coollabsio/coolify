@@ -42,6 +42,7 @@
 - For container image changes, inspect Compose services and every relevant Dockerfile build stage.
 - Pin a stable release tag instead of using a floating `latest` tag.
 - A successful image pull does not prove that the complete application build no longer uses the old image.
+- Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
 
 ## Make distributed schedules durable
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.

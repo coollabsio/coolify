@@ -1,0 +1,4 @@
+# Opt-in KVM development mode. The default Compose setup still starts testing-host.
+services:
+  testing-host:
+    profiles: ["testing-host"]

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# Manage the development stack with KVM when available, or testing-host otherwise.
+# Jean uses `run` to keep logs attached and clean up when the run ends.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+usage() {
+  echo 'Usage: ./scripts/dev start [qemu-profile]'
+  echo '       ./scripts/dev stop [qemu-profile]'
+  echo '       ./scripts/dev run [qemu-profile]'
+}
+
+if [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -gt 2 || ( "${1:-start}" != "start" && "${1:-start}" != "stop" && "${1:-start}" != "run" ) ]]; then
+  usage >&2
+  exit 2
+fi
+
+command="${1:-start}"
+profile="${2:-${COOLIFY_DEV_KVM_PROFILE:-ubuntu-root}}"
+backend="${COOLIFY_DEV_SERVER_BACKEND:-auto}"
+if [[ "$backend" != "auto" && "$backend" != "testing-host" ]]; then
+  echo 'COOLIFY_DEV_SERVER_BACKEND must be auto or testing-host.' >&2
+  exit 2
+fi
+
+privileged=()
+if [[ $EUID -ne 0 ]]; then
+  privileged=(sudo -n -E)
+fi
+
+if [[ "$backend" == "auto" && -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] &&
+   { [[ $EUID -eq 0 ]] || { command -v sudo >/dev/null && sudo -n -E true; }; }; then
+  backend=kvm
+else
+  backend=testing-host
+fi
+
+compose=(docker compose -f docker-compose.yml -f docker-compose.dev.yml)
+if [[ "$backend" == "kvm" ]]; then
+  compose+=(-f docker-compose.dev-kvm.yml)
+fi
+
+wait_for_coolify() {
+  local attempt status
+  for ((attempt = 0; attempt < 150; attempt++)); do
+    status="$(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' coolify 2>/dev/null || true)"
+    if [[ "$status" == 'running healthy' ]]; then
+      return 0
+    fi
+    if [[ "$status" == exited* || "$status" == dead* ]]; then
+      break
+    fi
+    sleep 2
+  done
+
+  echo 'Coolify did not become healthy within 5 minutes.' >&2
+  return 1
+}
+
+start_backend() {
+  if [[ "$backend" == "kvm" ]]; then
+    echo "Using KVM profile: $profile"
+    "${compose[@]}" --profile testing-host stop testing-host
+    "${compose[@]}" up -d
+    wait_for_coolify
+    "${privileged[@]}" php artisan dev:qemu "$profile" --as-localhost
+  else
+    echo 'KVM is unavailable or disabled; using coolify-testing-host.'
+    "${compose[@]}" up -d
+    wait_for_coolify
+    "${compose[@]}" exec -T coolify php artisan db:seed --class=ServerSeeder --force
+  fi
+}
+
+stop_backend() {
+  if [[ "$backend" == "kvm" ]] && command -v virsh >/dev/null; then
+    local domain domains state
+    domain="coolify-dev-${profile}"
+    domains="$("${privileged[@]}" virsh --connect qemu:///system list --all --name)"
+    if grep -Fxq "$domain" <<< "$domains"; then
+      state="$("${privileged[@]}" virsh --connect qemu:///system domstate "$domain")"
+      if [[ "$state" != 'shut off' ]]; then
+        "${privileged[@]}" virsh --connect qemu:///system shutdown "$domain"
+      fi
+    fi
+  fi
+  "${compose[@]}" stop
+}
+
+cleanup() {
+  status=$?
+  trap - EXIT INT TERM
+  stop_backend || true
+  "${compose[@]}" down || true
+  exit "$status"
+}
+
+case "$command" in
+  start)
+    start_backend
+    ;;
+  stop)
+    stop_backend
+    ;;
+  run)
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    docker rm -f coolify coolify-minio-init coolify-minio coolify-testing-host coolify-redis coolify-db coolify-mail coolify-vite >/dev/null 2>&1 || true
+    start_backend
+    "${compose[@]}" logs -f --tail=100
+    ;;
+esac
