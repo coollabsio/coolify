@@ -78,7 +78,7 @@ it('matches a container created without an explicit tag and one pinned to an ima
         ->assertSet('images.2.usedBy', ['oneoff-worker']);
 });
 
-it('deletes an unused image', function () use ($fakeDocker, $oldId) {
+it('deletes an unused image', function () use ($fakeDocker) {
     $fakeDocker();
 
     Livewire::test(DockerImages::class, ['server_uuid' => $this->server->uuid])
