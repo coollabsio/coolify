@@ -12,7 +12,7 @@ class SeedDevelopmentQemuServer
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $removeOtherServers = true): Server
+    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false): Server
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
@@ -34,11 +34,13 @@ class SeedDevelopmentQemuServer
                 ->delete();
         }
 
-        $server = Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server;
-        $server->forceFill(['uuid' => $profile['uuid']]);
+        $server = $asLocalhost
+            ? (Server::withTrashed()->find(0) ?? new Server)
+            : (Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server);
+        $server->forceFill($asLocalhost ? ['id' => 0, 'uuid' => 'localhost'] : ['uuid' => $profile['uuid']]);
         $server->fill([
-            'name' => $profile['name'],
-            'description' => 'Development-only QEMU virtual machine managed by dev:qemu.',
+            'name' => $asLocalhost ? 'localhost' : $profile['name'],
+            'description' => 'Development QEMU virtual machine',
             'ip' => $profile['ip'],
             'port' => 22,
             'user' => $profile['user'],
