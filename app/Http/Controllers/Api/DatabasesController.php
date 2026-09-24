@@ -1856,6 +1856,10 @@ class DatabasesController extends Controller
         // Use a generic authorization for database creation - using PostgreSQL as representative model
         $this->authorize('create', StandalonePostgresql::class);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
