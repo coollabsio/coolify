@@ -368,6 +368,7 @@
                 ...@js($keydbsJs),
                 ...@js($dragonfliesJs),
                 ...@js($clickhousesJs),
+                ...@js($sqlitesJs),
                 ...@js($servicesJs),
             ],
             get filterGroups() {

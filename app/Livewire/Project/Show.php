@@ -50,6 +50,7 @@ class Show extends Component
                             'mongodbs',
                             'mysqls',
                             'mariadbs',
+                            'sqlites',
                         ])
                         ->orderBy('created_at'),
                 ])
@@ -105,6 +106,7 @@ class Show extends Component
                     $environment->mongodbs_count,
                     $environment->mysqls_count,
                     $environment->mariadbs_count,
+                    $environment->sqlites_count,
                 ])->sum();
 
                 return [
