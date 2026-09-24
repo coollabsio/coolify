@@ -191,35 +191,38 @@ class SslHelper
                     });
 
                 if ($isPemKeyFileRequired) {
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.pem',
                         'mount_path' => $mountPath.'/server.pem',
                         'content' => $certificateStr."\n".$privateKeyStr,
                         'is_directory' => false,
-                        'chmod' => '600',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '600';
+                    $fileStorage->save();
                 } else {
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.crt',
                         'mount_path' => $mountPath.'/server.crt',
                         'content' => $certificateStr,
                         'is_directory' => false,
-                        'chmod' => '644',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '644';
+                    $fileStorage->save();
 
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.key',
                         'mount_path' => $mountPath.'/server.key',
                         'content' => $privateKeyStr,
                         'is_directory' => false,
-                        'chmod' => '600',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '600';
+                    $fileStorage->save();
                 }
             }
 
