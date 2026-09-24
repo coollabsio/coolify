@@ -74,6 +74,10 @@ class OauthLoginService
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
 
+        if ($provider === 'google' && filled($oauthSetting->tenant) && data_get($rawClaims, 'hd') !== $oauthSetting->tenant) {
+            throw new HttpException(403, 'Google account is not in the configured Workspace');
+        }
+
         $identityKey = [
             'provider' => $provider,
             'issuer' => $provider,
