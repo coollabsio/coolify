@@ -78,11 +78,46 @@ test('migrate exports imports via http and completes locally', function () {
 });
 
 test('migrate rejects a private target before sending the bundle', function () {
+    config()->set('app.env', 'production');
     Http::fake();
 
     expect(fn () => app(ServerTransferMigrator::class)->migrate(
         $this->server,
         'http://127.0.0.1:8001',
+        'token',
+    ))->toThrow(ValidationException::class);
+
+    Http::assertNothingSent();
+});
+
+test('migrate reaches a local peer instance in development', function () {
+    config()->set('app.env', 'local');
+    Http::fake(fn () => Http::response([
+        'dry_run' => false,
+        'server_uuid' => $this->server->uuid,
+        'claimed' => true,
+        'warnings' => [],
+    ], 201));
+
+    app(ServerTransferMigrator::class)->migrate(
+        $this->server,
+        'http://localhost:8001',
+        'target-token',
+    );
+
+    $targetHost = file_exists('/.dockerenv') || is_file('/run/.containerenv')
+        ? 'host.docker.internal'
+        : 'localhost';
+    Http::assertSent(fn ($request) => $request->url() === "http://{$targetHost}:8001/api/v1/servers/import");
+});
+
+test('migrate still rejects other private targets in development', function () {
+    config()->set('app.env', 'local');
+    Http::fake();
+
+    expect(fn () => app(ServerTransferMigrator::class)->migrate(
+        $this->server,
+        'http://10.0.0.5:8001',
         'token',
     ))->toThrow(ValidationException::class);
 

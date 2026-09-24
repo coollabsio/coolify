@@ -100,11 +100,30 @@ class ServerTransferMigrator
             throw new RuntimeException('A valid target instance URL is required (e.g. https://coolify.example.com).');
         }
 
+        if ($this->isLocalDevelopmentTarget($targetUrl)) {
+            if (file_exists('/.dockerenv') || is_file('/run/.containerenv')) {
+                return (string) preg_replace(
+                    '#^(https?://)(localhost|127\.0\.0\.1)(?=[:/]|$)#i',
+                    '$1host.docker.internal',
+                    $targetUrl,
+                );
+            }
+
+            return $targetUrl;
+        }
+
         Validator::make(['target_url' => $targetUrl], [
             'target_url' => ['required', new SafeWebhookUrl],
         ])->validate();
 
         return $targetUrl;
+    }
+
+    private function isLocalDevelopmentTarget(string $url): bool
+    {
+        return isDev()
+            && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+            && in_array(strtolower((string) parse_url($url, PHP_URL_HOST)), ['localhost', '127.0.0.1', 'host.docker.internal'], true);
     }
 
     private function normalizeToken(string $targetToken): string
@@ -137,7 +156,9 @@ class ServerTransferMigrator
 
         try {
             $response = Http::timeout(120)
-                ->withOptions(SafeWebhookUrl::httpClientOptions($importUrl))
+                ->withOptions($this->isLocalDevelopmentTarget($importUrl)
+                    ? ['allow_redirects' => false]
+                    : SafeWebhookUrl::httpClientOptions($importUrl))
                 ->acceptJson()
                 ->withToken($token)
                 ->asJson()
