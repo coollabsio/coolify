@@ -91,8 +91,9 @@ class EditCompose extends Component
             $this->validate([
                 'isContainerLabelEscapeEnabled' => 'required',
             ]);
-            $this->syncData(true);
-            $this->service->save(['is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled]);
+            $this->service->refresh()->update([
+                'is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled,
+            ]);
             $this->dispatch('success', 'Service updated successfully');
         } catch (\Throwable $e) {
             return handleError($e, $this);
