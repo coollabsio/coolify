@@ -3,12 +3,18 @@
 use App\Models\Server;
 use Symfony\Component\Process\Process;
 
-function runDockerNetworkEnsureIpv6Script(array $commands, array $values): array
-{
+function runDockerNetworkEnsureIpv6Script(
+    array $commands,
+    array $values,
+    bool $useSudo = false,
+): array {
     $script = <<<'BASH'
 exec 3>&2
 docker() {
     printf 'docker %s\n' "$*" >&3
+    if [ "$FAIL_OPERATION" = "$1 $2" ]; then
+        return 1
+    fi
     if [ "$1" = "network" ] && [ "$2" = "inspect" ]; then
         target=""
         for argument in "$@"; do
@@ -57,20 +63,36 @@ docker() {
     fi
     return 0
 }
+export -f docker
 BASH;
     $settings = array_merge([
         'NETWORK_EXISTS' => '1',
         'ENABLE_IPV6' => 'false',
         'IPV6_AVAILABLE' => '1',
         'CONTAINERS' => "app\ncoolify-proxy\n",
+        'FAIL_OPERATION' => '',
     ], $values);
     $script .= "\n".sprintf(
-        "NETWORK_EXISTS=%s\nENABLE_IPV6=%s\nIPV6_AVAILABLE=%s\nCONTAINERS=%s\n",
+        "export NETWORK_EXISTS=%s\nexport ENABLE_IPV6=%s\nexport IPV6_AVAILABLE=%s\nexport CONTAINERS=%s\nexport FAIL_OPERATION=%s\n",
         escapeshellarg($settings['NETWORK_EXISTS']),
         escapeshellarg($settings['ENABLE_IPV6']),
         escapeshellarg($settings['IPV6_AVAILABLE']),
         escapeshellarg($settings['CONTAINERS']),
+        escapeshellarg($settings['FAIL_OPERATION']),
     );
+
+    if ($useSudo) {
+        $script .= <<<'BASH'
+sudo() {
+    if [ "$1" = "bash" ] && [ "$2" = "-c" ]; then
+        shift 2
+        eval "$1"
+    else
+        "$@"
+    fi
+}
+BASH;
+    }
     $scriptPath = tempnam(sys_get_temp_dir(), 'coolify-network-');
     file_put_contents($scriptPath, $script."\n".implode("\n", $commands));
     $bashScriptPath = $scriptPath;
@@ -84,6 +106,23 @@ BASH;
     unlink($scriptPath);
 
     return [$process, $output];
+}
+
+function nonRootDockerNetworkEnsureIpv6Commands(): array
+{
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->user = 'ubuntu';
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+
+    $commands = parseCommandsByLineForSudo(
+        collect(dockerNetworkEnsureIpv6Commands('coolify')),
+        $server,
+    );
+
+    Mockery::close();
+
+    return $commands;
 }
 
 it('reconciles an existing IPv4 network and reconnects its containers', function () {
@@ -129,23 +168,46 @@ it('preserves an existing IPv4 network when IPv6 is unavailable', function () {
         ->and($output)->not->toContain('network connect');
 });
 
-it('keeps reconciliation commands parseable for non-root servers', function () {
-    $server = Mockery::mock(Server::class)->makePartial();
-    $server->user = 'ubuntu';
-    $server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
-    $server->shouldReceive('setAttribute')->andReturnSelf();
+it('runs IPv4 reconciliation through one sudo bash boundary', function () {
+    $commands = nonRootDockerNetworkEnsureIpv6Commands();
 
-    $commands = parseCommandsByLineForSudo(
-        collect(dockerNetworkEnsureIpv6Commands('coolify')),
-        $server,
+    expect($commands)->toHaveCount(1)
+        ->and($commands[0])->toStartWith("sudo bash -c '")
+        ->not->toContain('$(sudo');
+
+    [$process, $output] = runDockerNetworkEnsureIpv6Script($commands, [], true);
+
+    expect($process->isSuccessful())->toBeTrue()
+        ->and($output)->toContain('network disconnect coolify app')
+        ->and($output)->toContain('network create --attachable --ipv6 coolify')
+        ->and($output)->toContain('network connect coolify app');
+});
+
+it('keeps an already-correct IPv6 network unchanged through sudo', function () {
+    [$process, $output] = runDockerNetworkEnsureIpv6Script(
+        nonRootDockerNetworkEnsureIpv6Commands(),
+        ['ENABLE_IPV6' => 'true'],
+        true,
     );
 
-    expect(collect($commands)->implode("\n"))
-        ->toContain('if ! sudo docker network inspect')
-        ->not->toContain('sudo for')
-        ->not->toContain('sudo if');
+    expect($process->isSuccessful())->toBeTrue()
+        ->and($output)->toContain('network inspect')
+        ->not->toContain('network create')
+        ->not->toContain('network rm')
+        ->not->toContain('network disconnect')
+        ->not->toContain('network connect');
+});
 
-    Mockery::close();
+it('propagates failed Docker operations through the sudo boundary', function () {
+    [$process, $output] = runDockerNetworkEnsureIpv6Script(
+        nonRootDockerNetworkEnsureIpv6Commands(),
+        ['FAIL_OPERATION' => 'network connect'],
+        true,
+    );
+
+    expect($process->isSuccessful())->toBeFalse()
+        ->and($process->getExitCode())->toBe(1)
+        ->and($output)->toContain('network connect coolify app');
 });
 
 it('uses reconciliation commands from proxy bootstrap for standalone networks', function () {
