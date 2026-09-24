@@ -22,8 +22,16 @@ class StartLogDrain
             $type = 'axiom';
         } elseif ($server->settings->is_logdrain_custom_enabled) {
             $type = 'custom';
+        } elseif ($server->settings->is_logdrain_cloudwatch_enabled) {
+            $type = 'cloudwatch';
         } else {
             $type = 'none';
+        }
+        if ($type === 'cloudwatch') {
+            // Containers ship logs directly via Docker's awslogs driver; no Fluent Bit container is needed.
+            StopLogDrain::run($server);
+
+            return 'Amazon CloudWatch Logs uses the built-in Docker awslogs driver.';
         }
         if ($type !== 'none') {
             StopLogDrain::run($server);
@@ -212,7 +220,7 @@ Files:
 
     private function logDrainNetworkConnectCommands(Server $server): array
     {
-        if (! $server->isLogDrainEnabled()) {
+        if (! $server->isFluentBitLogDrainEnabled()) {
             return [];
         }
 

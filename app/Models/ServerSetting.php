@@ -24,6 +24,7 @@ use OpenApi\Attributes as OA;
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
+        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
@@ -43,6 +44,9 @@ use OpenApi\Attributes as OA;
         'is_usable' => ['type' => 'boolean'],
         'logdrain_axiom_api_key' => ['type' => 'string'],
         'logdrain_axiom_dataset_name' => ['type' => 'string'],
+        'logdrain_cloudwatch_region' => ['type' => 'string'],
+        'logdrain_cloudwatch_group' => ['type' => 'string'],
+        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string'],
         'logdrain_custom_config' => ['type' => 'string'],
         'logdrain_custom_config_parser' => ['type' => 'string'],
         'logdrain_highlight_project_id' => ['type' => 'string'],
@@ -96,6 +100,10 @@ class ServerSetting extends Model
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'is_logdrain_cloudwatch_enabled',
+        'logdrain_cloudwatch_region',
+        'logdrain_cloudwatch_group',
+        'logdrain_cloudwatch_stream_prefix',
         'concurrent_builds',
         'dynamic_timeout',
         'force_disabled',
@@ -158,6 +166,7 @@ class ServerSetting extends Model
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
+        'is_logdrain_cloudwatch_enabled' => 'boolean',
     ];
 
     /**

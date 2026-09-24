@@ -1424,6 +1424,14 @@ $siteAddress {
 
     public function isLogDrainEnabled()
     {
+        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
+    }
+
+    /**
+     * Whether the active log drain relies on the coolify-log-drain Fluent Bit container.
+     */
+    public function isFluentBitLogDrainEnabled(): bool
+    {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
     }
 

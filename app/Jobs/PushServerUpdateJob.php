@@ -948,7 +948,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     private function checkLogDrainContainer()
     {
-        if ($this->server->isLogDrainEnabled() && $this->foundLogDrainContainer === false) {
+        if ($this->server->isFluentBitLogDrainEnabled() && $this->foundLogDrainContainer === false) {
             StartLogDrain::dispatch($this->server);
         }
     }

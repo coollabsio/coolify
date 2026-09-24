@@ -3691,7 +3691,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }
         if ($this->mainServer->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
-            $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$this->container_name]['logging'] = generate_log_drain_configuration($this->mainServer);
         }
         if ($this->application->settings->is_gpu_enabled) {
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
