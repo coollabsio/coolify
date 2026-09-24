@@ -1617,7 +1617,7 @@ function sanitizeLogsForExport(string $text): string
     return remove_iip($text);
 }
 
-function getTopLevelNetworks(Service|Application $resource)
+function getTopLevelNetworks(Service|Application $resource): Collection
 {
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
@@ -1743,6 +1743,8 @@ function getTopLevelNetworks(Service|Application $resource)
 
         return $topLevelNetworks->keys();
     }
+
+    return collect();
 }
 function sourceIsLocal(Stringable $source)
 {
@@ -3312,8 +3314,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'configs' => $topLevelConfigs->toArray(),
                 'secrets' => $topLevelSecrets->toArray(),
             ];
+            $originalYaml = $yaml;
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            if ($yaml !== $originalYaml) {
+                $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($resource->docker_compose_raw, $yaml, ['content']);
+            }
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
 
             $resource->save();
@@ -4088,7 +4093,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
         $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
