@@ -43,6 +43,16 @@ test('preserves command substitutions inside database and volume backup scripts'
         ->not->toContain('$(sudo if');
 });
 
+test('preserves quoted backup container and file arguments for a non-root server', function () {
+    $container = escapeshellarg('db-name-uuid');
+    $path = escapeshellarg('/backups/db-name.dump');
+    $command = "docker exec {$container} pg_dump --username 'postgres' 'app' > {$path}";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result)->toBe(['sudo '.$command]);
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',
