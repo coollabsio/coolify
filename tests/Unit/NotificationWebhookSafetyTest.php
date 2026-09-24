@@ -2,6 +2,7 @@
 
 use App\Jobs\SendMessageToDiscordJob;
 use App\Jobs\SendMessageToSlackJob;
+use App\Jobs\SendWebhookJob;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +32,18 @@ it('blocks queued Discord notifications to IPv4-mapped link-local URLs', functio
     );
 
     $job->handle();
+
+    Http::assertNothingSent();
+});
+
+it('blocks queued webhook, Discord, and Slack sends to NAT64 local-use URLs', function () {
+    Http::fake();
+
+    $url = 'http://[64:ff9b:1::7f00:1]/';
+
+    (new SendWebhookJob(['event' => 'test'], $url))->handle();
+    (new SendMessageToDiscordJob(new DiscordMessage('Test', 'Description', DiscordMessage::infoColor()), $url))->handle();
+    (new SendMessageToSlackJob(new SlackMessage('Test', 'Description'), $url))->handle();
 
     Http::assertNothingSent();
 });
