@@ -99,6 +99,7 @@ it('starts the branch instance of the main checkout on the default ports', funct
         ->toContain('APP_URL=https://devserver.example.ts.net:8000')
         ->toContain('APP_PORT=8000')
         ->toContain('FORWARD_DB_PORT=5432')
+        ->toContain('FLUX_PORT=7443')
         ->and(devScriptLog())
         ->toContain('docker stop coolify coolify-db coolify-redis')
         ->toContain('docker compose -p coolify-dev-main -f docker-compose.dev-multi.yml --env-file .env --env-file')
@@ -126,6 +127,7 @@ it('gives a worktree branch its own port block, tailscale ports, and stable data
         ->toContain('FORWARD_TERMINAL_PORT=20022')
         ->toContain('FORWARD_DB_PORT=20023')
         ->toContain('VITE_PORT=20025')
+        ->toContain('FLUX_PORT=17002')
         ->toContain("APP_KEY={$appKey}")
         ->toContain('DEV_CHECKOUT='.realpath($this->devRoot.'/wt'))
         ->and(file_get_contents($this->devRoot.'/main/.dev-instances/slots'))->toBe("main 1\nfix-some_thing 2\n")
@@ -298,4 +300,35 @@ BASH);
         ->toContain('php artisan dev:qemu node-worker-a node-worker-b PORT=20020')
         ->toContain('exec -T coolify php artisan dev:qemu:bootstrap-nodes')
         ->and(strpos($log, '--as-localhost PORT=20020'))->toBeLessThan(strpos($log, 'dev:qemu node-worker-a'));
+});
+
+it('requires kvm and a profile for extra qemu vms', function () {
+    $withoutProfile = runDevScript('main', ['qemu']);
+    $withoutKvm = runDevScript('main', ['qemu', 'node-onboarding']);
+
+    expect($withoutProfile->isSuccessful())->toBeFalse()
+        ->and($withoutProfile->getErrorOutput())->toContain('./scripts/dev qemu <profile...>')
+        ->and($withoutKvm->isSuccessful())->toBeFalse()
+        ->and($withoutKvm->getErrorOutput())->toContain('QEMU VMs need /dev/kvm')
+        ->and(devScriptLog())->not->toContain('dev:qemu');
+});
+
+it('starts extra qemu vms such as the onboarding node for the instance', function () {
+    if (! function_exists('posix_geteuid') || posix_geteuid() !== 0 || ! file_exists('/dev/kvm') || filetype('/dev/kvm') !== 'char' || ! is_readable('/dev/kvm') || ! is_writable('/dev/kvm')) {
+        $this->markTestSkipped('KVM and root access are required for this launcher branch.');
+    }
+
+    file_put_contents($this->devRoot.'/bin/php', <<<'BASH'
+#!/usr/bin/env bash
+printf 'php %s INSTANCE=%s SLOT=%s\n' "$*" "$DEVELOPMENT_QEMU_INSTANCE" "$DEVELOPMENT_QEMU_SLOT" >> "$DEV_TEST_LOG"
+BASH);
+
+    runDevScript('main', ['start'], ['COOLIFY_DEV_SERVER_BACKEND' => 'auto']);
+    file_put_contents($this->devLog, '');
+    $process = runDevScript('wt', ['qemu', 'node-onboarding', '--fresh'], ['COOLIFY_DEV_SERVER_BACKEND' => 'auto']);
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(devScriptLog())
+        ->toContain('php artisan dev:qemu node-onboarding --fresh INSTANCE=fix-some_thing SLOT=2')
+        ->not->toContain('compose');
 });

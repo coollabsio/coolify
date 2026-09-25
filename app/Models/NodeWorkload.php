@@ -45,6 +45,24 @@ class NodeWorkload extends BaseModel
         return $this->hasMany(NodeWorkloadRevision::class);
     }
 
+    /**
+     * @param  array<string, mixed>  $configuration
+     * @param  array<string, string>  $environment
+     */
+    public function createRevision(string $image, array $configuration, array $environment = []): NodeWorkloadRevision
+    {
+        return $this->revisions()->create([
+            'image' => $image,
+            'configuration' => $configuration,
+            'environment' => $environment,
+            'configuration_hash' => hash_hmac('sha256', json_encode([
+                'image' => $image,
+                'configuration' => $configuration,
+                'environment' => $environment,
+            ], JSON_THROW_ON_ERROR), (string) config('app.key')),
+        ]);
+    }
+
     public function nodes(): BelongsToMany
     {
         return $this->belongsToMany(Node::class, 'node_workload_nodes')->withPivot('container_ip')->withTimestamps();

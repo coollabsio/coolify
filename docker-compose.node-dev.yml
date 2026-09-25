@@ -3,7 +3,8 @@ services:
     environment:
       SENTINEL_HOST_ENABLED: "true"
       FLUX_PORT: "${FLUX_PORT:-7443}"
-      FLUX_PUBLIC_URL: "https://coolify-flux:7443"
+      # Nodes resolve coolify-flux to the libvirt gateway and reach the published host port.
+      FLUX_PUBLIC_URL: "https://coolify-flux:${FLUX_PORT:-7443}"
       FLUX_ISSUER: "coolify-dev"
       FLUX_SIGNING_KEY_ID: "dev-key"
       FLUX_SIGNING_PRIVATE_KEY: "Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0Mi/Cl3kvC2/8C/z9t+2wwKoU4CWjZewONC6G44Kct0tg=="
@@ -36,7 +37,16 @@ services:
     command:
       - sh
       - -lc
-      - chown -R 1000:1000 /data/coolify/flux && exec /command/s6-setuidgid www-data php artisan flux:initialize-tls --identities=flux,coolify-flux,localhost,127.0.0.1,::1
+      # The coolify healthcheck passes before its first composer install and migrate finish.
+      - >-
+        chown -R 1000:1000 /data/coolify/flux &&
+        attempt=0 &&
+        until /command/s6-setuidgid www-data php artisan migrate:status --pending=1 >/dev/null 2>&1; do
+        attempt=$$((attempt + 1));
+        [ "$$attempt" -lt 150 ] || { echo 'Coolify migrations did not finish within 5 minutes.' >&2; exit 1; };
+        sleep 2;
+        done &&
+        exec /command/s6-setuidgid www-data php artisan flux:initialize-tls --identities=flux,coolify-flux,localhost,127.0.0.1,::1
     volumes:
       - .:/var/www/html/:cached
       - dev_flux_data:/data/coolify/flux

@@ -88,6 +88,9 @@ class FluxConnectionEventController extends Controller
         if (! $node->is_reachable) {
             $node->update(['is_reachable' => true]);
         }
+        if (isset($data['capabilities']) && $node->sentinel_capabilities !== $data['capabilities']) {
+            $node->update(['sentinel_capabilities' => $data['capabilities']]);
+        }
 
         return response()->noContent();
     }

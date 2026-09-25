@@ -32,6 +32,7 @@
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     <div class="nav-section hidden xl:block">Settings</div>
                     <a href="#general" class="menu-item menu-item-active"><x-reicon name="settings" class="menu-item-icon" /><span class="menu-item-label">General</span></a>
+                    <a href="#configuration" class="menu-item"><x-reicon name="code" class="menu-item-icon" /><span class="menu-item-label">Configuration</span></a>
                     <a href="#resources" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Resources</span></a>
                     <a href="#deployments" class="menu-item"><x-reicon name="time-back" class="menu-item-icon" /><span class="menu-item-label">Deployment Logs</span></a>
                     <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Node</span></a>
@@ -46,6 +47,20 @@
                 <div><span class="text-neutral-500 dark:text-fg-dim">Node</span><p><a class="hover:underline" href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}">{{ $node->name }}</a></p></div>
                 <div><span class="text-neutral-500 dark:text-fg-dim">Internal DNS</span><p class="font-mono text-xs">{{ $workload->internal_dns_name ? $workload->internal_dns_name.'.default.coolify.internal' : 'Pending' }}</p></div>
             </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="configuration" title="Configuration" helper="Changes create a new revision. Redeploy the application to apply them.">
+            <form wire:submit="saveConfiguration" class="flex flex-col gap-4">
+                <x-forms.input id="portMappings" label="Port mappings" placeholder="8080:80, 5353:53/udp"
+                    helper="Comma-separated host:container pairs. Add /udp or /sctp for other protocols. Ports bind to the Node WireGuard IP, so they are reachable only inside the cluster." />
+                <x-forms.input id="startCommand" label="Start command" placeholder="nginx -g &quot;daemon off;&quot;"
+                    helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />
+                @can('update', $workload)
+                    <x-forms.textarea id="environmentVariables" label="Environment variables" rows="8" placeholder="KEY=value"
+                        helper="One KEY=VALUE pair per line. Lines that start with # are ignored. Values are stored encrypted." />
+                    <div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save configuration</x-forms.button></div>
+                @endcan
+            </form>
         </x-application.settings-section>
 
         <x-application.settings-section id="resources" title="Resource limits" helper="Set optional runtime limits and scheduling reservations. Empty values mean unlimited.">

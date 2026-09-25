@@ -74,6 +74,7 @@ it('provides root and non-root profiles for every supported distribution', funct
     expect($profiles->keys()->all())->toBe([
         'node-worker-a',
         'node-worker-b',
+        'node-onboarding',
         'ubuntu-root',
         'ubuntu-non-root',
         'debian-root',
@@ -82,11 +83,11 @@ it('provides root and non-root profiles for every supported distribution', funct
         'centos-non-root',
         'alpine-root',
         'alpine-non-root',
-    ])->and($profiles->pluck('ip')->unique()->count())->toBe(10)
-        ->and($profiles->pluck('mac')->unique()->count())->toBe(10)
-        ->and($profiles->pluck('uuid')->unique()->count())->toBe(10)
-        ->and($profiles->pluck('domain')->unique()->count())->toBe(10)
-        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(6)
+    ])->and($profiles->pluck('ip')->unique()->count())->toBe(11)
+        ->and($profiles->pluck('mac')->unique()->count())->toBe(11)
+        ->and($profiles->pluck('uuid')->unique()->count())->toBe(11)
+        ->and($profiles->pluck('domain')->unique()->count())->toBe(11)
+        ->and($profiles->filter(fn (array $profile) => $profile['user'] === 'root')->count())->toBe(7)
         ->and($profiles->filter(fn (array $profile) => $profile['user'] !== 'root')->count())->toBe(4);
 });
 
@@ -293,31 +294,63 @@ it('runs the node-dev stack through the instance launcher', function () {
         ->toContain('DEVELOPMENT_QEMU_COOLIFY_PORT: "${APP_PORT:-8000}"');
 });
 
-it('manages the legacy onboarding qemu vm without host php', function () {
-    $script = File::get(base_path('scripts/dev-qemu'));
+it('prepares the onboarding node with ssh only and points it at the instance flux gateway', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-onboarding-test-'.uniqid();
+    useDevelopmentQemuInstance('main', 3, $storagePath);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.30.0.0/16\n"),
+        '* dominfo *' => Process::result(exitCode: 1),
+        '*' => Process::result(),
+    ]);
 
-    expect($script)->toContain('virt-install')
-        ->toContain('virsh')
-        ->toContain('docker exec coolify php artisan dev:qemu:seed')
-        ->toContain('docker exec coolify php artisan dev:qemu:bootstrap-nodes')
-        ->toContain('node-onboarding)')
-        ->toContain('runtime="${values[3]:-node}"')
-        ->toContain('if [[ "$runtime" == naked ]]')
-        ->toContain('network_info="$(virsh net-info "$network")"')
-        ->toContain('grep -Eq \'^Active:[[:space:]]+yes$\' <<< "$network_info"')
-        ->toContain('  - openssh-server')
-        ->toContain('systemctl enable --now ssh')
-        ->toContain('virsh dominfo "$domain"')
-        ->toContain('virsh domstate "$domain"')
-        ->toContain('Waiting for SSH and cloud-init')
-        ->toContain('-o LogLevel=ERROR')
-        ->toContain('sysctl -n net.ipv4.ip_forward')
-        ->toContain('iptables -C LIBVIRT_FWI')
-        ->not->toContain('reset_managed_vms')
-        ->not->toContain('php artisan dev:qemu ');
+    StartDevelopmentQemuVm::run('node-onboarding');
 
-    expect(is_executable(base_path('scripts/dev-qemu')))->toBeTrue();
-    expect(substr_count($script, "printf '192.168.122.1 coolify-flux\\n' >> /etc/hosts"))->toBe(2);
+    $userData = File::get("{$storagePath}/coolify-dev-main--node-onboarding-user-data.yaml");
+    $cloudInit = Yaml::parse($userData);
+
+    expect($cloudInit['packages'])->toBe(['openssh-server', 'sudo'])
+        ->and($cloudInit['runcmd'][0])->toContain('systemctl enable --now ssh', 'touch /etc/cloud/cloud-init.disabled', 'poweroff')
+        ->and($userData)->not->toContain('podman', 'docker', 'wireguard');
+    Process::assertRan(fn ($process) => str_contains($process->command, 'coolify-dev-node-onboarding-prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains($process->command, "'root@10.221.3.52'")
+        && str_contains($process->command, "'\\''10.221.3.1'\\'' >> /etc/hosts")
+        && ! str_contains($process->command, 'podman.sock'));
+});
+
+it('starts the onboarding node without seeding a server or node', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-onboarding-manage-'.uniqid()]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '* dominfo *' => Process::result(exitCode: 1),
+        '*' => Process::result(),
+    ]);
+
+    ManageDevelopmentQemuVm::run(['node-onboarding', 'node-worker-a']);
+
+    expect(Node::query()->where('uuid', 'development-qemu-node-onboarding')->exists())->toBeFalse()
+        ->and(Server::query()->where('uuid', 'development-qemu-node-onboarding')->exists())->toBeFalse()
+        ->and(Node::query()->where('uuid', 'development-qemu-node-worker-a')->exists())->toBeTrue();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'coolify-dev-node-onboarding'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'dev:qemu:seed'));
+});
+
+it('never seeds the onboarding node or uses it as localhost', function () {
+    Process::fake();
+
+    expect(fn () => SeedDevelopmentQemuServer::run('node-onboarding'))->toThrow(InvalidArgumentException::class, 'never seeded')
+        ->and(fn () => ManageDevelopmentQemuVm::run('node-onboarding', true))->toThrow(InvalidArgumentException::class, 'localhost');
+    Process::assertNothingRan();
+});
+
+it('tells the developer where to onboard the clean node', function () {
+    config(['app.env' => 'local']);
+    ManageDevelopmentQemuVm::shouldRun()->once()->with(['node-onboarding'], false, false);
+
+    $this->artisan('dev:qemu', ['profiles' => ['node-onboarding']])
+        ->expectsOutputToContain('Add it at /node-clusters/new-node')
+        ->assertSuccessful();
 });
 
 it('seeds the first node worker as a separate node with the host gateway endpoint', function () {
@@ -737,7 +770,8 @@ it('resolves isolated per-instance values from the environment', function () {
         ->and($config['profiles']['node-worker-a']['template'])->toBe('coolify-dev-node-worker-a')
         ->and($config['profiles']['node-worker-a']['ip'])->toBe('10.221.7.50')
         ->and($config['profiles']['node-worker-b']['ip'])->toBe('10.221.7.51')
-        ->and($profiles->pluck('ip')->unique()->count())->toBe(10)
+        ->and($config['profiles']['node-onboarding']['ip'])->toBe('10.221.7.52')
+        ->and($profiles->pluck('ip')->unique()->count())->toBe(11)
         ->and($profiles->pluck('mac')->all())->toBe(collect($legacy['profiles'])->pluck('mac')->all())
         ->and($profiles->pluck('uuid')->all())->toBe(collect($legacy['profiles'])->pluck('uuid')->all());
 });

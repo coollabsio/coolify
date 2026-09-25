@@ -38,7 +38,9 @@ class ManageDevelopmentQemuVmCommand extends Command
 
         foreach ($profileNames as $profileName) {
             $profile = $profiles[$profileName];
-            $this->info("Started and seeded {$profile['label']} at {$profile['ip']}.");
+            $this->info(($profile['runtime'] ?? null) === 'naked'
+                ? "Started {$profile['label']} at {$profile['ip']}. Add it at /node-clusters/new-node with user {$profile['user']} and the development private key."
+                : "Started and seeded {$profile['label']} at {$profile['ip']}.");
         }
 
         return self::SUCCESS;

@@ -74,15 +74,7 @@ class CreateClusterDockerImageWorkload
                 'environment_id' => $environment->id,
                 'name' => 'docker-image-'.new_public_id(),
             ]);
-            $configuration = ['restart_policy' => 'unless-stopped'];
-            $revision = $workload->revisions()->create([
-                'image' => $image,
-                'configuration' => $configuration,
-                'configuration_hash' => hash('sha256', json_encode([
-                    'image' => $image,
-                    'configuration' => $configuration,
-                ], JSON_THROW_ON_ERROR)),
-            ]);
+            $revision = $workload->createRevision($image, ['restart_policy' => 'unless-stopped']);
             $workload->nodes()->attach($node);
             EnsureNodeWorkloadDnsNames::run($node);
             $deployment = CreateDeploymentOperation::run($node, $revision, $requestedBy);

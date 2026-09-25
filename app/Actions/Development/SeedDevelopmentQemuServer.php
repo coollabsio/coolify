@@ -27,6 +27,10 @@ class SeedDevelopmentQemuServer
             throw new InvalidArgumentException("Unknown development QEMU profile: {$profileName}");
         }
 
+        if (($profile['runtime'] ?? null) === 'naked') {
+            throw new InvalidArgumentException("The {$profileName} profile is added through the Node onboarding UI and is never seeded.");
+        }
+
         $isNode = ($profile['runtime'] ?? null) === 'podman';
 
         if ($isNode && $asLocalhost) {

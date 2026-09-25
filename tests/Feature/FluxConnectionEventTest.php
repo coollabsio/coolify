@@ -194,3 +194,24 @@ it('rejects connection events for legacy servers', function () {
         'transport' => 'tls',
     ], ['Authorization' => 'Bearer internal-secret'])->assertNotFound();
 });
+
+it('keeps negotiated capabilities after the connection cache expires', function () {
+    $this->postJson('/api/v1/internal/sentinel/control/events', [
+        'event' => 'connected',
+        'server_id' => $this->node->uuid,
+        'connection_id' => '11111111-1111-4111-8111-111111111111',
+        'sentinel_version' => 'main',
+        'protocol_version' => 1,
+        'trust_bundle_version' => 1,
+        'transport' => 'plaintext',
+        'capabilities' => ['container.list.v1'],
+    ], ['Authorization' => 'Bearer internal-secret'])->assertNoContent();
+
+    Cache::flush();
+    $node = $this->node->refresh();
+
+    expect($node->sentinel_capabilities)->toBe(['container.list.v1'])
+        ->and($node->supportsCapability('container.list.v1'))->toBeTrue()
+        ->and($node->supportsCapability('workload.deploy.v1'))->toBeFalse()
+        ->and(fn () => $node->ensureCapability('workload.deploy.v1'))->toThrow(RuntimeException::class);
+});

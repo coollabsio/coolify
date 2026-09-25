@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\CreateClusterDockerImageWorkload;
+use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Enums\NodeContainerManagementState;
 use App\Enums\NodeOperationStatus;
 use App\Jobs\DeployNodeWorkloadJob;
@@ -21,6 +22,7 @@ use App\Models\StandaloneDocker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -444,4 +446,158 @@ it('shows cluster workloads in their environment resource list', function () {
         ->assertOk()
         ->assertSee($deployment['workload']->name)
         ->assertSee('Cluster application');
+});
+
+it('opens the Docker image form for a specific Node target', function () {
+    $this->get(route('project.resource.create', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'type' => 'docker-image',
+        'node' => $this->node->uuid,
+    ]))
+        ->assertOk()
+        ->assertSeeLivewire(DockerImage::class)
+        ->assertDontSeeLivewire(Select::class);
+});
+
+it('creates a new revision when resource settings return to an earlier value', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $component = Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ]);
+
+    foreach (['1', '2', '1'] as $cpuLimit) {
+        $component->set('cpuLimit', $cpuLimit)->call('saveResources')->assertHasNoErrors();
+    }
+
+    $revisions = $deployment['workload']->revisions()->orderBy('id')->get();
+    expect($revisions)->toHaveCount(4)
+        ->and($revisions[3]->configuration['resources'])->toEqual(['cpu_limit' => 1])
+        ->and($revisions[3]->configuration_hash)->toBe($revisions[1]->configuration_hash);
+});
+
+it('lets an administrator save ports, a start command, and encrypted environment variables', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->assertSee('Configuration')
+        ->set('portMappings', '8080:80, 5353:53/udp')
+        ->set('startCommand', 'nginx -g "daemon off;"')
+        ->set('environmentVariables', "# comment\nAPP_ENV=production\nSECRET=\"s3cret value\"\n")
+        ->call('saveConfiguration')
+        ->assertHasNoErrors()
+        ->assertDispatched('success')
+        ->assertSet('portMappings', '8080:80, 5353:53/udp')
+        ->assertSet('startCommand', 'nginx -g "daemon off;"')
+        ->assertSet('environmentVariables', "APP_ENV=production\nSECRET=s3cret value");
+
+    $latest = $deployment['workload']->revisions()->latest('id')->firstOrFail();
+    $rawEnvironment = DB::table('node_workload_revisions')->where('id', $latest->id)->value('environment');
+    expect($deployment['workload']->revisions()->count())->toBe(2)
+        ->and($latest->configuration)->toBe([
+            'restart_policy' => 'unless-stopped',
+            'command' => ['nginx', '-g', 'daemon off;'],
+            'ports' => [
+                ['host_port' => 8080, 'container_port' => 80, 'protocol' => 'tcp'],
+                ['host_port' => 5353, 'container_port' => 53, 'protocol' => 'udp'],
+            ],
+        ])
+        ->and($latest->environment)->toBe(['APP_ENV' => 'production', 'SECRET' => 's3cret value'])
+        ->and($rawEnvironment)->not->toContain('s3cret')
+        ->and($latest->toArray())->not->toHaveKey('environment');
+});
+
+it('keeps the current revision when the configuration does not change', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->call('saveConfiguration')
+        ->assertHasNoErrors();
+
+    expect($deployment['workload']->revisions()->count())->toBe(1);
+});
+
+it('rejects invalid ports and environment variables', function (string $field, string $value) {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->set($field, $value)
+        ->call('saveConfiguration')
+        ->assertHasErrors([$field]);
+
+    expect($deployment['workload']->revisions()->count())->toBe(1);
+})->with([
+    'container port only' => ['portMappings', '80'],
+    'port out of range' => ['portMappings', '70000:80'],
+    'duplicate host port' => ['portMappings', '8080:80, 8080:81'],
+    'unknown protocol' => ['portMappings', '8080:80/icmp'],
+    'missing equals sign' => ['environmentVariables', 'APP_ENV'],
+    'invalid key' => ['environmentVariables', '1BAD=value'],
+]);
+
+it('hides environment variables from members and forbids configuration changes', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], [], ['SECRET' => 'member-must-not-see']);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->assertSet('environmentVariables', '')
+        ->assertDontSee('member-must-not-see')
+        ->set('portMappings', '8080:80')
+        ->call('saveConfiguration')
+        ->assertForbidden();
+
+    expect($deployment['workload']->revisions()->count())->toBe(2);
+});
+
+it('asks Sentinel for a newer image when an administrator redeploys', function () {
+    Queue::fake();
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    expect(data_get($deployment['operation']->request, 'pull_policy'))->toBe('missing');
+    $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->call('deploy')
+        ->assertDispatched('success', 'Deployment queued.');
+
+    $operation = $deployment['workload']->operations()->latest('id')->firstOrFail();
+    expect($operation->id)->not->toBe($deployment['operation']->id)
+        ->and(data_get($operation->request, 'pull_policy'))->toBe('newer');
 });

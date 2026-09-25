@@ -26,7 +26,10 @@ class DispatchWorkloadDeployment
             throw new RuntimeException('Flux internal API configuration is incomplete.');
         }
 
-        $configuration = $this->validatedConfiguration($operation->revision->configuration ?? []);
+        $configuration = $this->validatedConfiguration([
+            ...($operation->revision->configuration ?? []),
+            'environment' => $operation->revision->environment ?? [],
+        ]);
         $environment = $configuration['environment'] ?? [];
         $resources = $configuration['resources'] ?? [];
         $ports = collect($configuration['ports'] ?? [])
@@ -57,6 +60,7 @@ class DispatchWorkloadDeployment
                 'ports' => $ports,
                 'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
                 'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
+                'pull_policy' => data_get($operation->request, 'pull_policy', 'missing'),
                 'network_name' => $containerIp === null ? '' : 'coolify-'.$operation->node->uuid,
                 'network_subnet' => $operation->node->workload_cidr ?? '',
                 'container_ip' => $containerIp ?? '',

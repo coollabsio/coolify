@@ -20,12 +20,18 @@ class ManageDevelopmentQemuVm
     {
         $profileNames = is_array($profileNames) ? array_values(array_unique($profileNames)) : [$profileNames];
 
-        if ($asLocalhost && collect($profileNames)->contains(fn (string $profileName) => config("development-qemu.profiles.{$profileName}.runtime") === 'podman')) {
-            throw new InvalidArgumentException('Worker Node profiles cannot be used as localhost.');
+        if ($asLocalhost && collect($profileNames)->contains(fn (string $profileName) => in_array(config("development-qemu.profiles.{$profileName}.runtime"), ['podman', 'naked'], true))) {
+            throw new InvalidArgumentException('Node profiles cannot be used as localhost.');
         }
 
-        foreach ($profileNames as $index => $profileName) {
+        $seededProfileCount = 0;
+        foreach ($profileNames as $profileName) {
             StartDevelopmentQemuVm::run($profileName, $fresh);
+
+            if (config("development-qemu.profiles.{$profileName}.runtime") === 'naked') {
+                continue;
+            }
+            $index = $seededProfileCount++;
 
             try {
                 SeedDevelopmentQemuServer::run($profileName, $index === 0, $asLocalhost);

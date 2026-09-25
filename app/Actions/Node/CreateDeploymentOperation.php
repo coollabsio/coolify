@@ -11,6 +11,7 @@ use App\Models\NodeWorkloadRevision;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -18,12 +19,18 @@ class CreateDeploymentOperation
 {
     use AsAction;
 
-    /** @return array{operation: NodeOperation, created: bool} */
-    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null): array
+    /**
+     * @param  'missing'|'newer'  $pullPolicy  Use `newer` for user redeploys so mutable tags get the latest image.
+     * @return array{operation: NodeOperation, created: bool}
+     */
+    public function handle(Node $node, NodeWorkloadRevision $revision, ?User $requestedBy = null, string $pullPolicy = 'missing'): array
     {
         $node->ensureCapability('workload.deploy.v1');
+        if (! in_array($pullPolicy, ['missing', 'newer'], true)) {
+            throw new InvalidArgumentException('The image pull policy is invalid.');
+        }
 
-        return DB::transaction(function () use ($node, $revision, $requestedBy): array {
+        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -64,7 +71,7 @@ class CreateDeploymentOperation
                 "deploy:{$node->uuid}:{$revision->uuid}:".Str::uuid(),
                 $workload,
                 $revision,
-                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash],
+                ['revision_uuid' => $revision->uuid, 'configuration_hash' => $revision->configuration_hash, 'pull_policy' => $pullPolicy],
                 $requestedBy,
             );
 

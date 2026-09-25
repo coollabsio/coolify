@@ -50,6 +50,22 @@ $developmentQemuProfiles = [
         'runtime' => 'podman',
         'memory' => 3072,
     ],
+    'node-onboarding' => [
+        'label' => 'Clean Node for UI onboarding (Ubuntu 24.04)',
+        'domain' => 'coolify-dev-node-onboarding',
+        'uuid' => 'development-qemu-node-onboarding',
+        'name' => 'QEMU onboarding Node',
+        'ip' => '192.168.122.52',
+        'user' => 'root',
+        'mac' => '52:54:00:ca:00:0b',
+        'image' => 'ubuntu-noble-amd64.qcow2',
+        'image_url' => 'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img',
+        'os_variant' => 'ubuntu24.04',
+        'provisioner' => 'apt',
+        // Only SSH: Node onboarding installs Podman, WireGuard, and Sentinel itself. Never seeded.
+        'runtime' => 'naked',
+        'memory' => 3072,
+    ],
     'ubuntu-root' => [
         'label' => 'Ubuntu 24.04 (root)',
         'domain' => 'coolify-dev-ubuntu-root',

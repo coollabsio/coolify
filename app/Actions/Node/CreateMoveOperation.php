@@ -21,6 +21,8 @@ class CreateMoveOperation
     {
         $source->refresh();
         $target->refresh();
+        $source->ensureCapability('workload.lifecycle.v1');
+        $target->ensureCapability('workload.deploy.v1');
 
         return DB::transaction(function () use ($source, $target, $revision, $requestedBy): NodeOperation {
             if ($source->id === $target->id

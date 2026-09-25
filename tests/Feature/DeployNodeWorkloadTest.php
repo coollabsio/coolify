@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\AssignNodeToCluster;
+use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateNodeCluster;
 use App\Actions\Node\CreateOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
@@ -33,7 +34,6 @@ beforeEach(function () {
     $this->node->workloads()->attach($this->workload);
     $configuration = [
         'command' => ['sleep', '3600'],
-        'environment' => ['APP_ENV' => 'production'],
         'ports' => [[
             'host_ip' => '127.0.0.1',
             'host_port' => 18080,
@@ -46,6 +46,7 @@ beforeEach(function () {
         'node_workload_id' => $this->workload->id,
         'image' => 'docker.io/library/alpine:latest',
         'configuration' => $configuration,
+        'environment' => ['APP_ENV' => 'production'],
         'configuration_hash' => hash('sha256', json_encode($configuration, JSON_THROW_ON_ERROR)),
     ]);
     $this->operation = CreateOperation::run(
@@ -106,13 +107,35 @@ it('deploys a revision with the durable operation UUID and refreshes inventory',
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/v1/commands/workload.deploy')
         && $request['command_id'] === $operation->uuid
         && $request['environment'] === ['APP_ENV' => 'production']
+        && $request['pull_policy'] === 'missing'
         && $request['labels']['coolify.revision'] === $this->revision->uuid);
+});
+
+it('sends the pull policy that the deployment operation requested', function () {
+    $this->operation->update(['request' => [...$this->operation->request, 'pull_policy' => 'newer']]);
+    Http::fake(['http://flux:7080/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation->refresh());
+
+    Http::assertSent(fn ($request): bool => $request['pull_policy'] === 'newer');
+});
+
+it('rejects an unknown pull policy before it creates an operation', function () {
+    expect(fn () => CreateDeploymentOperation::run($this->node, $this->revision, null, 'always'))
+        ->toThrow(InvalidArgumentException::class, 'The image pull policy is invalid.');
 });
 
 it('encodes an empty environment as a json object', function () {
     $configuration = ['restart_policy' => 'unless-stopped'];
     $this->revision->update([
         'configuration' => $configuration,
+        'environment' => null,
         'configuration_hash' => hash('sha256', json_encode($configuration, JSON_THROW_ON_ERROR)),
     ]);
     Http::fake(['*/v1/commands/workload.deploy' => Http::response([
@@ -290,7 +313,7 @@ it('queues an assigned revision from the Node page without storing environment v
     $node->workloads()->attach($workload);
     $revision = NodeWorkloadRevision::factory()->create([
         'node_workload_id' => $workload->id,
-        'configuration' => ['environment' => ['SECRET' => 'do-not-store']],
+        'environment' => ['SECRET' => 'do-not-store'],
     ]);
     $this->actingAs($user);
     session(['currentTeam' => $team]);
@@ -307,6 +330,7 @@ it('queues an assigned revision from the Node page without storing environment v
     expect($operation->request)->toBe([
         'revision_uuid' => $revision->uuid,
         'configuration_hash' => $revision->configuration_hash,
+        'pull_policy' => 'newer',
     ]);
     Queue::assertPushed(
         DeployNodeWorkloadJob::class,

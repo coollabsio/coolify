@@ -164,3 +164,35 @@ it('queues a safe move from the Node page', function () {
     expect($operation->request['target_node_uuid'])->toBe($target->uuid);
     Queue::assertPushed(MoveNodeWorkloadJob::class, fn ($job) => $job->operationId === $operation->id);
 });
+
+it('checks the capabilities that a move uses instead of a move command capability', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $key = PrivateKey::factory()->create(['team_id' => $team->id]);
+    $cluster = CreateNodeCluster::run($team, $user, 'Capability mesh');
+    $source = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $key->id,
+        'sentinel_capabilities' => ['workload.deploy.v1', 'workload.lifecycle.v1'],
+    ]);
+    $target = Node::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $key->id,
+        'sentinel_capabilities' => ['workload.lifecycle.v1'],
+    ]);
+    AssignNodeToCluster::run($cluster, $source);
+    AssignNodeToCluster::run($cluster, $target);
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $source->workloads()->attach($workload);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id]);
+
+    expect(fn () => CreateMoveOperation::run($source, $target, $revision))
+        ->toThrow(RuntimeException::class, 'workload.deploy.v1');
+
+    $target->update(['sentinel_capabilities' => ['workload.deploy.v1', 'workload.lifecycle.v1']]);
+    $operation = CreateMoveOperation::run($source, $target, $revision);
+
+    expect($operation->command_type)->toBe('workload.move.v1')
+        ->and($operation->status)->toBe(NodeOperationStatus::QUEUED);
+});

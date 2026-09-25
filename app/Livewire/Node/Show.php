@@ -106,7 +106,7 @@ class Show extends Component
                     ->where('team_id', $this->node->team_id)
                     ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
                 ->firstOrFail();
-            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user());
+            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
             $operation = $deployment['operation'];
             if ($deployment['created']) {
                 DeployNodeWorkloadJob::dispatch($operation->id);

@@ -31,14 +31,7 @@ class UpdateNodeWorkloadResources
                 $configuration['resources'] = $resources;
             }
 
-            return $workload->revisions()->create([
-                'image' => $current->image,
-                'configuration' => $configuration,
-                'configuration_hash' => hash('sha256', json_encode([
-                    'image' => $current->image,
-                    'configuration' => $configuration,
-                ], JSON_THROW_ON_ERROR)),
-            ]);
+            return $workload->createRevision($current->image, $configuration, $current->environment ?? []);
         });
     }
 }

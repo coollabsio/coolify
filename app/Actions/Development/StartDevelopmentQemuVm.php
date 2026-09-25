@@ -45,7 +45,25 @@ class StartDevelopmentQemuVm
 
         if ($this->usesPodman($profile)) {
             $this->configureNodeRuntime($profile);
+        } elseif ($this->isNaked($profile)) {
+            $this->runOrFail($this->sshCommand($profile, $this->fluxHostsCommand()));
         }
+    }
+
+    /** @param array{runtime?: string} $profile */
+    private function isNaked(array $profile): bool
+    {
+        return ($profile['runtime'] ?? 'docker') === 'naked';
+    }
+
+    /**
+     * Prepared images are shared by every dev instance, so the instance gateway is applied after boot.
+     */
+    private function fluxHostsCommand(): string
+    {
+        $gateway = config('development-qemu.gateway');
+
+        return "sed -i '/[[:space:]]coolify-flux\$/d' /etc/hosts && printf '%s coolify-flux\\n' ".escapeshellarg($gateway).' >> /etc/hosts';
     }
 
     /** @param array{runtime?: string} $profile */
@@ -70,21 +88,10 @@ class StartDevelopmentQemuVm
         }
     }
 
-    /**
-     * Prepared images are shared by every dev instance, so the instance gateway is applied after boot.
-     *
-     * @param  array{ip: string, user: string}  $profile
-     */
+    /** @param array{ip: string, user: string} $profile */
     private function configureNodeRuntime(array $profile): void
     {
-        $gateway = config('development-qemu.gateway');
-        $command = implode(' && ', [
-            "sed -i '/[[:space:]]coolify-flux\$/d' /etc/hosts",
-            "printf '%s coolify-flux\\n' ".escapeshellarg($gateway).' >> /etc/hosts',
-            'ln -sfn /run/podman/podman.sock /run/docker.sock',
-        ]);
-
-        $this->runOrFail($this->sshCommand($profile, $command));
+        $this->runOrFail($this->sshCommand($profile, $this->fluxHostsCommand().' && ln -sfn /run/podman/podman.sock /run/docker.sock'));
     }
 
     /** @param array{domain: string, template: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string, runtime?: string, memory?: int} $profile */
@@ -256,9 +263,11 @@ class StartDevelopmentQemuVm
             ? '    passwd: $6$dd2d71373a57c9ac$8.GUqZYlL/QqUmpUuupWfTuKQjNKT7kO31K5cp7OIY5SbBamlAVkJnBDYsIVimMaBrUtYfFjX3u6hzts3nKaD.'."\n    lock_passwd: false"
             : '    lock_passwd: true';
 
-        [$packages, $runtimeScript] = $this->usesPodman($profile)
-            ? $this->podmanSetup()
-            : $this->dockerSetup($profile);
+        [$packages, $runtimeScript] = match (true) {
+            $this->usesPodman($profile) => $this->podmanSetup(),
+            $this->isNaked($profile) => ["  - openssh-server\n  - sudo", '    systemctl enable --now ssh'],
+            default => $this->dockerSetup($profile),
+        };
 
         return <<<YAML
 #cloud-config

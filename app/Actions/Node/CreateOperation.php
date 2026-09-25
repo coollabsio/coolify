@@ -16,6 +16,9 @@ class CreateOperation
 {
     use AsAction;
 
+    /** Operations that Coolify coordinates itself. They are never sent to Sentinel as one command. */
+    private const COORDINATED_COMMANDS = ['workload.move.v1'];
+
     /** @param array<string, mixed> $request */
     public function handle(
         Node $node,
@@ -29,7 +32,9 @@ class CreateOperation
         if (blank($commandType) || mb_strlen($commandType) > 100) {
             throw new InvalidArgumentException('The command type is invalid.');
         }
-        $node->ensureCapability($commandType);
+        if (! in_array($commandType, self::COORDINATED_COMMANDS, true)) {
+            $node->ensureCapability($commandType);
+        }
         if (blank($idempotencyKey) || mb_strlen($idempotencyKey) > 255) {
             throw new InvalidArgumentException('The idempotency key is invalid.');
         }

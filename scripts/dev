@@ -7,6 +7,7 @@
 #   ./scripts/dev run [qemu-profile]     # start, follow logs, stop on exit (Jean)
 #   ./scripts/dev urls                   # all instances, ports, and state
 #   ./scripts/dev ps | logs | exec <cmd...> | container
+#   ./scripts/dev qemu <profile...> [--fresh]  # start extra KVM VMs, e.g. node-onboarding
 #   ./scripts/dev destroy <name>         # delete containers, volumes, VMs, and the port slot
 #   ./scripts/dev teardown               # destroy this worktree's instance if it exists (Jean)
 #
@@ -16,13 +17,15 @@
 #
 # Ports: the main checkout uses 8000 (Reverb 6001, terminal 6002, db 5432, redis 6379,
 # vite 5173). Worktrees use 20000 + slot*10: app +0, Reverb +1, terminal +2, db +3,
-# redis +4, vite +5, mailpit +6/+7, minio +8/+9.
+# redis +4, vite +5, mailpit +6/+7, minio +8/+9. Flux (v5 Nodes) uses 7443 on the main
+# checkout and 17000 + slot for worktrees.
 #
 # Env: COOLIFY_DEV_SERVER_BACKEND=auto|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
 #
 # v5 Nodes: when docker-compose.node-dev.yml exists it is layered on top (Flux control
 # channel). With the KVM backend and DEVELOPMENT_QEMU_AUTO_START=true (env or .env), the
 # QEMU worker Nodes (node-worker-a, node-worker-b) are started and bootstrapped as well.
+# `./scripts/dev qemu node-onboarding` starts a clean VM for the Node onboarding UI.
 #
 set -euo pipefail
 
@@ -40,7 +43,7 @@ QEMU_STORAGE="${DEVELOPMENT_QEMU_STORAGE_PATH:-/var/lib/libvirt/images/coolify-d
 LEGACY_CONTAINERS=(coolify coolify-db coolify-redis coolify-vite coolify-mail coolify-minio coolify-minio-init coolify-testing-host)
 
 usage() {
-  sed -n '2,26p' "$0" | sed 's/^# \?//'
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
 }
 
 normalize_name() {
@@ -110,17 +113,19 @@ app_url() {
 
 ensure_env() {
   local name="$1" slot env_file existing_key base
-  local app reverb terminal db redis vite mail mail_ui minio minio_ui
+  local app reverb terminal db redis vite mail mail_ui minio minio_ui flux
   slot="$(instance_slot "$name")"
   env_file="$(env_file "$name")"
 
   if ! is_linked_worktree && [[ -z "${COOLIFY_DEV_INSTANCE:-}" ]]; then
     app=8000 reverb=6001 terminal=6002 db=5432 redis=6379 vite=5173
-    mail=1025 mail_ui=8025 minio=9000 minio_ui=9001
+    mail=1025 mail_ui=8025 minio=9000 minio_ui=9001 flux=7443
   else
     base=$((20000 + slot * 10))
     app=$base reverb=$((base + 1)) terminal=$((base + 2)) db=$((base + 3)) redis=$((base + 4))
     vite=$((base + 5)) mail=$((base + 6)) mail_ui=$((base + 7)) minio=$((base + 8)) minio_ui=$((base + 9))
+    # The 10-port block is full, so Flux gets its own range below it.
+    flux=$((17000 + slot))
   fi
 
   # Never rotate APP_KEY once set: encrypted DB columns (private keys, secrets)
@@ -156,6 +161,7 @@ FORWARD_MAILPIT_PORT=${mail}
 FORWARD_MAILPIT_DASHBOARD_PORT=${mail_ui}
 FORWARD_MINIO_PORT=${minio}
 FORWARD_MINIO_PORT_CONSOLE=${minio_ui}
+FLUX_PORT=${flux}
 PUSHER_APP_ID=coolify-${name}
 PUSHER_APP_KEY=coolify-${name}
 PUSHER_APP_SECRET=coolify-${name}
@@ -389,6 +395,12 @@ case "$command" in
       exit 2
     fi
     ;;
+  qemu)
+    if [[ $# -lt 1 ]]; then
+      echo 'Usage: ./scripts/dev qemu <profile...> [--fresh]' >&2
+      exit 2
+    fi
+    ;;
   urls | ls | ps | logs | exec | container | teardown) ;;
   *)
     usage >&2
@@ -397,6 +409,7 @@ case "$command" in
 esac
 
 profile_arg="${1:-}"
+[[ "$command" == qemu ]] && profile_arg=""
 profile="${profile_arg:-${COOLIFY_DEV_KVM_PROFILE:-ubuntu-root}}"
 select_backend
 
@@ -458,6 +471,13 @@ case "$command" in
     ;;
   logs)
     compose "$instance" logs -f "$@"
+    ;;
+  qemu)
+    if [[ "$backend" != "kvm" ]]; then
+      echo 'QEMU VMs need /dev/kvm and root or passwordless sudo.' >&2
+      exit 1
+    fi
+    host_qemu_artisan dev:qemu "$@"
     ;;
   exec)
     [[ $# -gt 0 ]] || {

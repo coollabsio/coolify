@@ -26,6 +26,7 @@ class Node extends BaseModel
             'role' => NodeRole::class,
             'sentinel_token' => 'encrypted',
             'metadata' => 'array',
+            'sentinel_capabilities' => 'array',
             'is_reachable' => 'boolean',
             'is_usable' => 'boolean',
             'network_observed_state' => 'array',
@@ -115,7 +116,7 @@ class Node extends BaseModel
 
     public function supportsCapability(string $capability): ?bool
     {
-        $capabilities = data_get(Cache::get($this->cacheKey()), 'capabilities');
+        $capabilities = data_get(Cache::get($this->cacheKey()), 'capabilities') ?? $this->sentinel_capabilities;
         if (! is_array($capabilities)) {
             return null;
         }
