@@ -116,7 +116,10 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            $this->sqliteDatabases = str($this->sqliteDatabases)->replace(' ', '')->trim(',')->toString();
+            $this->sqliteDatabases = collect(explode(',', $this->sqliteDatabases))
+                ->map(fn (string $name) => trim($name))
+                ->filter(fn (string $name) => $name !== '')
+                ->implode(',');
             $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('databaseUpdated');

@@ -27,14 +27,9 @@
                     canGate="update" :canResource="$database"
                     helper="Comma-separated file names. Missing files are created in the data volume on the next start. Removing a name does not delete its file. Backups restore into the first file." />
             </div>
-            <div class="mt-4">
-                <x-callout type="info" title="Connecting applications">
-                    Mount the data volume from Persistent Storage in the application and open
-                    <span class="font-mono">&lt;mount path&gt;/&lt;file name&gt;</span>.
-                    The application must run as user 65532 or as root to access the files.
-                </x-callout>
-            </div>
         </x-application.settings-section>
+
+        <livewire:project.database.sqlite.connect-application :database="$database" />
 
         <x-application.settings-section title="Runtime" description="Configure Docker runtime options.">
             <x-forms.input

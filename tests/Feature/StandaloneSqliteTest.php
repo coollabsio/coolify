@@ -103,6 +103,18 @@ it('normalises the file list when saved from the general page', function () {
     expect($this->database->refresh()->sqlite_databases)->toBe('app.db,cache.db');
 });
 
+it('rejects space separated file names instead of merging them', function () {
+    $original = $this->database->sqlite_databases;
+
+    Livewire::actingAs($this->user)
+        ->test(General::class, ['database' => $this->database])
+        ->set('sqliteDatabases', 'app.db cache.db')
+        ->call('submit')
+        ->assertNotDispatched('success');
+
+    expect($this->database->refresh()->sqlite_databases)->toBe($original);
+});
+
 it('creates a sqlite database through the API without public access fields', function () {
     $headers = sqliteApiHeaders();
     $payload = [

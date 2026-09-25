@@ -147,6 +147,12 @@ class All extends Component
 
         $this->deleteDockerVolume = in_array('deleteDockerVolume', $selectedActions, true);
         if ($this->deleteDockerVolume) {
+            if ($storage->isSharedWithAnotherResource()) {
+                $this->dispatch('error', 'This Docker volume is also mounted by another resource. Remove the mount without deleting the Docker volume.');
+
+                return false;
+            }
+
             $server = $this->resource instanceof Application
                 ? $this->resource->destination->server
                 : $this->resource->service->server;

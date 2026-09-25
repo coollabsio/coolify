@@ -64,6 +64,24 @@ class LocalPersistentVolume extends BaseModel
         }
     }
 
+    /**
+     * Whether another resource mounts the same Docker volume, e.g. an application that uses a SQLite database volume.
+     */
+    public function isSharedWithAnotherResource(): bool
+    {
+        if (filled($this->host_path)) {
+            return false;
+        }
+
+        return static::query()
+            ->where('name', $this->name)
+            ->where(function ($query): void {
+                $query->where('resource_type', '!=', $this->resource_type)
+                    ->orWhere('resource_id', '!=', $this->resource_id);
+            })
+            ->exists();
+    }
+
     protected function customizeName($value)
     {
         return str($value)->trim()->value;
