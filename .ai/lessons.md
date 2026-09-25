@@ -61,3 +61,6 @@
 
 ## Test the real runtime image
 - Deployment shell commands run in the Alpine/BusyBox helper image and pass through the non-root sudo parser. Verify new flags and shell syntax in that image and with `parseCommandsByLineForSudo()`; faked command output hides both failures.
+
+## Format only your own files
+- `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.

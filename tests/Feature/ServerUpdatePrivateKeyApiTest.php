@@ -134,7 +134,20 @@ it('rejects the legacy build server API field', function () {
         ->assertJsonValidationErrors('is_build_server');
 });
 
-it('requires another build-capable server before selecting deployment only', function () {
+it('requires a dedicated build server before selecting deployment only', function () {
+    patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
+        'server_role' => 'deployment',
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('server_role');
+
+    $combinedServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $combinedServer->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'server_role' => 'both',
+        'is_build_server' => false,
+    ]);
+
     patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
         'server_role' => 'deployment',
     ])->assertUnprocessable()
@@ -165,7 +178,22 @@ it('creates a server with an API server role', function () {
 
     $server = Server::whereUuid($response->json('uuid'))->firstOrFail();
 
-    expect($server->settings->server_role->value)->toBe('build');
+    expect($server->settings->server_role->value)->toBe('build')
+        ->and($server->settings->is_build_server)->toBeTrue();
+});
+
+it('keeps the legacy build server flag in sync when the API changes the role', function () {
+    patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
+        'server_role' => 'build',
+    ])->assertCreated();
+
+    expect($this->server->settings->fresh()->is_build_server)->toBeTrue();
+
+    patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
+        'server_role' => 'both',
+    ])->assertCreated();
+
+    expect($this->server->settings->fresh()->is_build_server)->toBeFalse();
 });
 
 it('rejects an invalid API server role', function () {

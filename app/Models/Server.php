@@ -530,12 +530,27 @@ class Server extends BaseModel
             ->whereRelation('settings', 'force_disabled', false);
 
         return $isBuildServer
-            ? $query->whereHas('settings', fn (Builder $settings) => $settings
-                ->where('server_role', '!=', ServerRole::DEPLOYMENT->value)
-                ->orWhereNull('server_role'))
-            : $query->whereHas('settings', fn (Builder $settings) => $settings
-                ->where('server_role', '!=', ServerRole::BUILD->value)
-                ->orWhereNull('server_role'));
+            ? self::whereServerRole($query, ServerRole::BUILD)
+            : self::whereServerRole($query, ServerRole::DEPLOYMENT, ServerRole::BOTH);
+    }
+
+    /**
+     * Filters by the effective server role. A null role falls back to the legacy
+     * is_build_server flag, like ServerSetting::effectiveServerRole().
+     */
+    private static function whereServerRole(Builder $query, ServerRole ...$roles): Builder
+    {
+        $legacyBuildServerFlags = collect($roles)
+            ->reject(fn (ServerRole $role) => $role === ServerRole::DEPLOYMENT)
+            ->map(fn (ServerRole $role) => $role === ServerRole::BUILD)
+            ->values()
+            ->all();
+
+        return $query->whereHas('settings', fn (Builder $settings) => $settings
+            ->whereIn('server_role', array_map(fn (ServerRole $role) => $role->value, $roles))
+            ->orWhere(fn (Builder $legacy) => $legacy
+                ->whereNull('server_role')
+                ->whereIn('is_build_server', $legacyBuildServerFlags)));
     }
 
     public function canHostResources(): bool
@@ -929,16 +944,19 @@ $siteAddress {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
 
-    public static function buildServers($teamId)
+    /**
+     * Usable dedicated (build-only) servers of a team. Servers with the combined role
+     * host deployments, so they are never picked as build servers.
+     */
+    public static function buildServers($teamId): Builder
     {
-        return Server::whereTeamId($teamId)
+        $query = Server::whereTeamId($teamId)
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereHas('settings', fn (Builder $settings) => $settings
-                ->where('server_role', '!=', ServerRole::DEPLOYMENT->value)
-                ->orWhereNull('server_role'))
             ->whereRelation('settings', 'force_disabled', false);
+
+        return self::whereServerRole($query, ServerRole::BUILD);
     }
 
     public function isForceDisabled()

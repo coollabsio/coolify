@@ -425,7 +425,7 @@ class Show extends Component
 
             if ($newRole === ServerRole::DEPLOYMENT && ! Server::buildServers($this->server->team_id)->whereKeyNot($this->server->id)->exists()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Add another build-capable server before you set this server to deployments only.');
+                $this->dispatch('error', 'Add a usable build server before you set this server to deployments only.');
 
                 return;
             }
