@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
 
@@ -103,6 +104,7 @@ it('automatically configures the qemu host', function () {
 
     ConfigureDevelopmentQemuHost::run();
 
+    Process::assertRan(fn ($process) => str_contains($process->command, 'command -v') && str_contains($process->command, 'xorriso'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'systemctl enable --now libvirtd'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-define'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'virsh net-start'));
@@ -255,6 +257,74 @@ it('can create a vm without a host database connection', function () {
     expect(DB::getQueryLog())->toBeEmpty();
     Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'iptables -I LIBVIRT_FWI'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virsh domstate') && str_contains($process->command, 'shut off'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mv ') && str_contains($process->command, 'prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'qemu-img create') && str_contains($process->command, 'prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'xorriso -as mkisofs -V cidata -graft-points'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && str_contains($process->command, 'bus=virtio,readonly=on'));
+    $userData = File::get(config('development-qemu.storage_path').'/coolify-dev-ubuntu-root-user-data.yaml');
+    expect($userData)->toContain('docker compose version', 'docker buildx version', 'docker info', 'cloud-init.disabled');
+    $cloudInit = Yaml::parse($userData);
+    expect($cloudInit['runcmd'][0])->toContain('https://get.docker.com', 'systemctl enable --now docker', 'poweroff');
+});
+
+it('reuses a prepared vm image without reinstalling docker', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-prepared-test-'.uniqid();
+    config(['development-qemu.storage_path' => $storagePath]);
+    File::ensureDirectoryExists($storagePath);
+    File::put("{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2", 'prepared image');
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '*' => Process::result(),
+    ]);
+
+    StartDevelopmentQemuVm::run('ubuntu-root');
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'curl --fail --location'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'virsh domstate'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'qemu-img create') && str_contains($process->command, 'coolify-dev-ubuntu-root-prepared.qcow2'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'virt-install') && ! str_contains($process->command, '--cloud-init'));
+    expect(File::exists("{$storagePath}/coolify-dev-ubuntu-root-prepared.qcow2"))->toBeTrue();
+});
+
+it('prepares alpine with the compose and buildx packages for a non-root user', function () {
+    $storagePath = sys_get_temp_dir().'/coolify-qemu-alpine-test-'.uniqid();
+    config(['development-qemu.storage_path' => $storagePath]);
+    Process::fake([
+        '* net-dumpxml *' => Process::result(output: '<network></network>'),
+        '* network inspect *' => Process::result(output: "172.18.0.0/16\n"),
+        '*' => Process::result(),
+    ]);
+
+    StartDevelopmentQemuVm::run('alpine-non-root', false);
+
+    $cloudInit = Yaml::parse(File::get("{$storagePath}/coolify-dev-alpine-non-root-user-data.yaml"));
+    expect($cloudInit['packages'])->toContain('docker', 'docker-cli-compose', 'docker-cli-buildx')
+        ->and($cloudInit['users'][0]['shell'])->toBe('/bin/ash')
+        ->and($cloudInit['users'][0]['lock_passwd'])->toBeFalse()
+        ->and($cloudInit['runcmd'][0])->toContain('service cgroups start', 'addgroup coolify docker', 'until docker info', 'docker compose version', 'docker buildx version');
+});
+
+it('does not cache a vm when preparation does not finish', function () {
+    config(['development-qemu.storage_path' => sys_get_temp_dir().'/coolify-qemu-failed-preparation-'.uniqid()]);
+    Process::fake(function ($process) {
+        if (str_contains($process->command, 'net-dumpxml')) {
+            return Process::result(output: '<network></network>');
+        }
+
+        if (str_contains($process->command, 'network inspect')) {
+            return Process::result(output: "172.18.0.0/16\n");
+        }
+
+        return str_contains($process->command, 'timeout 900 bash')
+            ? Process::result(exitCode: 124)
+            : Process::result();
+    });
+
+    expect(fn () => StartDevelopmentQemuVm::run('ubuntu-root'))->toThrow(RuntimeException::class);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mv ') && str_contains($process->command, 'prepared.qcow2'));
+    Process::assertNotRan(fn ($process) => str_starts_with($process->command, 'virt-install ') && ! str_contains($process->command, 'readonly=on'));
 });
 
 it('seeds through the coolify container when the host database is unavailable', function () {

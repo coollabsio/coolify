@@ -24,7 +24,7 @@ class ConfigureDevelopmentQemuHost
 
     private function installDependencies(): void
     {
-        $binaries = ['curl', 'docker', 'iptables', 'qemu-img', 'virsh', 'virt-install'];
+        $binaries = ['curl', 'docker', 'iptables', 'qemu-img', 'virsh', 'virt-install', 'xorriso'];
         $check = collect($binaries)->map(fn (string $binary) => 'command -v '.escapeshellarg($binary))->implode(' && ');
 
         if (Process::run($check)->successful()) {
@@ -36,7 +36,7 @@ class ConfigureDevelopmentQemuHost
         }
 
         $this->runOrFail('apt-get update');
-        $this->runOrFail('DEBIAN_FRONTEND=noninteractive apt-get install -y curl iptables libvirt-clients libvirt-daemon-system qemu-utils qemu-system-x86 virtinst');
+        $this->runOrFail('DEBIAN_FRONTEND=noninteractive apt-get install -y curl iptables libvirt-clients libvirt-daemon-system qemu-utils qemu-system-x86 virtinst xorriso');
     }
 
     private function configureLibvirtNetwork(): void
