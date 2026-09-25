@@ -5,12 +5,14 @@ namespace App\Jobs;
 use App\Enums\ProcessStatus;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Spatie\Url\Url;
 
 class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -112,6 +114,16 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             return ! empty($links) ? implode(' | ', $links).' | ' : '';
         }
 
-        return $this->preview->fqdn ? "[Open Preview]({$this->preview->fqdn}) | " : '';
+        $fqdns = collect(ValidationPatterns::applicationDomainList($this->preview->fqdn));
+        if ($fqdns->isEmpty()) {
+            return '';
+        }
+        if ($fqdns->count() === 1) {
+            return "[Open Preview]({$fqdns->first()}) | ";
+        }
+
+        return $fqdns
+            ->map(fn (string $domain) => '[Open Preview ('.Url::fromString($domain)->getHost().")]({$domain})")
+            ->implode(' | ').' | ';
     }
 }
