@@ -56,9 +56,7 @@ class LocalFileVolume extends BaseModel
                 return;
             }
 
-            $compose = data_get($fileVolume->resource, 'docker_compose_raw')
-                ?? data_get($fileVolume->resource, 'service.docker_compose_raw');
-            if (is_string($compose) && $compose !== '') {
+            if ($fileVolume->usesComposeBindSource()) {
                 $fileVolume->pending_initialization = true;
                 $fileVolume->saveQuietly();
 
@@ -139,12 +137,7 @@ class LocalFileVolume extends BaseModel
 
                 return;
             }
-            $content = $this->readRemoteFileContent($escapedPath, $server);
-            // Check if content contains binary data by looking for null bytes or non-printable characters
-            if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
-                $content = self::BINARY_PLACEHOLDER;
-            }
-            $this->content = $content;
+            $this->content = self::displayContent($this->readRemoteFileContent($escapedPath, $server));
             $this->is_directory = false;
             $this->save();
         }
@@ -251,11 +244,15 @@ class LocalFileVolume extends BaseModel
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
-                $this->content = $this->readRemoteFileContent($escapedPath, $server);
+                $this->content = self::displayContent($this->readRemoteFileContent($escapedPath, $server));
             }
             $this->is_directory = false;
             $this->save();
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
+            /** A new storage adopts a file that already exists on the server. */
+            if ($this->pending_initialization) {
+                return null;
+            }
             throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
         } elseif ($isDir === 'OK' && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
@@ -272,7 +269,12 @@ class LocalFileVolume extends BaseModel
         if ($isDir === 'NOK' && ! $this->is_directory) {
             $chmod = data_get($this, 'chmod');
             $chown = data_get($this, 'chown');
-            if (! is_null($content)) {
+            if ($this->is_binary || $this->is_too_large) {
+                /** A placeholder is not file content; keep the file on the server. */
+                if ($isFile !== 'OK') {
+                    $commands->push("touch {$escapedPath}");
+                }
+            } elseif (! is_null($content)) {
                 $content = base64_encode($content);
                 $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
@@ -292,12 +294,52 @@ class LocalFileVolume extends BaseModel
         return instant_remote_process($commands, $server);
     }
 
+    /**
+     * Replace binary file content with a placeholder for display.
+     */
+    public static function displayContent(string $content): string
+    {
+        if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
+            return self::BINARY_PLACEHOLDER;
+        }
+
+        return $content;
+    }
+
+    /**
+     * Compose resources get their bind source from `docker compose config`, not from `fs_path`.
+     */
+    public function usesComposeBindSource(): bool
+    {
+        $compose = data_get($this->resource, 'docker_compose_raw')
+            ?? data_get($this->resource, 'service.docker_compose_raw');
+
+        return is_string($compose) && $compose !== '';
+    }
+
+    /**
+     * Write the storage to the server and clear the pending flag.
+     *
+     * @return string|null The error message when the storage could not be written.
+     */
+    public function initializeOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): ?string
+    {
+        try {
+            $this->saveStorageOnServer($composeFile, $projectDirectory, $envFile);
+        } catch (\Throwable $e) {
+            return $e->getMessage();
+        }
+        if ($this->pending_initialization) {
+            $this->pending_initialization = false;
+            $this->saveQuietly();
+        }
+
+        return null;
+    }
+
     public function resolvedStoragePath(string $workdir, Server $server, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
     {
-        $resource = $this->resource;
-        $compose = data_get($resource, 'docker_compose_raw')
-            ?? data_get($resource, 'service.docker_compose_raw');
-        if (is_string($compose) && $compose !== '') {
+        if ($this->usesComposeBindSource()) {
             validateComposeBindSource($this->fs_path);
 
             return ComposeBindPathResolver::resolve($this, $composeFile, $envFile, $projectDirectory);
@@ -316,11 +358,13 @@ class LocalFileVolume extends BaseModel
     {
         $escapedBase = escapeshellarg($baseDirectory);
         $escapedPath = escapeshellarg($path);
-        $result = instant_remote_process([
-            "base=\$(realpath -m -- {$escapedBase}) && target=\$(realpath -m -- {$escapedPath}) && case \"\$target\" in \"\$base\"|\"\$base\"/*) echo OK ;; *) echo NOK ;; esac",
-        ], $server, false, true);
+        /** One plain command so non-root servers run it through sudo like other storage commands. */
+        $result = instant_remote_process(["realpath -m -- {$escapedBase} {$escapedPath}"], $server, false);
+        $lines = explode("\n", trim((string) $result));
+        $resolvedBase = $lines[0] ?? '';
+        $resolvedPath = $lines[1] ?? '';
 
-        if (trim((string) $result) !== 'OK') {
+        if (count($lines) !== 2 || $resolvedBase === '' || ($resolvedPath !== $resolvedBase && ! str_starts_with($resolvedPath, rtrim($resolvedBase, '/').'/'))) {
             throw new \RuntimeException('Invalid storage path: resolved path must stay inside the resource configuration directory.');
         }
     }

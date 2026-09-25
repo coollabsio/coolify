@@ -179,10 +179,16 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            if ($fileVolume->is_host_file) {
+            /** Pending storages are written by the next deployment or start. */
+            if ($fileVolume->is_host_file || $fileVolume->pending_initialization) {
                 continue;
             }
-            $fileLocation = $fileVolume->resolvedStoragePath($workdir, $server);
+            /** Skip a storage that cannot be resolved yet, for example before its Compose file exists. */
+            try {
+                $fileLocation = $fileVolume->resolvedStoragePath($workdir, $server);
+            } catch (Throwable) {
+                continue;
+            }
             $escapedFileLocation = escapeshellarg($fileLocation);
             $content = data_get($fileVolume, 'content');
             // Exists and is a file

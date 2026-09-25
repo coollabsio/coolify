@@ -19,13 +19,10 @@ class ComposeBindPathResolver
             $workdir = $resource->workdir();
             $server = $resource->destination->server;
             $composeFile ??= $workdir.'/docker-compose.yaml';
-            if ($resource->docker_compose_custom_start_command) {
-                throw new RuntimeException('Cannot resolve storage from a custom Compose start command.');
-            }
             $serviceName = null;
             $projectName = $resource->settings->is_raw_compose_deployment_enabled ? null : $resource->uuid;
             if (! $resource->settings->is_raw_compose_deployment_enabled && ! $resource->settings->is_preserve_repository_enabled) {
-                /** The helper container uses a deployment-specific project directory for `up`. */
+                /** The helper container uses a deployment-specific project directory for `up`. Before the first deployment, use the workdir. */
                 if ($projectDirectory === null) {
                     $deployment = $resource->deployment_queue()
                         ->where('status', ApplicationDeploymentStatus::FINISHED->value)
@@ -34,11 +31,10 @@ class ComposeBindPathResolver
                         ->where('restart_only', false)
                         ->latest('id')
                         ->first();
-                    if ($deployment === null) {
-                        throw new RuntimeException('No completed Compose deployment is available to resolve this bind source.');
+                    if ($deployment !== null) {
+                        $projectDirectory = $resource->generateBaseDir($deployment->deployment_uuid)
+                            .rtrim((string) $resource->base_directory, '/');
                     }
-                    $projectDirectory = $resource->generateBaseDir($deployment->deployment_uuid)
-                        .rtrim((string) $resource->base_directory, '/');
                 }
             }
         } elseif ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
@@ -96,10 +92,12 @@ class ComposeBindPathResolver
             }
             foreach ($service['volumes'] ?? [] as $mount) {
                 if (($mount['target'] ?? null) === $target) {
-                    $matches[] = $mount;
+                    $matches[] = ['type' => $mount['type'] ?? null, 'source' => $mount['source'] ?? null];
                 }
             }
         }
+        /** Several services can mount the same source at the same target. */
+        $matches = array_values(array_unique($matches, SORT_REGULAR));
         if (count($matches) !== 1 || ($matches[0]['type'] ?? null) !== 'bind') {
             throw new RuntimeException('Storage target does not identify one Compose bind mount.');
         }

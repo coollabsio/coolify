@@ -33,6 +33,7 @@ use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Process\Pool;
@@ -1745,17 +1746,81 @@ function getTopLevelNetworks(Service|Application $resource): Collection
 
     return collect();
 }
+/**
+ * A Compose expression source (`${VAR:-./data}`, `${VAR}/data`) is a host path only when it contains `/`.
+ * `${VAR}` and `${VAR:-name}` stay named volumes.
+ */
 function sourceIsLocal(Stringable $source)
 {
-    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../') || $source->startsWith('$')) {
+    if ($source->startsWith('$')) {
+        return $source->contains('/');
+    }
+    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
         return true;
     }
 
     return false;
 }
 
+/**
+ * Decide the type of a short-syntax volume source for a resource.
+ *
+ * Before Compose expressions were kept, `${VAR}/data` became the named volume `{uuid}_var-data`.
+ * Keep that volume when it already exists so existing data stays mounted.
+ */
+function composeShortSyntaxIsBind(Stringable $source, Model $resource, string $uuid): bool
+{
+    if (! sourceIsLocal($source)) {
+        return false;
+    }
+    if (! $source->startsWith('$')) {
+        return true;
+    }
+
+    return ! $resource->persistentStorages()
+        ->where('name', "{$uuid}_".Str::slug(composeNamedVolumeSource($source), '-'))
+        ->exists();
+}
+
+/**
+ * Return the source text used to name a short-syntax named volume.
+ *
+ * `${VAR:-db}` was named from its default (`db`), and `${VAR:-}` from `${VAR}`. Keep these names.
+ */
+function composeNamedVolumeSource(Stringable $source): Stringable
+{
+    if (preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-([^{}]*)\}$/', $source->value(), $matches) === 1) {
+        return str($matches[2] !== '' ? $matches[2] : '${'.$matches[1].'}');
+    }
+
+    return $source;
+}
+
+/**
+ * Anchor relative paths to the resource configuration directory.
+ *
+ * For a leading `${VAR:-default}` (or `-`, `:+`, `+`), only the default value is changed, so
+ * `${DATA:-./data}` keeps the old default location and a set `DATA` still overrides it.
+ */
 function replaceLocalSource(Stringable $source, Stringable $replacedWith)
 {
+    if ($source->startsWith('${')) {
+        $value = $source->value();
+        $depth = 0;
+        $end = null;
+        for ($i = 0; $i < strlen($value); $i++) {
+            if ($value[$i] === '$' && ($value[$i + 1] ?? '') === '{') {
+                $depth++;
+                $i++;
+            } elseif ($value[$i] === '}' && --$depth === 0) {
+                $end = $i;
+                break;
+            }
+        }
+        if ($end !== null && preg_match('/^([A-Za-z_][A-Za-z0-9_]*)(:-|-|:\+|\+)(.+)$/s', substr($value, 2, $end - 2), $matches) === 1) {
+            $source = str('${'.$matches[1].$matches[2].replaceLocalSource(str($matches[3]), $replacedWith)->value().'}'.substr($value, $end + 1));
+        }
+    }
     if ($source->startsWith('.')) {
         $source = $source->replaceFirst('.', $replacedWith->value());
     }
@@ -2771,7 +2836,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $parsed = parseDockerVolumeString($volume);
                             $source = $parsed['source'];
                             $target = $parsed['target'];
-                            if (sourceIsLocal($source)) {
+                            if (composeShortSyntaxIsBind($source, $savedService, $savedService->service->uuid)) {
                                 $type = str('bind');
                                 // By default, we cannot determine if the bind is a directory or not, so we set it to directory
                                 $isDirectory = true;
@@ -3417,8 +3482,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 if ($parsedVolume['mode']) {
                                     $mount .= ':'.$parsedVolume['mode'];
                                 }
-                                if ($name->startsWith('.') || $name->startsWith('~') || $name->startsWith('$')) {
+                                if ($name->startsWith('.') || $name->startsWith('~') || ($name->startsWith('$') && $name->contains('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('$')) {
+                                        $name = replaceLocalSource($name, str($dir));
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }
@@ -3555,8 +3623,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 if ($parsedVolume['mode']) {
                                     $mount .= ':'.$parsedVolume['mode'];
                                 }
-                                if ($name->startsWith('.') || $name->startsWith('~') || $name->startsWith('$')) {
+                                if ($name->startsWith('.') || $name->startsWith('~') || ($name->startsWith('$') && $name->contains('/'))) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
+                                    if ($name->startsWith('$')) {
+                                        $name = replaceLocalSource($name, str($dir));
+                                    }
                                     if ($name->startsWith('.')) {
                                         $name = $name->replaceFirst('.', $dir);
                                     }

@@ -15,6 +15,7 @@ use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\LocalFileVolume;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -1136,10 +1137,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ($fileStorage->is_host_file || (! $fileStorage->pending_initialization && $this->pull_request_id === 0 && (! $this->preserveRepository || $fileStorage->is_based_on_git || $fileStorage->is_directory))) {
                         continue;
                     }
-                    $fileStorage->saveStorageOnServer($composeFileName, $projectDirectory, $envFile);
-                    if ($fileStorage->pending_initialization) {
-                        $fileStorage->pending_initialization = false;
-                        $fileStorage->saveQuietly();
+                    $error = $fileStorage->initializeOnServer($composeFileName, $projectDirectory, $envFile);
+                    if ($error !== null) {
+                        $this->logStorageWarning($fileStorage, $error);
                     }
                 }
             }
@@ -1159,7 +1159,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($fileStorage->is_host_file) {
                 continue;
             }
-            $path = $fileStorage->resolvedStoragePath($this->application->workdir(), $this->mainServer, $composeFileName, $projectDirectory, $envFile);
+            try {
+                $path = $fileStorage->resolvedStoragePath($this->application->workdir(), $this->mainServer, $composeFileName, $projectDirectory, $envFile);
+            } catch (Throwable $e) {
+                $this->logStorageWarning($fileStorage, $e->getMessage());
+
+                continue;
+            }
             $base = $this->application->workdir();
             if (! str_starts_with($path, $base.'/')) {
                 continue;
@@ -1189,9 +1195,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             $fileStorage->save();
-            $fileStorage->deleteStorageOnServer($composeFileName, $projectDirectory, $envFile);
-            $fileStorage->saveStorageOnServer($composeFileName, $projectDirectory, $envFile);
+            try {
+                $fileStorage->deleteStorageOnServer($composeFileName, $projectDirectory, $envFile);
+            } catch (Throwable $e) {
+                $this->logStorageWarning($fileStorage, $e->getMessage());
+
+                continue;
+            }
+            $error = $fileStorage->initializeOnServer($composeFileName, $projectDirectory, $envFile);
+            if ($error !== null) {
+                $this->logStorageWarning($fileStorage, $error);
+            }
         }
+    }
+
+    /**
+     * Storage errors do not stop the deployment; Docker Compose still starts the containers.
+     */
+    private function logStorageWarning(LocalFileVolume $fileStorage, string $error): void
+    {
+        $this->application_deployment_queue->addLogEntry("Warning: Could not prepare storage for {$fileStorage->mount_path}: {$error}", 'stderr');
     }
 
     private function push_to_docker_registry()

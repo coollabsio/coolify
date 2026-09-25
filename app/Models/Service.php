@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
-use App\Jobs\ServerStorageSaveJob;
 use App\Services\ContainerStatusAggregator;
 use App\Support\DomainPortOverrides;
 use App\Traits\Auditable;
@@ -15,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
@@ -1629,9 +1629,13 @@ class Service extends BaseModel
 
         instant_remote_process($commands, $this->server);
 
+        /** Write new file mounts now, so `docker compose up` does not create directories in their place. */
         foreach ($this->applications()->get()->concat($this->databases()->get()) as $resource) {
             foreach ($resource->fileStorages()->where('pending_initialization', true)->get() as $fileStorage) {
-                ServerStorageSaveJob::dispatch($fileStorage)->afterCommit();
+                $error = $fileStorage->initializeOnServer();
+                if ($error !== null) {
+                    Log::warning("Could not prepare storage {$fileStorage->mount_path} for service {$this->uuid}: {$error}");
+                }
             }
         }
     }

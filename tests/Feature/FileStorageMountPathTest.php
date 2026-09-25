@@ -47,7 +47,11 @@ beforeEach(function () {
         'team_id' => $this->team->id,
         'private_key_id' => $keyId,
     ]);
-    Process::fake(fn () => Process::result(output: 'OK'));
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'realpath -m')
+            ? (preg_match("/realpath -m -- '([^']*)' '([^']*)'/", $process->command, $paths) ? "{$paths[1]}\n{$paths[2]}" : '')
+            : 'OK'
+    ));
 
     StandaloneDocker::withoutEvents(function () {
         $this->destination = StandaloneDocker::firstOrCreate(
@@ -111,7 +115,10 @@ test('livewire directory storage accepts a path inside the application root', fu
 });
 
 test('livewire directory storage rejects a remote symlink escape without side effects', function () {
-    Process::fake(fn () => Process::result(output: 'NOK'));
+    $base = application_configuration_dir().'/'.$this->application->uuid;
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'realpath -m') ? "{$base}\n/root/outside" : 'NOK'
+    ));
 
     Livewire::test(Storage::class, ['resource' => $this->application])
         ->set('file_storage_directory_source', $this->application->workdir().'/linked/outside')

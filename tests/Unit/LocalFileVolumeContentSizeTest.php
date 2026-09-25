@@ -140,7 +140,7 @@ it('does not interpolate unsafe persisted file-storage paths into remote command
     $application->setRelation('destination', (object) ['server' => $server]);
 
     Process::fake();
-    expect(fn () => getFilesystemVolumesFromServer($application, true))->toThrow(Exception::class);
+    getFilesystemVolumesFromServer($application, true);
 
     Process::assertNotRan(fn ($process) => str_contains($process->command, $path));
 })->with(['/tmp/evil`id`', '/tmp/evil$(id)', '/tmp/evil;id', '/tmp/evil|id', '${DATA:-/tmp/evil$(id)}', '/srv/$HOME;id', '${DATA:-/srv/app;id}/config.yml', '${DATA:-${HOME:-$(id)}}', '${DATA:+/srv/app;id}/config.yml']);
@@ -226,4 +226,37 @@ it('keeps a bounded remote read that fits the limit', function () {
         ->toBe($maximumSizedContent)
         ->and(LocalFileVolume::contentFromBoundedRead(null))
         ->toBe('');
+});
+
+it('skips pending and unresolved storages and still syncs the others', function () {
+    $user = User::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $user->teams()->first()->id]);
+    Storage::fake('ssh-keys');
+    $server = Server::factory()->create([
+        'team_id' => $user->teams()->first()->id,
+        'private_key_id' => $privateKey->id,
+    ]);
+
+    $pending = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $pending->pending_initialization = true;
+    $pending->shouldNotReceive('resolvedStoragePath');
+    $unresolved = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $unresolved->shouldReceive('resolvedStoragePath')->once()->andThrow(new RuntimeException('compose file is missing'));
+    $resolved = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $resolved->shouldReceive('resolvedStoragePath')->once()->andReturn('/data/application/data');
+    $resolved->is_directory = true;
+    $resolved->shouldReceive('save')->once();
+
+    $fileStorages = Mockery::mock(MorphMany::class);
+    $fileStorages->shouldReceive('get')->once()->andReturn(collect([$pending, $unresolved, $resolved]));
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->shouldReceive('getMorphClass')->andReturn(Application::class);
+    $application->shouldReceive('workdir')->once()->andReturn('/data/application');
+    $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
+    $application->setRelation('destination', (object) ['server' => $server]);
+
+    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'test -') ? 'NOK' : ''));
+    getFilesystemVolumesFromServer($application, true);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '/data/application/data'"));
 });

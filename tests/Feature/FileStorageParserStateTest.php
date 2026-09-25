@@ -254,24 +254,46 @@ it('defers a new application mount until final Compose files exist', function ()
     expect($application->fileStorages()->first()->pending_initialization)->toBeTrue();
 });
 
-it('queues a new service mount after final Compose files exist', function () {
+it('writes a new service mount before start after final Compose files exist', function () {
     [$service] = makeComposeService(DATA_DIR_COMPOSE);
 
     serviceParser($service);
     serviceParser($service);
 
+    $storage = $service->applications()->first()->fileStorages()->first();
     Bus::assertNotDispatched(ServerStorageSaveJob::class);
-    expect($service->applications()->first()->fileStorages()->first()->pending_initialization)->toBeTrue();
+    expect($storage->pending_initialization)->toBeTrue();
 
     $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
     $service->server->update(['private_key_id' => $privateKey->id]);
-    Process::fake();
+    $hostPath = '/data/coolify/services/'.$service->uuid.'/data';
+    Process::fake(function ($process) use ($hostPath) {
+        if (str_contains($process->command, 'config --format json')) {
+            return Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
+                ['type' => 'bind', 'source' => $hostPath, 'target' => '/app/data'],
+            ]]]]));
+        }
+
+        return Process::result(output: 'NOK');
+    });
+
     $service->saveComposeConfigs();
 
-    Bus::assertDispatchedTimes(ServerStorageSaveJob::class, 1);
-    Bus::assertDispatched(ServerStorageSaveJob::class, function (ServerStorageSaveJob $job): bool {
-        return ! $job->localFileVolume->relationLoaded('service') && $job->afterCommit === true;
-    });
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '{$hostPath}'"));
+    expect($storage->fresh()->pending_initialization)->toBeFalse();
+});
+
+it('keeps a service mount pending when Compose cannot resolve it', function () {
+    [$service] = makeComposeService(DATA_DIR_COMPOSE);
+    serviceParser($service);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'config --format json') ? '{"services":{}}' : 'NOK'));
+
+    $service->saveComposeConfigs();
+
+    expect($service->applications()->first()->fileStorages()->first()->pending_initialization)->toBeTrue();
 });
 
 it('preserves long-form bind interpolation and configured file content', function () {
@@ -294,7 +316,7 @@ YAML;
     $storage = $application->fileStorages()->firstOrFail();
     expect($mount)->toBeArray()
         ->and($mount['type'])->toBe('bind')
-        ->and($mount['source'])->toBe('${DATA_ROOT:-${FALLBACK_ROOT:-./config}}/settings.ini')
+        ->and($mount['source'])->toBe('${DATA_ROOT:-${FALLBACK_ROOT:-/data/coolify/applications/'.$application->uuid.'/config}}/settings.ini')
         ->and($storage->content)->toBe('configured value')
         ->and($storage->pending_initialization)->toBeTrue();
 });
@@ -325,7 +347,7 @@ YAML);
     $application->parse();
 
     $volumes = Yaml::parse($application->fresh()->docker_compose)['services']['app']['volumes'];
-    expect($volumes[0])->toContain('${DATA_ROOT:-${FALLBACK_ROOT:-./data}}/file:/app/file');
+    expect($volumes[0])->toContain('${DATA_ROOT:-${FALLBACK_ROOT:-/data/coolify/applications/'.$application->uuid.'/data}}/file:/app/file');
 });
 
 it('creates a legacy service bind row without splitting its nested default', function () {

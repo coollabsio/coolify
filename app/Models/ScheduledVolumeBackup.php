@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ComposeBindPathResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -171,6 +172,10 @@ class ScheduledVolumeBackup extends BaseModel
 
         if (! $target instanceof LocalFileVolume || ! $target->is_directory) {
             throw new \RuntimeException('The backup target is not a directory or persistent volume.');
+        }
+
+        if ($target->usesComposeBindSource()) {
+            return ComposeBindPathResolver::resolve($target);
         }
 
         $path = str($target->fs_path);

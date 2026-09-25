@@ -235,13 +235,9 @@ function parseDockerVolumeString(string $volumeString): array
     $mode = $parts[2] ?? null;
     validateComposeBindSource($source);
     validateShellSafePath($target, 'volume target');
-    if ($mode !== null) {
-        $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-        foreach (explode(',', $mode) as $flag) {
-            if (! in_array($flag, $validModes, true)) {
-                throw new Exception('Invalid Docker volume mode.');
-            }
-        }
+    /** Compose accepts options such as `ro`, `z`, and `nocopy`, and ignores unknown ones. */
+    if ($mode !== null && preg_match('/^[A-Za-z]+(?:,[A-Za-z]+)*$/', $mode) !== 1) {
+        throw new Exception('Invalid Docker volume mode.');
     }
 
     return ['source' => str($source), 'target' => str($target), 'mode' => $mode === null ? null : str($mode)];
@@ -712,7 +708,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -815,6 +811,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
@@ -859,9 +858,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         ]
                     );
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
+            dispatch(new ServerFilesFromServerJob($originalResource));
         }
 
         if ($depends_on?->count() > 0) {
@@ -2070,7 +2069,7 @@ function serviceParser(Service $resource): Collection
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -2165,6 +2164,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
@@ -2206,9 +2208,9 @@ function serviceParser(Service $resource): Collection
                         ]
                     );
                 }
-                dispatch(new ServerFilesFromServerJob($originalResource));
                 $volumesParsed->put($index, $volume);
             }
+            dispatch(new ServerFilesFromServerJob($originalResource));
         }
 
         if (! $use_network_mode) {

@@ -164,6 +164,9 @@ class LocalPersistentVolume extends BaseModel
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
+                    if (is_string($volume) && $source) {
+                        $source = composeNamedVolumeSource(str($source));
+                    }
                     $target = data_get($parsedVolume, 'target');
                     $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
                     $generatedName = $source ? $resourceUuid.'_'.Str::slug($source, '-') : null;
