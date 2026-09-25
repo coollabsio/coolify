@@ -161,31 +161,6 @@ function replaceVariables(string $variable): Stringable
     return $str;
 }
 
-/**
- * Quote a storage path without changing its existing simple shell-variable expansion.
- */
-function filesystemVolumeShellArgument(string $path): string
-{
-    if (trim($path) === '') {
-        throw new Exception('Invalid storage path: path is empty.');
-    }
-    validateComposeArrayVolumeSource($path);
-
-    $tilde = '';
-    if (preg_match('/^~[A-Za-z0-9_-]*(?:\/|$)/', $path, $matches)) {
-        $tilde = $matches[0];
-        $path = substr($path, strlen($tilde));
-    }
-
-    if (! str_contains($path, '$')) {
-        return $tilde === '' ? escapeshellarg($path) : $tilde.($path === '' ? '' : escapeshellarg($path));
-    }
-
-    $quotedPath = str_replace(['\\', '"'], ['\\\\', '\\"'], $path);
-
-    return $tilde.'"'.$quotedPath.'"';
-}
-
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
@@ -204,15 +179,12 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
-            $path = str(data_get($fileVolume, 'fs_path'));
-            $content = data_get($fileVolume, 'content');
-            if ($path->startsWith('.')) {
-                $path = $path->after('.');
-                $fileLocation = $workdir.$path;
-            } else {
-                $fileLocation = $path;
+            if ($fileVolume->is_host_file) {
+                continue;
             }
-            $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
+            $fileLocation = $fileVolume->resolvedStoragePath($workdir, $server);
+            $escapedFileLocation = escapeshellarg($fileLocation);
+            $content = data_get($fileVolume, 'content');
             // Exists and is a file
             $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
             // Exists and is a directory
@@ -229,14 +201,15 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
+            } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && ! is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
+                $dir = escapeshellarg(dirname($fileLocation));
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "mkdir -p -- {$dir}",
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {

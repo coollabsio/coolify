@@ -11,7 +11,6 @@ use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\Auditable;
-
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -2094,8 +2093,8 @@ class Application extends BaseModel
                     $type = null;
                     $source = null;
                     if (is_string($volume)) {
-                        $source = str($volume)->before(':');
-                        if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                        $source = parseDockerVolumeString($volume)['source'];
+                        if (sourceIsLocal($source)) {
                             $type = str('bind');
                         }
                     } elseif (is_array($volume)) {

@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Jobs\ServerStorageSaveJob;
 use App\Services\ContainerStatusAggregator;
 use App\Support\DomainPortOverrides;
 use App\Traits\Auditable;
-
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -1628,6 +1628,12 @@ class Service extends BaseModel
         }
 
         instant_remote_process($commands, $this->server);
+
+        foreach ($this->applications()->get()->concat($this->databases()->get()) as $resource) {
+            foreach ($resource->fileStorages()->where('pending_initialization', true)->get() as $fileStorage) {
+                ServerStorageSaveJob::dispatch($fileStorage)->afterCommit();
+            }
+        }
     }
 
     public function parse(bool $isNew = false): Collection

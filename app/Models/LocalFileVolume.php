@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
+use App\Services\ComposeBindPathResolver;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -25,6 +26,7 @@ class LocalFileVolume extends BaseModel
         'is_directory' => 'boolean',
         'is_host_file' => 'boolean',
         'is_preview_suffix_enabled' => 'boolean',
+        'pending_initialization' => 'boolean',
     ];
 
     protected $hidden = [
@@ -51,6 +53,15 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             if ($fileVolume->is_host_file) {
+                return;
+            }
+
+            $compose = data_get($fileVolume->resource, 'docker_compose_raw')
+                ?? data_get($fileVolume->resource, 'service.docker_compose_raw');
+            if (is_string($compose) && $compose !== '') {
+                $fileVolume->pending_initialization = true;
+                $fileVolume->saveQuietly();
+
                 return;
             }
 
@@ -116,19 +127,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
-
-        if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
-        }
-
-        // Validate and escape path to prevent command injection
-        validateShellSafePath($path, 'storage path');
+        $path = $this->resolvedStoragePath($workdir, $server);
         $escapedPath = escapeshellarg($path);
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
@@ -184,7 +183,7 @@ class LocalFileVolume extends BaseModel
         return (string) $content;
     }
 
-    public function deleteStorageOnServer()
+    public function deleteStorageOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null)
     {
         if ($this->is_host_file) {
             return;
@@ -200,19 +199,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
-
-        if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
-        }
-
-        // Validate and escape path to prevent command injection
-        validateShellSafePath($path, 'storage path');
+        $path = $this->resolvedStoragePath($workdir, $server, $composeFile, $projectDirectory, $envFile);
         $escapedPath = escapeshellarg($path);
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
@@ -230,7 +217,7 @@ class LocalFileVolume extends BaseModel
         }
     }
 
-    public function saveStorageOnServer()
+    public function saveStorageOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null)
     {
         if ($this->is_host_file) {
             return;
@@ -247,38 +234,16 @@ class LocalFileVolume extends BaseModel
         }
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
+        $path = $this->resolvedStoragePath($workdir, $server, $composeFile, $projectDirectory, $envFile);
+        $escapedPath = escapeshellarg($path);
 
         if ($this->is_directory) {
-            // Validate fs_path early before any shell interpolation
-            validateShellSafePath($this->fs_path, 'storage path');
-            $escapedFsPath = escapeshellarg($this->fs_path);
-            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p -- {$escapedPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
             $commands->push("cd {$escapedWorkdir}");
         }
-        $path = data_get_str($this, 'fs_path');
         $content = data_get($this, 'content');
-        $pathForParentDirectory = str($this->fs_path);
-        if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
-            $parent_dir = $pathForParentDirectory->beforeLast('/');
-            if ($parent_dir != '') {
-                $escapedParentDir = escapeshellarg($parent_dir);
-                $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
-            }
-        }
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
-
-        if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
-        }
-
-        // Validate and escape resolved path (may differ from fs_path if relative)
-        validateShellSafePath($path, 'storage path');
-        $escapedPath = escapeshellarg($path);
+        $commands->push('mkdir -p -- '.escapeshellarg(dirname($path)).' > /dev/null 2>&1 || true');
 
         $isFile = instant_remote_process(["test -f {$escapedPath} && echo OK || echo NOK"], $server);
         $isDir = instant_remote_process(["test -d {$escapedPath} && echo OK || echo NOK"], $server);
@@ -307,7 +272,7 @@ class LocalFileVolume extends BaseModel
         if ($isDir === 'NOK' && ! $this->is_directory) {
             $chmod = data_get($this, 'chmod');
             $chown = data_get($this, 'chown');
-            if ($content) {
+            if (! is_null($content)) {
                 $content = base64_encode($content);
                 $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
@@ -327,6 +292,23 @@ class LocalFileVolume extends BaseModel
         return instant_remote_process($commands, $server);
     }
 
+    public function resolvedStoragePath(string $workdir, Server $server, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
+    {
+        $resource = $this->resource;
+        $compose = data_get($resource, 'docker_compose_raw')
+            ?? data_get($resource, 'service.docker_compose_raw');
+        if (is_string($compose) && $compose !== '') {
+            validateComposeBindSource($this->fs_path);
+
+            return ComposeBindPathResolver::resolve($this, $composeFile, $envFile, $projectDirectory);
+        }
+
+        $path = confinePathToBase($workdir, $this->fs_path, 'storage path');
+        $this->assertRemotePathIsConfined($workdir, $path, $server);
+
+        return $path;
+    }
+
     /**
      * Reject symlink escapes immediately before a managed path is used remotely.
      */
@@ -336,53 +318,11 @@ class LocalFileVolume extends BaseModel
         $escapedPath = escapeshellarg($path);
         $result = instant_remote_process([
             "base=\$(realpath -m -- {$escapedBase}) && target=\$(realpath -m -- {$escapedPath}) && case \"\$target\" in \"\$base\"|\"\$base\"/*) echo OK ;; *) echo NOK ;; esac",
-        ], $server, false);
+        ], $server, false, true);
 
         if (trim((string) $result) !== 'OK') {
             throw new \RuntimeException('Invalid storage path: resolved path must stay inside the resource configuration directory.');
         }
-    }
-
-    /**
-     * Raw Compose bind mounts keep administrator-selected host path semantics.
-     */
-    protected function isAdminControlledComposeMount(): bool
-    {
-        $compose = data_get($this->resource, 'docker_compose_raw')
-            ?? data_get($this->resource, 'service.docker_compose_raw');
-
-        if (! is_string($compose) || $compose === '') {
-            return false;
-        }
-
-        try {
-            $services = data_get(Yaml::parse($compose), 'services', []);
-            foreach ($services as $service) {
-                foreach (data_get($service, 'volumes', []) as $volume) {
-                    if (is_string($volume)) {
-                        $parsed = parseDockerVolumeString($volume);
-                        $source = data_get($parsed, 'source');
-                        $target = data_get($parsed, 'target');
-                    } else {
-                        $source = data_get($volume, 'source');
-                        $target = data_get($volume, 'target');
-                    }
-
-                    if ((string) $target !== $this->mount_path || ! sourceIsLocal(str((string) $source))) {
-                        continue;
-                    }
-
-                    $resolvedSource = replaceLocalSource(str((string) $source), str($this->resource->workdir()));
-                    if (normalizeUnixPath($resolvedSource->value()) === normalizeUnixPath($this->fs_path)) {
-                        return true;
-                    }
-                }
-            }
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return false;
     }
 
     // Accessor for convenient access
