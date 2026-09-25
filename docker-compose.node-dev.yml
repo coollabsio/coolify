@@ -12,6 +12,8 @@ services:
       FLUX_INTERNAL_URL: "http://coolify-flux:7080"
       FLUX_RUNTIME_UID: "1000"
       FLUX_TLS_VERIFY_HOST: "coolify-flux"
+      # Host port of this instance's UI; QEMU worker Nodes reach Coolify through the libvirt gateway.
+      DEVELOPMENT_QEMU_COOLIFY_PORT: "${APP_PORT:-8000}"
     volumes:
       - dev_flux_data:/data/coolify/flux
 
@@ -43,7 +45,8 @@ services:
 
   flux:
     image: ghcr.io/coollabsio/flux:main
-    container_name: coolify-flux
+    # Per Compose project, so stopped dev instances (scripts/dev) do not block each other.
+    container_name: "${COMPOSE_PROJECT_NAME:-coolify}-flux"
     user: "1000:1000"
     restart: unless-stopped
     environment:
@@ -63,7 +66,9 @@ services:
     ports:
       - "${FLUX_PORT:-7443}:7443"
     networks:
-      - coolify
+      coolify:
+        aliases:
+          - coolify-flux
 
   testing-host:
     image: coolify-testing-host-systemd:dev

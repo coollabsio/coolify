@@ -91,6 +91,8 @@ class AdminView extends Component
 
     public function render()
     {
+        abort_unless(isInstanceAdmin(), 403);
+
         $search = trim($this->search);
         $teamId = currentTeam()->id;
         $users = User::query()

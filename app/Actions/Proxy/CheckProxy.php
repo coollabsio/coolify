@@ -3,11 +3,12 @@
 namespace App\Actions\Proxy;
 
 use App\Enums\ProxyTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Services\ProxyPortParser;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Symfony\Component\Yaml\Yaml;
 
 class CheckProxy
 {
@@ -52,6 +53,19 @@ class CheckProxy
 
             return true;
         } else {
+            $portsToCheck = [];
+
+            try {
+                if ($server->proxyType() !== ProxyTypes::NONE->value) {
+                    $proxyCompose = GetProxyConfiguration::run($server);
+                    $portsToCheck = ProxyPortParser::fromConfiguration($proxyCompose);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Error checking proxy: '.$e->getMessage());
+
+                return false;
+            }
+
             $status = getContainerStatus($server, $proxyContainerName);
             if ($status === 'running') {
                 $server->proxy->set('status', 'running');
@@ -61,37 +75,6 @@ class CheckProxy
             }
             if ($server->settings->is_cloudflare_tunnel) {
                 return false;
-            }
-            $ip = $server->ip;
-            if ($server->id === 0) {
-                $ip = 'host.docker.internal';
-            }
-            $portsToCheck = [];
-
-            try {
-                if ($server->proxyType() !== ProxyTypes::NONE->value) {
-                    $proxyCompose = GetProxyConfiguration::run($server);
-                    if (isset($proxyCompose)) {
-                        $yaml = Yaml::parse($proxyCompose);
-                        $configPorts = [];
-                        if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
-                            $ports = data_get($yaml, 'services.traefik.ports');
-                        } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
-                            $ports = data_get($yaml, 'services.caddy.ports');
-                        }
-                        if (isset($ports)) {
-                            foreach ($ports as $port) {
-                                $configPorts[] = str($port)->before(':')->value();
-                            }
-                        }
-                        // Combine default ports with config ports
-                        $portsToCheck = array_merge($portsToCheck, $configPorts);
-                    }
-                } else {
-                    $portsToCheck = [];
-                }
-            } catch (\Exception $e) {
-                Log::error('Error checking proxy: '.$e->getMessage());
             }
             if (count($portsToCheck) === 0) {
                 return false;
@@ -163,14 +146,31 @@ class CheckProxy
     /**
      * Build the SSH command for checking a specific port
      */
-    private function buildPortCheckCommands(Server $server, string $port, string $proxyContainerName): array
+    private function buildPortCheckCommands(Server $server, int $port, string $proxyContainerName): array
     {
+        $portCheckScript = $this->buildPortCheckScript($port, $proxyContainerName);
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $portCheckScript);
+
+        return [
+            'ssh_command' => $sshCommand,
+            'script' => $portCheckScript,
+        ];
+    }
+
+    private function buildPortCheckScript(int $port, string $proxyContainerName): string
+    {
+
+        $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
+        $socketPort = escapeshellarg(':'.$port);
+        $portSuffixPattern = escapeshellarg(':'.$port.' ');
+        $portArgument = escapeshellarg((string) $port);
+
         // First check if our own proxy is using this port (which is fine)
         $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
         $checkProxyPortScript = "
             CONTAINER_ID=\$($getProxyContainerId);
             if [ ! -z \"\$CONTAINER_ID\" ]; then
-                if docker inspect \$CONTAINER_ID --format '{{json .NetworkSettings.Ports}}' | grep -q '\"$port/tcp\"'; then
+                if docker inspect \$CONTAINER_ID --format '{{json .NetworkSettings.Ports}}' | grep -q $dockerPortPattern; then
                     echo 'proxy_using_port';
                     exit 0;
                 fi;
@@ -183,12 +183,12 @@ class CheckProxy
             
             # Try ss command first
             if command -v ss >/dev/null 2>&1; then
-                ss_output=\$(ss -Htuln state listening sport = :$port 2>/dev/null);
+                ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null);
                 if [ -z \"\$ss_output\" ]; then
                     echo 'port_free';
                     exit 0;
                 fi;
-                count=\$(echo \"\$ss_output\" | grep -c ':$port ');
+                count=\$(echo \"\$ss_output\" | grep -c $portSuffixPattern);
                 if [ \$count -eq 0 ]; then
                     echo 'port_free';
                     exit 0;
@@ -204,7 +204,7 @@ class CheckProxy
             
             # Try netstat as fallback
             if command -v netstat >/dev/null 2>&1; then
-                netstat_output=\$(netstat -tuln 2>/dev/null | grep ':$port ');
+                netstat_output=\$(netstat -tuln 2>/dev/null | grep $portSuffixPattern);
                 if [ -z \"\$netstat_output\" ]; then
                     echo 'port_free';
                     exit 0;
@@ -223,25 +223,20 @@ class CheckProxy
             fi;
             
             # Final fallback using nc
-            if nc -z -w1 127.0.0.1 $port >/dev/null 2>&1; then
+            if nc -z -w1 127.0.0.1 $portArgument >/dev/null 2>&1; then
                 echo 'port_conflict|nc_detected';
             else
                 echo 'port_free';
             fi;
         ";
 
-        $sshCommand = \App\Helpers\SshMultiplexingHelper::generateSshCommand($server, $portCheckScript);
-
-        return [
-            'ssh_command' => $sshCommand,
-            'script' => $portCheckScript,
-        ];
+        return $portCheckScript;
     }
 
     /**
      * Parse the result from port check command
      */
-    private function parsePortCheckResult($processResult, string $port, string $proxyContainerName): bool
+    private function parsePortCheckResult($processResult, int $port, string $proxyContainerName): bool
     {
         $exitCode = $processResult->exitCode();
         $output = trim($processResult->output());
@@ -282,15 +277,19 @@ class CheckProxy
      * Smart port checker that handles dual-stack configurations
      * Returns true only if there's a real port conflict (not just dual-stack)
      */
-    private function isPortConflict(Server $server, string $port, string $proxyContainerName): bool
+    private function isPortConflict(Server $server, int $port, string $proxyContainerName): bool
     {
+        $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
+        $socketPort = escapeshellarg(':'.$port);
+        $portSuffixPattern = escapeshellarg(':'.$port.' ');
+
         // First check if our own proxy is using this port (which is fine)
         try {
             $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
             $containerId = trim(instant_remote_process([$getProxyContainerId], $server));
 
             if (! empty($containerId)) {
-                $checkProxyPort = "docker inspect $containerId --format '{{json .NetworkSettings.Ports}}' | grep '\"$port/tcp\"'";
+                $checkProxyPort = "docker inspect $containerId --format '{{json .NetworkSettings.Ports}}' | grep $dockerPortPattern";
                 try {
                     instant_remote_process([$checkProxyPort], $server);
 
@@ -311,9 +310,9 @@ class CheckProxy
                 'available' => 'command -v ss >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
-                    "ss_output=\$(ss -Htuln state listening sport = :$port 2>/dev/null) && echo \"\$ss_output\"",
+                    "ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null) && echo \"\$ss_output\"",
                     // Count IPv4 listeners
-                    "echo \"\$ss_output\" | grep -c ':$port '",
+                    "echo \"\$ss_output\" | grep -c $portSuffixPattern",
                 ],
             ],
             // Set 2: Use netstat as alternative to ss
@@ -321,9 +320,9 @@ class CheckProxy
                 'available' => 'command -v netstat >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
-                    "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep ':$port '",
+                    "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep $portSuffixPattern",
                     // Count listeners
-                    "echo \"\$netstat_output\" | grep ':$port ' | grep -c 'LISTEN'",
+                    "echo \"\$netstat_output\" | grep $portSuffixPattern | grep -c 'LISTEN'",
                 ],
             ],
             // Set 3: Use lsof as last resort
@@ -331,9 +330,9 @@ class CheckProxy
                 'available' => 'command -v lsof >/dev/null 2>&1',
                 'check' => [
                     // Get process using the port
-                    "lsof -i :$port -P -n | grep 'LISTEN'",
+                    "lsof -i $socketPort -P -n | grep 'LISTEN'",
                     // Count listeners
-                    "lsof -i :$port -P -n | grep 'LISTEN' | wc -l",
+                    "lsof -i $socketPort -P -n | grep 'LISTEN' | wc -l",
                 ],
             ],
         ];

@@ -11,12 +11,13 @@ test('default form buttons and inputs share the same control height', function (
     preg_match('/@utility button \{[^}]*\}/s', $utilities, $button);
 
     expect($inputSelect[0] ?? '')
-        ->toContain('h-9')
-        ->and($button[0] ?? '')->toContain('h-9')
-        ->and($button[0] ?? '')->toContain('min-h-9')
+        ->toContain('h-8')
+        ->not->toContain('h-9')
+        ->and($button[0] ?? '')->toContain('h-8')
+        ->and($button[0] ?? '')->toContain('min-h-8')
         ->and($button[0] ?? '')->toContain('whitespace-nowrap')
         ->and($button[0] ?? '')->toContain('shrink-0')
-        ->and($button[0] ?? '')->not->toContain('h-8');
+        ->and($button[0] ?? '')->not->toContain('h-9');
 });
 
 test('settings form surfaces keep input and button heights equal', function () {

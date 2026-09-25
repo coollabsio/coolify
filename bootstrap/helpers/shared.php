@@ -166,6 +166,44 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 }
 
 /**
+ * Build the remote mkdir command for a raw Compose bind volume source.
+ *
+ * Keep volume paths as single arguments when creating bind directories.
+ *
+ * Compose environment interpolations are left to Docker Compose. They are
+ * not expanded by the destination server shell.
+ *
+ * @throws Exception If the source is invalid
+ */
+function rawComposeBindMkdirCommand(string $source): ?string
+{
+    if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
+        throw new Exception('Invalid volume source: contains a control character.');
+    }
+
+    $source = trim($source);
+    if ($source === '') {
+        throw new Exception('Invalid volume source: path is empty.');
+    }
+
+    $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source) === 1;
+    $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}(?:\/[\w.\-]+)*\/?$/', $source) === 1;
+    if ($isSimpleEnvVar || $isEnvVarWithPath) {
+        return null;
+    }
+
+    if (preg_match('/^\$\{([a-zA-Z_][a-zA-Z0-9_]*):-(.*)\}$/', $source, $matches) === 1) {
+        validateShellSafePath($matches[2], 'volume source');
+
+        return null;
+    }
+
+    validateShellSafePath($source, 'volume source');
+
+    return 'mkdir -p -- '.escapeshellarg($source).' > /dev/null 2>&1 || true';
+}
+
+/**
  * Validate that a filename is safe for use as a plain file name (no path components).
  *
  * Prevents unsafe parent directory paths by rejecting directory separators, parent directory
@@ -1579,7 +1617,7 @@ function sanitizeLogsForExport(string $text): string
     return remove_iip($text);
 }
 
-function getTopLevelNetworks(Service|Application $resource)
+function getTopLevelNetworks(Service|Application $resource): Collection
 {
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
@@ -1705,6 +1743,8 @@ function getTopLevelNetworks(Service|Application $resource)
 
         return $topLevelNetworks->keys();
     }
+
+    return collect();
 }
 function sourceIsLocal(Stringable $source)
 {
@@ -2400,7 +2440,7 @@ function get_public_ips()
     }
 }
 
-function isAnyDeploymentInprogress()
+function isAnyDeploymentInprogress(bool $showAll = false)
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
 
@@ -2417,34 +2457,31 @@ function isAnyDeploymentInprogress()
         if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
             $horizonJobIds[] = $runningJob->horizon_job_id;
 
-            // Get application and team information
-            $application = Application::find($runningJob->application_id);
-            $teamMembers = [];
-            $deploymentUrl = '';
+            if ($showAll) {
+                $application = Application::find($runningJob->application_id);
+                $teamMembers = [];
+                $deploymentUrl = '';
 
-            if ($application) {
-                // Get team members through the application's project
-                $team = $application->team();
-                if ($team) {
-                    $teamMembers = $team->members()->pluck('email')->toArray();
+                if ($application) {
+                    $team = $application->team();
+                    if ($team) {
+                        $teamMembers = $team->members()->pluck('email')->toArray();
+                    }
+
+                    if ($runningJob->deployment_url) {
+                        $deploymentUrl = base_url().$runningJob->deployment_url;
+                    }
                 }
 
-                // Construct the full deployment URL
-                if ($runningJob->deployment_url) {
-                    $baseUrl = base_url();
-                    $deploymentUrl = $baseUrl.$runningJob->deployment_url;
-                }
+                $deploymentDetails[] = [
+                    'application_name' => $runningJob->application_name ?? 'Unknown',
+                    'server_name' => $runningJob->server_name ?? 'Unknown',
+                    'deployment_url' => $deploymentUrl,
+                    'team_members' => $teamMembers,
+                    'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
+                    'horizon_job_id' => $runningJob->horizon_job_id,
+                ];
             }
-
-            $deploymentDetails[] = [
-                'id' => $runningJob->id,
-                'application_name' => $runningJob->application_name ?? 'Unknown',
-                'server_name' => $runningJob->server_name ?? 'Unknown',
-                'deployment_url' => $deploymentUrl,
-                'team_members' => $teamMembers,
-                'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
-                'horizon_job_id' => $runningJob->horizon_job_id,
-            ];
         }
     }
 
@@ -2453,28 +2490,39 @@ function isAnyDeploymentInprogress()
         exit(0);
     }
 
-    // Display enhanced deployment information
-    echo "\n=== Running Deployments ===\n";
-    echo 'Total active deployments: '.count($horizonJobIds)."\n\n";
-
-    foreach ($deploymentDetails as $index => $deployment) {
-        echo 'Deployment #'.($index + 1).":\n";
-        echo '  Application: '.$deployment['application_name']."\n";
-        echo '  Server: '.$deployment['server_name']."\n";
-        echo '  Started: '.$deployment['created_at']."\n";
-        if ($deployment['deployment_url']) {
-            echo '  URL: '.$deployment['deployment_url']."\n";
-        }
-        if (! empty($deployment['team_members'])) {
-            echo '  Team members: '.implode(', ', $deployment['team_members'])."\n";
-        } else {
-            echo "  Team members: No team members found\n";
-        }
-        echo '  Horizon Job ID: '.$deployment['horizon_job_id']."\n";
-        echo "\n";
-    }
+    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll);
 
     exit(1);
+}
+
+function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false): string
+{
+    $output = "\n=== Running Deployments ===\n";
+    $output .= 'Total active deployments: '.$activeDeploymentCount."\n";
+
+    if (! $showAll) {
+        return $output;
+    }
+
+    $output .= "\n";
+
+    foreach ($deploymentDetails as $index => $deployment) {
+        $output .= 'Deployment #'.($index + 1).":\n";
+        $output .= '  Application: '.$deployment['application_name']."\n";
+        $output .= '  Server: '.$deployment['server_name']."\n";
+        $output .= '  Started: '.$deployment['created_at']."\n";
+        if ($deployment['deployment_url']) {
+            $output .= '  URL: '.$deployment['deployment_url']."\n";
+        }
+        if (! empty($deployment['team_members'])) {
+            $output .= '  Team members: '.implode(', ', $deployment['team_members'])."\n";
+        } else {
+            $output .= "  Team members: No team members found\n";
+        }
+        $output .= '  Horizon Job ID: '.$deployment['horizon_job_id']."\n\n";
+    }
+
+    return $output;
 }
 
 function isBase64Encoded($strValue)
@@ -3266,8 +3314,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'configs' => $topLevelConfigs->toArray(),
                 'secrets' => $topLevelSecrets->toArray(),
             ];
+            $originalYaml = $yaml;
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            if ($yaml !== $originalYaml) {
+                $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($resource->docker_compose_raw, $yaml, ['content']);
+            }
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
 
             $resource->save();
@@ -3884,7 +3935,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if (count($docker_compose_domains) > 0) {
                                 $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                                 if ($found_fqdn) {
-                                    $fqdns = collect($found_fqdn);
+                                    $fqdns = str($found_fqdn)->explode(',')->map(fn ($fqdn) => trim($fqdn))->filter();
                                 } else {
                                     $fqdns = collect([]);
                                 }
@@ -4042,7 +4093,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
         $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
         data_forget($resource, 'environment_variables');
         data_forget($resource, 'environment_variables_preview');
@@ -4234,6 +4284,8 @@ function coolifyHelperImage(): string
 
 function getHelperVersion(): string
 {
+    $configuredHelperVersion = config('constants.coolify.helper_version');
+
     if (isDev()) {
         $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
 
@@ -4242,7 +4294,13 @@ function getHelperVersion(): string
         }
     }
 
-    return config('constants.coolify.helper_version');
+    $fetchedHelperVersion = InstanceSettings::query()->whereKey(0)->value('helper_version');
+
+    if (! empty($fetchedHelperVersion) && version_compare($fetchedHelperVersion, $configuredHelperVersion, '>')) {
+        return $fetchedHelperVersion;
+    }
+
+    return $configuredHelperVersion;
 }
 
 function loggy($message = null, array $context = [])
@@ -5029,6 +5087,31 @@ function refererHost(?string $referer): ?string
     $host = strtolower($host);
 
     return str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+}
+
+/**
+ * Group referrer breakdown rows by hostname and sum their metrics.
+ *
+ * @param  array<int, array{value?: string, requests?: int, bytesOut?: int}>  $rows
+ * @return array<int, array{value: string, requests: int, bytesOut: int}>
+ */
+function groupRefererBreakdownRows(array $rows): array
+{
+    $grouped = [];
+
+    foreach ($rows as $row) {
+        $value = (string) ($row['value'] ?? '');
+        $host = $value === '__other__' ? $value : (refererHost($value) ?? $value);
+
+        $grouped[$host] ??= ['value' => $host, 'requests' => 0, 'bytesOut' => 0];
+        $grouped[$host]['requests'] += (int) ($row['requests'] ?? 0);
+        $grouped[$host]['bytesOut'] += (int) ($row['bytesOut'] ?? 0);
+    }
+
+    $rows = array_values($grouped);
+    usort($rows, fn (array $left, array $right): int => $right['requests'] <=> $left['requests']);
+
+    return $rows;
 }
 
 /**

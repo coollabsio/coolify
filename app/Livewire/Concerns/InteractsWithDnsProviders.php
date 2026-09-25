@@ -240,6 +240,12 @@ trait InteractsWithDnsProviders
             ->first();
 
         if ($record !== null && ! app(CloudflareDnsProvider::class)->deleteRecord($record)) {
+            auditLog('ui.dns_record.delete_skipped', [
+                'team_id' => currentTeam()->id,
+                'hostname' => $hostname,
+                'provider' => 'cloudflare',
+                'reason' => 'remote_record_changed',
+            ], 'warning');
             $this->dispatch('warning', 'The domain was removed, but its DNS record changed externally and was left untouched.');
         }
     }

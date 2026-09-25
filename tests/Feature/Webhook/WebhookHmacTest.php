@@ -7,9 +7,17 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 uses(RefreshDatabase::class);
+
+test('manual webhook routes are rate limited', function (string $provider) {
+    $route = Route::getRoutes()->match(Request::create("/webhooks/source/{$provider}/events/manual", 'POST'));
+
+    expect($route->gatherMiddleware())->toContain('throttle:60,1');
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
 function createApplicationWithWebhook(string $repo = 'test-org/test-repo', string $branch = 'main', array $overrides = []): Application
 {
@@ -387,7 +395,7 @@ describe('Manual Webhook Repository Matching', function () {
 
         $response->assertOk();
         $content = $response->getContent();
-        expect($content)->toContain('No applications found')
+        expect($content)->toContain('Invalid signature.')
             ->not->toContain('secret-github-app')
             ->not->toContain($app->uuid);
     });
@@ -481,7 +489,7 @@ describe('Manual Webhook Repository Matching', function () {
 
         $response->assertOk();
         $content = $response->getContent();
-        expect($content)->toContain('No applications found')
+        expect($content)->toContain('Invalid signature.')
             ->not->toContain("secret-{$provider}-app")
             ->not->toContain($app->uuid);
     })->with([

@@ -43,6 +43,36 @@ test('preserves command substitutions inside database and volume backup scripts'
         ->not->toContain('$(sudo if');
 });
 
+test('keeps safe file-storage path expansion in non-root commands', function () {
+    $argument = filesystemVolumeShellArgument('${DATA_PATH:-/srv/app/config.yml}');
+    $commands = collect([
+        "test -f {$argument} && echo OK || echo NOK",
+        'mkdir -p -- "$(dirname -- '.$argument.')"',
+        "echo 'e30=' | base64 -d | tee -- {$argument}",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toContain('"${DATA_PATH:-/srv/app/config.yml}"')
+        ->and($result[1])->toContain('$(sudo dirname -- "${DATA_PATH:-/srv/app/config.yml}")')
+        ->and($result[2])->toContain('"${DATA_PATH:-/srv/app/config.yml}"');
+});
+
+test('rejects unsupported nested Compose defaults before non-root file commands', function () {
+    expect(fn () => filesystemVolumeShellArgument('${DATA:-${HOME}/config.yml}'))
+        ->toThrow(Exception::class);
+});
+
+test('preserves quoted backup container and file arguments for a non-root server', function () {
+    $container = escapeshellarg('db-name-uuid');
+    $path = escapeshellarg('/backups/db-name.dump');
+    $command = "docker exec {$container} pg_dump --username 'postgres' 'app' > {$path}";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result)->toBe(['sudo '.$command]);
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',

@@ -263,7 +263,7 @@ class Change extends Component
             }
 
             $jwt = generateGithubJwt($this->github_app);
-            $appResponse = Http::withHeaders([
+            $appResponse = Http::GitSource($this->github_app->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github+json',
             ])->timeout(10)->get("{$this->github_app->api_url}/app");

@@ -212,7 +212,7 @@ class User extends Authenticatable implements SendsEmail
      */
     public function deleteIfNotVerifiedAndForcePasswordReset()
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
+        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true && ! TeamInvitation::whereEmail($this->email)->exists()) {
             $this->delete();
         }
     }
@@ -235,7 +235,7 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',

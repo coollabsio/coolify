@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\PrivateKey;
 use App\Models\User;
+use App\Services\TerminalSessionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -106,7 +107,8 @@ it('keeps the node terminal behind the development feature gate', function () {
     $this->get(route('node.command', $this->node->uuid))->assertNotFound();
 });
 
-it('generates an ssh terminal command for an authorized node', function () {
+it('issues a terminal session that redeems to an ssh command for an authorized node', function () {
+    $token = null;
     Livewire::test(Terminal::class)
         ->dispatch(
             'send-terminal-command',
@@ -115,9 +117,22 @@ it('generates an ssh terminal command for an authorized node', function () {
             serverUuid: $this->node->uuid,
             targetType: 'node',
         )
-        ->assertDispatched('send-back-command', function (string $event, array $parameters): bool {
-            return str_contains($parameters[0], "'root'@'192.0.2.10'");
+        ->assertDispatched('send-terminal-token', function (string $event, array $parameters) use (&$token): bool {
+            $token = $parameters[0];
+
+            return is_string($token) && strlen($token) === 64;
         });
+
+    $this->postJson(route('terminal.session'), ['token' => $token])
+        ->assertSuccessful()
+        ->assertJson(fn ($json) => $json->where('command', fn (string $command): bool => str_contains($command, "'root'@'192.0.2.10'")));
+});
+
+it('refuses to redeem a node terminal session after the node stops being ready', function () {
+    $token = app(TerminalSessionService::class)->issue($this->user, $this->node);
+    $this->node->update(['is_usable' => false]);
+
+    $this->postJson(route('terminal.session'), ['token' => $token])->assertForbidden();
 });
 
 it('rejects terminal commands for a node that is not ready', function () {

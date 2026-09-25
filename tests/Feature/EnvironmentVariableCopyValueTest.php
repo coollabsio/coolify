@@ -7,10 +7,12 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -133,6 +135,49 @@ test('compose-managed rows copy the referenced variable value', function () {
 
     assertCopiedComposeValue('$SERVICE_USER_CLASSICPRESS', 'classicpress-user');
     assertCopiedComposeValue('production', 'production');
+});
+
+test('copying a reference does not reveal a locked variable', function () {
+    createEnvironmentVariable(['key' => 'SERVICE_PASSWORD_MYSQL', 'value' => 'locked-password', 'is_shown_once' => true]);
+
+    assertCopiedValue(
+        createEnvironmentVariable(['key' => 'DB_PASSWORD', 'value' => '$SERVICE_PASSWORD_MYSQL']),
+        '$SERVICE_PASSWORD_MYSQL',
+    );
+    assertCopiedComposeValue('$SERVICE_PASSWORD_MYSQL', '$SERVICE_PASSWORD_MYSQL');
+});
+
+test('compose-managed rows do not accept a changed lookup from the client', function (string $property, mixed $value) {
+    Livewire::test(ShowHardcoded::class, [
+        'env' => ['key' => 'MYSQL_USER', 'value' => 'production'],
+        'resourceableType' => Application::class,
+        'resourceableId' => test()->application->id,
+    ])->set($property, $value);
+})->with([
+    'value' => ['value', '$DATABASE_PASSWORD'],
+    'preview scope' => ['isPreview', true],
+    'resource type' => ['resourceableType', Service::class],
+    'resource id' => ['resourceableId', 999],
+])->throws(CannotUpdateLockedPropertyException::class);
+
+test('compose-managed rows do not copy values from another team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create(['environment_id' => $otherEnvironment->id]);
+    createEnvironmentVariable([
+        'key' => 'DATABASE_PASSWORD',
+        'value' => 'other-team-secret',
+        'resourceable_id' => $otherApplication->id,
+    ]);
+
+    Livewire::test(ShowHardcoded::class, [
+        'env' => ['key' => 'DB_PASSWORD', 'value' => '$DATABASE_PASSWORD'],
+        'resourceableType' => Application::class,
+        'resourceableId' => $otherApplication->id,
+    ])
+        ->call('copyValue')
+        ->assertReturned(null);
 });
 
 test('compose-managed rows hide copying from members', function () {

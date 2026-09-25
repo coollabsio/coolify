@@ -11,7 +11,8 @@
                 description="Deliver team alerts through your Pushover application.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$pushoverEnabled" enabledProperty="pushoverEnabled"
-                        toggleMethod="instantSavePushoverEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSavePushoverEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

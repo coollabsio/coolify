@@ -13,6 +13,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::fake();
+    InstanceSettings::forceCreate(['id' => 0]);
 
     // Create user (which automatically creates a team)
     $user = User::factory()->create();
@@ -123,10 +124,9 @@ it('respects server timezone when checking sentinel updates', function () {
     });
 });
 
-it('does not dispatch sentinel check for servers without sentinel enabled', function () {
-    // Disable sentinel
+it('does not dispatch sentinel check for build servers', function () {
     $this->server->settings->update([
-        'is_sentinel_enabled' => false,
+        'is_build_server' => true,
     ]);
 
     $instanceSettings = InstanceSettings::first();
@@ -144,13 +144,13 @@ it('does not dispatch sentinel check for servers without sentinel enabled', func
     Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
-it('handles multiple servers with different sentinel configurations', function () {
-    // Create a second server with sentinel disabled
+it('handles multiple servers with different sentinel eligibility', function () {
+    // Create a second server that cannot run Sentinel
     $server2 = Server::factory()->create([
         'team_id' => $this->team->id,
     ]);
     $server2->settings->update([
-        'is_sentinel_enabled' => false,
+        'is_build_server' => true,
         'server_timezone' => 'UTC',
     ]);
 

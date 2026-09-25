@@ -95,6 +95,7 @@ class Index extends Component
             Auth::user()->update([
                 'name' => $this->name,
             ]);
+            auditLog('ui.user.profile_updated', $this->auditContext(['changed_fields' => ['name']]));
 
             $this->dispatch('success', 'Profile updated.');
         } catch (\Throwable $e) {
@@ -154,6 +155,7 @@ class Index extends Component
             }
 
             Auth::user()->requestEmailChange($this->new_email);
+            auditLog('ui.user.email_change_requested', $this->auditContext());
 
             $this->show_email_change = false;
             $this->show_verification = true;
@@ -216,6 +218,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
             }
@@ -328,6 +331,7 @@ class Index extends Component
             auth()->user()->update([
                 'password' => Hash::make($this->new_password),
             ]);
+            auditLog('ui.user.password_changed', $this->auditContext());
             $this->dispatch('success', 'Password updated.');
             $this->current_password = '';
             $this->new_password = '';
@@ -344,6 +348,17 @@ class Index extends Component
             'oidc' => 'OIDC',
             default => str($provider)->headline()->toString(),
         };
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        $user = Auth::user();
+
+        return array_merge([
+            'team_id' => $user->currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+        ], $context);
     }
 
     public function render()

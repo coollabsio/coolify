@@ -1,8 +1,8 @@
 {
   "scripts": {
     "setup": "cp $JEAN_ROOT_PATH/.env .",
-    "teardown": null,
-    "run": "bash scripts/dev-stack"
+    "teardown": "./scripts/dev teardown",
+    "run": "./scripts/dev run"
   },
   "ports": [
     {

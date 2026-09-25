@@ -209,6 +209,34 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration rejects missing configurati
         ->assertUnprocessable();
 });
 
+test('PUT /api/v1/servers/{uuid}/proxy/configuration rejects command injection without mutation', function () {
+    $originalProxy = $this->server->proxy->toArray();
+    $configuration = "services:\n  traefik:\n    ports:\n      - '`id>/tmp/pwned`:443'\n";
+
+    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode($configuration),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.configuration.0', 'Proxy ports must be integers from 1 through 65535.');
+
+    expect($this->server->fresh()->proxy->toArray())->toBe($originalProxy);
+});
+
+test('PUT /api/v1/servers/{uuid}/proxy/configuration forbids normal members', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $memberToken = serverProxyApiToken($member, $this->team, ['*']);
+
+    SaveProxyConfiguration::shouldNotRun();
+
+    $this->withHeaders(serverProxyApiHeaders($memberToken))
+        ->putJson("/api/v1/servers/{$this->server->uuid}/proxy/configuration", [
+            'configuration' => base64_encode("services:\n  traefik:\n    ports: ['80:80']\n"),
+        ])
+        ->assertForbidden();
+});
+
 test('POST /api/v1/servers/{uuid}/proxy/restart queues RestartProxyJob', function () {
     Queue::fake();
 

@@ -6,9 +6,11 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
+use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Spatie\Activitylog\Models\Activity;
 
 class Heading extends Component
 {
@@ -19,6 +21,10 @@ class Heading extends Component
     public array $parameters;
 
     public $docker_cleanup = true;
+
+    public $isDeploymentProgress = false;
+
+    public $runningActivityId = null;
 
     public function getListeners()
     {
@@ -61,10 +67,58 @@ class Heading extends Component
 
     public function checkStatus()
     {
+        $this->checkDeployments();
+
         if ($this->database->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->database->destination->server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
+        }
+    }
+
+    public function checkDeployments()
+    {
+        try {
+            $activity = Activity::where('properties->type_uuid', $this->database->uuid)->latest()->first();
+            $status = data_get($activity, 'properties.status');
+            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
+                $this->isDeploymentProgress = true;
+                $this->runningActivityId = $activity->id;
+            } else {
+                $this->isDeploymentProgress = false;
+                $this->runningActivityId = null;
+            }
+        } catch (\Throwable) {
+            $this->isDeploymentProgress = false;
+            $this->runningActivityId = null;
+        }
+
+        return $this->isDeploymentProgress;
+    }
+
+    /**
+     * Re-attach the live log dialog to a start/restart that is already running,
+     * so the log reappears after the dialog was closed.
+     */
+    public function reopenDeployment()
+    {
+        $this->authorize('view', $this->database);
+
+        $this->checkDeployments();
+
+        if ($this->isDeploymentProgress && $this->runningActivityId) {
+            $this->dispatch('activityMonitor', $this->runningActivityId, ServiceStatusChanged::class);
+            $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
+        } else {
+            $this->dispatch('info', 'No operation is currently running.');
+        }
+    }
+
+    private function markDeploymentRunning($activity): void
+    {
+        if (is_object($activity)) {
+            $this->isDeploymentProgress = true;
+            $this->runningActivityId = $activity->id;
         }
     }
 
@@ -80,6 +134,8 @@ class Heading extends Component
             'environment_uuid' => $this->database->environment->uuid,
             'database_uuid' => $this->database->uuid,
         ];
+
+        $this->checkDeployments();
     }
 
     public function stop()
@@ -102,6 +158,7 @@ class Heading extends Component
 
             $activity = RestartDatabase::run($this->database);
             $this->auditDatabaseAction('ui.database.restarted');
+            $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {
@@ -116,6 +173,7 @@ class Heading extends Component
 
             $activity = StartDatabase::run($this->database);
             $this->auditDatabaseAction('ui.database.started');
+            $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {

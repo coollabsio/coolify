@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\CreateScheduledBackup;
 use App\Models\Environment;
 use App\Models\Project;
@@ -91,6 +92,32 @@ it('creates a service database backup without S3 and opens its configuration', f
 
     expect($backup->save_s3)->toBeFalsy()
         ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('rejects an unsupported service database name during backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgres test',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+        'status' => 'running',
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => false,
+        'database_type' => ServiceDatabase::class,
+        'database_id' => $database->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    expect(fn () => (new DatabaseBackupJob($backup))->handle())
+        ->toThrow(Exception::class, 'Invalid database container name.');
 });
 
 it('selects a service database when creating a backup from the unified backups page', function () {

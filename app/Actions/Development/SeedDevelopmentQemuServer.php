@@ -14,13 +14,23 @@ class SeedDevelopmentQemuServer
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $removeOtherServers = true): Server|Node
+    /**
+     * Seed the Server (or, for Podman profiles, the worker Node) of a development QEMU profile.
+     * $removeOtherServers removes other development QEMU records of the same kind; $asLocalhost reuses Server id 0.
+     */
+    public function handle(string $profileName, bool $removeOtherServers = true, bool $asLocalhost = false): Server|Node
     {
         $this->ensureDevelopmentEnvironment();
         $profile = config("development-qemu.profiles.{$profileName}");
 
         if (! is_array($profile)) {
             throw new InvalidArgumentException("Unknown development QEMU profile: {$profileName}");
+        }
+
+        $isNode = ($profile['runtime'] ?? null) === 'podman';
+
+        if ($isNode && $asLocalhost) {
+            throw new InvalidArgumentException("The {$profileName} profile is a worker Node and cannot be used as localhost.");
         }
 
         $privateKey = PrivateKey::query()->find(1);
@@ -30,24 +40,20 @@ class SeedDevelopmentQemuServer
         }
 
         if ($removeOtherServers) {
-            Server::query()
-                ->where('uuid', 'like', 'development-qemu-%')
-                ->where('uuid', '!=', $profile['uuid'])
-                ->delete();
-            Node::query()
+            ($isNode ? Node::query() : Server::query())
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
                 ->delete();
         }
 
-        if (($profile['runtime'] ?? null) === 'podman') {
+        if ($isNode) {
             Server::query()->where('uuid', $profile['uuid'])->delete();
 
             return Node::query()->updateOrCreate(
                 ['uuid' => $profile['uuid']],
                 [
                     'name' => $profile['name'],
-                    'description' => 'Development-only QEMU virtual machine managed by dev:qemu.',
+                    'description' => 'Development QEMU virtual machine',
                     'role' => NodeRole::WORKER,
                     'ip' => $profile['ip'],
                     'port' => 22,
@@ -67,11 +73,13 @@ class SeedDevelopmentQemuServer
 
         Node::query()->where('uuid', $profile['uuid'])->delete();
 
-        $server = Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server;
-        $server->forceFill(['uuid' => $profile['uuid']]);
+        $server = $asLocalhost
+            ? (Server::withTrashed()->find(0) ?? new Server)
+            : (Server::withTrashed()->where('uuid', $profile['uuid'])->first() ?? new Server);
+        $server->forceFill($asLocalhost ? ['id' => 0, 'uuid' => 'localhost'] : ['uuid' => $profile['uuid']]);
         $server->fill([
-            'name' => $profile['name'],
-            'description' => 'Development-only QEMU virtual machine managed by dev:qemu.',
+            'name' => $asLocalhost ? 'localhost' : $profile['name'],
+            'description' => 'Development QEMU virtual machine',
             'ip' => $profile['ip'],
             'port' => 22,
             'user' => $profile['user'],

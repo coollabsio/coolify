@@ -185,10 +185,6 @@ export function initializeTerminalComponent() {
             maxHeartbeatMisses: 3,
             // Command buffering for race condition prevention
             pendingCommand: null,
-            // Last successfully sent SSH command — replayed after a transient reconnect
-            // so the PTY respawns automatically. Cleared on intentional terminations
-            // (pty-exited, unprocessable).
-            lastSentCommand: null,
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
@@ -290,8 +286,8 @@ export function initializeTerminalComponent() {
 
                 this.setupTerminalEventListeners();
 
-                this.$wire.on('send-back-command', (command) => {
-                    this.sendCommandWhenReady({ command: command });
+                this.$wire.on('send-terminal-token', ([token]) => {
+                    this.sendCommandWhenReady({ terminalToken: token });
                 });
 
                 this.$wire.on('terminal-should-focus', () => {
@@ -658,15 +654,11 @@ export function initializeTerminalComponent() {
                     this.connectionTimeoutId = null;
                 }
 
-                // Flush any buffered command from before WebSocket was ready, otherwise
-                // replay the last command so a transient reconnect respawns the PTY
-                // automatically without requiring the user to click Connect again.
+                // Flush a token that was issued before the WebSocket was ready. Issued
+                // tokens are single-use and must never be replayed after a reconnect.
                 if (this.pendingCommand) {
                     this.sendMessage(this.pendingCommand);
                     this.pendingCommand = null;
-                } else if (this.lastSentCommand) {
-                    logTerminal('log', '[Terminal] Replaying last command after reconnect.');
-                    this.sendMessage(this.lastSentCommand);
                 }
 
                 // (Re)start application-level keepalive on every successful connect.
@@ -749,9 +741,6 @@ export function initializeTerminalComponent() {
             sendMessage(message) {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.socket.send(JSON.stringify(message));
-                    if (message && message.command) {
-                        this.lastSentCommand = message;
-                    }
                 } else {
                     logTerminal('warn', '[Terminal] WebSocket not ready, message not sent:', message);
                 }
@@ -822,7 +811,6 @@ export function initializeTerminalComponent() {
                     this.starting = false;
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
-                    this.lastSentCommand = null;
                     this.resetTerminalSessionCountdown();
                     this.message = '(sorry, something went wrong, please try again)';
 
@@ -836,7 +824,6 @@ export function initializeTerminalComponent() {
                     this.resetTerminalSessionCountdown();
                     this.term.reset();
                     this.commandBuffer = '';
-                    this.lastSentCommand = null;
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');

@@ -73,36 +73,109 @@ function createResourceHostingTestApplication(object $test): Application
 test('only eligible deployment servers can host resources', function () {
     expect($this->server->canHostResources())->toBeTrue();
 
-    $this->server->settings->update(['is_build_server' => true]);
+    $this->server->settings->update(['server_role' => 'build', 'is_build_server' => true]);
 
     expect($this->server->fresh()->canHostResources())->toBeFalse();
 });
 
-test('a populated build server can be changed back to a deployment server', function () {
-    createResourceHostingTestApplication($this);
-    $this->server->settings()->update(['is_build_server' => true]);
+test('legacy server settings with a null role use the combined role', function () {
+    $this->actingAs($this->user);
+    $this->server->settings()->update(['server_role' => null]);
+    $this->server->refresh()->load('settings');
 
-    Livewire::actingAs($this->user)
-        ->test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSet('isBuildServer', true)
-        ->assertSet('isBuildServerLocked', false)
-        ->set('isBuildServer', false)
-        ->assertHasNoErrors();
-
-    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse();
+    expect($this->server->settings->effectiveServerRole()->value)->toBe('both')
+        ->and($this->server->canHostResources())->toBeTrue()
+        ->and(Server::isUsable()->pluck('id'))->toContain($this->server->id)
+        ->and(Server::isUsableBuildServer()->pluck('id'))->not->toContain($this->server->id)
+        ->and(Server::buildServers($this->team->id)->pluck('id'))->not->toContain($this->server->id);
 });
 
-test('a populated deployment server cannot be changed into a build server', function () {
-    createResourceHostingTestApplication($this);
+test('legacy build servers with a null role stay build only', function () {
+    $this->actingAs($this->user);
+    $this->server->settings()->update(['server_role' => null, 'is_build_server' => true]);
+    $this->server->refresh()->load('settings');
+
+    expect($this->server->settings->effectiveServerRole()->value)->toBe('build')
+        ->and(Server::isUsable()->pluck('id'))->not->toContain($this->server->id)
+        ->and(Server::isUsableBuildServer()->pluck('id'))->toContain($this->server->id)
+        ->and(Server::buildServers($this->team->id)->pluck('id'))->toContain($this->server->id);
+});
+
+test('deployments only requires a dedicated build server, not a combined server', function () {
+    $combinedServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $combinedServer->settings()->update(['server_role' => 'both',
+        'is_build_server' => false, 'is_reachable' => true, 'is_usable' => true]);
 
     Livewire::actingAs($this->user)
         ->test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSet('isBuildServer', false)
-        ->assertSet('isBuildServerLocked', true)
-        ->set('isBuildServer', true)
-        ->assertSet('isBuildServer', false);
+        ->set('serverRole', 'deployment')
+        ->call('requestServerRoleChange')
+        ->assertSet('serverRole', 'both')
+        ->assertDispatched('error');
 
-    expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse();
+    expect($this->server->settings->fresh()->server_role->value)->toBe('both');
+});
+
+test('changing from build only to deployments and builds requires confirmation', function () {
+    createResourceHostingTestApplication($this);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
+
+    Livewire::actingAs($this->user)
+        ->test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('serverRole', 'build')
+        ->set('serverRole', 'both')
+        ->call('requestServerRoleChange')
+        ->assertSet('serverRole', 'build')
+        ->assertSet('pendingServerRole', 'both')
+        ->assertDispatched('open-server-role-confirmation')
+        ->call('confirmServerRoleChange')
+        ->assertSet('serverRole', 'both');
+
+    expect($this->server->settings->fresh()->server_role->value)->toBe('both');
+});
+
+test('an empty deployment-only server requires confirmation before the combined role is enabled', function () {
+    $this->server->settings()->update([
+        'server_role' => 'deployment',
+        'is_build_server' => false,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->set('serverRole', 'both')
+        ->call('requestServerRoleChange')
+        ->assertSet('serverRole', 'deployment')
+        ->assertSet('pendingServerRole', 'both')
+        ->assertDispatched('open-server-role-confirmation');
+
+    expect($this->server->settings->fresh()->server_role->value)->toBe('deployment');
+});
+
+test('a populated server requires confirmation before builds are enabled', function () {
+    createResourceHostingTestApplication($this);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('serverRole', 'both')
+        ->set('serverRole', 'deployment')
+        ->call('requestServerRoleChange');
+
+    $otherBuildServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherBuildServer->settings()->update(['server_role' => 'build',
+        'is_build_server' => true, 'is_reachable' => true, 'is_usable' => true]);
+
+    $component
+        ->set('serverRole', 'deployment')
+        ->call('requestServerRoleChange')
+        ->set('serverRole', 'both')
+        ->call('requestServerRoleChange')
+        ->assertSet('serverRole', 'deployment')
+        ->assertSet('pendingServerRole', 'both')
+        ->assertDispatched('open-server-role-confirmation')
+        ->call('confirmServerRoleChange')
+        ->assertSet('serverRole', 'both');
+
+    expect($this->server->settings->fresh()->server_role->value)->toBe('both');
 });
 
 test('resource selection keeps excluded build servers visible for explanation', function () {
@@ -111,6 +184,7 @@ test('resource selection keeps excluded build servers visible for explanation', 
     $buildServer->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
         'is_swarm_worker' => false,
         'force_disabled' => false,
@@ -125,6 +199,26 @@ test('resource selection keeps excluded build servers visible for explanation', 
         ->not->toContain($this->server->id)
         ->and($component->buildServers->pluck('id'))->toContain($buildServer->id)
         ->and($component->allServers->pluck('id'))->toContain($this->server->id, $buildServer->id);
+});
+
+test('resource selection lists each combined server once', function () {
+    $this->actingAs($this->user);
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherServer->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'server_role' => 'both',
+        'is_build_server' => false,
+        'is_swarm_worker' => false,
+        'force_disabled' => false,
+    ]);
+
+    $component = new ResourceSelect;
+    $component->loadServers();
+
+    expect($component->buildServers)->toBeEmpty()
+        ->and($component->servers->pluck('id')->all())->toEqualCanonicalizing([$this->server->id, $otherServer->id])
+        ->and($component->allServers->pluck('id')->duplicates())->toBeEmpty();
 });
 
 test('resource selection does not show the empty server message when only build servers are available', function () {
@@ -144,7 +238,7 @@ test('resource selection does not show the empty server message when only build 
 });
 
 test('application API rejects build servers', function () {
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->postJson('/api/v1/applications/dockerimage', [
@@ -163,7 +257,7 @@ test('application API rejects build servers', function () {
 });
 
 test('database API rejects build servers', function () {
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->postJson('/api/v1/databases/postgresql', [
@@ -177,7 +271,7 @@ test('database API rejects build servers', function () {
 });
 
 test('service API rejects build servers', function () {
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->postJson('/api/v1/services', [
@@ -209,7 +303,7 @@ test('server API rejects enabling build mode when resources exist', function () 
 
 test('server API allows keeping build mode enabled when resources exist', function () {
     createResourceHostingTestApplication($this);
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
@@ -222,7 +316,7 @@ test('server API allows keeping build mode enabled when resources exist', functi
 
 test('server API allows disabling build mode when resources exist', function () {
     createResourceHostingTestApplication($this);
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
@@ -272,7 +366,7 @@ test('resource APIs still accept deployment servers', function () {
 
 test('a crafted web request cannot create a resource on a build server', function () {
     $this->actingAs($this->user);
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
 
     $url = route('project.resource.create', [
         'project_uuid' => $this->project->uuid,
@@ -286,7 +380,7 @@ test('a crafted web request cannot create a resource on a build server', functio
 
 test('a manipulated resource form cannot submit to a build server', function () {
     $this->actingAs($this->user);
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
     $routeParameters = [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
@@ -303,7 +397,7 @@ test('a manipulated resource form cannot submit to a build server', function () 
 
 test('a manipulated project clone cannot target a build server', function () {
     $this->actingAs($this->user);
-    $this->server->settings()->update(['is_build_server' => true]);
+    $this->server->settings()->update(['server_role' => 'build', 'is_build_server' => true]);
     $projectCount = Project::count();
 
     Livewire::test(CloneMe::class, [
@@ -391,6 +485,7 @@ test('a manipulated clone request cannot target a build server', function () {
     $buildServer->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
     $buildDestination = StandaloneDocker::where('server_id', $buildServer->id)->firstOrFail();
@@ -430,6 +525,7 @@ test('resource operations explains why build servers cannot be clone targets', f
     $buildServer->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
 

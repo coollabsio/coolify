@@ -173,6 +173,22 @@ test('member cannot update application general settings', function () {
     expect($this->member->can('update', $this->application))->toBeFalse();
 });
 
+test('application config download is not callable through Livewire', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+    $this->application->update([
+        'static_image' => 'nginx:alpine',
+        'base_directory' => '/',
+        'is_http_basic_auth_enabled' => false,
+        'redirect' => 'no',
+    ]);
+
+    $component = Livewire::test(ApplicationGeneral::class, ['application' => $this->application]);
+
+    expect(fn () => $component->call('downloadConfig'))
+        ->toThrow(MethodNotFoundException::class);
+});
+
 test('member cannot reset application labels', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);

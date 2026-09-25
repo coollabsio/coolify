@@ -5,6 +5,7 @@ namespace App\Actions\Proxy;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Services\ProxyPortParser;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
@@ -112,6 +113,7 @@ class GetProxyConfiguration
         }
 
         if (! empty(trim($result ?? ''))) {
+            ProxyPortParser::fromConfiguration($result);
             $server->proxy->last_saved_proxy_configuration = $result;
             $server->save();
 

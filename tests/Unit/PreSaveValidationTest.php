@@ -198,3 +198,74 @@ YAML;
     expect(fn () => validateDockerComposeForInjection($validCompose))
         ->not->toThrow(Exception::class);
 });
+
+test('validateDockerComposeForInjection blocks invalid top-level network names', function () {
+    $invalidCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+networks:
+  "app'network":
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($invalidCompose))
+        ->toThrow(Exception::class, 'Invalid Docker Compose network name');
+});
+
+test('validateDockerComposeForInjection blocks invalid service network list items', function () {
+    $invalidCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+    networks:
+      - "app'network"
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($invalidCompose))
+        ->toThrow(Exception::class, 'Invalid Docker Compose service network');
+});
+
+test('validateDockerComposeForInjection blocks invalid service network map keys', function () {
+    $invalidCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+    networks:
+      "app'network":
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($invalidCompose))
+        ->toThrow(Exception::class, 'Invalid Docker Compose service network');
+});
+
+test('validateDockerComposeForInjection blocks invalid compose network name fields', function () {
+    $invalidCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+networks:
+  frontend:
+    name: "app'network"
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($invalidCompose))
+        ->toThrow(Exception::class, 'Invalid Docker Compose network name field');
+});
+
+test('validateDockerComposeForInjection allows legitimate compose networks', function () {
+    $validCompose = <<<'YAML'
+services:
+  web:
+    image: nginx:latest
+    networks:
+      - frontend
+      - backend
+networks:
+  frontend:
+  backend:
+    name: app-backend
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($validCompose))
+        ->not->toThrow(Exception::class);
+});

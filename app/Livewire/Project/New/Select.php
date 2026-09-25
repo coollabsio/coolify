@@ -279,7 +279,7 @@ class Select extends Component
             $this->servers = $this->allServers;
         } else {
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }
@@ -377,7 +377,7 @@ class Select extends Component
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {
-                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
                 } else {
                     $this->servers = $this->allServers;
                 }
@@ -387,7 +387,7 @@ class Select extends Component
             $this->isDatabase = true;
             $this->includeSwarm = false;
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }

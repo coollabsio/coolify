@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Models\Application;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 
 trait MatchesManualWebhookApplications
@@ -59,6 +60,17 @@ trait MatchesManualWebhookApplications
             'status' => 'failed',
             'message' => 'Invalid signature.',
         ];
+    }
+
+    protected function manualWebhookResponse(Collection $payloads): Response
+    {
+        $failure = $this->unauthenticatedManualWebhookFailurePayload();
+        $authorizedPayloads = $payloads->reject(fn (array $payload): bool => $payload === $failure)->values();
+        if ($authorizedPayloads->isEmpty() && $payloads->isNotEmpty()) {
+            return response([$failure]);
+        }
+
+        return response($authorizedPayloads);
     }
 
     protected function canonicalManualWebhookRepository(?string $gitRepository): ?string

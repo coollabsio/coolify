@@ -40,7 +40,7 @@ it('shows a warning icon when sentinel is enabled but not working', function () 
     $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
 
     expect($contents)
-        ->toContain("'warning' => \$server->isSentinelEnabled() && ! \$server->isSentinelLive()");
+        ->toContain("'warning' => \$server->isSentinelEnabled() && \$sentinelStatus === 'out_of_sync'");
 });
 
 it('uses the network reicon for proxy in the server sidebar', function () {
@@ -62,6 +62,10 @@ it('shows a warning icon when a server menu item requires attention', function (
         ->toContain('proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),')
         ->toContain('traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo())')
         ->toContain('@proxy-configuration-state-changed.window')
+        ->toContain('@sentinel-status-changed.window')
+        ->toContain('sentinelOutOfSync = $event.detail.outOfSync')
+        ->toContain('scheduleSentinelExpiry($event.detail.expiresInMilliseconds)')
+        ->toContain('setTimeout(() => this.sentinelOutOfSync = true, delay)')
         ->toContain("\$menuItem['warning'] ?? false")
         ->toContain('name="alert-triangle"');
 

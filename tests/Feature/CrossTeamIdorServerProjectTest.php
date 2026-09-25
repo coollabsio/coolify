@@ -8,6 +8,7 @@ use App\Livewire\Project\DeleteProject;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -25,7 +26,14 @@ beforeEach(function () {
     $this->teamA = Team::factory()->create();
     $this->userA->teams()->attach($this->teamA, ['role' => 'owner']);
 
-    $this->serverA = Server::factory()->create(['team_id' => $this->teamA->id]);
+    $keyA = PrivateKey::withoutEvents(fn () => PrivateKey::factory()->create([
+        'uuid' => new_public_id(),
+        'team_id' => $this->teamA->id,
+    ]));
+    $this->serverA = Server::factory()->create([
+        'team_id' => $this->teamA->id,
+        'private_key_id' => $keyA->id,
+    ]);
     $this->projectA = Project::factory()->create(['team_id' => $this->teamA->id]);
     $this->environmentA = Environment::factory()->create(['project_id' => $this->projectA->id]);
 
@@ -34,7 +42,14 @@ beforeEach(function () {
     $this->teamB = Team::factory()->create();
     $this->userB->teams()->attach($this->teamB, ['role' => 'owner']);
 
-    $this->serverB = Server::factory()->create(['team_id' => $this->teamB->id]);
+    $keyB = PrivateKey::withoutEvents(fn () => PrivateKey::factory()->create([
+        'uuid' => new_public_id(),
+        'team_id' => $this->teamB->id,
+    ]));
+    $this->serverB = Server::factory()->create([
+        'team_id' => $this->teamB->id,
+        'private_key_id' => $keyB->id,
+    ]);
     $this->projectB = Project::factory()->create(['team_id' => $this->teamB->id]);
     $this->environmentB = Environment::factory()->create(['project_id' => $this->projectB->id]);
 
@@ -87,6 +102,7 @@ describe('Boarding Project IDOR', function () {
 
     test('boarding selectExistingProject can load own team project', function () {
         $component = Livewire::test(BoardingIndex::class)
+            ->set('createdServer', $this->serverA)
             ->set('selectedProject', $this->projectA->id)
             ->call('selectExistingProject');
 

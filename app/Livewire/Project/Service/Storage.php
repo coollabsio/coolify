@@ -24,8 +24,6 @@ class Storage extends Component
 
     public string $mount_path = '';
 
-    public ?string $host_path = null;
-
     public string $file_storage_path = '';
 
     public ?string $file_storage_content = null;
@@ -209,17 +207,14 @@ class Storage extends Component
             $this->validate([
                 'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
-                'host_path' => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
-            ], array_merge(ValidationPatterns::volumeNameMessages(), [
-                'host_path.regex' => 'Host path must start with / and only contain safe path characters.',
-            ]));
+            ], ValidationPatterns::volumeNameMessages());
 
             $name = $this->resource->uuid.'-'.$this->name;
 
             LocalPersistentVolume::create([
                 'name' => $name,
                 'mount_path' => $this->mount_path,
-                'host_path' => $this->host_path,
+                'host_path' => null,
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->getMorphClass(),
             ]);
@@ -312,14 +307,17 @@ class Storage extends Component
                 'file_storage_directory_destination' => 'required|string',
             ]);
 
-            $this->file_storage_directory_source = trim($this->file_storage_directory_source);
-            $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
-            $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
-            $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
-
-            // Validate paths to prevent command injection
-            validateShellSafePath($this->file_storage_directory_source, 'storage source path');
-            validateShellSafePath($this->file_storage_directory_destination, 'storage destination path');
+            $this->file_storage_directory_source = confinePathToBase(
+                $this->fileStorageHostPath(),
+                $this->file_storage_directory_source,
+                'storage source path'
+            );
+            $this->file_storage_directory_destination = validateFileMountPath(
+                $this->file_storage_directory_destination,
+                'storage destination path'
+            );
+            $server = $this->resource->service?->server ?? $this->resource->destination->server;
+            LocalFileVolume::assertRemotePathIsConfined($this->fileStorageHostPath(), $this->file_storage_directory_source, $server);
 
             LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
@@ -344,7 +342,6 @@ class Storage extends Component
     {
         $this->name = $this->generateDefaultVolumeName();
         $this->mount_path = '';
-        $this->host_path = null;
         $this->file_storage_path = '';
         $this->file_storage_content = null;
         $this->file_storage_directory_destination = '';

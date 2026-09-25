@@ -128,6 +128,10 @@ it('renders a team-wide analytics summary across enabled servers', function () {
 
     $fake = new FakeGlobalAnalyticsTrafficClient($server);
     $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
+    $fake->responses['/traffic/breakdown/referer'] = json_encode([
+        ['value' => 'https://www.google.com/search', 'requests' => 250, 'bytes_out' => 7000],
+        ['value' => 'http://google.com/news', 'requests' => 50, 'bytes_out' => 1000],
+    ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
     loadLazy(Livewire::test(Analytics::class))
@@ -253,7 +257,10 @@ it('shows path domains, links top apps to analytics, groups by project, and surf
         ->assertSee('Top IPs')
         ->assertSee('203.0.113.7')
         ->assertSee('Top user agents')
-        ->assertSee('TestAgent/1.0');
+        ->assertSee('TestAgent/1.0')
+        ->assertSet('breakdowns.referer', [
+            ['value' => 'google.com', 'requests' => 300, 'bytesOut' => 8000],
+        ]);
 
     // Path rows carry the resolved domain, top-app rows carry the domain + analytics link.
     expect($component->instance()->topPaths[0]['domain'])->toBe('shop.example.com');

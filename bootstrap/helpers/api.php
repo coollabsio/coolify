@@ -141,7 +141,7 @@ function sharedDataApplications()
         'gpu_device_ids' => 'string|nullable',
         'gpu_options' => 'string|nullable',
         'is_consistent_container_name_enabled' => 'boolean',
-        'custom_internal_name' => 'string|nullable',
+        'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',

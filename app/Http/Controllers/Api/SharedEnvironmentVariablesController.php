@@ -356,7 +356,7 @@ class SharedEnvironmentVariablesController extends Controller
                     new OA\Property(property: 'value', type: 'string', nullable: true),
                     new OA\Property(property: 'is_literal', type: 'boolean'),
                     new OA\Property(property: 'is_multiline', type: 'boolean'),
-                    new OA\Property(property: 'is_shown_once', type: 'boolean'),
+                    new OA\Property(property: 'is_shown_once', type: 'boolean', description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'),
                     new OA\Property(property: 'comment', type: 'string', nullable: true),
                 ],
             ),

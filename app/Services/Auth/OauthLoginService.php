@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class OauthLoginService
@@ -27,11 +28,37 @@ class OauthLoginService
             ? $this->resolveOidcUser($oauthUser, $oauthSetting, $email)
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
-        Auth::login($user);
         $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
         session(['currentTeam' => $user->currentTeam = $team]);
 
+        if ($this->requiresTwoFactorChallenge($user)) {
+            Auth::logout();
+            session()->put([
+                'login.id' => $user->getKey(),
+                'login.remember' => false,
+            ]);
+            TwoFactorAuthenticationChallenged::dispatch($user);
+
+            return $user;
+        }
+
+        Auth::login($user);
+        auditLog('auth.user.oauth_login_succeeded', [
+            'team_id' => $team?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+            'actor_id' => $user->id,
+            'actor_name' => $user->name,
+            'actor_email' => $user->email,
+            'provider' => $provider,
+        ]);
+
         return $user;
+    }
+
+    public function requiresTwoFactorChallenge(User $user): bool
+    {
+        return $user->hasEnabledTwoFactorAuthentication();
     }
 
     private function resolveOauthUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
@@ -46,6 +73,10 @@ class OauthLoginService
         }
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
+
+        if ($provider === 'google' && filled($oauthSetting->tenant) && data_get($rawClaims, 'hd') !== $oauthSetting->tenant) {
+            throw new HttpException(403, 'Google account is not in the configured Workspace');
+        }
 
         $identityKey = [
             'provider' => $provider,
@@ -67,7 +98,15 @@ class OauthLoginService
                     return $identity->user;
                 }
 
+                if (! $this->hasVerifiedEmail($provider, $rawClaims)) {
+                    throw new HttpException(403, 'OAuth provider did not verify the email address');
+                }
+
                 $user = User::whereEmail($email)->first();
+                if ($user?->oauthIdentities()->exists()) {
+                    throw new HttpException(403, 'OAuth identity cannot be linked to this account');
+                }
+
                 if (! $user) {
                     if (! $this->canCreateUser($oauthSetting)) {
                         throw new HttpException(403, 'Registration is disabled');
@@ -91,6 +130,23 @@ class OauthLoginService
         } catch (UniqueConstraintViolationException $exception) {
             return OauthIdentity::where($identityKey)->first()?->user ?? throw $exception;
         }
+    }
+
+    /**
+     * GitHub and Bitbucket select only verified primary email addresses in
+     * their Socialite providers. Other providers must return an explicit
+     * boolean verification claim in the raw provider response.
+     *
+     * @param  array<string, mixed>  $rawClaims
+     */
+    private function hasVerifiedEmail(string $provider, array $rawClaims): bool
+    {
+        return match ($provider) {
+            'github', 'bitbucket' => true,
+            'discord' => data_get($rawClaims, 'verified') === true,
+            'google' => data_get($rawClaims, 'verified_email') === true,
+            default => data_get($rawClaims, 'email_verified') === true,
+        };
     }
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
@@ -144,6 +200,10 @@ class OauthLoginService
                     throw new HttpException(403, 'OIDC provider must verify the email address before linking to an existing account');
                 }
 
+                if ($user?->oauthIdentities()->exists()) {
+                    throw new HttpException(403, 'OAuth identity cannot be linked to this account');
+                }
+
                 if (! $user) {
                     if (! $this->canCreateUser($oauthSetting)) {
                         throw new HttpException(403, 'Registration is disabled');
@@ -169,9 +229,17 @@ class OauthLoginService
         }
     }
 
+    /**
+     * Only OIDC exposes a provider-level user creation setting. Other providers
+     * follow the instance registration setting, as before OIDC support.
+     */
     private function canCreateUser(OauthSetting $oauthSetting): bool
     {
-        return instanceSettings()->is_registration_enabled || $oauthSetting->allow_registration;
+        if (instanceSettings()->is_registration_enabled) {
+            return true;
+        }
+
+        return $oauthSetting->provider === 'oidc' && $oauthSetting->allow_registration;
     }
 
     private function createUser(string $name, string $email, OauthSetting $oauthSetting): User

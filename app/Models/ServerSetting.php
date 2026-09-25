@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ServerRole;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use OpenApi\Attributes as OA;
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
-        'is_build_server' => ['type' => 'boolean'],
+        'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
@@ -67,11 +68,18 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
+
+    public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
+
+    public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
+
     protected $fillable = [
         'server_id',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
+        'server_role',
         'is_reachable',
         'is_usable',
         'wildcard_domain',
@@ -135,6 +143,7 @@ class ServerSetting extends Model
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
+        'server_role' => ServerRole::class,
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
@@ -157,6 +166,7 @@ class ServerSetting extends Model
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
+        'is_build_server',
         'sentinel_token',
         'sentinel_custom_url',
         'logdrain_newrelic_license_key',
@@ -203,6 +213,11 @@ class ServerSetting extends Model
                 }
             }
         });
+    }
+
+    public function effectiveServerRole(): ServerRole
+    {
+        return $this->server_role ?? ($this->is_build_server ? ServerRole::BUILD : ServerRole::BOTH);
     }
 
     /**
@@ -272,6 +287,10 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
+        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+            $url = null;
+        }
+
         if (blank($url)) {
             $url = $this->generateSentinelUrl(ignoreEvent: true);
         }
@@ -283,12 +302,22 @@ class ServerSetting extends Model
         return $url;
     }
 
+    public function restoreDefaultSentinelConfiguration(): void
+    {
+        $this->generateSentinelUrl(save: false, ignoreEvent: true);
+        $this->sentinel_metrics_refresh_rate_seconds = self::DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS;
+        $this->sentinel_metrics_history_days = self::DEFAULT_SENTINEL_METRICS_HISTORY_DAYS;
+        $this->sentinel_push_interval_seconds = self::DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS;
+        $this->is_sentinel_debug_enabled = false;
+        $this->saveQuietly();
+    }
+
     public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
-            $domain = 'http://host.docker.internal:8000';
+            $domain = 'http://coolify:8080';
         } elseif ($settings->fqdn) {
             $domain = $settings->fqdn;
         } elseif ($settings->public_ipv4) {

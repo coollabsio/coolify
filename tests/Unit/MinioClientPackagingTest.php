@@ -1,21 +1,27 @@
 <?php
 
-it('pins the AIStor MinIO client release in every Coolify image', function () {
-    $imageFiles = [
-        dirname(__DIR__, 2).'/docker/production/Dockerfile',
+it('uses the mx MinIO-compatible client in development', function () {
+    $developmentFiles = [
         dirname(__DIR__, 2).'/docker/development/Dockerfile',
-        dirname(__DIR__, 2).'/docker/coolify-helper/Dockerfile',
         dirname(__DIR__, 2).'/docker-compose.dev.yml',
         dirname(__DIR__, 2).'/docker-compose.dev-multi.yml',
         dirname(__DIR__, 2).'/docker-compose-maxio.dev.yml',
     ];
 
-    foreach ($imageFiles as $imageFile) {
-        $contents = file_get_contents($imageFile);
+    foreach ($developmentFiles as $developmentFile) {
+        $contents = file_get_contents($developmentFile);
 
         expect($contents)
-            ->toContain('quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z')
-            ->not->toContain('quay.io/minio/aistor/mc:latest')
+            ->toContain('ghcr.io/coollabsio/mx:0.1.0')
+            ->not->toContain('quay.io/minio/aistor/mc:')
             ->not->toContain('minio/mc:');
     }
+});
+
+it('keeps the mc command path when packaging mx', function () {
+    $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/development/Dockerfile');
+
+    expect($dockerfile)
+        ->toContain('COPY --from=minio-client /usr/bin/mc /usr/bin/mc')
+        ->not->toContain('COPY --from=minio-client /usr/bin/mx');
 });

@@ -21,12 +21,13 @@ beforeEach(function () {
     session(['currentTeam' => $this->currentTeam]);
 });
 
-test('switching teams keeps the current page URL', function () {
+test('switching teams always redirects to the dashboard', function () {
     $currentUrl = route('security.api-tokens', ['page' => 2]);
 
     Livewire::test(SwitchTeam::class)
+        ->assertDontSee('window.location.href', false)
         ->call('switch_to', $this->otherTeam->id, $currentUrl)
-        ->assertRedirect($currentUrl);
+        ->assertRedirect(route('dashboard'));
 
     expect(session('currentTeam')->is($this->otherTeam))->toBeTrue();
 });

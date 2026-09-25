@@ -161,6 +161,31 @@ function replaceVariables(string $variable): Stringable
     return $str;
 }
 
+/**
+ * Quote a storage path without changing its existing simple shell-variable expansion.
+ */
+function filesystemVolumeShellArgument(string $path): string
+{
+    if (trim($path) === '') {
+        throw new Exception('Invalid storage path: path is empty.');
+    }
+    validateComposeArrayVolumeSource($path);
+
+    $tilde = '';
+    if (preg_match('/^~[A-Za-z0-9_-]*(?:\/|$)/', $path, $matches)) {
+        $tilde = $matches[0];
+        $path = substr($path, strlen($tilde));
+    }
+
+    if (! str_contains($path, '$')) {
+        return $tilde === '' ? escapeshellarg($path) : $tilde.($path === '' ? '' : escapeshellarg($path));
+    }
+
+    $quotedPath = str_replace(['\\', '"'], ['\\\\', '\\"'], $path);
+
+    return $tilde.'"'.$quotedPath.'"';
+}
+
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
@@ -172,9 +197,10 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $server = $oneService->service->server;
         }
         $fileVolumes = $oneService->fileStorages()->get();
+        $escapedWorkdir = escapeshellarg($workdir);
         $commands = collect([
-            "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd $workdir",
+            "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
+            "cd {$escapedWorkdir}",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
@@ -186,10 +212,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             } else {
                 $fileLocation = $path;
             }
+            $escapedFileLocation = filesystemVolumeShellArgument((string) $fileLocation);
             // Exists and is a file
-            $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
+            $isFile = instant_remote_process(["test -f {$escapedFileLocation} && echo OK || echo NOK"], $server);
             // Exists and is a directory
-            $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
+            $isDir = instant_remote_process(["test -d {$escapedFileLocation} && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
                 $fileVolume->is_directory = false;
@@ -208,23 +235,22 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
-                $dir = str($fileLocation)->dirname();
                 instant_remote_process([
-                    "mkdir -p $dir",
-                    "echo '$content' | base64 -d | tee $fileLocation",
+                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p $fileLocation"], $server);
+                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has no content => create directory
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-                instant_remote_process(["mkdir -p $fileLocation"], $server);
+                instant_remote_process(["mkdir -p -- {$escapedFileLocation}"], $server);
             }
         }
     } catch (Throwable $e) {

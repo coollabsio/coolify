@@ -106,9 +106,12 @@ class Analytics extends Component
 
             $breakdowns = [];
             foreach ($this->breakdownDimensions as $dimension) {
-                $breakdowns[$dimension] = $client->breakdown($key, $dimension, $from, $to, 50)
+                $rows = $client->breakdown($key, $dimension, $from, $to, 50)
                     ->map(fn ($row) => $row->toArray())
                     ->all();
+                $breakdowns[$dimension] = $dimension === 'referer'
+                    ? groupRefererBreakdownRows($rows)
+                    : $rows;
             }
             $this->breakdowns = $breakdowns;
 

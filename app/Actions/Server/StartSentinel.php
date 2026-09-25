@@ -87,7 +87,11 @@ class StartSentinel
         $trafficMount = $server->isTrafficAnalyticsEnabled()
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
-        $dockerCommand = "docker run -d $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        $network = $server->isLocalhost() ? ' --network coolify' : '';
+        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+
+        $server->sentinelHeartbeat(isReset: true);
+        $server->forceFill(['sentinel_waiting_since' => now()])->save();
 
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',
@@ -99,7 +103,10 @@ class StartSentinel
 
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
-        $server->sentinelHeartbeat();
+        $server->refresh();
+        if ($server->sentinel_waiting_since !== null) {
+            $server->forceFill(['sentinel_waiting_since' => now()])->save();
+        }
 
         // Dispatch event to notify UI components
         SentinelRestarted::dispatch($server, $version);

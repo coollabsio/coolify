@@ -1,12 +1,11 @@
 <?php
 
-it('keeps backup and transactional email out of the settings top navigation', function () {
-    $this->blade('<x-settings.navbar />')
-        ->assertSeeText('Configuration')
-        ->assertSeeText('OAuth')
-        ->assertSeeText('Scheduled Jobs')
-        ->assertDontSeeText('Instance Backup')
-        ->assertDontSeeText('Transactional Email');
+it('does not show scheduled jobs in instance settings navigation', function () {
+    $layout = file_get_contents(resource_path('views/components/settings/layout.blade.php'));
+
+    expect($layout)
+        ->not->toContain('Scheduled Jobs')
+        ->not->toContain('settings.scheduled-jobs');
 });
 
 it('shows backup and transactional email in the settings configuration sidebar', function () {

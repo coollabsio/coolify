@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -21,6 +22,7 @@ class Gitlab extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
     {
@@ -48,7 +50,7 @@ class Gitlab extends Controller
 
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 
-            $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+            $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
                 'client_id' => $gitlabApp->client_id,
                 'client_secret' => $gitlabApp->client_secret,
                 'code' => $code,
@@ -245,6 +247,15 @@ class Gitlab extends Controller
                             continue;
                         }
 
+                        if (! $this->isPreviewDeploymentRepositoryTrusted(
+                            data_get($payload, 'object_attributes.source_project_id'),
+                            data_get($payload, 'object_attributes.target_project_id'),
+                            data_get($payload, 'project.id'),
+                            $application->settings->is_pr_deployments_public_enabled,
+                        )) {
+                            continue;
+                        }
+
                         if ($skip_deploy_pr) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -405,10 +416,7 @@ class Gitlab extends Controller
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     return response($return_payloads);
                 }
@@ -416,10 +424,7 @@ class Gitlab extends Controller
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with branch '$base_branch'.",
-                    ]);
+                    $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
                     return response($return_payloads);
                 }
@@ -532,6 +537,15 @@ class Gitlab extends Controller
                 if ($x_gitlab_event === 'merge_request') {
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                         if ($application->isPRDeployable()) {
+                            if (! $this->isPreviewDeploymentRepositoryTrusted(
+                                data_get($payload, 'object_attributes.source_project_id'),
+                                data_get($payload, 'object_attributes.target_project_id'),
+                                data_get($payload, 'project.id'),
+                                $application->settings->is_pr_deployments_public_enabled,
+                            )) {
+                                continue;
+                            }
+
                             if ($skip_deploy_pr ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -621,7 +635,7 @@ class Gitlab extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads);
         } catch (Exception $e) {
             return handleError($e);
         }

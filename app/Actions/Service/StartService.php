@@ -48,7 +48,8 @@ class StartService
             $safeNetwork = escapeshellarg($service->destination->network);
             $serviceNames = data_get(Yaml::parse($compose), 'services', []);
             foreach ($serviceNames as $serviceName => $serviceConfig) {
-                $commands[] = "docker network connect --alias {$serviceName}-{$service->uuid} {$safeNetwork} {$serviceName}-{$service->uuid} >/dev/null 2>&1 || true";
+                $containerName = escapeshellarg("{$serviceName}-{$service->uuid}");
+                $commands[] = "docker network connect --alias {$containerName} {$safeNetwork} {$containerName} >/dev/null 2>&1 || true";
             }
         }
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));

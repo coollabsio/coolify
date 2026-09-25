@@ -56,7 +56,54 @@ describe('token team endpoints', function () {
             ->getJson('/api/v1/team')
             ->assertOk()
             ->assertJsonPath('id', $this->team->id)
-            ->assertJsonPath('name', 'Token Team');
+            ->assertJsonPath('name', 'Token Team')
+            ->assertJsonPath('is_build_server_fallback_enabled', true);
+    });
+
+    test('PATCH /team updates the build server fallback policy', function () {
+        $this->withHeaders(teamTokenApiHeaders($this->bearerToken))
+            ->patchJson('/api/v1/team', [
+                'is_build_server_fallback_enabled' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_build_server_fallback_enabled', false);
+
+        expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeFalse();
+    });
+
+    test('PATCH /team validates the build server fallback policy', function () {
+        $this->withHeaders(teamTokenApiHeaders($this->bearerToken))
+            ->patchJson('/api/v1/team', [
+                'is_build_server_fallback_enabled' => 'invalid',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_build_server_fallback_enabled');
+
+        expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeTrue();
+    });
+
+    test('team members cannot update the build server fallback policy', function () {
+        $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+        $this->withHeaders(teamTokenApiHeaders($this->bearerToken))
+            ->patchJson('/api/v1/team', [
+                'is_build_server_fallback_enabled' => false,
+            ])
+            ->assertForbidden();
+
+        expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeTrue();
+    });
+
+    test('read-only tokens cannot update the build server fallback policy', function () {
+        $readOnlyToken = $this->user->createToken('read-only-team-token', ['read'])->plainTextToken;
+
+        $this->withHeaders(teamTokenApiHeaders($readOnlyToken))
+            ->patchJson('/api/v1/team', [
+                'is_build_server_fallback_enabled' => false,
+            ])
+            ->assertForbidden();
+
+        expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeTrue();
     });
 
     test('GET /team/members returns members of the token team', function () {

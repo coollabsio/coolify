@@ -3,13 +3,22 @@
 namespace App\Actions\Service;
 
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use RuntimeException;
 
 class DeleteService
 {
     public function cleanupRemote(Service $service, bool $deleteVolumes, bool $deleteConnectedNetworks, bool $deleteConfigurations): void
     {
         $server = data_get($service, 'server');
-        if ($deleteVolumes && $server->isFunctional()) {
+        if (! $server?->isFunctional()) {
+            throw new RuntimeException('Server is not functional.');
+        }
+
+        $this->removeContainers($service);
+
+        if ($deleteVolumes) {
             $commands = [];
             foreach ($service->applications()->get() as $application) {
                 foreach ($application->persistentStorages()->get() as $storage) {
@@ -22,7 +31,7 @@ class DeleteService
                 }
             }
             foreach ($commands as $command) {
-                instant_remote_process([$command], $server, false);
+                instant_remote_process([$command], $server);
             }
         }
 
@@ -32,7 +41,28 @@ class DeleteService
         if ($deleteConfigurations) {
             $service->deleteConfigurations();
         }
-        instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
+    }
+
+    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): void
+    {
+        $service = $resource->service;
+        $server = $service?->server;
+        if (! $server?->isFunctional()) {
+            throw new RuntimeException('Server is not functional.');
+        }
+
+        $this->removeContainers($service, $resource->id);
+    }
+
+    private function removeContainers(Service $service, ?int $subresourceId = null): void
+    {
+        $filters = "--filter 'label=coolify.serviceId={$service->id}'";
+        if ($subresourceId !== null) {
+            $filters .= " --filter 'label=coolify.service.subId={$subresourceId}'";
+        }
+
+        $command = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
+        instant_remote_process([$command], $service->server);
     }
 
     public function deleteLocal(Service $service): void

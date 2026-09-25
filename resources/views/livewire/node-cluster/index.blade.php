@@ -59,7 +59,9 @@
                             </div>
                             <div class="min-w-0">
                                 <p class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</p>
-                                <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description ?: 'No description' }}</p>
+                                @if (filled($node->description))
+                                    <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
+                                @endif
                             </div>
                         </div>
                         <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">{{ str($node->role->value)->replace('-', ' ')->title() }}</div>
@@ -79,7 +81,7 @@
             $clusterRows = $clusters->map(fn ($cluster) => [
                 'uuid' => $cluster->uuid,
                 'name' => $cluster->name,
-                'description' => $cluster->description ?: 'No description',
+                'description' => $cluster->description ?? '',
                 'cidr' => $cluster->cidr,
                 'status' => str($cluster->network_status)->replace('_', ' ')->title()->toString(),
                 'nodesCount' => $cluster->nodes_count,
@@ -109,7 +111,7 @@
             <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($clusters as $cluster)
                     <a wire:key="cluster-grid-{{ $cluster->uuid }}"
-                        x-show="matches(@js([$cluster->name, $cluster->description ?: 'No description', $cluster->cidr, $cluster->network_status]))"
+                        x-show="matches(@js([$cluster->name, $cluster->description ?? '', $cluster->cidr, $cluster->network_status]))"
                         href="{{ route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]) }}" {{ wireNavigate() }}
                         class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
                         <div class="flex items-start gap-3">
@@ -118,7 +120,9 @@
                             </div>
                             <div class="min-w-0 flex-1">
                                 <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">{{ $cluster->name }}</h2>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->description ?: 'No description' }}</p>
+                                @if (filled($cluster->description))
+                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->description }}</p>
+                                @endif
                             </div>
                             <x-status-badge :status="str($cluster->network_status)->replace('_', ' ')->title()" type="neutral" />
                         </div>
@@ -138,7 +142,7 @@
                     <a :href="cluster.href" {{ wireNavigate() }} class="grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_10rem_9rem_7rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim"><x-reicon name="servers" class="size-4" /></div>
-                            <div class="min-w-0"><p class="truncate text-[13px] font-semibold text-black dark:text-fg" x-text="cluster.name"></p><p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint" x-text="cluster.description"></p></div>
+                            <div class="min-w-0"><p class="truncate text-[13px] font-semibold text-black dark:text-fg" x-text="cluster.name"></p><p x-show="cluster.description" class="truncate text-[11px] text-neutral-500 dark:text-fg-faint" x-text="cluster.description"></p></div>
                         </div>
                         <div class="truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim" x-text="cluster.cidr"></div>
                         <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim" x-text="cluster.status"></div>

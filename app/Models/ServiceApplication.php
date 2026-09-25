@@ -54,6 +54,7 @@ class ServiceApplication extends BaseModel
 
     protected $attributes = [
         'is_force_https_enabled' => true,
+        'max_restart_count' => 0,
     ];
 
     protected function casts(): array
@@ -87,7 +88,7 @@ class ServiceApplication extends BaseModel
     public function restart()
     {
         $container_id = $this->name.'-'.$this->service->uuid;
-        instant_remote_process(["docker restart {$container_id}"], $this->service->server);
+        instant_remote_process(['docker restart '.escapeshellarg($container_id)], $this->service->server);
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)

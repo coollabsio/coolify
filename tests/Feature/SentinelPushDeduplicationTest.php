@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Api\SentinelController;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
@@ -8,6 +9,7 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
@@ -99,6 +101,32 @@ it('updates the heartbeat even when the job is skipped', function () use ($runni
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
     expect(Carbon::parse($this->server->fresh()->sentinel_updated_at)->diffInSeconds(now()))->toBeLessThan(5);
+});
+
+it('broadcasts when a successful push restores sentinel synchronization', function () use ($running) {
+    Event::fake([SentinelSynchronized::class]);
+    $this->server->update(['sentinel_updated_at' => now()->subHour()]);
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    Event::assertDispatched(SentinelSynchronized::class, fn (SentinelSynchronized $event): bool => $event->serverUuid === $this->server->uuid);
+});
+
+it('clears the waiting state after the first authenticated push', function () use ($running) {
+    $this->server->forceFill(['sentinel_waiting_since' => now()])->save();
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    expect($this->server->fresh()->sentinel_waiting_since)->toBeNull();
+});
+
+it('does not broadcast synchronization for each healthy sentinel push', function () use ($running) {
+    Event::fake([SentinelSynchronized::class]);
+    $this->server->sentinelHeartbeat();
+
+    pushSentinel($this->token, sentinelPayload($running()))->assertOk();
+
+    Event::assertNotDispatched(SentinelSynchronized::class);
 });
 
 it('accepts an empty container list as a heartbeat when no containers are running', function () {

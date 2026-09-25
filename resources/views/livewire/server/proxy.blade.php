@@ -110,21 +110,26 @@
                         </x-slot:actions>
 
                         @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                            @if ($server->detected_traefik_version === 'latest')
+                            @if ($this->traefikVersionForWarning === 'latest')
                                 <x-callout type="warning" title="Unpinned Traefik version">
                                     The proxy uses the <span class="font-mono">latest</span> tag. Pin
                                     <span class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>
                                     for predictable updates.
                                 </x-callout>
-                            @elseif($this->isTraefikOutdated)
+                            @endif
+                            @if ($this->isTraefikOutdated)
                                 <x-callout type="warning" title="Traefik patch update available">
-                                    Version {{ $this->latestTraefikVersion }} is available. Test the update before
-                                    applying it to production servers.
+                                    {{ $server->detected_traefik_version ? 'Running version' : 'Configured image' }}
+                                    v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
+                                    for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
+                                    to production servers.
                                 </x-callout>
-                            @elseif($this->newerTraefikBranchAvailable)
+                            @endif
+                            @if ($this->newerTraefikBranchAvailable)
                                 <x-callout type="info" title="New Traefik minor version available">
-                                    {{ $this->newerTraefikBranchAvailable }} is available. Review the Traefik
-                                    changelog for breaking changes before upgrading.
+                                    {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
+                                    {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
+                                    changes before upgrading.
                                 </x-callout>
                             @endif
                         @endif
