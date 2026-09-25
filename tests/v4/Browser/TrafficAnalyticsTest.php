@@ -44,6 +44,25 @@ it('shows the disabled empty state on the global analytics page', function () {
         ->screenshot(filename: 'global-analytics-disabled-empty-state');
 });
 
+it('dismisses the global analytics enable prompt', function () {
+    loginAndSkipBoarding();
+
+    $page = visit('/analytics');
+
+    $page->assertVisible('[title="Dismiss"]')
+        ->assertSee('Set up on localhost');
+
+    expect($page->attribute('Set up on localhost', 'href'))
+        ->toContain('/server/'.$this->stack['server']->uuid.'/analytics');
+
+    $page->click('[title="Dismiss"]')
+        ->assertMissing('[title="Dismiss"]')
+        ->refresh()
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertMissing('[title="Dismiss"]')
+        ->screenshot(filename: 'global-analytics-prompt-dismissed');
+});
+
 it('shows the disabled empty state on the dashboard traffic widget', function () {
     $page = loginAndSkipBoarding();
 

@@ -131,7 +131,13 @@ class Application extends BaseModel
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
+    public const MAX_DOCKER_COMPOSE_COLLECTION_ALIASES = 256;
+
     private static $parserVersion = '5';
+
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
 
     protected $fillable = [
         'name',
@@ -2069,7 +2075,10 @@ class Application extends BaseModel
     public function oldRawParser()
     {
         try {
-            $yaml = Yaml::parse($this->docker_compose_raw);
+            $yaml = Yaml::parse(
+                $this->docker_compose_raw,
+                maxAliasesForCollections: self::MAX_DOCKER_COMPOSE_COLLECTION_ALIASES,
+            );
         } catch (\Exception $e) {
             throw new RuntimeException($e->getMessage());
         }
@@ -2093,6 +2102,7 @@ class Application extends BaseModel
                         $source = data_get_str($volume, 'source');
                     }
                     if ($type?->value() === 'bind') {
+                        $source = str($source);
                         if ($source->value() === '/var/run/docker.sock') {
                             continue;
                         }
@@ -2100,10 +2110,12 @@ class Application extends BaseModel
                             continue;
                         }
                         if ($source->startsWith('.')) {
-                            $source = $source->after('.');
-                            $source = $workdir.$source;
+                            $source = str($workdir.$source->after('.'));
                         }
-                        $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
+                        $mkdirCommand = rawComposeBindMkdirCommand($source->value());
+                        if ($mkdirCommand !== null) {
+                            $commands->push($mkdirCommand);
+                        }
                     }
                 }
             }

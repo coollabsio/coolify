@@ -22,14 +22,10 @@ class OauthController extends Controller
         try {
             $oauthSetting = $this->enabledProvider($provider);
             $oauthUser = get_socialite_provider($oauthSetting->provider)->user();
-            $oauthLoginService->login($oauthSetting->provider, $oauthUser, $oauthSetting);
+            $user = $oauthLoginService->login($oauthSetting->provider, $oauthUser, $oauthSetting);
 
-            $team = $user->resolveStoredTeam();
-            if (! $team && $user->teams()->count() === 0) {
-                $team = $user->recreate_personal_team();
-            }
-            if ($team) {
-                session(['currentTeam' => $user->currentTeam = $team]);
+            if ($oauthLoginService->requiresTwoFactorChallenge($user)) {
+                return redirect()->route('two-factor.login');
             }
 
             return redirect('/');
@@ -44,6 +40,11 @@ class OauthController extends Controller
 
     private function logCallbackFailure(string $provider, \Throwable $exception): void
     {
+        auditLog('auth.oauth.callback_failed', [
+            'provider' => $provider,
+            'exception_class' => $exception::class,
+            'reason' => $exception instanceof HttpException ? 'access_denied' : 'callback_error',
+        ], 'warning');
         Log::error('OAuth callback failed.', [
             'provider' => $provider,
             'exception_class' => $exception::class,

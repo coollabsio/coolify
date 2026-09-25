@@ -1571,10 +1571,17 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int|string
 {
+    if ($lines === 'all') {
+        return 'all';
+    }
+
     $lines = filter_var($lines, FILTER_VALIDATE_INT);
-    if ($lines === false || $lines <= 0) {
+    if ($lines === -1) {
+        return 'all';
+    }
+    if ($lines === false || $lines < -1) {
         return $default;
     }
 
@@ -1586,7 +1593,7 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
     return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 }
 
-function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $command = "docker logs -n {$lines}";
     if ($server->isSwarm()) {
@@ -1600,7 +1607,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int $li
     return "{$command} ".escapeshellarg($container_id).' 2>&1';
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);
@@ -1706,6 +1713,10 @@ function generateDockerBuildArgs($variables): Collection
     return $variables->map(function ($var) {
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
+        if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
+            throw new InvalidArgumentException('Invalid environment variable key.');
+        }
+
         // Only return the key - Docker will get the value from the environment
         return '--build-arg '.escapeshellarg((string) $key);
     });
@@ -1725,19 +1736,17 @@ function generateDockerEnvFlags($variables): string
         ->map(function ($var) {
             $key = is_array($var) ? data_get($var, 'key') : $var->key;
             $value = is_array($var) ? data_get($var, 'value') : $var->value;
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
 
-            if ($isMultiline) {
-                // For multiline variables, strip surrounding quotes and escape for bash
-                $raw_value = trim($value, "'");
-                $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
-
-                return "-e {$key}=\"{$escaped_value}\"";
+            if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
+                throw new InvalidArgumentException('Invalid environment variable key.');
             }
 
-            $escaped_value = escapeshellarg($value);
+            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
+            if ($isMultiline) {
+                $value = trim($value, "'");
+            }
 
-            return "-e {$key}={$escaped_value}";
+            return '-e '.escapeshellarg("{$key}={$value}");
         })
         ->implode(' ');
 }

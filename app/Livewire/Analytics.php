@@ -438,6 +438,9 @@ class Analytics extends Component
         foreach ($this->breakdownDimensions as $dimension) {
             $rows = array_values($breakdownTotals[$dimension]);
             usort($rows, fn ($a, $b) => $b['requests'] <=> $a['requests']);
+            if ($dimension === 'referer') {
+                $rows = groupRefererBreakdownRows($rows);
+            }
             $breakdowns[$dimension] = array_slice($rows, 0, 50);
         }
         $this->breakdowns = $breakdowns;

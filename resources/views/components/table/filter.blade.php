@@ -7,7 +7,7 @@
                 @if ($activeText) title="{{ $activeText }}" @endif
                 @class(['button max-w-80 min-w-0', 'button-highlighted' => $activeCount > 0])>
                 <x-reicon name="filter" class="size-3.5 shrink-0" />
-                <span class="truncate">Filter</span>
+                <span class="truncate">{{ $activeText ?: 'Filter' }}</span>
                 @if ($activeCount > 0)
                     <span class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim">{{ $activeCount }}</span>
                 @endif

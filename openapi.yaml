@@ -2346,6 +2346,74 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}/logs':
+    get:
+      tags:
+        - Applications
+      summary: 'Get preview application logs.'
+      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.'
+      operationId: get-preview-application-logs-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview deployment.'
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
+          required: false
+          schema:
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
+        -
+          name: show_timestamps
+          in: query
+          description: 'Show timestamps in the logs.'
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Preview runtime logs.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/previews/{pull_request_id}':
     delete:
       tags:
@@ -2510,7 +2578,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -2571,7 +2639,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -2615,7 +2683,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -2960,10 +3028,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -3036,10 +3100,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true
@@ -5696,7 +5756,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -5756,7 +5816,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -5802,7 +5862,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -5931,10 +5991,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -6007,10 +6063,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true
@@ -11010,6 +11062,10 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                max_restart_count:
+                  description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
+                  type: [integer, 'null']
+                  minimum: 0
                 is_force_https_enabled:
                   type: [boolean, 'null']
               type: object
@@ -12108,7 +12164,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -12171,7 +12227,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -12217,7 +12273,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -12559,10 +12615,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path.'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, optional).'
                 content:
                   type: string
                   nullable: true
@@ -12635,10 +12687,6 @@ paths:
                 mount_path:
                   type: string
                   description: 'The container mount path (not allowed for read-only storages).'
-                host_path:
-                  type: string
-                  nullable: true
-                  description: 'The host path (persistent only, not allowed for read-only storages).'
                 content:
                   type: string
                   nullable: true
@@ -12904,6 +12952,7 @@ paths:
                   type: boolean
                 is_shown_once:
                   type: boolean
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
                 comment:
                   type: [string, 'null']
               type: object
@@ -14788,6 +14837,7 @@ components:
           type: boolean
         is_shown_once:
           type: boolean
+          description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
         key:
           type: string
         value:

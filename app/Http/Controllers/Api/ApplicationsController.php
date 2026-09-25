@@ -1213,6 +1213,10 @@ class ApplicationsController extends Controller
 
         $this->authorize('create', Application::class);
 
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -2437,13 +2441,12 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -2483,6 +2486,59 @@ class ApplicationsController extends Controller
             ),
         ]
     )]
+    #[OA\Get(
+        summary: 'Get preview application logs.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/logs',
+        operationId: 'get-preview-application-logs-by-pull-request-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(type: 'string'),
+            ),
+            new OA\Parameter(
+                name: 'pull_request_id',
+                in: 'path',
+                description: 'Pull request ID of the preview deployment.',
+                required: true,
+                schema: new OA\Schema(type: 'integer', minimum: 1),
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
+            ),
+            new OA\Parameter(
+                name: 'show_timestamps',
+                in: 'query',
+                description: 'Show timestamps in the logs.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [new OA\Property(property: 'logs', type: 'string')],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
     public function logs_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
@@ -2498,7 +2554,25 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+        $this->authorize('view', $application);
+
+        $pullRequestId = null;
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if ($pullRequestIdRaw !== null) {
+            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+                return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+            }
+            $pullRequestId = (int) $pullRequestIdRaw;
+
+            $previewExists = ApplicationPreview::where('application_id', $application->id)
+                ->where('pull_request_id', $pullRequestId)
+                ->exists();
+            if (! $previewExists) {
+                return response()->json(['message' => 'Preview not found.'], 404);
+            }
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -3087,13 +3161,17 @@ class ApplicationsController extends Controller
 
         $this->authorize('update', $application);
 
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('deploy', $application);
+        }
+
         $server = $application->destination->server;
         $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
-            'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_domains.*' => 'array:name,domain,redirect',
@@ -3575,7 +3653,7 @@ class ApplicationsController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -3793,7 +3871,7 @@ class ApplicationsController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4014,7 +4092,7 @@ class ApplicationsController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -4904,7 +4982,6 @@ class ApplicationsController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -4966,11 +5043,10 @@ class ApplicationsController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -5012,7 +5088,7 @@ class ApplicationsController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -5050,9 +5126,6 @@ class ApplicationsController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {
@@ -5108,7 +5181,6 @@ class ApplicationsController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -5153,14 +5225,13 @@ class ApplicationsController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -5196,7 +5267,6 @@ class ApplicationsController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $application->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $application->id,
                 'resource_type' => $application->getMorphClass(),
             ]);
@@ -5232,11 +5302,16 @@ class ApplicationsController extends Controller
                 ], 422);
             }
 
-            $fsPath = str($request->fs_path)->trim()->start('/')->value();
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($fsPath, 'storage source path');
-            validateShellSafePath($mountPath, 'storage destination path');
+            try {
+                $fsPath = confinePathToBase(application_configuration_dir().'/'.$application->uuid, $request->fs_path, 'storage source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
+                LocalFileVolume::assertRemotePathIsConfined($application->workdir(), $fsPath, $application->destination->server);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,

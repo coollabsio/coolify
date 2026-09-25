@@ -142,6 +142,18 @@ test('owner can update team MCP setting', function () {
     expect($this->team->fresh()->is_mcp_server_enabled)->toBeFalse();
 });
 
+test('owner can update team build server fallback policy', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TeamIndex::class)
+        ->set('is_build_server_fallback_enabled', false)
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->team->fresh()->is_build_server_fallback_enabled)->toBeFalse();
+});
+
 test('team index mounts when is_mcp_server_enabled is null on the session team', function () {
     $this->actingAs($this->owner);
 

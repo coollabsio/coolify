@@ -81,7 +81,6 @@ use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
-use App\Livewire\Settings\ScheduledJobs as SettingsScheduledJobs;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -112,6 +111,8 @@ use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
+use App\Services\TerminalSessionService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 
@@ -177,8 +178,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/oauth/{provider}', SettingsOauth::class)
         ->where('provider', '[A-Za-z0-9_-]+')
         ->name('settings.oauth.provider');
-    Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
-
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
@@ -254,6 +253,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return response()->json(['ipAddresses' => []], 401);
     })->name('terminal.auth.ips')->middleware('can.access.terminal');
+
+    Route::post('/terminal/session', function (Request $request, TerminalSessionService $terminalSessionService) {
+        $request->validate(['token' => ['required', 'string', 'size:64']]);
+
+        return response()->json([
+            'command' => $terminalSessionService->redeem($request->user(), $request->string('token')->toString()),
+        ]);
+    })->name('terminal.session')->middleware('can.access.terminal');
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'showInvitation'])->name('team.invitation.show');

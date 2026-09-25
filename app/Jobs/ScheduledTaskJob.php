@@ -12,6 +12,7 @@ use App\Models\Service;
 use App\Models\Team;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
+use App\Services\ScheduledJobDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -65,7 +66,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public string $server_timezone = 'UTC';
 
-    public function __construct(ScheduledTask $task)
+    public function __construct(ScheduledTask $task, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
 
@@ -106,7 +107,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
         $startTime = Carbon::now();
+        $failed = false;
 
         try {
             $this->initializeExecutionContext();
@@ -170,6 +176,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // No valid container was found.
             throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
         } catch (\Throwable $e) {
+            $failed = true;
             if ($this->task_log) {
                 $this->task_log->update([
                     'status' => 'failed',
@@ -192,6 +199,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // Re-throw to trigger Laravel's retry mechanism with backoff
             throw $e;
         } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
             if ($this->team) {
                 ScheduledTaskDone::dispatch($this->team->id);
             }
@@ -229,6 +240,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function failed(?\Throwable $exception): void
     {
+        if ($this->occurrenceUuid) {
+            app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
         $this->team ??= Team::find($this->task->team_id);
 
         Log::channel('scheduled-errors')->error('ScheduledTask permanently failed', [

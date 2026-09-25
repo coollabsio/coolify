@@ -5,10 +5,12 @@ namespace App\Traits;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Stringable;
 
 trait ExecuteRemoteCommand
 {
@@ -20,49 +22,53 @@ trait ExecuteRemoteCommand
 
     private function redact_sensitive_info($text)
     {
-        $text = remove_iip($text);
+        try {
+            $text = remove_iip($text);
 
-        if (! isset($this->application)) {
-            return $text;
+            if (! isset($this->application)) {
+                return $text;
+            }
+
+            $lockedVars = collect([]);
+
+            if (isset($this->application->environment_variables)) {
+                $lockedVars = $lockedVars->merge(
+                    $this->application->environment_variables
+                        ->where('is_shown_once', true)
+                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
+                        ->filter()
+                );
+            }
+
+            if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
+                $lockedVars = $lockedVars->merge(
+                    $this->application->environment_variables_preview
+                        ->where('is_shown_once', true)
+                        ->flatMap(fn (EnvironmentVariable $variable): array => $variable->logRedactionValues())
+                        ->filter()
+                );
+            }
+
+            if (isset($this->remote_secrets_cache)) {
+                $lockedVars = $lockedVars->merge(array_values(array_filter(
+                    $this->remote_secrets_cache,
+                    static fn (mixed $value): bool => is_string($value) && $value !== ''
+                )));
+            }
+
+            foreach ($lockedVars as $key => $value) {
+                $escapedValue = preg_quote($value, '/');
+                $text = preg_replace(
+                    '/'.$escapedValue.'/',
+                    REDACTED,
+                    $text
+                );
+            }
+
+            return is_string($text) ? $text : REDACTED;
+        } catch (\Throwable) {
+            return REDACTED;
         }
-
-        $lockedVars = collect([]);
-
-        if (isset($this->application->environment_variables)) {
-            $lockedVars = $lockedVars->merge(
-                $this->application->environment_variables
-                    ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
-                    ->filter()
-            );
-        }
-
-        if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
-            $lockedVars = $lockedVars->merge(
-                $this->application->environment_variables_preview
-                    ->where('is_shown_once', true)
-                    ->pluck('real_value', 'key')
-                    ->filter()
-            );
-        }
-
-        if (isset($this->remote_secrets_cache)) {
-            $lockedVars = $lockedVars->merge(array_values(array_filter(
-                $this->remote_secrets_cache,
-                static fn (mixed $value): bool => is_string($value) && $value !== ''
-            )));
-        }
-
-        foreach ($lockedVars as $key => $value) {
-            $escapedValue = preg_quote($value, '/');
-            $text = preg_replace(
-                '/'.$escapedValue.'/',
-                REDACTED,
-                $text
-            );
-        }
-
-        return $text;
     }
 
     public function execute_remote_command(...$commands)
@@ -169,17 +175,16 @@ trait ExecuteRemoteCommand
 
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
         $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
-            $output = str($output)->trim();
-            if ($output->startsWith('╔')) {
-                $output = "\n".$output;
-            }
-
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
             $sanitized_output = sanitize_utf8_text($output);
+            $log_output = str($sanitized_output)->trim();
+            if ($log_output->startsWith('╔')) {
+                $log_output = "\n".$log_output;
+            }
 
             $new_log_entry = [
                 'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
-                'output' => $this->redact_sensitive_info($sanitized_output),
+                'output' => $this->redact_sensitive_info($log_output),
                 'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
@@ -213,17 +218,7 @@ trait ExecuteRemoteCommand
 
             $this->application_deployment_queue->save();
 
-            if ($this->save) {
-                if (data_get($this->saved_outputs, $this->save, null) === null) {
-                    $this->saved_outputs->put($this->save, str());
-                }
-                if ($append) {
-                    $current_value = $this->saved_outputs->get($this->save);
-                    $this->saved_outputs->put($this->save, str($current_value.str($sanitized_output)->trim()));
-                } else {
-                    $this->saved_outputs->put($this->save, str($sanitized_output)->trim());
-                }
-            }
+            $this->saveCommandOutput($sanitized_output, $append);
         });
         $this->application_deployment_queue->update([
             'current_process_id' => $process->id(),
@@ -250,6 +245,27 @@ trait ExecuteRemoteCommand
                 throw new DeploymentException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
             }
         }
+    }
+
+    private function saveCommandOutput(string $output, bool $append): void
+    {
+        if (! $this->save) {
+            return;
+        }
+
+        if ($append) {
+            $currentValue = $this->saved_outputs->get($this->save, '');
+            $this->saved_outputs->put($this->save, str($currentValue.$output));
+
+            return;
+        }
+
+        $this->saved_outputs->put($this->save, str($output)->trim());
+    }
+
+    private function trimmedSavedOutput(string $key): Stringable
+    {
+        return str($this->saved_outputs->get($key))->trim();
     }
 
     /**

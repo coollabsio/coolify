@@ -30,6 +30,8 @@ use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\Auditable;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -279,6 +281,7 @@ test('automatic and explicit auditing both preserve their events', function () {
 
 test('auditable models ignore unauthenticated mutations', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
 
     Project::factory()->create(['team_id' => $this->team->id]);
 
@@ -289,8 +292,8 @@ test('webhook audits resolve the team from the application', function () {
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
     $application = Application::factory()->create(['environment_id' => $environment->id]);
-    AuditEvent::query()->delete();
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     auditLog('webhook.deployment.queued', [
@@ -307,6 +310,7 @@ test('webhook audits resolve the team from the application', function () {
 
 test('unauthenticated webhook failures without a team are preserved', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     auditLogWebhookFailure('sentinel', 'token_missing');
@@ -324,6 +328,7 @@ test('unauthenticated webhook failures without a team are preserved', function (
 
 test('early Sentinel and Stripe rejections persist unscoped audit events', function () {
     auth()->logout();
+    AuditEvent::query()->delete();
     session()->forget('currentTeam');
 
     $this->postJson('/api/v1/sentinel/push', [])->assertUnauthorized();
@@ -556,6 +561,25 @@ test('audit log redacts sensitive metadata', function () {
         ->and($metadata['nested']['safe'])->toBe('visible');
 });
 
+test('audit severity is persisted and invalid levels fall back to info', function () {
+    auditLog('webhook.test.signature_failed', ['team_id' => $this->team->id], 'warning');
+    auditLog('ui.project.updated', ['team_id' => $this->team->id], 'invalid');
+
+    expect(AuditEvent::query()->orderBy('id')->pluck('level')->all())->toBe(['warning', 'info']);
+});
+
+test('authentication failures and logout are audited without credentials', function () {
+    event(new Failed('web', null, ['email' => 'person@example.com', 'password' => 'not-stored']));
+    event(new Logout('web', $this->user));
+
+    $failed = AuditEvent::query()->where('event', 'auth.user.login_failed')->sole();
+    $logout = AuditEvent::query()->where('event', 'auth.user.logged_out')->sole();
+
+    expect($failed->level)->toBe('warning')
+        ->and($failed->metadata)->not->toHaveKey('password')
+        ->and($logout->actor_id)->toBe($this->user->id);
+});
+
 test('audit log redacts common credential metadata keys', function (string $key) {
     auditLog('api.application.updated', [
         'team_id' => $this->team->id,
@@ -683,6 +707,12 @@ test('team admins can query only their team audit events through the api', funct
 });
 
 test('team admins with sensitive read access can query full audit event details', function () {
+    $token = $this->user->createToken('audit-sensitive-read', ['read', 'read:sensitive']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+    AuditEvent::query()->delete();
+
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
         'actor_email' => 'owner@example.com',
@@ -691,11 +721,6 @@ test('team admins with sensitive read access can query full audit event details'
         'ip_address' => '192.0.2.1',
         'user_agent' => 'Sensitive user agent',
     ]);
-
-    $token = $this->user->createToken('audit-sensitive-read', ['read', 'read:sensitive']);
-    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
-    auth()->logout();
-    auth()->forgetGuards();
 
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events')

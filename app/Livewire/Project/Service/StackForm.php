@@ -149,8 +149,9 @@ class StackForm extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->syncData(true);
-            $this->service->save();
+            $this->service->refresh()->update([
+                'connect_to_docker_network' => $this->connectToDockerNetwork,
+            ]);
             $this->dispatch('success', 'Service settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

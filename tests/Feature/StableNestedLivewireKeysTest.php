@@ -29,7 +29,6 @@ it('saves reindexed PostgreSQL scripts by their original stable identity', funct
 it('keeps editable and refreshed list row keys independent of their positions', function () {
     $applicationDomains = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
     $serviceDomains = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-    $scheduledJobs = file_get_contents(resource_path('views/livewire/settings/scheduled-jobs.blade.php'));
 
     expect($applicationDomains)
         ->not->toContain('wire:key="domain-row-{{ $index }}-')
@@ -38,12 +37,6 @@ it('keeps editable and refreshed list row keys independent of their positions', 
     expect($serviceDomains)
         ->not->toContain('-{{ $index }}-')
         ->toContain('wire:key="svc-domain-{{ $row[\'service_application_id\'] ?? \'x\' }}-{{ md5(');
-
-    expect($scheduledJobs)
-        ->not->toContain('wire:key="run-{{ $loop->index }}"')
-        ->not->toContain('wire:key="skip-{{ $loop->index }}"')
-        ->toContain('wire:key="run-{{ md5(serialize($run)) }}"')
-        ->toContain('wire:key="skip-{{ md5(serialize($skip)) }}"');
 });
 
 it('keys nested Livewire status components rendered inside navigation loops', function () {

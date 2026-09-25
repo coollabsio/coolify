@@ -2,17 +2,15 @@
 
 use App\Livewire\Storage\Form;
 use App\Models\S3Storage;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
-use Tests\TestCase;
-
-uses(TestCase::class);
 
 it('tests the S3 connection with the values currently entered in the form', function () {
     if (! defined('CURLOPT_RESOLVE')) {
         define('CURLOPT_RESOLVE', 10203);
     }
 
-    $disk = Mockery::mock();
+    $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->expects('files')->once()->andReturn([]);
     $testedConfig = null;
 

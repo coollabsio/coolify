@@ -1,4 +1,5 @@
 @php
+    $hasSourcePaths = $resource->persistentStorages->contains(fn ($storage) => filled($storage->host_path));
     $gridClass = match (true) {
         $supportsPreviewSuffix => 'volumes-table-grid-with-pr',
         $showActionsColumn => 'volumes-table-grid',
@@ -16,9 +17,11 @@
 
     @if ($resource->persistentStorages->isNotEmpty())
         <div class="data-table w-full">
-            <div class="data-table-header {{ $gridClass }}">
-                <span>Volume Name</span>
-                <span class="volumes-col-source">Source Path</span>
+            <div class="data-table-header {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
+                <span>Storage Name</span>
+                @if ($hasSourcePaths)
+                    <span>Source Path</span>
+                @endif
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
                     <div class="volumes-col-pr flex items-center gap-1.5">
@@ -44,26 +47,33 @@
                     $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
-                    $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
                 @endphp
 
                 @if ($inputsReadonly)
                     <div class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }} text-[13px] text-neutral-700 dark:text-fg-dim">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }} text-[13px] text-neutral-700 dark:text-fg-dim">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <span
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
+                                @if (blank($storage->host_path))
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
+                                @endif
                             </div>
 
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate text-[13px]"
-                                    title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
-                            </div>
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -108,7 +118,7 @@
 
                             @if ($showBackupAction)
                                 <div
-                                    class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                    class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
@@ -151,37 +161,29 @@
                     </div>
                 @else
                     <form wire:submit="submit({{ $id }})" class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }}">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <div class="min-w-0 flex-1">
                                         <x-forms.input id="forms.{{ $id }}.name" required />
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                @if (filled($form['hostPath']))
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="min-w-0 flex-1">
-                                            <x-forms.input id="forms.{{ $id }}.hostPath" />
-                                        </div>
-                                        <x-modal-confirmation title="Remove Source Path?" isErrorButton
-                                            canGate="update" :canResource="$resource"
-                                            buttonTitle="Remove" submitAction="clearHostPath({{ $id }})"
-                                            :actions="[
-                                                'Are you sure you want to remove the source path?',
-                                                'The next deployment will use a named Docker volume instead.',
-                                                'Data from the existing host directory will not be copied to the named volume.',
-                                                'Use a Directory Mount when you need to mount a host directory.',
-                                            ]" />
-                                    </div>
-                                @else
-                                    <span class="data-table-cell-dash">-</span>
+                                @if (blank($storage->host_path))
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
                             </div>
+
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -227,7 +229,7 @@
                             </div>
 
                             <div
-                                class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                 <x-forms.button type="submit" class="!px-2.5 !text-xs">
                                     Update
                                 </x-forms.button>

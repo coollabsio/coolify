@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Exception;
@@ -15,6 +16,7 @@ class Bitbucket extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
     {
@@ -72,10 +74,7 @@ class Bitbucket extends Controller
             }
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
-                return response([
-                    'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                ]);
+                return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -90,7 +89,7 @@ class Bitbucket extends Controller
 
                     continue;
                 }
-                $payload = $request->getContent();
+                $rawPayload = $request->getContent();
 
                 $parts = explode('=', $x_bitbucket_token, 2);
                 if (count($parts) !== 2 || $parts[0] !== 'sha256') {
@@ -105,7 +104,7 @@ class Bitbucket extends Controller
                     continue;
                 }
                 $hash = $parts[1];
-                $payloadHash = hash_hmac('sha256', $payload, $webhook_secret);
+                $payloadHash = hash_hmac('sha256', $rawPayload, $webhook_secret);
                 if (! hash_equals($hash, $payloadHash) && ! isDev()) {
                     auditLogWebhookFailure('bitbucket', 'invalid_signature', [
                         'application_uuid' => $application->uuid,
@@ -182,6 +181,15 @@ class Bitbucket extends Controller
                 }
                 if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:updated') {
                     if ($application->isPRDeployable()) {
+                        if (! $this->isPreviewDeploymentRepositoryTrusted(
+                            data_get($payload, 'pullrequest.source.repository.uuid'),
+                            data_get($payload, 'pullrequest.destination.repository.uuid'),
+                            data_get($payload, 'repository.uuid'),
+                            $application->settings->is_pr_deployments_public_enabled,
+                        )) {
+                            continue;
+                        }
+
                         if ($skip_deploy_pr ?? false) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -267,7 +275,7 @@ class Bitbucket extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads);
         } catch (Exception $e) {
             return handleError($e);
         }

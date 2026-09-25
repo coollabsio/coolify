@@ -97,6 +97,8 @@ class SettingsOauth extends Component
             $this->ensureProviderCanBeEnabled($oauth);
             $oauth->save();
 
+            $this->auditOauthSettings($oauth, 'updated');
+
             $this->oauth_settings_map[$provider] = $this->oauthSettingToArray($oauth);
 
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
@@ -127,11 +129,17 @@ class SettingsOauth extends Component
             }
 
             $oauth->save();
+            $this->auditOauthSettings($oauth, 'updated');
             $this->oauth_settings_map[$oauth->provider] = $this->oauthSettingToArray($oauth);
         }
 
         instanceSettings()->update([
             'disable_registration_when_oauth_enabled' => $this->disable_registration_when_oauth_enabled,
+        ]);
+        auditLog('ui.instance.authentication.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'changed_fields' => ['disable_registration_when_oauth_enabled'],
         ]);
 
         if (! empty($errors)) {
@@ -285,6 +293,11 @@ class SettingsOauth extends Component
         instanceSettings()->update([
             'disable_registration_when_oauth_enabled' => $this->disable_registration_when_oauth_enabled,
         ]);
+        auditLog('ui.instance.authentication.updated', [
+            'team_id' => null,
+            'resource' => 'instance',
+            'changed_fields' => ['disable_registration_when_oauth_enabled'],
+        ]);
 
         $this->dispatch('success', 'Authentication settings updated successfully!');
     }
@@ -310,5 +323,17 @@ class SettingsOauth extends Component
 
             handleError($e, $this);
         }
+    }
+
+    private function auditOauthSettings(OauthSetting $oauth, string $action): void
+    {
+        auditLog("ui.oauth_setting.{$action}", [
+            'team_id' => null,
+            'resource' => 'oauth_setting',
+            'oauth_setting_name' => $oauth->provider,
+            'provider' => $oauth->provider,
+            'enabled' => $oauth->enabled,
+            'changed_fields' => array_values(array_diff(array_keys($oauth->getChanges()), ['client_secret', 'updated_at'])),
+        ]);
     }
 }

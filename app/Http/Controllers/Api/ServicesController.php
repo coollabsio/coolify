@@ -368,6 +368,10 @@ class ServicesController extends Controller
 
         $this->authorize('create', Service::class);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -692,8 +696,7 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            Yaml::parse($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {
@@ -869,13 +872,12 @@ class ServicesController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(
-                    type: 'integer',
-                    format: 'int32',
-                    default: 100,
-                )
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
             new OA\Parameter(
                 name: 'show_timestamps',
@@ -973,6 +975,7 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_from_coolify_only', in: 'query', required: false, description: 'Remove only Coolify metadata without deleting Docker resources.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1022,22 +1025,28 @@ class ServicesController extends Controller
 
         $service->delete();
 
+        $deleteFromCoolifyOnly = $request->boolean('delete_from_coolify_only') || ! $service->server?->isFunctional();
+
         DeleteResourceJob::dispatch(
             resource: $service,
             deleteVolumes: $request->boolean('delete_volumes', true),
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
-            dockerCleanup: $request->boolean('docker_cleanup', true)
+            dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteFromCoolifyOnly: $deleteFromCoolifyOnly,
         );
 
         auditLog('api.service.deleted', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
+            'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
         return response()->json([
-            'message' => 'Service deletion request queued.',
+            'message' => $deleteFromCoolifyOnly
+                ? 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.'
+                : 'Service deletion request queued.',
         ]);
     }
 
@@ -1176,6 +1185,11 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('deploy', $service);
+        }
+
         $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $validationRules = [
@@ -1228,8 +1242,7 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            Yaml::parse($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {
@@ -1413,7 +1426,7 @@ class ServicesController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -1555,7 +1568,7 @@ class ServicesController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -1687,7 +1700,7 @@ class ServicesController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -2422,7 +2435,6 @@ class ServicesController extends Controller
                             'resource_uuid' => ['type' => 'string', 'description' => 'UUID of the service application or database sub-resource.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -2468,14 +2480,13 @@ class ServicesController extends Controller
             'resource_uuid' => 'required|string',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'resource_uuid', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2519,7 +2530,6 @@ class ServicesController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $subResource->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $subResource->id,
                 'resource_type' => $subResource->getMorphClass(),
             ]);
@@ -2555,11 +2565,16 @@ class ServicesController extends Controller
                 ], 422);
             }
 
-            $fsPath = str($request->fs_path)->trim()->start('/')->value();
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($fsPath, 'storage source path');
-            validateShellSafePath($mountPath, 'storage destination path');
+            try {
+                $fsPath = confinePathToBase(service_configuration_dir().'/'.$service->uuid, $request->fs_path, 'storage source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
+                LocalFileVolume::assertRemotePathIsConfined($service->workdir(), $fsPath, $service->server);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,
@@ -2671,7 +2686,6 @@ class ServicesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -2733,11 +2747,10 @@ class ServicesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -2806,7 +2819,7 @@ class ServicesController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -2844,9 +2857,6 @@ class ServicesController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {

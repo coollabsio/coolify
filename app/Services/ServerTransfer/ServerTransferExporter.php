@@ -384,7 +384,8 @@ class ServerTransferExporter
             'port' => (int) $server->port,
             'user' => (string) $server->user,
             'proxy' => $server->proxy?->toArray() ?? [],
-            'is_build_server' => (bool) $server->is_build_server,
+            'server_role' => $server->settings->effectiveServerRole()->value,
+            'is_build_server' => $server->isBuildServer(),
             'cloud_provider_token_uuid' => $server->cloudProviderToken?->uuid,
             'settings' => $settingsPayload,
         ];

@@ -1,0 +1,426 @@
+#!/usr/bin/env bash
+# Manage the development instance of the current git branch.
+#
+# Usage:
+#   ./scripts/dev start [qemu-profile]   # start this branch's instance (KVM VM or testing-host)
+#   ./scripts/dev stop [qemu-profile]    # stop containers and VMs; data is kept
+#   ./scripts/dev run [qemu-profile]     # start, follow logs, stop on exit (Jean)
+#   ./scripts/dev urls                   # all instances, ports, and state
+#   ./scripts/dev ps | logs | exec <cmd...> | container
+#   ./scripts/dev destroy <name>         # delete containers, volumes, VMs, and the port slot
+#   ./scripts/dev teardown               # destroy this worktree's instance if it exists (Jean)
+#
+# Each branch is one instance: Compose project, container, volumes, and KVM VMs are
+# named after it, so stop + start keeps the same data. Detached HEAD uses the
+# checkout directory name. Set COOLIFY_DEV_INSTANCE=<name> to override.
+#
+# Ports: the main checkout uses 8000 (Reverb 6001, terminal 6002, db 5432, redis 6379,
+# vite 5173). Worktrees use 20000 + slot*10: app +0, Reverb +1, terminal +2, db +3,
+# redis +4, vite +5, mailpit +6/+7, minio +8/+9.
+#
+# Env: COOLIFY_DEV_SERVER_BACKEND=auto|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
+#
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT="$(pwd -P)"
+
+COMPOSE_FILE="docker-compose.dev-multi.yml"
+GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+# Shared by all worktrees, so slots, APP_KEYs, and data survive worktree removal.
+ENV_DIR="$(dirname "$GIT_COMMON_DIR")/.dev-instances"
+SLOTS_FILE="$ENV_DIR/slots"
+QEMU_STORAGE="${DEVELOPMENT_QEMU_STORAGE_PATH:-/var/lib/libvirt/images/coolify-development}"
+LEGACY_CONTAINERS=(coolify coolify-db coolify-redis coolify-vite coolify-mail coolify-minio coolify-minio-init coolify-testing-host)
+
+usage() {
+  sed -n '2,22p' "$0" | sed 's/^# \?//'
+}
+
+normalize_name() {
+  local name
+  name="$(tr '[:upper:]' '[:lower:]' <<<"$1" | sed -E 's/[^a-z0-9_]+/-/g; s/^-+//; s/-+$//')"
+  if [[ ! "$name" =~ ^[a-z0-9_]+(-[a-z0-9_]+)*$ ]]; then
+    echo "Invalid instance name '$1'" >&2
+    exit 1
+  fi
+  echo "$name"
+}
+
+is_linked_worktree() {
+  [[ "$(git rev-parse --path-format=absolute --git-dir)" != "$GIT_COMMON_DIR" ]]
+}
+
+current_instance() {
+  if [[ -n "${COOLIFY_DEV_INSTANCE:-}" ]]; then
+    normalize_name "$COOLIFY_DEV_INSTANCE"
+    return
+  fi
+  normalize_name "$(git symbolic-ref --quiet --short HEAD || basename "$ROOT")"
+}
+
+project_name() { echo "coolify-dev-$1"; }
+env_file() { echo "$ENV_DIR/$1.env"; }
+env_value() { grep -E "^$2=" "$(env_file "$1")" | cut -d= -f2-; }
+
+# Lowest free slot (1..254), stable per instance name. It selects the port block
+# and the libvirt network (10.221.<slot>.0/24) of the instance.
+instance_slot() {
+  local name="$1" slot
+  mkdir -p "$ENV_DIR"
+  touch "$SLOTS_FILE"
+  exec 9>"$SLOTS_FILE.lock"
+  if command -v flock >/dev/null; then
+    flock 9
+  fi
+  slot="$(awk -v n="$name" '$1 == n { print $2 }' "$SLOTS_FILE")"
+  if [[ -z "$slot" ]]; then
+    slot=1
+    while awk -v s="$slot" '$2 == s { found = 1 } END { exit !found }' "$SLOTS_FILE"; do
+      slot=$((slot + 1))
+    done
+    if ((slot > 254)); then
+      echo 'No free dev instance slot. Destroy unused instances first.' >&2
+      exit 1
+    fi
+    echo "$name $slot" >>"$SLOTS_FILE"
+  fi
+  exec 9>&-
+  echo "$slot"
+}
+
+# Keep the scheme and host of APP_URL in .env (for example a Tailscale name) and use the instance port.
+app_url() {
+  local port="$1" url=""
+  if [[ -f .env ]]; then
+    url="$(grep -E '^APP_URL=' .env | tail -n1 | cut -d= -f2- | tr -d "\"'" || true)"
+  fi
+  if [[ "$url" =~ ^(https?)://([^/:]+) ]]; then
+    echo "${BASH_REMATCH[1]}://${BASH_REMATCH[2]}:${port}"
+  else
+    echo "http://localhost:${port}"
+  fi
+}
+
+ensure_env() {
+  local name="$1" slot env_file existing_key base
+  local app reverb terminal db redis vite mail mail_ui minio minio_ui
+  slot="$(instance_slot "$name")"
+  env_file="$(env_file "$name")"
+
+  if ! is_linked_worktree && [[ -z "${COOLIFY_DEV_INSTANCE:-}" ]]; then
+    app=8000 reverb=6001 terminal=6002 db=5432 redis=6379 vite=5173
+    mail=1025 mail_ui=8025 minio=9000 minio_ui=9001
+  else
+    base=$((20000 + slot * 10))
+    app=$base reverb=$((base + 1)) terminal=$((base + 2)) db=$((base + 3)) redis=$((base + 4))
+    vite=$((base + 5)) mail=$((base + 6)) mail_ui=$((base + 7)) minio=$((base + 8)) minio_ui=$((base + 9))
+  fi
+
+  # Never rotate APP_KEY once set: encrypted DB columns (private keys, secrets)
+  # become unreadable ("The MAC is invalid") if APP_KEY changes while volumes persist.
+  existing_key=""
+  if [[ -f "$env_file" ]]; then
+    existing_key="$(grep -E '^APP_KEY=base64:' "$env_file" | tail -n1 | cut -d= -f2- || true)"
+  fi
+  if [[ -z "$existing_key" && -f "$ENV_DIR/$name.appkey" ]]; then
+    existing_key="$(cat "$ENV_DIR/$name.appkey")"
+  fi
+  if [[ -z "$existing_key" ]]; then
+    existing_key="base64:$(openssl rand -base64 32)"
+  fi
+  printf '%s\n' "$existing_key" >"$ENV_DIR/$name.appkey"
+
+  cat >"$env_file" <<EOF
+# Generated by scripts/dev for instance ${name} — do not commit
+COMPOSE_PROJECT_NAME=$(project_name "$name")
+DEV_CHECKOUT=${ROOT}
+DEVELOPMENT_QEMU_INSTANCE=${name}
+DEVELOPMENT_QEMU_SLOT=${slot}
+APP_NAME=Coolify-${name}
+APP_URL=$(app_url "$app")
+APP_KEY=${existing_key}
+APP_PORT=${app}
+FORWARD_PUSHER_PORT=${reverb}
+FORWARD_TERMINAL_PORT=${terminal}
+FORWARD_DB_PORT=${db}
+FORWARD_REDIS_PORT=${redis}
+VITE_PORT=${vite}
+FORWARD_MAILPIT_PORT=${mail}
+FORWARD_MAILPIT_DASHBOARD_PORT=${mail_ui}
+FORWARD_MINIO_PORT=${minio}
+FORWARD_MINIO_PORT_CONSOLE=${minio_ui}
+PUSHER_APP_ID=coolify-${name}
+PUSHER_APP_KEY=coolify-${name}
+PUSHER_APP_SECRET=coolify-${name}
+EOF
+}
+
+# compose <name> <args...>: .env of the checkout first, generated instance env wins.
+compose() {
+  local name="$1"
+  shift
+  local -a env_files=()
+  if [[ -f .env ]]; then
+    env_files+=(--env-file .env)
+  fi
+  docker compose -p "$(project_name "$name")" -f "$COMPOSE_FILE" \
+    "${env_files[@]}" --env-file "$(env_file "$name")" "${profiles[@]}" "$@"
+}
+
+select_backend() {
+  backend="${COOLIFY_DEV_SERVER_BACKEND:-auto}"
+  if [[ "$backend" != "auto" && "$backend" != "testing-host" ]]; then
+    echo 'COOLIFY_DEV_SERVER_BACKEND must be auto or testing-host.' >&2
+    exit 2
+  fi
+  privileged=()
+  if [[ $EUID -ne 0 ]]; then
+    privileged=(sudo -n -E)
+  fi
+  if [[ "$backend" == "auto" && -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] &&
+    { [[ $EUID -eq 0 ]] || { command -v sudo >/dev/null && sudo -n -E true; }; }; then
+    backend=kvm
+  else
+    backend=testing-host
+  fi
+  profiles=(--profile vite --profile mailpit --profile minio)
+  if [[ "$backend" == "testing-host" ]]; then
+    profiles+=(--profile testing-host)
+  fi
+}
+
+wait_for_coolify() {
+  local container attempt status
+  container="$(project_name "$instance")"
+  for ((attempt = 0; attempt < 150; attempt++)); do
+    status="$(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container" 2>/dev/null || true)"
+    if [[ "$status" == 'running healthy' ]]; then
+      return 0
+    fi
+    if [[ "$status" == exited* || "$status" == dead* ]]; then
+      break
+    fi
+    sleep 2
+  done
+
+  echo 'Coolify did not become healthy within 5 minutes.' >&2
+  return 1
+}
+
+# Only one instance of a checkout runs at a time: they share its ports (main checkout)
+# and its public/hot Vite file. The legacy fixed-name stack also holds the main ports.
+stop_other_checkout_instances() {
+  local file other
+  for file in "$ENV_DIR"/*.env; do
+    [[ -f "$file" ]] || continue
+    other="$(basename "$file" .env)"
+    if [[ "$other" != "$instance" ]] && grep -qxF "DEV_CHECKOUT=$ROOT" "$file" &&
+      [[ -n "$(docker ps -q --filter "label=com.docker.compose.project=$(project_name "$other")")" ]]; then
+      echo "Stopping instance ${other} (same checkout)"
+      docker compose -p "$(project_name "$other")" stop
+    fi
+  done
+  if ! is_linked_worktree; then
+    docker stop "${LEGACY_CONTAINERS[@]}" >/dev/null 2>&1 || true
+  fi
+}
+
+# Publish the browser-facing ports over Tailscale HTTPS when APP_URL uses a tailnet name.
+tailscale_serve() {
+  local action="$1" port
+  [[ "$(env_value "$instance" APP_URL)" == https://*.ts.net:* ]] || return 0
+  command -v tailscale >/dev/null || return 0
+  for port in APP_PORT FORWARD_PUSHER_PORT FORWARD_TERMINAL_PORT VITE_PORT; do
+    port="$(env_value "$instance" "$port")"
+    if [[ "$action" == on ]]; then
+      tailscale serve --bg --https="$port" "http://127.0.0.1:$port" >/dev/null || true
+    else
+      tailscale serve --https="$port" off >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+vm_domains() {
+  command -v virsh >/dev/null || return 0
+  "${privileged[@]}" virsh --connect qemu:///system list "$@" --name 2>/dev/null |
+    grep -E "^coolify-dev-${instance}--" || true
+}
+
+start_backend() {
+  stop_other_checkout_instances
+  echo "==> Instance ${instance} → $(env_value "$instance" APP_URL) (backend: ${backend})"
+  compose "$instance" up -d --build
+  wait_for_coolify
+  tailscale_serve on
+  if [[ "$backend" == "kvm" ]]; then
+    local host="${DEV_BIND_ADDRESS:-127.0.0.1}"
+    [[ "$host" == 0.0.0.0 ]] && host=127.0.0.1
+    echo "Using KVM profile: $profile"
+    # The host command must reach this instance's database, not the one in .env, and must
+    # not create root-owned files in storage/logs.
+    LOG_CHANNEL=stderr DB_HOST="$host" DB_PORT="$(env_value "$instance" FORWARD_DB_PORT)" \
+      REDIS_HOST="$host" REDIS_PORT="$(env_value "$instance" FORWARD_REDIS_PORT)" \
+      DEVELOPMENT_QEMU_INSTANCE="$instance" \
+      DEVELOPMENT_QEMU_SLOT="$(env_value "$instance" DEVELOPMENT_QEMU_SLOT)" \
+      DEVELOPMENT_QEMU_DOCKER_NETWORK="$(project_name "$instance")" \
+      DEVELOPMENT_QEMU_COOLIFY_CONTAINER="$(project_name "$instance")" \
+      "${privileged[@]}" php artisan dev:qemu "$profile" --as-localhost
+  else
+    compose "$instance" exec -T coolify php artisan db:seed --class=ServerSeeder --force
+  fi
+}
+
+stop_backend() {
+  local domain
+  if [[ "$backend" == "kvm" ]]; then
+    for domain in $(vm_domains --state-running); do
+      if [[ -z "$profile_arg" || "$domain" == "coolify-dev-${instance}--${profile_arg}" ]]; then
+        "${privileged[@]}" virsh --connect qemu:///system shutdown "$domain"
+      fi
+    done
+  fi
+  compose "$instance" stop
+}
+
+cmd_urls() {
+  local name file state
+  printf '%-40s %-44s %-7s %-7s %-6s %s\n' NAME URL STATE DB REDIS CHECKOUT
+  for file in "$ENV_DIR"/*.env; do
+    [[ -f "$file" ]] || continue
+    name="$(basename "$file" .env)"
+    state="$(docker inspect --format '{{.State.Status}}' "$(project_name "$name")" 2>/dev/null || echo stopped)"
+    printf '%-40s %-44s %-7s %-7s %-6s %s\n' "$name" "$(env_value "$name" APP_URL)" "$state" \
+      "$(env_value "$name" FORWARD_DB_PORT)" "$(env_value "$name" FORWARD_REDIS_PORT)" \
+      "$(env_value "$name" DEV_CHECKOUT)"
+  done
+}
+
+cmd_destroy() {
+  local name="$1" slot domain subnet
+  instance="$name"
+  [[ -f "$(env_file "$name")" ]] || {
+    echo "Unknown instance '$name'. See ./scripts/dev urls" >&2
+    exit 1
+  }
+  slot="$(env_value "$name" DEVELOPMENT_QEMU_SLOT)"
+  echo "==> Destroying ${name} (containers, volumes, VMs, port slot)"
+  tailscale_serve off
+  subnet="$(docker network inspect "$(project_name "$name")" --format '{{(index .IPAM.Config 0).Subnet}}' 2>/dev/null || true)"
+  compose "$name" --profile '*' down --remove-orphans --volumes
+  if command -v virsh >/dev/null; then
+    for domain in $(vm_domains --all); do
+      "${privileged[@]}" virsh --connect qemu:///system destroy "$domain" >/dev/null 2>&1 || true
+      "${privileged[@]}" virsh --connect qemu:///system undefine "$domain" >/dev/null
+    done
+    "${privileged[@]}" rm -f "$QEMU_STORAGE/coolify-dev-${name}--"*
+    if "${privileged[@]}" virsh --connect qemu:///system net-info "coolify-dev-${slot}" >/dev/null 2>&1; then
+      "${privileged[@]}" virsh --connect qemu:///system net-destroy "coolify-dev-${slot}" >/dev/null 2>&1 || true
+      "${privileged[@]}" virsh --connect qemu:///system net-undefine "coolify-dev-${slot}" >/dev/null
+    fi
+    if [[ -n "$subnet" ]]; then
+      "${privileged[@]}" iptables -D LIBVIRT_FWI -s "$subnet" -d "10.221.${slot}.0/24" -o "cdevbr${slot}" -j ACCEPT >/dev/null 2>&1 || true
+    fi
+  fi
+  rm -f "$(env_file "$name")" "$ENV_DIR/$name.appkey"
+  awk -v n="$name" '$1 != n' "$SLOTS_FILE" >"$SLOTS_FILE.tmp"
+  mv "$SLOTS_FILE.tmp" "$SLOTS_FILE"
+}
+
+command="${1:-start}"
+shift || true
+case "$command" in
+  --help | -h | help)
+    usage
+    exit 0
+    ;;
+  start | stop | run)
+    if [[ $# -gt 1 ]]; then
+      usage >&2
+      exit 2
+    fi
+    ;;
+  destroy)
+    if [[ $# -ne 1 ]]; then
+      echo 'Usage: ./scripts/dev destroy <name>' >&2
+      exit 2
+    fi
+    ;;
+  urls | ls | ps | logs | exec | container | teardown) ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+profile_arg="${1:-}"
+profile="${profile_arg:-${COOLIFY_DEV_KVM_PROFILE:-ubuntu-root}}"
+select_backend
+
+case "$command" in
+  urls | ls)
+    cmd_urls
+    exit 0
+    ;;
+  container)
+    project_name "$(current_instance)"
+    exit 0
+    ;;
+  destroy)
+    cmd_destroy "$(normalize_name "$1")"
+    exit 0
+    ;;
+  teardown)
+    # Jean runs this before it deletes a worktree; a failure blocks the deletion.
+    if ! is_linked_worktree; then
+      echo 'teardown only destroys the instance of a linked worktree.' >&2
+      exit 1
+    fi
+    instance="$(current_instance)"
+    if [[ ! -f "$(env_file "$instance")" ]]; then
+      echo "No dev instance for ${instance}; nothing to destroy."
+      exit 0
+    fi
+    cmd_destroy "$instance"
+    exit 0
+    ;;
+esac
+
+instance="$(current_instance)"
+ensure_env "$instance"
+
+case "$command" in
+  start)
+    start_backend
+    ;;
+  stop)
+    stop_backend
+    ;;
+  run)
+    cleanup() {
+      status=$?
+      trap - EXIT INT TERM
+      stop_backend || true
+      compose "$instance" down --remove-orphans || true
+      exit "$status"
+    }
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    start_backend
+    compose "$instance" logs -f --tail=100
+    ;;
+  ps)
+    compose "$instance" ps
+    ;;
+  logs)
+    compose "$instance" logs -f "$@"
+    ;;
+  exec)
+    [[ $# -gt 0 ]] || {
+      usage >&2
+      exit 2
+    }
+    compose "$instance" exec coolify "$@"
+    ;;
+esac

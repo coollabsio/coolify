@@ -109,7 +109,10 @@ class CloudflareDnsProvider
                     throw new RuntimeException('Cloudflare DNS records could not be checked.');
                 }
 
-                return $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
+                $record = $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
+                $this->auditDnsRecord('created', $zone, $hostname, $resource);
+
+                return $record;
             }
             throw new DnsRecordConflictException($remote['id'], $remote['content'], $content);
         }
@@ -120,7 +123,10 @@ class CloudflareDnsProvider
             throw new RuntimeException('Cloudflare could not create the DNS record.');
         }
 
-        return $this->trackRecord($zone, $response->json('result.id'), $type, $hostname, $content, $resource);
+        $record = $this->trackRecord($zone, $response->json('result.id'), $type, $hostname, $content, $resource);
+        $this->auditDnsRecord('created', $zone, $hostname, $resource);
+
+        return $record;
     }
 
     public function replaceRecord(
@@ -150,7 +156,10 @@ class CloudflareDnsProvider
             throw new RuntimeException('Cloudflare could not replace the conflicting DNS record.');
         }
 
-        return $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
+        $record = $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
+        $this->auditDnsRecord('replaced', $zone, $hostname, $resource);
+
+        return $record;
     }
 
     public function deleteRecord(ManagedDnsRecord $record): bool
@@ -167,6 +176,7 @@ class CloudflareDnsProvider
             return false;
         }
         $record->delete();
+        $this->auditDnsRecord('deleted', $record->zone, $record->name, $record->resource);
 
         return true;
     }
@@ -179,6 +189,22 @@ class CloudflareDnsProvider
                 'resource_type' => $resource?->getMorphClass(), 'resource_id' => $resource?->getKey(),
                 'type' => $type, 'name' => $name, 'content' => $content],
         );
+    }
+
+    private function auditDnsRecord(string $action, DnsProviderZone $zone, string $hostname, ?Model $resource): void
+    {
+        $resourceType = $resource ? str(class_basename($resource))->snake()->value() : 'dns_record';
+
+        $source = auth()->check() ? 'ui' : 'system';
+        auditLog("{$source}.dns_record.{$action}", [
+            'team_id' => $zone->integrationToken->team_id,
+            'resource' => $resourceType,
+            "{$resourceType}_uuid" => $resource?->getAttribute('uuid'),
+            "{$resourceType}_name" => $resource?->getAttribute('name'),
+            'hostname' => $hostname,
+            'provider' => 'cloudflare',
+            'zone' => $zone->name,
+        ]);
     }
 
     private function client(IntegrationToken $token): PendingRequest
