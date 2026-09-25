@@ -41,6 +41,7 @@ use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Stevebauman\Purify\Facades\Purify;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -1058,6 +1059,29 @@ $siteAddress {
     public function isTrafficAnalyticsEnabled(): bool
     {
         return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
+    }
+
+    /**
+     * Caddy's `log_append` tags access-log lines with the app UUID for traffic analytics. It needs
+     * Caddy 2.8+, which caddy-docker-proxy ships from 2.9: the 2.8 image (the default before 2.13)
+     * runs Caddy 2.7.6, which rejects the whole Caddyfile. A saved change that is not applied yet may still run the
+     * old image, so it counts as unsupported.
+     */
+    public function caddySupportsLogAppend(): bool
+    {
+        if ($this->proxyType() !== ProxyTypes::CADDY->value || $this->hasPendingProxyConfiguration()) {
+            return false;
+        }
+
+        try {
+            $image = data_get(Yaml::parse((string) $this->proxy->get('last_saved_proxy_configuration')), 'services.caddy.image');
+        } catch (ParseException) {
+            return false;
+        }
+
+        return is_string($image)
+            && preg_match('#(?:^|/)caddy-docker-proxy:(\d+)\.(\d+)#', $image, $version) === 1
+            && [(int) $version[1], (int) $version[2]] >= [2, 9];
     }
 
     public function isServerApiEnabled(): bool

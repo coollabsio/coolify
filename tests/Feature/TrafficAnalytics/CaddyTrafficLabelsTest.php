@@ -6,8 +6,16 @@ it('adds no traffic labels to caddy sites when disabled', function () {
 });
 
 it('stamps coolify_app_id and JSON access log on each caddy site when enabled', function () {
-    $labels = fqdnLabelsForCaddy('coolify', 'app-uuid', collect(['https://example.com']), is_traffic_analytics_enabled: true);
+    $labels = fqdnLabelsForCaddy('coolify', 'app-uuid', collect(['https://example.com']), is_traffic_analytics_enabled: true, supports_log_append: true);
     expect($labels->contains('caddy_0.log_append=coolify_app_id app-uuid'))->toBeTrue();
+    expect($labels->contains('caddy_0.log.output=file /traffic/access.log'))->toBeTrue();
+    expect($labels->contains('caddy_0.log.format=json'))->toBeTrue();
+});
+
+it('keeps the JSON access log but omits log_append when caddy does not support it', function () {
+    // caddy-docker-proxy 2.8 runs Caddy 2.7.6, which rejects the whole Caddyfile for log_append.
+    $labels = fqdnLabelsForCaddy('coolify', 'app-uuid', collect(['https://example.com']), is_traffic_analytics_enabled: true);
+    expect($labels->filter(fn ($l) => str_contains($l, 'log_append'))->isEmpty())->toBeTrue();
     expect($labels->contains('caddy_0.log.output=file /traffic/access.log'))->toBeTrue();
     expect($labels->contains('caddy_0.log.format=json'))->toBeTrue();
 });
