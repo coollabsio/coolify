@@ -206,8 +206,8 @@ class ByHostinger extends Component
                 ->values()
                 ->toArray();
             $this->catalog_items = $hostingerService->getCatalogItems();
-            $this->hostinger_public_keys = $hostingerService->getPublicKeys();
-            $this->post_install_scripts = $hostingerService->getPostInstallScripts();
+            $this->hostinger_public_keys = $this->optionalProviderData(fn () => $hostingerService->getPublicKeys());
+            $this->post_install_scripts = $this->optionalProviderData(fn () => $hostingerService->getPostInstallScripts());
         } catch (\Throwable $e) {
             $this->provider_data_error = $e->getMessage();
             $this->dispatch('error', $this->provider_data_error);
@@ -369,14 +369,28 @@ class ByHostinger extends Component
         return $token?->token ?? '';
     }
 
+    /**
+     * Load an optional Hostinger list. Some tokens cannot read these lists, so a failure must not block the form.
+     */
+    private function optionalProviderData(callable $callback): array
+    {
+        try {
+            return $callback();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
     private function providerSelectionsAreValid(HostingerService $hostingerService): bool
     {
         $priceIds = collect($hostingerService->getCatalogItems())
             ->flatMap(fn (array $item) => collect($item['prices'] ?? [])->pluck('id'));
         $dataCenterIds = collect($hostingerService->getDataCenters())->pluck('id')->map(fn ($id) => (int) $id);
         $templateIds = collect($hostingerService->getTemplates())->pluck('id')->map(fn ($id) => (int) $id);
-        $publicKeyIds = collect($hostingerService->getPublicKeys())->pluck('id')->map(fn ($id) => (int) $id);
-        $postInstallScriptIds = collect($hostingerService->getPostInstallScripts())->pluck('id')->map(fn ($id) => (int) $id);
+        $publicKeyIds = collect($this->selected_public_key_ids ? $hostingerService->getPublicKeys() : [])->pluck('id')->map(fn ($id) => (int) $id);
+        $postInstallScriptIds = collect($this->selected_post_install_script_id ? $hostingerService->getPostInstallScripts() : [])->pluck('id')->map(fn ($id) => (int) $id);
 
         if (! $priceIds->contains($this->selected_price_id)) {
             $this->addError('selected_price_id', 'The selected Hostinger plan or billing period is no longer available.');

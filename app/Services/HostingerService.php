@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\RateLimitException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 
 class HostingerService
@@ -82,6 +83,8 @@ class HostingerService
         $response = $this->request('post', '/api/vps/v1/virtual-machines', $params);
 
         if (empty($response['virtual_machine']['id'])) {
+            logger()->warning('Hostinger VPS order did not return a virtual machine', Arr::only($response, ['id', 'subscription_id', 'status', 'message']));
+
             throw new \Exception('Hostinger order '.($response['id'] ?? 'unknown').' is waiting for payment. Finish the VPS setup in hPanel.', 202);
         }
 

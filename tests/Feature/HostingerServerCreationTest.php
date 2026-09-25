@@ -161,6 +161,37 @@ it('keeps a purchased Hostinger VPS linked while its public IP is pending', func
         ->toBe(Server::PLACEHOLDER_IP);
 });
 
+it('loads the Hostinger form when optional provider lists are not authorized', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19, 'name' => 'nl-ams', 'city' => 'Amsterdam']]),
+        'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([['id' => 1130, 'name' => 'Ubuntu']]),
+        'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
+            ['name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['message' => '[VPS:2000] Unauthorized'], 403),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['message' => '[VPS:2000] Unauthorized'], 403),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'virtual_machine' => ['id' => 17923, 'state' => 'creating', 'ipv4' => [['address' => '203.0.113.10']]],
+        ]),
+    ]);
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->assertSet('provider_data_error', null)
+        ->assertSet('hostinger_public_keys', [])
+        ->assertSet('post_install_scripts', [])
+        ->assertSee('Buy and create')
+        ->set('server_name', 'optional-lists.example.com')
+        ->set('selected_data_center_id', 19)
+        ->set('selected_template_id', 1130)
+        ->set('selected_price_id', 'kvm2-monthly')
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Server::query()->where('hostinger_virtual_machine_id', 17923)->exists())->toBeTrue();
+});
+
 it('revalidates the selected Hostinger price before making a purchase', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([

@@ -3,6 +3,7 @@
 use App\Exceptions\RateLimitException;
 use App\Services\HostingerService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -132,9 +133,16 @@ it('reports a Hostinger purchase whose payment is still processing', function ()
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
             'id' => 2957086,
+            'subscription_id' => 'Azz353Uhl1xC54pR0',
             'status' => 'payment_initiated',
             'message' => 'Payment is being processed.',
         ], 202),
+    ]);
+    Log::shouldReceive('warning')->once()->with('Hostinger VPS order did not return a virtual machine', [
+        'id' => 2957086,
+        'subscription_id' => 'Azz353Uhl1xC54pR0',
+        'status' => 'payment_initiated',
+        'message' => 'Payment is being processed.',
     ]);
 
     expect(fn () => (new HostingerService('test-token'))->purchaseVirtualMachine([
