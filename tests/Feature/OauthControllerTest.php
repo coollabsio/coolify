@@ -225,6 +225,51 @@ it('registers a new user from a verified provider identity', function () {
     ]);
 });
 
+it('does not register a new user through a non-OIDC provider when registration is disabled', function (string $provider, array $rawClaims) {
+    // Upgraded installs have allow_registration = true on every provider row (column default).
+    OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+        'allow_registration' => true,
+    ]);
+
+    expect(fn () => app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'stranger@example.com',
+        'name' => 'Stranger',
+        'id' => 'stranger-id',
+        'user' => $rawClaims,
+    ], OauthSetting::where('provider', $provider)->firstOrFail()))->toThrow(HttpException::class, 'Registration is disabled');
+
+    $this->assertGuest();
+    expect(User::count())->toBe(0)
+        ->and(OauthIdentity::count())->toBe(0);
+})->with([
+    'github' => ['github', []],
+    'google' => ['google', ['verified_email' => true, 'hd' => 'example.com']],
+]);
+
+it('registers a new user through a non-OIDC provider when registration is enabled', function () {
+    InstanceSettings::findOrFail(0)->update(['is_registration_enabled' => true]);
+    OauthSetting::create([
+        'provider' => 'github',
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+        'allow_registration' => false,
+    ]);
+
+    $user = app(OauthLoginService::class)->login('github', (object) [
+        'email' => 'new-user@example.com',
+        'name' => 'New User',
+        'id' => 'github-new-user-id',
+        'user' => [],
+    ], OauthSetting::where('provider', 'github')->firstOrFail());
+
+    expect($user->email)->toBe('new-user@example.com');
+    $this->assertAuthenticatedAs($user);
+});
+
 it('does not link another provider identity to an account by shared email', function () {
     $user = User::factory()->create(['email' => 'shared@example.com']);
     OauthIdentity::create([
