@@ -905,6 +905,15 @@ function s3_image_url(?int $storageId, ?string $path, int $version): ?string
         return null;
     }
 
+    // S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests for
+    // every object, including plain GETs, so an unauthenticated direct link only works
+    // when a public CDN has been configured in front of the bucket. Without one, callers
+    // must fall back to the app's own authenticated proxy route.
+    $cdnUrl = instanceSettings()->image_cdn_url;
+    if (blank($cdnUrl)) {
+        return null;
+    }
+
     $storage = S3Storage::query()
         ->whereKey($storageId)
         ->whereTeamId(0)
@@ -915,9 +924,7 @@ function s3_image_url(?int $storageId, ?string $path, int $version): ?string
         return null;
     }
 
-    $baseUrl = instanceSettings()->image_cdn_url ?: $storage->awsUrl();
-
-    return rtrim($baseUrl, '/').'/'.ltrim($path, '/').'?v='.$version;
+    return rtrim($cdnUrl, '/').'/'.ltrim($path, '/').'?v='.$version;
 }
 
 /**
