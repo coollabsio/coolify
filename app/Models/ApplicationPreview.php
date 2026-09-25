@@ -62,6 +62,11 @@ class ApplicationPreview extends BaseModel
                     }
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);
                 });
+                // The compose parser stores preview volumes on the application, not on the preview
+                $previewSuffix = addPreviewDeploymentSuffix('', $preview->pull_request_id);
+                $application->persistentStorages()
+                    ->whereIn('name', $volumeKeys->filter(fn ($key) => str($key)->endsWith($previewSuffix))->values())
+                    ->delete();
                 $networkKeys->each(function ($key) use ($server) {
                     if (! preg_match(ValidationPatterns::DOCKER_NETWORK_PATTERN, $key)) {
                         return;
