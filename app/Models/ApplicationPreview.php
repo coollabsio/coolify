@@ -54,10 +54,13 @@ class ApplicationPreview extends BaseModel
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                foreach ($preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', []))) as $volumeName) {
+                $volumeNames = $preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', [])));
+                foreach ($volumeNames as $volumeName) {
                     // Docker does not remove a volume that a container still uses, also with -f.
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
                 }
+                // The compose parser stores preview volumes on the application, not on the preview
+                $application->persistentStorages()->whereIn('name', $volumeNames)->delete();
                 $preview->removeComposePreviewNetwork($application, $server);
             } else {
                 // Regular application volume cleanup
