@@ -521,35 +521,46 @@ it('keeps the original sourced environment path when build-time keys are shell s
         ->not->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH);
 });
 
-it('rejects dotted Nixpacks plan keys instead of passing them as Docker secrets', function () {
+it('skips dotted keys from the Nixpacks plan without failing the deployment', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',
     ]);
 
-    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
-        'dockerBuildkitSupported' => true,
-        'dockerSecretsAvailable' => true,
-        'nixpacks_plan_json' => collect([
-            'variables' => [
-                'X.VALUE' => 'dotted-from-toml',
-                'SAFE_FROM_TOML' => 'ok-from-toml',
-            ],
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'spring.profiles.active',
+        'value' => 'prod',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'saved_outputs' => collect([
+            'nixpacks_plan' => json_encode([
+                'variables' => [
+                    'X.VALUE' => 'dotted-from-toml',
+                    'SAFE_FROM_TOML' => 'ok-from-toml',
+                    'NIXPACKS_NODE_VERSION' => '22',
+                ],
+            ]),
+            'nixpacks_type' => 'node',
         ]),
     ]);
 
-    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables'))
-        ->toThrow(
-            DeploymentException::class,
-            'Dotted Nixpacks build-time environment variable names cannot be passed as Docker build secrets: X.VALUE. Rename these keys to use underscores instead of dots (for example X_VALUE).'
-        );
+    invokeDeploymentJobMethod($job, $reflection, 'generate_nixpacks_confs');
+
+    $variables = collect(readDeploymentJobProperty($job, $reflection, 'nixpacks_plan_json')->get('variables'));
+
+    expect($variables->has('SAFE_FROM_TOML'))->toBeTrue();
+    expect($variables->has('X.VALUE'))->toBeFalse();
+    expect($variables->has('spring.profiles.active'))->toBeFalse();
 
     $logs = implode("\n", $job->recordedLogEntries);
 
     expect($logs)
-        ->toContain('X.VALUE')
+        ->toContain('Build-time variable X.VALUE has a dot in its name, which Nixpacks cannot pass to the build')
+        ->toContain('Build-time variable spring.profiles.active has a dot in its name')
         ->toContain('Suggested name: X_VALUE')
-        ->toContain('nixpacks.toml');
-    expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeFalse();
+        ->toContain('Available at Buildtime')
+        ->not->toContain('dotted-from-toml')
+        ->not->toContain('prod');
 });
 
 it('still allows underscore Nixpacks plan keys through generate_build_env_variables', function () {
@@ -919,28 +930,23 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
     expect($job->writtenDockerfile)->not->toContain('ARG RAILPACK_NODE_VERSION=');
 });
 
-it('rejects dotted keys when dockerfile builds use docker secrets', function () {
+it('passes dotted keys as Docker build secrets for Dockerfile builds', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'dockerfile',
-    ]);
-    $application->settings()->update(['use_build_secrets' => true]);
-
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'DOTTED.USER',
-        'value' => 'df-dotted',
-        'is_buildtime' => true,
-        'is_runtime' => true,
     ]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
         'dockerSecretsSupported' => true,
-        'env_args' => collect(['DOTTED.USER' => 'df-dotted', 'SAFE' => 'ok']),
     ]);
 
-    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect([
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect([
         'DOTTED.USER' => 'df-dotted',
         'SAFE' => 'ok',
-    ])))->toThrow(DeploymentException::class, 'DOTTED.USER');
+    ]));
+
+    expect(readDeploymentJobProperty($job, $reflection, 'build_secrets'))
+        ->toContain('id=DOTTED.USER,env=DOTTED.USER')
+        ->toContain('id=SAFE,env=SAFE');
 });
 
 it('keeps dotted dockerfile build args when secrets are not used', function () {
@@ -1062,8 +1068,72 @@ it('rejects existing variable names that would break the .env file or build comm
 })->with([
     'runtime-only name with =' => ['A=B', false],
     'runtime-only name with a newline' => ["A\nB", false],
-    'build-time name with a hyphen' => ['my-var', true],
+    'build-time name with shell characters' => ['my;var', true],
 ]);
+
+it('skips existing build-time variables whose names new variables cannot use', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockerfile',
+    ]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'legacy-value',
+        'is_buildtime' => true,
+        'is_runtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'VALID_KEY',
+        'value' => 'valid-value',
+        'is_buildtime' => true,
+        'is_runtime' => true,
+    ]);
+    // Names like my-var were accepted before the current rules; the model no longer allows them.
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('Build-time variable my-var uses a name that new variables cannot use. It is skipped during the build, but is still passed to the container.')
+        ->toContain('Suggested name: my_var')
+        ->not->toContain('legacy-value');
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    expect($buildtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'my-var=')))->toBeFalse();
+    expect($buildtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'VALID_KEY=')))->toBeTrue();
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+    expect($envArgs->has('my-var'))->toBeFalse();
+    expect($envArgs->get('VALID_KEY'))->not->toBeNull();
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    expect($runtimeEnvs->contains(fn (string $env) => str_starts_with($env, 'my-var=')))->toBeTrue();
+});
+
+it('skips existing build-time variables whose names new variables cannot use from Railpack builds', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'railpack',
+    ]);
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'legacy-value',
+        'is_buildtime' => true,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'build_pack' => 'railpack',
+        'branch' => 'main',
+    ]);
+
+    /** @var Collection $variables */
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    expect($variables->has('my-var'))->toBeFalse();
+});
 
 it('injects raw escaped remote secrets into Dockerfile args and hashes the same values', function (int $pullRequestId, bool $isPreview) {
     [$application, $server] = makeDeploymentControlVarFixture();
@@ -1227,6 +1297,39 @@ it('builds railpack variables from generic buildtime vars railpack vars and cool
     expect($variables->get('COOLIFY_RESOURCE_UUID'))->toBe($application->uuid);
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('RUNTIME_ONLY'))->toBeFalse();
+});
+
+it('skips dotted keys from Railpack build variables without failing the deployment', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'railpack',
+    ]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_ENV',
+        'value' => 'production',
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'spring.profiles.active',
+        'value' => 'prod',
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'build_pack' => 'railpack',
+        'branch' => 'main',
+    ]);
+
+    /** @var Collection $variables */
+    $variables = invokeDeploymentJobMethod($job, $reflection, 'railpack_build_variables');
+
+    expect($variables->get('APP_ENV'))->toBe('production');
+    expect($variables->has('spring.profiles.active'))->toBeFalse();
+    expect(implode("\n", $job->recordedLogEntries))
+        ->toContain('Build-time variable spring.profiles.active has a dot in its name, which Railpack cannot pass to the build')
+        ->toContain('Suggested name: spring_profiles_active');
 });
 
 it('builds preview railpack variables without leaking stale nixpacks vars', function () {
