@@ -2066,15 +2066,40 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Build-time names go into shell and Docker build commands, so they must be valid. Runtime-only
+     * variables only go into the .env file: existing ones with names that new variables can no longer
+     * use (such as my-var) keep working, unless the name would break a .env line.
+     */
     private function validateDeploymentEnvironmentVariableKeys(): void
     {
         $environmentVariables = $this->pull_request_id === 0
-            ? $this->application->environment_variables()->get(['key'])
-            : $this->application->environment_variables_preview()->get(['key']);
+            ? $this->application->environment_variables()->get(['key', 'is_buildtime'])
+            : $this->application->environment_variables_preview()->get(['key', 'is_buildtime']);
 
         foreach ($environmentVariables as $environmentVariable) {
-            $this->validatedBuildtimeEnvironmentVariableKey((string) $environmentVariable->key, 'the deployment environment');
+            $key = (string) $environmentVariable->key;
+            $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
+            if ($environmentVariable->is_buildtime || ! $isEnvFileSafe) {
+                $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
+
+                continue;
+            }
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $this->logLegacyRuntimeEnvironmentVariableKey($key);
+            }
         }
+    }
+
+    private function logLegacyRuntimeEnvironmentVariableKey(string $key): void
+    {
+        $suggestedKey = (string) preg_replace('/[^A-Za-z0-9_]/', '_', $key);
+        if (preg_match('/\A[0-9]/', $suggestedKey) === 1) {
+            $suggestedKey = '_'.$suggestedKey;
+        }
+
+        $this->application_deployment_queue->addLogEntry('⚠️ Runtime variable '.ValidationPatterns::displayShellEnvironmentVariableKey($key).' uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.', 'stderr');
+        $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
     }
 
     private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void

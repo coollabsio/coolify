@@ -992,6 +992,44 @@ it('rejects an unsafe stored key before running a deployment command', function 
     expect($job->recordedCommands)->toBeEmpty();
 });
 
+it('keeps deploying existing runtime-only variables whose names new variables cannot use', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => false,
+    ]);
+    // Names like my-var were accepted before the current rules; the model no longer allows them.
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => 'my-var']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+    invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys');
+
+    expect(collect($job->recordedLogEntries)->implode("\n"))
+        ->toContain('my-var')
+        ->toContain('Suggested name: my_var');
+    expect($job->recordedCommands)->toBeEmpty();
+});
+
+it('rejects existing variable names that would break the .env file or build commands', function (string $key, bool $isBuildtime) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $environmentVariable = createApplicationEnvironmentVariable($application, [
+        'key' => 'SAFE_KEY',
+        'value' => 'secret',
+        'is_buildtime' => $isBuildtime,
+    ]);
+    DB::table('environment_variables')->where('id', $environmentVariable->id)->update(['key' => $key]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'validateDeploymentEnvironmentVariableKeys'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the deployment environment');
+})->with([
+    'runtime-only name with =' => ['A=B', false],
+    'runtime-only name with a newline' => ["A\nB", false],
+    'build-time name with a hyphen' => ['my-var', true],
+]);
+
 it('injects raw escaped remote secrets into Dockerfile args and hashes the same values', function (int $pullRequestId, bool $isPreview) {
     [$application, $server] = makeDeploymentControlVarFixture();
 
