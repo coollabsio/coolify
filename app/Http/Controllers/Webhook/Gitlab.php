@@ -223,7 +223,10 @@ class Gitlab extends Controller
                 $latest_commit_message = data_get($payload, 'object_attributes.last_commit.message');
                 $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title, $latest_commit_message]);
 
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $applications->get();
 
                 foreach ($applications as $application) {
                     if (! $application->destination->server->isFunctional()) {
@@ -422,7 +425,10 @@ class Gitlab extends Controller
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     $return_payloads->push($this->unauthenticatedManualWebhookFailurePayload());
 
