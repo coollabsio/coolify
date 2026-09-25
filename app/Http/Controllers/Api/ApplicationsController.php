@@ -6229,6 +6229,103 @@ class ApplicationsController extends Controller
         return response()->json(['message' => 'Destination detached.']);
     }
 
+    #[OA\Post(
+        summary: 'Deploy to Destination',
+        description: 'Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.',
+        path: '/applications/{uuid}/destinations/{destination_uuid}/deploy',
+        operationId: 'deploy-application-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'destination_uuid', in: 'path', required: true, description: 'UUID of the destination.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild.', schema: new OA\Schema(type: 'boolean', default: false)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Deployment queued.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
+                                'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function deploy_destination(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $force = $request->boolean('force', false);
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('deploy', $application);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('destination_uuid'))->first();
+        if (! $destination) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $isPrimary = $application->destination_id === $destination->id && $application->destination_type === $destination->getMorphClass();
+        if (! $isPrimary && ! $application->additional_networks()->where('standalone_dockers.id', $destination->id)->exists()) {
+            return response()->json(['message' => 'Destination is not attached to this application.'], 422);
+        }
+
+        if ($application->additional_servers()->exists() && str($application->docker_registry_image_name)->isEmpty()) {
+            return response()->json(['message' => 'A Docker registry image is required to deploy to multiple destinations.'], 422);
+        }
+
+        $deploymentUuid = new_public_id();
+
+        $result = queue_application_deployment(
+            application: $application,
+            deployment_uuid: $deploymentUuid,
+            force_rebuild: $force,
+            is_api: true,
+            no_questions_asked: true,
+            server: $destination->server,
+            destination: $destination,
+            only_this_server: true,
+        );
+
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 400);
+        }
+
+        auditLog('api.application.destination_deployed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'destination_uuid' => $destination->uuid,
+            'deployment_uuid' => $deploymentUuid,
+            'force_rebuild' => $force,
+        ]);
+
+        return response()->json([
+            'message' => 'Deployment request queued.',
+            'deployment_uuid' => $deploymentUuid,
+        ]);
+    }
+
     /**
      * @param  Collection<string, array{domain: ?string, redirect?: string}>  $domains
      * @param  array<string, int|string>|null  $existingOverrides
