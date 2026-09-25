@@ -38,9 +38,7 @@ beforeEach(function () {
     ]);
 
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'realpath -m')
-            ? (preg_match("/realpath -m -- '([^']*)' '([^']*)'/", $process->command, $paths) ? "{$paths[1]}\n{$paths[2]}" : '')
-            : 'NOK'
+        output: str_contains($process->command, 'readlink -f') ? 'OK' : 'NOK'
     ));
 
     $this->processedSaves = 0;

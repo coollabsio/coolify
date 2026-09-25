@@ -277,12 +277,12 @@ test('the confinement check runs through sudo on non-root servers', function () 
     $this->server->update(['user' => 'ubuntu']);
     $base = '/data/coolify/applications/app';
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'sudo realpath -m') ? "{$base}\n{$base}/data" : ''
+        output: str_contains($process->command, 'sudo bash -c') && str_contains($process->command, 'readlink -f') ? 'OK' : ''
     ));
 
     LocalFileVolume::assertRemotePathIsConfined($base, "{$base}/data", $this->server->fresh());
 
-    Process::fake(fn () => Process::result(output: "{$base}\n/root/outside"));
+    Process::fake(fn () => Process::result(output: 'NOK'));
     expect(fn () => LocalFileVolume::assertRemotePathIsConfined($base, "{$base}/link", $this->server->fresh()))
         ->toThrow(RuntimeException::class);
 });

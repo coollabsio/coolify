@@ -339,17 +339,18 @@ class PreviewDomains extends Component
         }
 
         $row = $this->domainRows[$index];
+        $statusKey = $this->statusKey($row['url'], $row['service']);
         $checkId = new_public_id();
         $this->domainRows[$index]['dns_status'] = 'checking';
         $this->domainRows[$index]['dns_message'] = 'Checking DNS...';
         $this->domainRows[$index]['check_id'] = $checkId;
-        $this->persistDnsStatuses();
+        $this->persistDnsStatuses([$statusKey]);
 
         try {
             $server = $this->preview->application->destination?->server;
             CheckDomainDnsJob::dispatch(
                 $this->preview,
-                $this->statusKey($row['url'], $row['service']),
+                $statusKey,
                 $row['url'],
                 $server,
                 $server ? serverDnsTargetIp($server) ?? $server->ip : null,
@@ -494,7 +495,11 @@ class PreviewDomains extends Component
         return true;
     }
 
-    private function persistDnsStatuses(): void
+    /**
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
+     */
+    private function persistDnsStatuses(array $startingCheckKeys = []): void
     {
         $statuses = [];
         foreach ($this->domainRows as $row) {
@@ -505,13 +510,13 @@ class PreviewDomains extends Component
             ];
         }
 
-        DB::transaction(function () use (&$statuses): void {
+        DB::transaction(function () use (&$statuses, $startingCheckKeys): void {
             $preview = ApplicationPreview::query()->lockForUpdate()->findOrFail($this->preview->id);
             $storedStatuses = $preview->domain_dns_statuses ?? [];
 
             foreach ($statuses as $key => $status) {
                 $storedStatus = $storedStatuses[$key] ?? null;
-                if (! is_array($storedStatus)) {
+                if (! is_array($storedStatus) || in_array($key, $startingCheckKeys, true)) {
                     continue;
                 }
 

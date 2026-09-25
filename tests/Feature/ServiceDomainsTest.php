@@ -1319,3 +1319,31 @@ it('lays out the domain settings dropdowns in responsive columns', function () {
     expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
         ->toContain('flex flex-wrap items-center justify-between gap-2');
 });
+
+it('restarts a service dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $domain = 'https://api.example.com';
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
+    $index = collect($component->get('domainRows'))->search(fn (array $row): bool => $row['url'] === $domain);
+
+    expect($index)->not->toBeFalse();
+
+    $component->call('checkDomainDns', $index)
+        ->assertSet("domainRows.{$index}.dns_status", 'checking');
+
+    expect($this->apiApp->fresh()->domain_dns_statuses[$domain]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
+});
