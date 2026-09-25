@@ -10,6 +10,10 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+beforeEach(function () {
+    Http::preventStrayRequests();
+});
+
 it('refreshes Hostinger virtual machine status and public IP', function () {
     $team = Team::factory()->create();
     $token = CloudProviderToken::factory()->create([

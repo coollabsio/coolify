@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\RateLimitException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 class HostingerService
@@ -18,7 +19,12 @@ class HostingerService
             ->asJson()
             ->timeout(30)
             ->connectTimeout(10)
-            ->retry(3, fn (int $attempt) => $attempt * 100, throw: false)
+            ->retry(
+                $method === 'get' ? 3 : 1,
+                fn (int $attempt) => $attempt * 100,
+                fn (\Exception $exception) => ! $exception instanceof RequestException || $exception->response->serverError(),
+                throw: false
+            )
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
@@ -75,7 +81,11 @@ class HostingerService
     {
         $response = $this->request('post', '/api/vps/v1/virtual-machines', $params);
 
-        return $response['virtual_machine'] ?? [];
+        if (empty($response['virtual_machine']['id'])) {
+            throw new \Exception('Hostinger order '.($response['id'] ?? 'unknown').' is waiting for payment. Finish the VPS setup in hPanel.', 202);
+        }
+
+        return $response['virtual_machine'];
     }
 
     public function getVirtualMachine(int $virtualMachineId): array

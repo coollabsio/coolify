@@ -278,6 +278,10 @@ class HostingerController extends Controller
                 'hostinger_virtual_machine_id' => $virtualMachineId,
             ]);
 
+            if ($e->getCode() === 202) {
+                return response()->json(['message' => $e->getMessage()], 202);
+            }
+
             return response()->json(array_filter([
                 'message' => $virtualMachineId
                     ? 'The Hostinger VPS was purchased but could not be saved in Coolify. Manage it in hPanel.'

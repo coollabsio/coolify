@@ -12,6 +12,8 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::preventStrayRequests();
+
     InstanceSettings::query()->whereKey(0)->delete();
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create([
         'id' => 0,
@@ -102,6 +104,28 @@ it('creates a Hostinger VPS server through the API', function () {
         'hostinger_virtual_machine_id' => 17923,
         'ip' => '203.0.113.10',
     ]);
+});
+
+it('reports a Hostinger order that is waiting for payment through the API', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'id' => 2957086,
+            'status' => 'payment_initiated',
+        ], 202),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/servers/hostinger', [
+            'cloud_provider_token_id' => $this->hostingerToken->uuid,
+            'item_id' => 'hostingercom-vps-kvm2-usd-1m',
+            'data_center_id' => 19,
+            'template_id' => 1130,
+            'private_key_uuid' => $this->privateKey->uuid,
+        ])
+        ->assertStatus(202)
+        ->assertJsonFragment(['message' => 'Hostinger order 2957086 is waiting for payment. Finish the VPS setup in hPanel.']);
+
+    $this->assertDatabaseMissing('servers', ['team_id' => $this->team->id]);
 });
 
 it('accepts Hostinger cloud provider tokens through the API', function () {

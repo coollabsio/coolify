@@ -7,6 +7,10 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
+beforeEach(function () {
+    Http::preventStrayRequests();
+});
+
 it('fetches Hostinger provisioning options', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
@@ -107,6 +111,36 @@ it('purchases a Hostinger virtual machine with its setup options', function () {
         && $request['setup']['template_id'] === 1130
         && $request['setup']['enable_backups'] === true
         && $request['setup']['public_key']['key'] === 'ssh-ed25519 AAAA test@example.com');
+});
+
+it('does not retry a failed Hostinger purchase', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'message' => 'Server error',
+        ], 500),
+    ]);
+
+    expect(fn () => (new HostingerService('test-token'))->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm2-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1130],
+    ]))->toThrow(Exception::class, 'Hostinger API error: Server error');
+
+    Http::assertSentCount(1);
+});
+
+it('reports a Hostinger purchase whose payment is still processing', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'id' => 2957086,
+            'status' => 'payment_initiated',
+            'message' => 'Payment is being processed.',
+        ], 202),
+    ]);
+
+    expect(fn () => (new HostingerService('test-token'))->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm2-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1130],
+    ]))->toThrow(Exception::class, 'Hostinger order 2957086 is waiting for payment. Finish the VPS setup in hPanel.');
 });
 
 it('extracts a Hostinger public IPv4 address before falling back to IPv6', function () {

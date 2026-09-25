@@ -37,7 +37,7 @@
                 @php
                     $dataCenterOptions = collect($data_centers)->map(fn ($dataCenter) => [
                         'value' => $dataCenter['id'],
-                        'label' => ($dataCenter['city'] ?? $dataCenter['name'])
+                        'label' => ($dataCenter['city'] ?? $dataCenter['name'] ?? $dataCenter['id'])
                             . (!empty($dataCenter['location']) ? ' · ' . strtoupper($dataCenter['location']) : ''),
                     ])->values()->all();
                     $priceOptions = collect($this->priceOptions)->map(fn ($price) => [
@@ -46,7 +46,7 @@
                     ])->values()->all();
                     $templateOptions = collect($templates)->map(fn ($template) => [
                         'value' => $template['id'],
-                        'label' => $template['name'] ?? $template['description'],
+                        'label' => $template['name'] ?? $template['description'] ?? $template['id'],
                     ])->values()->all();
                     $privateKeyOptions = $private_keys->map(fn ($key) => [
                         'value' => $key->id,

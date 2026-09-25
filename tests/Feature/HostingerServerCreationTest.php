@@ -19,6 +19,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::preventStrayRequests();
+
     config([
         'cache.default' => 'array',
         'session.driver' => 'array',
@@ -91,6 +93,8 @@ it('purchases a Hostinger VPS and creates the linked Coolify server', function (
                 ],
             ],
         ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['data' => []]),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['data' => []]),
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
             'order' => ['id' => 2957086, 'status' => 'completed'],
             'virtual_machine' => [
@@ -128,7 +132,7 @@ it('purchases a Hostinger VPS and creates the linked Coolify server', function (
 
 it('keeps a purchased Hostinger VPS linked while its public IP is pending', function () {
     Http::fake([
-        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19]]),
+        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19, 'name' => 'nl-ams', 'city' => null]]),
         'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([['id' => 1130, 'name' => 'Ubuntu']]),
         'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
             ['name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
@@ -160,7 +164,7 @@ it('keeps a purchased Hostinger VPS linked while its public IP is pending', func
 it('revalidates the selected Hostinger price before making a purchase', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
-            ['id' => 19, 'city' => 'Amsterdam'],
+            ['id' => 19, 'name' => 'nl-ams', 'city' => 'Amsterdam'],
         ]),
         'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([
             ['id' => 1130, 'name' => 'Ubuntu 24.04 LTS'],
@@ -172,6 +176,8 @@ it('revalidates the selected Hostinger price before making a purchase', function
                 'prices' => [['id' => 'hostingercom-vps-kvm2-usd-1m']],
             ],
         ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['data' => []]),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['data' => []]),
     ]);
 
     Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
