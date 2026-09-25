@@ -77,6 +77,11 @@ it('seeds every railpack example in the production environment on testing-host',
     $githubDeployKey = $applications->firstWhere('uuid', 'railpack-github-deploy-key');
     $gitlabDeployKey = $applications->firstWhere('uuid', 'railpack-gitlab-deploy-key');
 
+    expect($applications->where('git_repository', DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
+        ->pluck('git_branch')->unique()->sort()->values()->all())->toBe(['main', 'next'])
+        ->and($applications->firstWhere('uuid', 'railpack-python-flask')->git_branch)->toBe('main')
+        ->and($nestjs->git_branch)->toBe('next');
+
     expect($nestjs->base_directory)->toBe('/node/nestjs')
         ->and($nestjs->build_command)->toBe('npm run build')
         ->and($nestjs->start_command)->toBe('npm run start:prod')

@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -720,7 +721,7 @@ class ByHetzner extends Component
             // Create server in Coolify database immediately so the Hetzner
             // server is always tracked, even when no IP is assigned yet —
             // the server page polling backfills the placeholder IP later.
-            $server = Server::create([
+            $server = Team::createServerWithinLimit(currentTeam()->id, [
                 'name' => $this->server_name,
                 'ip' => $ipAddress ?? Server::PLACEHOLDER_IP,
                 'user' => 'root',
@@ -755,6 +756,19 @@ class ByHetzner extends Component
             }
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
+        } catch (ValidationException $e) {
+            if (! isset($e->errors()['server'])) {
+                throw $e;
+            }
+            if (isset($hetznerService, $hetznerServer['id'])) {
+                try {
+                    $hetznerService->deleteServer((int) $hetznerServer['id']);
+                } catch (\Throwable $cleanupError) {
+                    report($cleanupError);
+                }
+            }
+
+            return $this->dispatch('error', 'You have reached the server limit for your subscription.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Request as RequestFacade;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 it('uses Reverb as the first-party broadcast server', function () {
     expect(file_get_contents(base_path('composer.json')))
@@ -117,8 +120,10 @@ it('runs Reverb and terminal websocket services inside the Coolify containers', 
 it('removes the dedicated realtime service from bundled compose files', function (string $composeFile, bool $hasRuntimeEnvironment) {
     $composeContents = file_get_contents(base_path($composeFile));
 
+    // Production keeps "coolify-realtime" only as a network alias of the coolify container.
     expect($composeContents)
-        ->not->toContain('coolify-realtime')
+        ->not->toContain('container_name: coolify-realtime')
+        ->not->toContain('coolify-realtime:')
         ->not->toContain('soketi:')
         ->not->toContain('SOKETI_DEFAULT_APP_ID')
         ->toContain('6001')
@@ -263,8 +268,44 @@ it('stops publishing or preserving the obsolete realtime image', function () {
         ->not->toContain('| Realtime');
 });
 
+it('keeps 4.3.23 realtime setups working with the production compose files', function (string $composeFile) {
+    $coolify = Yaml::parseFile(base_path($composeFile))['services']['coolify'];
+
+    // The browser port comes only from .env (for example PUSHER_PORT=443 for Cloudflare Tunnel).
+    expect(collect($coolify['environment'])->filter(fn (string $entry) => Str::startsWith($entry, 'PUSHER_PORT')))->toBeEmpty()
+        ->and($coolify['networks']['coolify']['aliases'])->toContain('coolify-realtime')
+        ->and($coolify['ports'])->toContain('6002:6002')
+        ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
+})->with([
+    'production compose' => ['docker-compose.prod.yml'],
+    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
+]);
+
+it('keeps TERMINAL_PORT browser-only in the Windows compose files', function (string $composeFile) {
+    $coolify = Yaml::parseFile(base_path($composeFile))['services']['coolify'];
+
+    expect($coolify['ports'])->toContain('6002:6002')
+        ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
+})->with([
+    'windows compose' => ['docker-compose.windows.yml'],
+    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
+]);
+
+it('resolves the browser websocket port like 4.3.23', function (string $pageUrl, ?string $pusherPort, ?string $expectedPort) {
+    config()->set('constants.pusher.port', $pusherPort);
+    RequestFacade::swap(Request::create($pageUrl));
+
+    expect(getRealtime())->toBe($expectedPort);
+})->with([
+    'https domain through the Coolify proxy' => ['https://coolify.example.com/', null, null],
+    'https domain with an empty PUSHER_PORT' => ['https://coolify.example.com/', '', null],
+    'direct IP and port access' => ['http://203.0.113.10:8000/', null, '6001'],
+    'Cloudflare Tunnel guide' => ['https://coolify.example.com/', '443', '443'],
+]);
+
 it('uses current Reverb and terminal names in development tooling', function () {
-    expect(file_get_contents(base_path('scripts/dev-instances')))
-        ->toContain('"REVERB" "TERMINAL"')
-        ->not->toContain('"SOKETI"');
+    expect(file_get_contents(base_path('scripts/dev')))
+        ->toContain('FORWARD_PUSHER_PORT')
+        ->toContain('FORWARD_TERMINAL_PORT')
+        ->not->toContain('SOKETI');
 });

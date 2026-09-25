@@ -6,6 +6,7 @@ use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
+        $this->configureGitLabHttp();
         $this->configureOidcSocialite();
     }
 
@@ -85,18 +87,33 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureGitHubHttp(): void
     {
+        Http::macro('GitSource', function (string $url) {
+            return Http::withOptions(SafeExternalUrl::httpClientOptions($url));
+        });
+
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
             if ($github_access_token) {
-                return Http::withHeaders([
+                return Http::GitSource($api_url)->withHeaders([
                     'X-GitHub-Api-Version' => '2022-11-28',
                     'Accept' => 'application/vnd.github.v3+json',
                     'Authorization' => "Bearer $github_access_token",
                 ])->baseUrl($api_url);
             } else {
-                return Http::withHeaders([
+                return Http::GitSource($api_url)->withHeaders([
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
+        });
+    }
+
+    private function configureGitLabHttp(): void
+    {
+        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::GitSource($api_url)->withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+
+            return $access_token ? $client->withToken($access_token) : $client;
         });
     }
 }

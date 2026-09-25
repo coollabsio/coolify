@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
+use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
@@ -423,33 +424,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function selectBuildServer(): void
     {
-        if (! data_get($this->application, 'settings.is_build_server_enabled')) {
-            $this->build_server = $this->server;
+        $this->build_server = $this->server;
 
+        // A deployments-only server never builds. Docker image and Compose applications are exempt:
+        // the first builds nothing and the second does not support build servers.
+        $mustBuildElsewhere = ! $this->server->canBuildApplications()
+            && ! in_array($this->application->build_pack, ['dockerimage', 'dockercompose'], true);
+
+        if (! $mustBuildElsewhere && ! data_get($this->application, 'settings.is_build_server_enabled')) {
             return;
         }
 
+        if ($mustBuildElsewhere && ! $this->restart_only && str($this->application->docker_registry_image_name)->isEmpty()) {
+            throw new DeploymentException("The deployment server ({$this->server->name}) is set to deployments only, so this application is built on a build server. Set a Docker image name in the application's General settings so the deployment server can pull the built image.");
+        }
+
         $team = $this->application->environment->project->team;
-        $buildServers = Server::buildServers($team->id)->get();
+        $buildServers = Server::buildServers($team->id)->whereKeyNot($this->server->id)->get();
 
         if ($buildServers->isEmpty()) {
+            // A restart only rebuilds when the image is missing, so it may still run on the deployment server.
+            if ($mustBuildElsewhere && ! $this->restart_only) {
+                throw new DeploymentException("The deployment server ({$this->server->name}) is set to deployments only, and no usable build server was found. Add a build server or change the server role.");
+            }
             if (! $team->is_build_server_fallback_enabled) {
                 throw new DeploymentException('No available dedicated build server was found. Enable a usable build server for this team or allow fallback to the deployment server in the team settings.');
             }
 
             $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
-            $this->build_server = $this->server;
 
             return;
         }
 
         $this->build_server = $buildServers->random();
-        if ($this->build_server->is($this->server)) {
-            $this->application_deployment_queue->addLogEntry("Using deployment server ({$this->server->name}) for the build.");
-
-            return;
-        }
-
         $this->application_deployment_queue->build_server_id = $this->build_server->id;
         $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
         $this->use_build_server = true;
@@ -1448,10 +1455,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * Replace {{vault.KEY}} references with values from the configured secret
      * manager source. Missing keys fail the deployment with a
      * list — changing the source never re-checks references, so this is the
-     * moment problems surface.
+     * moment problems surface. Values without references are returned as-is
+     * and never fetch secrets.
      */
     private function substitute_remote_secrets(string $value, string $envKey): string
     {
+        if (! RemoteSecretReferences::containsReference($value)) {
+            return $value;
+        }
+
         $secrets = $this->remote_secrets();
         $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
@@ -3322,7 +3334,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : $this->production_image_name;
 
         if ($this->application->settings->is_static && $this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
 
         $build_command = $this->railpack_build_command($image_name, $railpackVariables);
@@ -3353,7 +3365,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $publishDir = trim($this->application->publish_directory, '/');
         $publishDir = $publishDir ? "/{$publishDir}" : '';
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from={$this->build_image_name} /app{$publishDir} .
@@ -3885,12 +3897,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return $default;
     }
 
-    private function pull_latest_image($image)
+    private function staticImage(): string
     {
+        return StaticImageTypes::from($this->application->static_image)->value;
+    }
+
+    private function pull_latest_image(string $image): void
+    {
+        $image = StaticImageTypes::from($image)->value;
         $this->application_deployment_queue->addLogEntry("Pulling latest image ($image) from the registry.");
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "docker pull {$image}"),
+                executeInDocker($this->deployment_uuid, 'docker pull '.escapeshellarg($image)),
                 'hidden' => true,
             ]
         );
@@ -3901,9 +3919,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         if ($this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
         WORKDIR /usr/share/nginx/html/
         LABEL coolify.deploymentId={$this->deployment_uuid}
         COPY . .
@@ -3998,7 +4016,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application->settings->is_static) {
             if ($this->application->static_image) {
-                $this->pull_latest_image($this->application->static_image);
+                $this->pull_latest_image($this->staticImage());
                 $this->application_deployment_queue->addLogEntry('Continuing with the building process.');
             }
             if ($this->application->build_pack === 'nixpacks') {
@@ -4104,7 +4122,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
             $publishDir = trim($this->application->publish_directory, '/');
             $publishDir = $publishDir ? "/{$publishDir}" : '';
-            $dockerfile = base64_encode("FROM {$this->application->static_image}
+            $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from=$this->build_image_name /app{$publishDir} .
@@ -4899,8 +4917,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
             $fullDockerfilePath = escapeshellarg("{$this->workdir}/{$dockerfilePath}");
 
+            // BusyBox realpath in the helper image accepts no options; a missing file prints nothing.
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath -e -- {$fullDockerfilePath}) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\""),
+                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath {$fullDockerfilePath} 2>/dev/null) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\" || true"),
                 'hidden' => true,
                 'save' => 'dockerfile_check_'.$serviceName,
             ]);

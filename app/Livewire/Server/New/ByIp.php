@@ -143,11 +143,7 @@ class ByIp extends Component
             $this->authorize('create', Server::class);
             $foundServer = Server::whereIp($this->ip)->first();
             if ($foundServer) {
-                if ($foundServer->team_id === currentTeam()->id) {
-                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-                }
-
-                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
             }
 
             if (is_null($this->private_key_id)) {
@@ -168,7 +164,7 @@ class ByIp extends Component
             if ($this->server_role === ServerRole::BUILD->value) {
                 data_forget($payload, 'proxy');
             }
-            $server = Server::create($payload);
+            $server = Team::createServerWithinLimit(currentTeam()->id, $payload);
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();

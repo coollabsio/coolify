@@ -74,10 +74,7 @@ class Bitbucket extends Controller
             }
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
-                return response([
-                    'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                ]);
+                return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -278,7 +275,7 @@ class Bitbucket extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads);
         } catch (Exception $e) {
             return handleError($e);
         }

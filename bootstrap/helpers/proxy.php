@@ -72,6 +72,7 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
         if ($enabled && ! $server->isSwarm() && ! isDev()) {
             $proxyPath = $server->proxyPath();
             $config['services']['traefik-logrotate'] = [
+                'container_name' => 'coolify-proxy-logrotate',
                 'image' => 'alpine:3.20',
                 'restart' => RESTART_MODE,
                 'volumes' => [
