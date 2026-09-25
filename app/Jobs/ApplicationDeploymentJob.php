@@ -1449,10 +1449,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * Replace {{vault.KEY}} references with values from the configured secret
      * manager source. Missing keys fail the deployment with a
      * list — changing the source never re-checks references, so this is the
-     * moment problems surface.
+     * moment problems surface. Values without references are returned as-is
+     * and never fetch secrets.
      */
     private function substitute_remote_secrets(string $value, string $envKey): string
     {
+        if (! RemoteSecretReferences::containsReference($value)) {
+            return $value;
+        }
+
         $secrets = $this->remote_secrets();
         $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 

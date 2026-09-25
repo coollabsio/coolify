@@ -1031,6 +1031,42 @@ it('injects raw escaped remote secrets into Dockerfile args and hashes the same 
     'preview' => [99, true],
 ]);
 
+it('injects Dockerfile args for plain build-time variables without a secret manager source', function (int $pullRequestId, bool $isPreview) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'APP_ENV',
+        'value' => 'production',
+        'is_preview' => $isPreview,
+        'is_runtime' => false,
+        'is_buildtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => $pullRequestId,
+        'saved_outputs' => [
+            'dockerfile' => "FROM php:8.4-cli\nRUN php -v",
+        ],
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'add_build_env_variables_to_dockerfile');
+
+    $expectedHash = invokeDeploymentJobMethod(
+        $job,
+        $reflection,
+        'generate_secrets_hash',
+        collect(['APP_ENV' => escapeBashEnvValue('production')]),
+    );
+
+    expect($job->writtenDockerfile)
+        ->toContain('ARG APP_ENV')
+        ->toContain("ARG COOLIFY_BUILD_SECRETS_HASH={$expectedHash}");
+    expect(readDeploymentJobProperty($job, $reflection, 'remote_secrets_cache'))->toBeNull();
+})->with([
+    'production' => [0, false],
+    'preview' => [99, true],
+]);
+
 it('builds railpack variables from generic buildtime vars railpack vars and coolify vars only', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'railpack',
