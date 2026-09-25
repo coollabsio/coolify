@@ -105,7 +105,8 @@ it('purchases a Hostinger virtual machine with its setup options', function () {
 
     expect($virtualMachine['id'])->toBe(17923);
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
         && $request->hasHeader('Authorization', 'Bearer test-token')
         && $request['item_id'] === 'hostingercom-vps-kvm2-usd-1m'
         && $request['setup']['data_center_id'] === 19
@@ -114,11 +115,33 @@ it('purchases a Hostinger virtual machine with its setup options', function () {
         && $request['setup']['public_key']['key'] === 'ssh-ed25519 AAAA test@example.com');
 });
 
-it('does not retry a failed Hostinger purchase', function () {
+it('only sends a fully qualified hostname to Hostinger', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
-            'message' => 'Server error',
-        ], 500),
+            'virtual_machine' => ['id' => 17923, 'state' => 'creating'],
+        ]),
+    ]);
+
+    $service = new HostingerService('test-token');
+    $service->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1130, 'hostname' => 'coolify-server'],
+    ]);
+    $service->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1130, 'hostname' => 'coolify.example.com'],
+    ]);
+
+    $sentHostnames = Http::recorded()->filter(fn ($record) => $record[0]->method() === 'POST')->values()->map(fn ($record) => $record[0]['setup']['hostname'] ?? null)->all();
+
+    expect($sentHostnames)->toBe([null, 'coolify.example.com']);
+});
+
+it('does not retry a failed Hostinger purchase', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => fn ($request) => $request->method() === 'GET'
+            ? Http::response([])
+            : Http::response(['message' => 'Server error'], 500),
     ]);
 
     expect(fn () => (new HostingerService('test-token'))->purchaseVirtualMachine([
@@ -126,7 +149,62 @@ it('does not retry a failed Hostinger purchase', function () {
         'setup' => ['data_center_id' => 19, 'template_id' => 1130],
     ]))->toThrow(Exception::class, 'Hostinger API error: Server error');
 
-    Http::assertSentCount(1);
+    Http::assertSentCount(3);
+    expect(Http::recorded()->filter(fn ($record) => $record[0]->method() === 'POST'))->toHaveCount(1);
+});
+
+it('sets up a charged Hostinger VPS when the purchase returns an error', function () {
+    $listRequests = 0;
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/2008976/setup' => Http::response([
+            'id' => 2008976,
+            'state' => 'creating',
+            'ipv4' => [['address' => '72.61.180.163']],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => function ($request) use (&$listRequests) {
+            if ($request->method() === 'POST') {
+                return Http::response(['message' => '[VPS:2004] Wrong hostname FQDN format'], 422);
+            }
+
+            return Http::response($listRequests++ === 0
+                ? [['id' => 100, 'state' => 'running']]
+                : [['id' => 100, 'state' => 'running'], ['id' => 2008976, 'state' => 'initial']]);
+        },
+    ]);
+
+    $virtualMachine = (new HostingerService('test-token'))->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1077, 'enable_backups' => false],
+    ]);
+
+    expect($virtualMachine['id'])->toBe(2008976)
+        ->and($virtualMachine['state'])->toBe('creating');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines/2008976/setup'
+        && $request['data_center_id'] === 19
+        && $request['template_id'] === 1077
+        && $request['enable_backups'] === false);
+});
+
+it('returns a charged Hostinger VPS that still needs setup when the setup retry fails', function () {
+    $listRequests = 0;
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/2008976/setup' => Http::response(['message' => 'Setup failed'], 422),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => function ($request) use (&$listRequests) {
+            if ($request->method() === 'POST') {
+                return Http::response(['message' => 'Setup failed'], 422);
+            }
+
+            return Http::response($listRequests++ === 0 ? [] : [['id' => 2008976, 'state' => 'initial']]);
+        },
+    ]);
+
+    $virtualMachine = (new HostingerService('test-token'))->purchaseVirtualMachine([
+        'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+        'setup' => ['data_center_id' => 19, 'template_id' => 1077],
+    ]);
+
+    expect($virtualMachine)->toBe(['id' => 2008976, 'state' => 'initial']);
 });
 
 it('reports a Hostinger purchase whose payment is still processing', function () {

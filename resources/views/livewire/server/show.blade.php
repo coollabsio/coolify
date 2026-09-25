@@ -30,7 +30,7 @@
                     };
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
-                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
+                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'initial', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
                         in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted', 'destroyed', 'error']) => 'error',
                         default => 'neutral',
                     };
@@ -79,36 +79,25 @@
                             @if ($provider)
                                 <x-status-badge :label="$provider . ($providerStatus ? ' · ' . ucfirst($providerStatus) : '')"
                                     :type="$providerStatusType" />
-                                @if ($provider === 'Hetzner')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHetznerServerStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'DigitalOcean')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkDigitalOceanDropletStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Vultr')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkVultrInstanceStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @elseif ($provider === 'Hostinger')
-                                    <x-forms.button type="button" class="size-8! px-0!"
-                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
-                                        title="Refresh provider status">
-                                        <x-reicon name="refresh" class="size-3.5" />
-                                    </x-forms.button>
-                                @endif
+                                @php
+                                    $providerStatusMethod = match ($provider) {
+                                        'Hetzner' => 'checkHetznerServerStatus',
+                                        'DigitalOcean' => 'checkDigitalOceanDropletStatus',
+                                        'Vultr' => 'checkVultrInstanceStatus',
+                                        'Hostinger' => 'checkHostingerVirtualMachineStatus',
+                                    };
+                                @endphp
+                                <x-forms.button type="button" wire:click.prevent="{{ $providerStatusMethod }}(true)"
+                                    title="Refresh provider status">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Refresh status
+                                </x-forms.button>
                             @endif
                             @if ($server->server_metadata)
-                                <x-forms.button type="button" class="size-8! px-0!"
-                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata"
+                                    title="Refresh server details">
                                     <x-reicon name="refresh" class="size-3.5" />
+                                    Refresh details
                                 </x-forms.button>
                             @endif
                             @if ($server->isTransferredAway())

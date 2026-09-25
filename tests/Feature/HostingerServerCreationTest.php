@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Server\DeleteServer;
 use App\Livewire\Server\Create;
 use App\Livewire\Server\CreatePage;
 use App\Livewire\Server\Delete;
@@ -14,7 +15,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 uses(RefreshDatabase::class);
 
@@ -124,7 +127,8 @@ it('purchases a Hostinger VPS and creates the linked Coolify server', function (
         ->and($server->hostinger_virtual_machine_status)->toBe('creating')
         ->and($server->cloud_provider_token_id)->toBe($this->token->id);
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
         && $request['item_id'] === 'hostingercom-vps-kvm2-usd-1m'
         && $request['setup']['hostname'] === 'coolify-hostinger.example.com'
         && $request['setup']['public_key']['key'] === $this->privateKey->getPublicKey());
@@ -248,6 +252,21 @@ it('starts a stopped Hostinger VPS from the server page', function () {
     expect($server->fresh()->hostinger_virtual_machine_status)->toBe('starting');
 });
 
+it('labels the Hostinger status refresh button on the server page', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+        'cloud_provider_token_id' => $this->token->id,
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'running',
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $server->uuid])
+        ->assertSee('Hostinger · Running')
+        ->assertSee('Refresh status')
+        ->assertSeeHtml('wire:click.prevent="checkHostingerVirtualMachineStatus(true)"');
+});
+
 it('does not validate a stopped Hostinger VPS over SSH', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
@@ -279,6 +298,37 @@ it('warns that deleting from Coolify does not cancel the Hostinger VPS', functio
     ]);
 
     Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
-        ->assertSee('The Hostinger VPS and its subscription will not be deleted or changed.')
-        ->assertSee('https://hpanel.hostinger.com/', false);
+        ->assertSee('Hostinger deletes the VPS only at the end of its paid period, and only if you select this in the confirmation dialog.')
+        ->assertSee('https://hpanel.hostinger.com/', false)
+        ->assertSeeHtml('<strong>Hostinger deletes a VPS only at the end of its paid period.</strong>')
+        ->assertSee('The VPS on Hostinger will NOT be deleted, and Hostinger will keep billing for it.');
+});
+
+it('passes the Hostinger deletion choice to the server deletion', function () {
+    Queue::fake();
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+        'cloud_provider_token_id' => $this->token->id,
+        'hostinger_virtual_machine_id' => 17923,
+    ]);
+
+    Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
+        ->assertSee('Also delete VPS from Hostinger (at the end of the paid period)')
+        ->call('delete', 'password', ['delete_from_hostinger']);
+
+    Queue::assertPushed(JobDecorator::class, fn (JobDecorator $job) => $job->getAction() instanceof DeleteServer
+        && $job->getParameters()[9] === true
+        && $job->getParameters()[10] === 17923);
+});
+
+it('keeps the default deletion warning for servers without a Hostinger VPS', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+
+    Livewire::test(Delete::class, ['server_uuid' => $server->uuid])
+        ->assertSee('This operation is permanent and cannot be undone.')
+        ->assertDontSee('Hostinger deletes a VPS');
 });

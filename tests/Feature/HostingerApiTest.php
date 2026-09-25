@@ -106,6 +106,44 @@ it('creates a Hostinger VPS server through the API', function () {
     ]);
 });
 
+it('keeps a charged Hostinger VPS when the purchase returns an error through the API', function () {
+    $listRequests = 0;
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/2008976/setup' => Http::response([
+            'id' => 2008976,
+            'state' => 'creating',
+            'ipv4' => [['address' => '72.61.180.163']],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => function ($request) use (&$listRequests) {
+            if ($request->method() === 'POST') {
+                return Http::response(['message' => '[VPS:2004] Wrong hostname FQDN format'], 422);
+            }
+
+            return Http::response($listRequests++ === 0 ? [] : [['id' => 2008976, 'state' => 'initial']]);
+        },
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/servers/hostinger', [
+            'cloud_provider_token_id' => $this->hostingerToken->uuid,
+            'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+            'data_center_id' => 19,
+            'template_id' => 1077,
+            'private_key_uuid' => $this->privateKey->uuid,
+        ])
+        ->assertCreated()
+        ->assertJsonFragment([
+            'hostinger_virtual_machine_id' => 2008976,
+            'ip' => '72.61.180.163',
+        ]);
+
+    $this->assertDatabaseHas('servers', [
+        'team_id' => $this->team->id,
+        'hostinger_virtual_machine_id' => 2008976,
+        'ip' => '72.61.180.163',
+    ]);
+});
+
 it('reports a Hostinger order that is waiting for payment through the API', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([

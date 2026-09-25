@@ -80,7 +80,29 @@ class HostingerService
 
     public function purchaseVirtualMachine(array $params): array
     {
-        $response = $this->request('post', '/api/vps/v1/virtual-machines', $params);
+        // Hostinger accepts only a fully qualified hostname and uses its own default otherwise.
+        if (! str_contains($params['setup']['hostname'] ?? '', '.')) {
+            unset($params['setup']['hostname']);
+        }
+
+        $existingVirtualMachineIds = collect($this->getVirtualMachines())->pluck('id')->all();
+
+        try {
+            $response = $this->request('post', '/api/vps/v1/virtual-machines', $params);
+        } catch (\Throwable $e) {
+            // Hostinger can charge for the VPS before its setup fails, so keep the VPS if one was created.
+            $virtualMachine = $this->findPurchasedVirtualMachine($existingVirtualMachineIds);
+            if (! $virtualMachine) {
+                throw $e;
+            }
+
+            logger()->warning('Hostinger charged for a VPS but its setup failed', [
+                'hostinger_virtual_machine_id' => $virtualMachine['id'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->setupPurchasedVirtualMachine($virtualMachine, $params['setup']);
+        }
 
         if (empty($response['virtual_machine']['id'])) {
             logger()->warning('Hostinger VPS order did not return a virtual machine', Arr::only($response, ['id', 'subscription_id', 'status', 'message']));
@@ -89,6 +111,34 @@ class HostingerService
         }
 
         return $response['virtual_machine'];
+    }
+
+    private function findPurchasedVirtualMachine(array $existingVirtualMachineIds): ?array
+    {
+        try {
+            return collect($this->getVirtualMachines())
+                ->first(fn (array $virtualMachine) => ! in_array($virtualMachine['id'] ?? null, $existingVirtualMachineIds, true));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function setupPurchasedVirtualMachine(array $virtualMachine, array $setup): array
+    {
+        if (($virtualMachine['state'] ?? null) !== 'initial') {
+            return $virtualMachine;
+        }
+
+        try {
+            return $this->request('post', $this->virtualMachineEndpoint((int) $virtualMachine['id']).'/setup', $setup);
+        } catch (\Throwable $e) {
+            logger()->warning('Hostinger VPS setup retry failed', [
+                'hostinger_virtual_machine_id' => $virtualMachine['id'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return $virtualMachine;
+        }
     }
 
     public function getVirtualMachine(int $virtualMachineId): array
@@ -131,6 +181,11 @@ class HostingerService
         }
 
         return null;
+    }
+
+    public function disableAutoRenewal(string $subscriptionId): array
+    {
+        return $this->request('delete', "/api/billing/v1/subscriptions/{$subscriptionId}/auto-renewal/disable");
     }
 
     public function startVirtualMachine(int $virtualMachineId): array
