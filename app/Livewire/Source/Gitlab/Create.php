@@ -59,8 +59,8 @@ class Create extends Component
 
             $this->validate([
                 'name' => 'required|string',
-                'html_url' => ['required', 'string', 'url', new SafeExternalUrl],
-                'api_url' => ['required', 'string', 'url', new SafeExternalUrl],
+                'html_url' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
+                'api_url' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
                 'custom_user' => 'required|string',
                 'custom_port' => 'required|int',
                 'is_system_wide' => 'required|bool',

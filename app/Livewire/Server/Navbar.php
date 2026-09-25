@@ -258,6 +258,7 @@ class Navbar extends Component
             'proxy-configuration-state-changed',
             pending: $this->server->hasPendingProxyConfiguration(),
             traefikOutdated: $this->server->hasCurrentTraefikOutdatedInfo(),
+            proxyNotRunning: $this->server->proxySet() && ($this->server->proxy->status ?? 'unknown') !== 'running',
         );
     }
 
