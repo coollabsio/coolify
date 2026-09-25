@@ -179,7 +179,7 @@
                 ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
 
-        // Group that holds the current page — the only one expanded by default.
+        // Group that holds the current page — always kept open, even if collapsed before.
         $activeGroup = (string) $groupedMenuItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
         // In-page sections (cards) shown as sub-items under the active page

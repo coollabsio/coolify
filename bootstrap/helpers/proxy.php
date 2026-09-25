@@ -463,7 +463,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'caddy' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'lucaslorentz/caddy-docker-proxy:2.8-alpine',
+                    'image' => 'lucaslorentz/caddy-docker-proxy:2.13-alpine',
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',

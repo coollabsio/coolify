@@ -23,6 +23,10 @@ class RestartDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            return $prerequisiteError;
+        }
         StopDatabase::run($database, dockerCleanup: false);
 
         return StartDatabase::run($database);

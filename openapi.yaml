@@ -2578,7 +2578,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -2639,7 +2639,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -2683,7 +2683,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -5846,7 +5846,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -5906,7 +5906,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -5952,7 +5952,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -12188,7 +12188,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -12251,7 +12251,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "The flag to indicate if the environment variable's value is shown on the UI."
+                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
               type: object
       responses:
         '201':
@@ -12297,7 +12297,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "The flag to indicate if the environment variable's value is shown on the UI." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
               type: object
       responses:
         '201':
@@ -12976,6 +12976,7 @@ paths:
                   type: boolean
                 is_shown_once:
                   type: boolean
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
                 comment:
                   type: [string, 'null']
               type: object
@@ -14860,6 +14861,7 @@ components:
           type: boolean
         is_shown_once:
           type: boolean
+          description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
         key:
           type: string
         value:

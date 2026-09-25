@@ -336,6 +336,10 @@ class Gitlab extends Controller
 
     public function manual(Request $request)
     {
+        if ($this->hasTooManyManualWebhookFailures($request, 'gitlab')) {
+            return $this->tooManyManualWebhookFailuresResponse($request, 'gitlab');
+        }
+
         try {
             $return_payloads = collect([]);
             $payload = $request->collect();
@@ -356,12 +360,8 @@ class Gitlab extends Controller
                 auditLogWebhookFailure('gitlab', 'webhook_token_missing', [
                     'event' => $x_gitlab_event,
                 ]);
-                $return_payloads->push([
-                    'status' => 'failed',
-                    'message' => 'Invalid signature.',
-                ]);
 
-                return response($return_payloads);
+                return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
             }
 
             if ($x_gitlab_event === 'push') {
@@ -416,23 +416,13 @@ class Gitlab extends Controller
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with branch '$base_branch'.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
                 }
             }
             foreach ($applications as $application) {
@@ -641,7 +631,7 @@ class Gitlab extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $request, 'gitlab');
         } catch (Exception $e) {
             return handleError($e);
         }

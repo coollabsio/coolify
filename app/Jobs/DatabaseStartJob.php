@@ -13,6 +13,7 @@ use App\Actions\Database\StartRedis;
 use App\Actions\Database\StartSqlite;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
+use App\Exceptions\DatabaseStartException;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -22,6 +23,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Support\ResourceStartActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -55,7 +57,7 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
         abort_unless((int) $database->team()->id === $this->teamId, 403);
         $activity = Activity::query()->findOrFail($this->activityId);
 
-        match ($database->getMorphClass()) {
+        $result = match ($database->getMorphClass()) {
             StandalonePostgresql::class => StartPostgresql::run($database, $activity),
             StandaloneRedis::class => StartRedis::run($database, $activity),
             StandaloneMongodb::class => StartMongodb::run($database, $activity),
@@ -66,6 +68,10 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
             StandaloneSqlite::class => StartSqlite::run($database, $activity),
         };
+
+        if (! $result instanceof Activity || data_get($result, 'properties.status') !== ProcessStatus::FINISHED->value) {
+            throw DatabaseStartException::startCommandsDidNotRun();
+        }
 
         event(new DatabaseStatusChanged($this->userId));
     }
@@ -78,12 +84,10 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $activity->properties = $activity->properties->merge([
-                'status' => ProcessStatus::ERROR->value,
-                'error' => 'Database start failed.',
-                'failed_at' => now()->toIso8601String(),
-            ]);
-            $activity->save();
+            ResourceStartActivity::markFailed(
+                $activity,
+                $exception instanceof DatabaseStartException ? $exception->getMessage() : 'Database start failed.',
+            );
         } finally {
             event(new DatabaseStatusChanged($this->userId));
         }

@@ -9,9 +9,9 @@ use function Laravel\Prompts\multiselect;
 
 class ManageDevelopmentQemuVmCommand extends Command
 {
-    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php} {--as-localhost : Use the VM for the localhost server (id 0)}';
+    protected $signature = 'dev:qemu {profiles?* : Profile keys from config/development-qemu.php} {--as-localhost : Use the VM for the localhost server (id 0)} {--fresh : Destroy and recreate the selected VMs instead of reusing them}';
 
-    protected $description = 'Recreate selected development QEMU VMs and seed their Coolify servers';
+    protected $description = 'Start (or create) selected development QEMU VMs and seed their Coolify servers';
 
     public function handle(): int
     {
@@ -34,7 +34,7 @@ class ManageDevelopmentQemuVmCommand extends Command
             return self::FAILURE;
         }
 
-        ManageDevelopmentQemuVm::run($profileNames, (bool) $this->option('as-localhost'));
+        ManageDevelopmentQemuVm::run($profileNames, (bool) $this->option('as-localhost'), (bool) $this->option('fresh'));
 
         foreach ($profileNames as $profileName) {
             $profile = $profiles[$profileName];

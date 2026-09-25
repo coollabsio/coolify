@@ -3931,7 +3931,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4023,7 +4023,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4114,7 +4114,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -8897,7 +8897,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -8988,7 +8988,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -9078,7 +9078,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -19260,7 +19260,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -19355,7 +19355,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -19449,7 +19449,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -20506,7 +20506,8 @@
                                         "type": "boolean"
                                     },
                                     "is_shown_once": {
-                                        "type": "boolean"
+                                        "type": "boolean",
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     },
                                     "comment": {
                                         "type": [
@@ -23219,7 +23220,8 @@
                         "type": "boolean"
                     },
                     "is_shown_once": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                     },
                     "key": {
                         "type": "string"

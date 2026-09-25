@@ -87,7 +87,10 @@ it('backs up with a read-only VACUUM INTO snapshot instead of a SQL dump', funct
 it('restores a gzipped backup with .restore into the first database file', function () {
     $command = app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->database, '/tmp/restore_1', false);
 
-    expect($command)->toBe('backup=\'/tmp/restore_1\'; gunzip -c "$backup" > "$backup.db" && sqlite3 -bail \'/var/lib/sqlite/app.db\' \'.timeout 10000\' ".restore $backup.db"; status=$?; rm -f "$backup.db"; exit $status');
+    expect($command)
+        ->toStartWith("backup='/tmp/restore_1'\n")
+        ->toContain('stream() { if is_gzip; then gunzip -c "$backup"; else cat "$backup"; fi; }')
+        ->toEndWith("stream > \"\$backup.db\" || fail 'The backup cannot be read. Nothing was changed.'\nsqlite3 -bail '/var/lib/sqlite/app.db' '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status");
 });
 
 it('normalises the file list when saved from the general page', function () {

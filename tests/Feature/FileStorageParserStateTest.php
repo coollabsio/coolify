@@ -139,6 +139,36 @@ it('keeps valid Compose when one-time fields use flow syntax', function () {
         ->and($cleanedSource)->not->toContain('content: initial');
 });
 
+it('rejects unsafe array source defaults in the application parser', function (string $source) {
+    $application = makeComposeApplication("services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n");
+
+    expect(fn () => applicationParser($application))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:-/tmp/evil`id`}', '${DATA:-/tmp/evil$(id)}', '${DATA:-/tmp/evil;id}']);
+
+it('rejects unsafe array source defaults in the service parser', function (string $source) {
+    [$service] = makeComposeService("services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n");
+
+    expect(fn () => serviceParser($service))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:-/tmp/evil`id`}', '${DATA:-/tmp/evil$(id)}', '${DATA:-/tmp/evil;id}']);
+
+it('keeps safe array source expressions in both parsers', function (string $source) {
+    $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n";
+    $application = makeComposeApplication($compose);
+    [$service] = makeComposeService($compose);
+
+    expect(fn () => applicationParser($application))->not->toThrow(Exception::class)
+        ->and(fn () => serviceParser($service))->not->toThrow(Exception::class);
+})->with(['${DATA}', '${DATA}/config', '${DATA}//config', '${DATA:-/srv/app/data}', '/srv/$HOME/config.yml', '$HOME/$FILE', '${DATA:-/srv/$HOME/config.yml}']);
+
+it('keeps unsupported array source forms rejected in both parsers', function (string $source) {
+    $compose = "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: '".$source."'\n        target: /app/data\n";
+    $application = makeComposeApplication($compose);
+    [$service] = makeComposeService($compose);
+
+    expect(fn () => applicationParser($application))->toThrow(Exception::class, 'Invalid Docker volume definition')
+        ->and(fn () => serviceParser($service))->toThrow(Exception::class, 'Invalid Docker volume definition');
+})->with(['${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
+
 it('preserves existing application file volume content when reparsing compose bind mounts', function () {
     $application = makeComposeApplication(TWO_FILE_COMPOSE);
     $baseDir = application_configuration_dir()."/{$application->uuid}";

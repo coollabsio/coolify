@@ -6,6 +6,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasRestartLimit;
+use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,7 +14,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
-    use HasFactory, HasNoindexDomains, HasRestartLimit, SoftDeletes;
+    use HasFactory, HasNoindexDomains, HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
 
     protected $appends = ['url'];
 

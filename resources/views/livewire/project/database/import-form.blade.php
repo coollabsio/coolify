@@ -55,43 +55,16 @@
             <x-application.settings-section title="Restore configuration"
                 description="Configure how the selected backup is applied to this database.">
                 <div class="space-y-4">
-            @if ($resourceDbType === 'standalone-postgresql')
-                @if ($dumpAll)
+            @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
                             <x-callout type="warning" title="Full restore overwrites administrator passwords">
                                 The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
                                 <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
                             </x-callout>
-                            <x-forms.textarea rows="6" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command" readonly
-                                helper="Enable replacement below to drop and recreate matching objects from the archive."
-                                wire:model="postgresqlRestoreCommand" canGate="update"
-                                :canResource="$this->resource" />
-                @endif
-            @elseif ($resourceDbType === 'standalone-mysql')
-                @if ($dumpAll)
-                            <x-forms.textarea rows="10" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command" wire:model="mysqlRestoreCommand"
-                                canGate="update" :canResource="$this->resource" />
-                @endif
-            @elseif ($resourceDbType === 'standalone-mariadb')
-                @if ($dumpAll)
-                            <x-forms.textarea rows="10" readonly label="Import command"
-                                wire:model="restoreCommandText" canGate="update"
-                                :canResource="$this->resource" />
-                @else
-                            <x-forms.input label="Import command" wire:model="mariadbRestoreCommand"
-                                canGate="update" :canResource="$this->resource" />
-                @endif
-            @elseif ($resourceDbType === 'standalone-sqlite')
-                            <x-forms.input label="Import command" readonly wire:model="sqliteRestoreCommand"
-                                canGate="update" :canResource="$this->resource" />
             @endif
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
                     @if ($resourceDbType !== 'standalone-sqlite')
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
@@ -103,7 +76,14 @@
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
                             <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
-                                helper="Drops matching tables, functions, types, and other PostgreSQL objects from the archive before restoring them."
+                                helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if ($resourceDbType === 'standalone-mongodb')
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" label="Replace collections that already exist"
+                                helper="Drops each collection from the backup before restoring it. Without this option, documents that already exist are skipped."
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif

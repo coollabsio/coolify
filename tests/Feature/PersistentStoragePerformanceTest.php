@@ -24,7 +24,9 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
-    Process::fake();
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'readlink -f') ? 'OK' : ''
+    ));
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],
         ['id' => 0, 'is_dns_validation_enabled' => false]

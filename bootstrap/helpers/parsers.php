@@ -60,24 +60,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
-                            // Allow env vars and env vars with defaults (validated in parseDockerVolumeString)
-                            // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
-                            $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source);
-                            $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $source);
-                            $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $source);
-
-                            if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                                try {
-                                    validateShellSafePath($source, 'volume source');
-                                } catch (Exception $e) {
-                                    throw new Exception(
-                                        'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                        ' Please use safe path names without shell metacharacters.',
-                                        0,
-                                        $e
-                                    );
-                                }
-                            }
+                            validateComposeArrayVolumeSource($source);
                         }
                     }
                     if (isset($volume['target'])) {
@@ -116,10 +99,77 @@ function validateDockerComposeForInjection(string $composeYaml): void
                 validateComposeNetworkName((string) $networkName);
             }
             if (is_array($networkConfig) && isset($networkConfig['name']) && is_string($networkConfig['name'])) {
-                validateComposeNetworkName($networkConfig['name'], 'network name field');
+                validateComposeNetworkNameField($networkConfig['name']);
             }
         }
     }
+}
+
+/**
+ * Keep the existing array-source forms, but inspect the default that was previously skipped.
+ */
+function validateComposeArrayVolumeSource(string $source): void
+{
+    try {
+        if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
+            throw new Exception('Invalid volume source: contains a control character.');
+        }
+
+        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*\}[\/\w.\-]*$/', $source)) {
+            return;
+        }
+
+        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}$/', $source, $matches)) {
+            validateShellSafePath($matches[1], 'volume source');
+
+            return;
+        }
+
+        validateShellSafePath($source, 'volume source');
+    } catch (Exception $e) {
+        throw new Exception(
+            'Invalid Docker volume definition (array syntax): '.$e->getMessage().
+            ' Please use safe path names without shell metacharacters.',
+            0,
+            $e
+        );
+    }
+}
+
+/**
+ * Splits a top-level network `name:` that is one whole Compose variable (`${VAR}`, `${VAR:-default}`
+ * or `${VAR-default}`), such as an external network that differs per server.
+ *
+ * @return array{variable: string, default: ?string}|null
+ */
+function composeNetworkNameVariable(string $name): ?array
+{
+    if (preg_match('/\A\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}\z/', $name, $matches) !== 1) {
+        return null;
+    }
+
+    return ['variable' => $matches[1], 'default' => $matches[2] ?? null];
+}
+
+/**
+ * A network `name:` may be such a variable: only Docker Compose reads this value and it never runs a
+ * shell; Coolify's own network commands use the network keys. The default must still be a valid
+ * network name, and nothing else is allowed around the variable.
+ *
+ * @throws Exception If the value is not a valid network name or such a variable
+ */
+function validateComposeNetworkNameField(string $name): void
+{
+    $variable = composeNetworkNameVariable($name);
+    if ($variable !== null) {
+        if ($variable['default'] !== null) {
+            validateComposeNetworkName($variable['default'], 'network name field');
+        }
+
+        return;
+    }
+
+    validateComposeNetworkName($name, 'network name field');
 }
 
 /**
@@ -881,22 +931,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
-
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                            try {
-                                validateShellSafePath($sourceValue, 'volume source');
-                            } catch (Exception $e) {
-                                throw new Exception(
-                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
-                                );
-                            }
-                        }
+                        validateComposeArrayVolumeSource($source->value());
                     }
                     if ($target !== null && ! empty($target->value())) {
                         try {
@@ -1709,6 +1744,21 @@ function serviceParser(Service $resource): Collection
         'configs' => collect(data_get($yaml, 'configs', [])),
         'secrets' => collect(data_get($yaml, 'secrets', [])),
     ]);
+    // A network name like ${SHARED_NETWORK:-default} becomes a service variable, like variables in
+    // environment:, so users can see and change it. Compose resolves the name from .env at deployment.
+    foreach ($topLevel->get('networks') as $network) {
+        $variable = is_string(data_get($network, 'name')) ? composeNetworkNameVariable(data_get($network, 'name')) : null;
+        if ($variable !== null) {
+            $resource->environment_variables()->firstOrCreate([
+                'key' => $variable['variable'],
+                'resourceable_type' => get_class($resource),
+                'resourceable_id' => $resource->id,
+            ], [
+                'value' => $variable['default'] ?? '',
+                'is_preview' => false,
+            ]);
+        }
+    }
     // If there are predefined volumes, make sure they are not null
     if ($topLevel->get('volumes')->count() > 0) {
         $temp = collect([]);
@@ -2248,22 +2298,7 @@ function serviceParser(Service $resource): Collection
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        $sourceValue = $source->value();
-                        // Allow environment variable references and env vars with path concatenation
-                        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceValue);
-                        $isEnvVarWithDefault = preg_match('/^\$\{[^}]+:-[^}]*\}$/', $sourceValue);
-                        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceValue);
-
-                        if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
-                            try {
-                                validateShellSafePath($sourceValue, 'volume source');
-                            } catch (Exception $e) {
-                                throw new Exception(
-                                    'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-                                    ' Please use safe path names without shell metacharacters.'
-                                );
-                            }
-                        }
+                        validateComposeArrayVolumeSource($source->value());
                     }
                     if ($target !== null && ! empty($target->value())) {
                         try {

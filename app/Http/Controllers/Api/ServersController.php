@@ -540,7 +540,7 @@ class ServersController extends Controller
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->exists()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['server_role' => ['Add another build-capable server before you set this server to deployments only.']],
+                'errors' => ['server_role' => ['Add a usable build server before you set this server to deployments only.']],
             ], 422);
         }
         if (is_null($request->instant_validate)) {
@@ -584,6 +584,7 @@ class ServersController extends Controller
 
         $server->settings()->update([
             'server_role' => $serverRole,
+            'is_build_server' => $serverRole === ServerRole::BUILD,
         ]);
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
@@ -763,7 +764,7 @@ class ServersController extends Controller
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->whereKeyNot($server->id)->exists()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['server_role' => ['Add another build-capable server before you set this server to deployments only.']],
+                'errors' => ['server_role' => ['Add a usable build server before you set this server to deployments only.']],
             ], 422);
         }
 
@@ -771,6 +772,7 @@ class ServersController extends Controller
         if ($serverRole !== null) {
             $server->settings()->update([
                 'server_role' => $serverRole,
+                'is_build_server' => $serverRole === ServerRole::BUILD,
             ]);
         }
 

@@ -221,6 +221,7 @@ it('creates the root user when oidc provisions the first account', function () {
 
     $response->assertRedirect('/');
     $this->assertDatabaseHas('users', ['id' => 0, 'email' => 'root@example.com']);
+    expect(User::whereEmail('root@example.com')->firstOrFail()->email_verified_at)->toBeNull();
     $this->assertDatabaseHas('team_user', ['team_id' => 0, 'user_id' => 0, 'role' => 'owner']);
     expect(InstanceSettings::find(0)->is_registration_enabled)->toBeFalse();
 });
@@ -290,4 +291,16 @@ it('logs callback failures with diagnostic context', function () {
             && $context['has_state'] === true
             && $context['exception'] instanceof RuntimeException;
     });
+});
+
+it('does not mark a newly provisioned oidc account verified without a verified email claim', function () {
+    User::factory()->create(['email' => 'existing@example.com']);
+    OauthSetting::where('provider', 'oidc')->update(['allow_registration' => true, 'require_email_verified' => false]);
+
+    fakeOidcProvider(['email' => 'unverified@example.com', 'email_verified' => false]);
+
+    $this->get(route('auth.callback', 'oidc'))->assertRedirect('/');
+
+    $user = User::whereEmail('unverified@example.com')->firstOrFail();
+    expect($user->email_verified_at)->toBeNull();
 });

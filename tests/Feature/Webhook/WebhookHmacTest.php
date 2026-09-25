@@ -7,9 +7,181 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Testing\TestResponse;
+use Tests\TestCase;
 
 uses(RefreshDatabase::class);
+
+test('manual webhook routes are not rate limited per request', function (string $provider) {
+    $route = Route::getRoutes()->match(Request::create("/webhooks/source/{$provider}/events/manual", 'POST'));
+
+    expect(collect($route->gatherMiddleware())->filter(fn (mixed $middleware): bool => is_string($middleware) && str_starts_with($middleware, 'throttle')))->toBeEmpty();
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+function sendManualWebhookPush(TestCase $test, string $provider, Application $application, bool $validSignature = true, string $ip = '203.0.113.10', string $repository = 'test-org/test-repo'): TestResponse
+{
+    $secret = $validSignature ? $application->{"manual_webhook_secret_{$provider}"} : 'wrong-secret';
+    $server = ['REMOTE_ADDR' => $ip, 'CONTENT_TYPE' => 'application/json'];
+
+    if ($provider === 'gitlab') {
+        $payload = json_encode([
+            'object_kind' => 'push',
+            'ref' => 'refs/heads/main',
+            'project' => ['path_with_namespace' => $repository],
+            'after' => 'abc123',
+            'commits' => [],
+        ]);
+
+        return $test->call('POST', '/webhooks/source/gitlab/events/manual', [], [], [], $server + [
+            'HTTP_X-Gitlab-Token' => $secret,
+        ], $payload);
+    }
+
+    if ($provider === 'bitbucket') {
+        $payload = json_encode([
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'repository' => ['full_name' => $repository],
+        ]);
+
+        return $test->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], $server + [
+            'HTTP_X-Event-Key' => 'repo:push',
+            'HTTP_X-Hub-Signature' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+        ], $payload);
+    }
+
+    $payload = json_encode([
+        'ref' => 'refs/heads/main',
+        'repository' => ['full_name' => $repository],
+        'after' => 'abc123',
+        'commits' => [],
+    ]);
+    $eventHeader = $provider === 'github' ? 'HTTP_X-GitHub-Event' : 'HTTP_X-Gitea-Event';
+
+    return $test->call('POST', "/webhooks/source/{$provider}/events/manual", [], [], [], $server + [
+        $eventHeader => 'push',
+        'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
+    ], $payload);
+}
+
+describe('Manual Webhook Failed Authentication Rate Limiting', function () {
+    test('valid signed deliveries are never throttled', function (string $provider) {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 80; $i++) {
+            $response = sendManualWebhookPush($this, $provider, $application);
+
+            expect($response->getStatusCode())->toBe(200);
+            expect($response->getContent())->not->toContain('Invalid signature');
+        }
+
+        expect(RateLimiter::attempts("manual-webhook-failures:{$provider}:203.0.113.10"))->toBe(0);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('repeated invalid signatures are throttled after 30 failures', function (string $provider) {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            $response = sendManualWebhookPush($this, $provider, $application, validSignature: false);
+
+            $response->assertOk();
+            expect($response->getContent())->toContain('Invalid signature');
+        }
+
+        $response = sendManualWebhookPush($this, $provider, $application, validSignature: false);
+
+        $response->assertStatus(429);
+        $response->assertHeader('Retry-After');
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('valid deliveries do not count when another matching application has a different secret', function () {
+        $application = createApplicationWithWebhook();
+        createApplicationWithWebhook(overrides: ['name' => 'second-webhook-test-app']);
+
+        for ($i = 0; $i < 35; $i++) {
+            $response = sendManualWebhookPush($this, 'github', $application);
+
+            $response->assertOk();
+            expect($response->getContent())->not->toContain('Invalid signature');
+        }
+
+        expect(RateLimiter::attempts('manual-webhook-failures:github:203.0.113.10'))->toBe(0);
+    });
+
+    test('deliveries for unknown repositories count as failed authentication', function () {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            sendManualWebhookPush($this, 'github', $application, repository: 'unknown-org/unknown-repo')->assertOk();
+        }
+
+        sendManualWebhookPush($this, 'github', $application)->assertStatus(429);
+    });
+
+    test('gitlab deliveries without a token count as failed authentication', function () {
+        createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            $this->postJson('/webhooks/source/gitlab/events/manual', [
+                'object_kind' => 'push',
+                'ref' => 'refs/heads/main',
+                'project' => ['path_with_namespace' => 'test-org/test-repo'],
+            ])->assertOk();
+        }
+
+        expect(RateLimiter::tooManyAttempts('manual-webhook-failures:gitlab:127.0.0.1', 30))->toBeTrue();
+    });
+
+    test('ping deliveries do not count as failures', function () {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 40; $i++) {
+            $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+                'REMOTE_ADDR' => '203.0.113.10',
+                'HTTP_X-GitHub-Event' => 'ping',
+                'CONTENT_TYPE' => 'application/json',
+            ], '{}')->assertOk();
+        }
+
+        $response = sendManualWebhookPush($this, 'github', $application);
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('Invalid signature');
+    });
+
+    test('failures on one provider do not block another provider', function () {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            sendManualWebhookPush($this, 'github', $application, validSignature: false);
+        }
+        sendManualWebhookPush($this, 'github', $application, validSignature: false)->assertStatus(429);
+
+        foreach (['gitlab', 'bitbucket', 'gitea'] as $provider) {
+            $response = sendManualWebhookPush($this, $provider, $application);
+
+            $response->assertOk();
+            expect($response->getContent())->not->toContain('Invalid signature');
+        }
+    });
+
+    test('valid deliveries from a different client IP are not blocked', function () {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            sendManualWebhookPush($this, 'github', $application, validSignature: false, ip: '198.51.100.7');
+        }
+        sendManualWebhookPush($this, 'github', $application, validSignature: false, ip: '198.51.100.7')->assertStatus(429);
+
+        $response = sendManualWebhookPush($this, 'github', $application, ip: '203.0.113.10');
+
+        $response->assertOk();
+        expect($response->getContent())->not->toContain('Invalid signature');
+    });
+});
 
 function createApplicationWithWebhook(string $repo = 'test-org/test-repo', string $branch = 'main', array $overrides = []): Application
 {
@@ -387,7 +559,7 @@ describe('Manual Webhook Repository Matching', function () {
 
         $response->assertOk();
         $content = $response->getContent();
-        expect($content)->toContain('No applications found')
+        expect($content)->toContain('Invalid signature.')
             ->not->toContain('secret-github-app')
             ->not->toContain($app->uuid);
     });
@@ -481,7 +653,7 @@ describe('Manual Webhook Repository Matching', function () {
 
         $response->assertOk();
         $content = $response->getContent();
-        expect($content)->toContain('No applications found')
+        expect($content)->toContain('Invalid signature.')
             ->not->toContain("secret-{$provider}-app")
             ->not->toContain($app->uuid);
     })->with([

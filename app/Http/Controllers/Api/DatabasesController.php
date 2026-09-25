@@ -3591,6 +3591,10 @@ class DatabasesController extends Controller
             ]);
         }
 
+        if ($env->is_shown_once ?? false) {
+            $env->makeHidden(['value', 'real_value']);
+        }
+
         return serializeApiResponse($env);
     }
 
@@ -3696,7 +3700,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -3837,7 +3841,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -3968,7 +3972,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),

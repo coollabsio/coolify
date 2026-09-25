@@ -143,11 +143,7 @@ class ByIp extends Component
             $this->authorize('create', Server::class);
             $foundServer = Server::whereIp($this->ip)->first();
             if ($foundServer) {
-                if ($foundServer->team_id === currentTeam()->id) {
-                    return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-                }
-
-                return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+                return $this->dispatch('error', 'A server with this IP/Domain already exists.');
             }
 
             if (is_null($this->private_key_id)) {

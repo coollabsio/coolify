@@ -18,6 +18,31 @@ class LocalFileVolume extends BaseModel
 
     public const TOO_LARGE_PLACEHOLDER = '[file too large to display]';
 
+    /**
+     * Resolves $1 and $2 like `realpath -m`, but only with POSIX sh and `readlink -f`, which
+     * BusyBox also has. It walks up to the deepest existing path, resolves it, and appends the
+     * missing rest. A dangling symlink or `.`/`..` in the missing rest fails closed.
+     */
+    private const REMOTE_PATH_CONFINEMENT_SCRIPT = <<<'SH'
+        resolve() {
+            path=$1
+            rest=
+            case $path in /*) ;; *) return 1 ;; esac
+            while [ ! -e "$path" ]; do
+                if [ -L "$path" ]; then return 1; fi
+                rest=/${path##*/}$rest
+                path=${path%/*}
+                [ -n "$path" ] || path=/
+            done
+            case "$rest/" in */./*|*/../*) return 1 ;; esac
+            path=$(readlink -f "$path") || return 1
+            printf "%s\n" "${path%/}$rest"
+        }
+        base=$(resolve "$1") || exit 1
+        target=$(resolve "$2") || exit 1
+        case $target in "$base"|"$base"/*) echo OK ;; *) echo NOK ;; esac
+        SH;
+
     protected $casts = [
         // 'fs_path' => 'encrypted',
         // 'mount_path' => 'encrypted',
@@ -332,15 +357,20 @@ class LocalFileVolume extends BaseModel
      */
     public static function assertRemotePathIsConfined(string $baseDirectory, string $path, Server $server): void
     {
-        $escapedBase = escapeshellarg($baseDirectory);
-        $escapedPath = escapeshellarg($path);
-        $result = instant_remote_process([
-            "base=\$(realpath -m -- {$escapedBase}) && target=\$(realpath -m -- {$escapedPath}) && case \"\$target\" in \"\$base\"|\"\$base\"/*) echo OK ;; *) echo NOK ;; esac",
-        ], $server, false);
+        $result = instant_remote_process([self::remotePathConfinementCommand($baseDirectory, $path)], $server, false);
 
         if (trim((string) $result) !== 'OK') {
             throw new \RuntimeException('Invalid storage path: resolved path must stay inside the resource configuration directory.');
         }
+    }
+
+    /**
+     * One `sh -c` line with the paths as arguments, so the non-root sudo parser only puts
+     * sudo in front of it and never changes the script.
+     */
+    public static function remotePathConfinementCommand(string $baseDirectory, string $path): string
+    {
+        return 'sh -c '.escapeshellarg(self::REMOTE_PATH_CONFINEMENT_SCRIPT).' sh '.escapeshellarg($baseDirectory).' '.escapeshellarg($path);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Services\Dns;
 
+use App\Enums\ManagedDnsDeletionResult;
 use App\Exceptions\DnsRecordConflictException;
 use App\Models\DnsProviderZone;
 use App\Models\IntegrationToken;
@@ -12,6 +13,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class CloudflareDnsProvider
 {
@@ -73,9 +75,11 @@ class CloudflareDnsProvider
     }
 
     /**
-     * @return array{id: string, type: string, name: string, content: string}|null
+     * All records of the given type for a hostname (several records form a round-robin set).
+     *
+     * @return array<int, array{id: string, type: string, name: string, content: string, proxied: bool|null, ttl: int|null, comment: string|null}>
      */
-    public function findRecord(DnsProviderZone $zone, string $hostname, string $type): ?array
+    public function findRecords(DnsProviderZone $zone, string $hostname, string $type): array
     {
         $hostname = strtolower(rtrim($hostname, '.'));
         $response = $this->client($zone->integrationToken)->get(
@@ -85,50 +89,67 @@ class CloudflareDnsProvider
         if (! $response->successful()) {
             throw new RuntimeException('Cloudflare DNS records could not be checked.');
         }
-        $remote = collect($response->json('result', []))->first();
-        if ($remote === null) {
-            return null;
-        }
 
-        return [
-            'id' => (string) ($remote['id'] ?? ''),
-            'type' => (string) ($remote['type'] ?? $type),
-            'name' => strtolower((string) ($remote['name'] ?? $hostname)),
-            'content' => (string) ($remote['content'] ?? ''),
-        ];
+        return collect($response->json('result', []))
+            ->filter(fn ($remote): bool => is_array($remote))
+            ->map(fn (array $remote): array => $this->normalizeRemoteRecord($remote, $hostname, $type))
+            ->values()
+            ->all();
     }
 
+    /**
+     * Creates the record with Coolify's ownership comment, or references an existing record that already has the wanted content.
+     * Existing records that Coolify did not create are only referenced and never marked as owned.
+     */
     public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null): ManagedDnsRecord
     {
         $hostname = strtolower(rtrim($hostname, '.'));
-        $type = filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? 'AAAA' : 'A';
-        $remote = $this->findRecord($zone, $hostname, $type);
-        if ($remote !== null) {
-            if ($remote['content'] === $content) {
-                if ($remote['id'] === '') {
-                    throw new RuntimeException('Cloudflare DNS records could not be checked.');
-                }
-
-                $record = $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
-                $this->auditDnsRecord('created', $zone, $hostname, $resource);
-
-                return $record;
+        $type = $this->recordType($content);
+        $remoteRecords = $this->findRecords($zone, $hostname, $type);
+        $matching = collect($remoteRecords)->first(fn (array $remote): bool => $remote['content'] === $content);
+        if ($matching !== null) {
+            if ($matching['id'] === '') {
+                throw new RuntimeException('Cloudflare DNS records could not be checked.');
             }
-            throw new DnsRecordConflictException($remote['id'], $remote['content'], $content);
+
+            $record = $this->trackExistingRecord($zone, $matching, $type, $hostname, $content, $resource);
+            $this->auditDnsRecord('adopted', $zone, $hostname, $resource);
+
+            return $record;
         }
+        if (count($remoteRecords) > 1) {
+            throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
+        }
+        if (count($remoteRecords) === 1) {
+            throw new DnsRecordConflictException($remoteRecords[0]['id'], $remoteRecords[0]['content'], $content);
+        }
+
+        $uuid = new_public_id();
         $response = $this->client($zone->integrationToken)->post("https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records", [
             'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => false,
+            'comment' => ManagedDnsRecord::ownershipCommentFor($uuid),
         ]);
         if (! $response->successful() || ! is_string($response->json('result.id'))) {
             throw new RuntimeException('Cloudflare could not create the DNS record.');
         }
 
-        $record = $this->trackRecord($zone, $response->json('result.id'), $type, $hostname, $content, $resource);
+        $record = ManagedDnsRecord::query()->create([
+            'uuid' => $uuid, 'team_id' => $zone->integrationToken->team_id, 'integration_token_id' => $zone->integration_token_id,
+            'dns_provider_zone_id' => $zone->id, 'provider_record_id' => $response->json('result.id'),
+            'type' => $type, 'name' => $hostname, 'content' => $content, 'owned' => true,
+        ]);
+        if ($resource !== null) {
+            $record->addReference($resource);
+        }
         $this->auditDnsRecord('created', $zone, $hostname, $resource);
 
         return $record;
     }
 
+    /**
+     * Points an existing (conflicting) record at the new content after explicit user confirmation.
+     * Only the content changes: proxy status, TTL, comment and other settings stay as they are.
+     */
     public function replaceRecord(
         DnsProviderZone $zone,
         string $recordId,
@@ -138,8 +159,12 @@ class CloudflareDnsProvider
         ?string $expectedCurrent = null,
     ): ManagedDnsRecord {
         $hostname = strtolower(rtrim($hostname, '.'));
-        $type = filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? 'AAAA' : 'A';
-        $remote = $this->findRecord($zone, $hostname, $type);
+        $type = $this->recordType($content);
+        $remoteRecords = $this->findRecords($zone, $hostname, $type);
+        if (count($remoteRecords) > 1) {
+            throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
+        }
+        $remote = $remoteRecords[0] ?? null;
         if ($remote === null
             || $remote['id'] === ''
             || $remote['id'] !== $recordId
@@ -148,47 +173,117 @@ class CloudflareDnsProvider
             throw new RuntimeException('The DNS conflict is no longer available. Check the record again.');
         }
 
-        $response = $this->client($zone->integrationToken)->put(
+        $response = $this->client($zone->integrationToken)->patch(
             "https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records/{$remote['id']}",
-            ['type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => false],
+            ['content' => $content],
         );
         if (! $response->successful()) {
             throw new RuntimeException('Cloudflare could not replace the conflicting DNS record.');
         }
 
-        $record = $this->trackRecord($zone, $remote['id'], $type, $hostname, $content, $resource);
+        $record = $this->trackExistingRecord($zone, $remote, $type, $hostname, $content, $resource);
         $this->auditDnsRecord('replaced', $zone, $hostname, $resource);
 
         return $record;
     }
 
-    public function deleteRecord(ManagedDnsRecord $record): bool
+    /**
+     * Deletes the provider record only when Coolify created it and it still carries Coolify's ownership comment and value.
+     * Removes the local row when the provider record is gone.
+     */
+    public function deleteRecord(ManagedDnsRecord $record, ?Model $resource = null): ManagedDnsDeletionResult
     {
+        if (! $record->owned) {
+            return ManagedDnsDeletionResult::NotOwned;
+        }
+
         $record->loadMissing(['zone', 'integrationToken']);
         $url = "https://api.cloudflare.com/client/v4/zones/{$record->zone->provider_zone_id}/dns_records/{$record->provider_record_id}";
-        $response = $this->client($record->integrationToken)->get($url);
-        $remote = $response->json('result');
-        if (! $response->successful() || ($remote['type'] ?? null) !== $record->type
-            || strtolower((string) ($remote['name'] ?? '')) !== $record->name || ($remote['content'] ?? null) !== $record->content) {
-            return false;
-        }
-        if (! $this->client($record->integrationToken)->delete($url)->successful()) {
-            return false;
-        }
-        $record->delete();
-        $this->auditDnsRecord('deleted', $record->zone, $record->name, $record->resource);
 
-        return true;
+        try {
+            $response = $this->client($record->integrationToken)->get($url);
+            if ($response->status() === 404) {
+                return $this->forgetDeletedRecord($record, ManagedDnsDeletionResult::AlreadyGone, $resource);
+            }
+            $remote = $response->json('result');
+            if (! $response->successful() || ! is_array($remote)) {
+                return ManagedDnsDeletionResult::Failed;
+            }
+            if (($remote['type'] ?? null) !== $record->type
+                || strtolower((string) ($remote['name'] ?? '')) !== $record->name
+                || ($remote['content'] ?? null) !== $record->content
+                || ($remote['comment'] ?? null) !== $record->ownershipComment()) {
+                return ManagedDnsDeletionResult::ChangedExternally;
+            }
+
+            $deleteResponse = $this->client($record->integrationToken)->delete($url);
+            if ($deleteResponse->status() === 404) {
+                return $this->forgetDeletedRecord($record, ManagedDnsDeletionResult::AlreadyGone, $resource);
+            }
+            if (! $deleteResponse->successful()) {
+                return ManagedDnsDeletionResult::Failed;
+            }
+        } catch (Throwable) {
+            return ManagedDnsDeletionResult::Failed;
+        }
+
+        return $this->forgetDeletedRecord($record, ManagedDnsDeletionResult::Deleted, $resource);
     }
 
-    private function trackRecord(DnsProviderZone $zone, string $recordId, string $type, string $name, string $content, ?Model $resource): ManagedDnsRecord
+    private function forgetDeletedRecord(ManagedDnsRecord $record, ManagedDnsDeletionResult $result, ?Model $resource): ManagedDnsDeletionResult
     {
-        return ManagedDnsRecord::query()->updateOrCreate(
-            ['dns_provider_zone_id' => $zone->id, 'provider_record_id' => $recordId],
-            ['team_id' => $zone->integrationToken->team_id, 'integration_token_id' => $zone->integration_token_id,
-                'resource_type' => $resource?->getMorphClass(), 'resource_id' => $resource?->getKey(),
-                'type' => $type, 'name' => $name, 'content' => $content],
-        );
+        $record->delete();
+        if ($result === ManagedDnsDeletionResult::Deleted) {
+            $this->auditDnsRecord('deleted', $record->zone, $record->name, $resource);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Tracks a record that already exists in the provider. New rows are never owned; an owned row whose
+     * provider comment no longer matches loses its ownership.
+     *
+     * @param  array{id: string, comment: string|null}  $remote
+     */
+    private function trackExistingRecord(DnsProviderZone $zone, array $remote, string $type, string $name, string $content, ?Model $resource): ManagedDnsRecord
+    {
+        $record = ManagedDnsRecord::query()->firstOrNew(['dns_provider_zone_id' => $zone->id, 'provider_record_id' => $remote['id']]);
+        $record->fill([
+            'team_id' => $zone->integrationToken->team_id, 'integration_token_id' => $zone->integration_token_id,
+            'type' => $type, 'name' => $name, 'content' => $content,
+        ]);
+        if (! $record->exists || $remote['comment'] !== $record->ownershipComment()) {
+            $record->owned = false;
+        }
+        $record->save();
+        if ($resource !== null) {
+            $record->addReference($resource);
+        }
+
+        return $record;
+    }
+
+    /**
+     * @param  array<string, mixed>  $remote
+     * @return array{id: string, type: string, name: string, content: string, proxied: bool|null, ttl: int|null, comment: string|null}
+     */
+    private function normalizeRemoteRecord(array $remote, string $hostname, string $type): array
+    {
+        return [
+            'id' => (string) ($remote['id'] ?? ''),
+            'type' => (string) ($remote['type'] ?? $type),
+            'name' => strtolower((string) ($remote['name'] ?? $hostname)),
+            'content' => (string) ($remote['content'] ?? ''),
+            'proxied' => isset($remote['proxied']) ? (bool) $remote['proxied'] : null,
+            'ttl' => isset($remote['ttl']) ? (int) $remote['ttl'] : null,
+            'comment' => isset($remote['comment']) && is_string($remote['comment']) ? $remote['comment'] : null,
+        ];
+    }
+
+    private function recordType(string $content): string
+    {
+        return filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? 'AAAA' : 'A';
     }
 
     private function auditDnsRecord(string $action, DnsProviderZone $zone, string $hostname, ?Model $resource): void

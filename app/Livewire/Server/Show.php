@@ -235,11 +235,7 @@ class Show extends Component
                 ->first();
             if ($foundServer) {
                 $this->ip = $this->server->ip;
-                if ($foundServer->team_id === currentTeam()->id) {
-                    throw new \Exception('A server with this IP/Domain already exists in your team.');
-                }
-
-                throw new \Exception('A server with this IP/Domain is already in use by another team.');
+                throw new \Exception('A server with this IP/Domain already exists.');
             }
 
             $this->server->name = $this->name;
@@ -429,7 +425,7 @@ class Show extends Component
 
             if ($newRole === ServerRole::DEPLOYMENT && ! Server::buildServers($this->server->team_id)->whereKeyNot($this->server->id)->exists()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Add another build-capable server before you set this server to deployments only.');
+                $this->dispatch('error', 'Add a usable build server before you set this server to deployments only.');
 
                 return;
             }
