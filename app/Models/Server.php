@@ -1947,6 +1947,21 @@ $siteAddress {
         $configRepository->disableSshMux();
     }
 
+    /**
+     * Return the server's CA certificate, generating it first when it does not exist yet.
+     */
+    public function ensureCaCertificate(): ?SslCertificate
+    {
+        $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
+        if ($caCertificate) {
+            return $caCertificate;
+        }
+
+        $this->generateCaCertificate();
+
+        return $this->sslCertificates()->where('is_ca_certificate', true)->first();
+    }
+
     public function generateCaCertificate()
     {
         try {

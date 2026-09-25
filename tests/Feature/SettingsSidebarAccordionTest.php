@@ -1,8 +1,8 @@
 <?php
 
-// Discussion #11833: the resource settings sidebar must not expand every group by
-// default. Each grouped sidebar wires up the shared accordion so only the group
-// containing the active page is open by default (client-side, via localStorage).
+// Each grouped resource settings sidebar wires up the shared accordion. Every group
+// is expanded by default; a group the user collapsed stays collapsed (client-side,
+// via localStorage), except the group containing the active page.
 
 $groupedSidebars = [
     'application' => 'resources/views/components/application/configuration-sidebar.blade.php',
@@ -17,7 +17,7 @@ it('wires the collapsible accordion into every grouped settings sidebar', functi
 
     expect($contents)
         ->toContain('settingsSidebarAccordion(')          // shared Alpine data provider
-        ->toContain('$activeGroup')                        // only the active group opens by default
+        ->toContain('$activeGroup')                        // the active group is always open
         ->toContain('nav-section-toggle')                  // group header is a toggle button
         ->toContain('toggle(')                             // header collapses/expands the group
         ->toContain("? 'xl:block' : 'xl:hidden'");         // desktop-only collapse wrapper
@@ -65,4 +65,14 @@ it('keeps the group for the active page open', function () {
     expect($accordion)
         ->toContain('if (group === this.activeGroup)')
         ->toContain('return true;');
+});
+
+it('expands every group by default when the user has not collapsed it', function () {
+    $accordion = file_get_contents(base_path('resources/js/settings-sidebar-accordion.js'));
+
+    $isOpen = str($accordion)->after('isOpen(group) {')->before('toggle(group)')->toString();
+
+    expect($isOpen)
+        ->toContain('return this.groups[group];')
+        ->not->toContain('return false;');
 });

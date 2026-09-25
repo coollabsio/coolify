@@ -25,6 +25,10 @@ class Github extends Controller
 
     public function manual(Request $request)
     {
+        if ($this->hasTooManyManualWebhookFailures($request, 'github')) {
+            return $this->tooManyManualWebhookFailuresResponse($request, 'github');
+        }
+
         try {
             $return_payloads = collect([]);
             $x_github_delivery = request()->header('X-GitHub-Delivery');
@@ -79,7 +83,7 @@ class Github extends Controller
             if ($x_github_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return response([$this->unauthenticatedManualWebhookFailurePayload()]);
+                    return $this->unauthenticatedManualWebhookResponse($request, 'github');
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -88,7 +92,7 @@ class Github extends Controller
                 }
                 $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
-                    return response([$this->unauthenticatedManualWebhookFailurePayload()]);
+                    return $this->unauthenticatedManualWebhookResponse($request, 'github');
                 }
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
@@ -239,7 +243,7 @@ class Github extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $request, 'github');
         } catch (Exception $e) {
             return handleError($e);
         }

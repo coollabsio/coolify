@@ -278,6 +278,7 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
         'mainServer' => $server,
         'pull_request_id' => 0,
         'commit' => 'HEAD',
+        'basedir' => '/artifacts/test-app',
         'workdir' => '/artifacts/test-app',
         'deployment_uuid' => 'deployment-uuid',
         'dockerfile_location' => '/Dockerfile',
@@ -1078,6 +1079,7 @@ it('checks compose Dockerfiles with a portable command that skips missing files'
 
     try {
         [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+            'basedir' => $workdir,
             'workdir' => $workdir,
             'env_args' => collect(['APP_ENV' => 'production']),
         ]);

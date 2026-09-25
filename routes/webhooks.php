@@ -14,13 +14,13 @@ Route::middleware(['web', 'auth', 'throttle:60,1'])->group(function () {
 });
 
 Route::post('/source/github/events', [Github::class, 'normal']);
-Route::post('/source/github/events/manual', [Github::class, 'manual'])->middleware('throttle:60,1');
+Route::post('/source/github/events/manual', [Github::class, 'manual']);
 
 Route::post('/source/gitlab/events', [Gitlab::class, 'normal']);
-Route::post('/source/gitlab/events/manual', [Gitlab::class, 'manual'])->middleware('throttle:60,1');
+Route::post('/source/gitlab/events/manual', [Gitlab::class, 'manual']);
 
-Route::post('/source/bitbucket/events/manual', [Bitbucket::class, 'manual'])->middleware('throttle:60,1');
+Route::post('/source/bitbucket/events/manual', [Bitbucket::class, 'manual']);
 
-Route::post('/source/gitea/events/manual', [Gitea::class, 'manual'])->middleware('throttle:60,1');
+Route::post('/source/gitea/events/manual', [Gitea::class, 'manual']);
 
 Route::post('/payments/stripe/events', [Stripe::class, 'events']);

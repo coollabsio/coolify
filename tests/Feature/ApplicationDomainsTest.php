@@ -607,6 +607,27 @@ it('does not overwrite a completed preview dns result with stale checking state'
         ]);
 });
 
+it('links the labels warning to the container labels section', function () {
+    $this->application->settings()->update(['is_container_label_readonly_enabled' => false]);
+
+    $labelsUrl = route('project.application.configuration', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]).'#container-labels-section';
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Domains managed via labels')
+        ->assertSee('href="'.$labelsUrl.'"', false)
+        ->assertSee('Go to Container labels');
+});
+
+it('does not show the labels warning when Coolify manages labels', function () {
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Domains managed via labels')
+        ->assertDontSee('#container-labels-section', false);
+});
+
 it('lists existing domains as individual rows', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com,https://another.example.com,https://www.another.example.com',
@@ -1021,17 +1042,16 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'resource_id' => $this->application->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'app.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->application);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -1039,6 +1059,7 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
             'type' => 'A',
             'name' => 'app.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 

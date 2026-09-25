@@ -192,7 +192,7 @@ class Domains extends Component
 
         match ($status) {
             'ok' => $this->dispatch('success', "DNS is configured correctly for {$host}."),
-            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record."),
+            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later."),
             default => $this->dispatch('info', "DNS check skipped for {$host}."),
         };
     }
@@ -1357,9 +1357,7 @@ class Domains extends Component
                 return;
             }
 
-            if (in_array('deleteManagedDns', $selectedActions, true)) {
-                $this->deleteManagedDnsForUrl($url);
-            }
+            $this->releaseManagedDnsForUrl($url, $app, in_array('deleteManagedDns', $selectedActions, true));
 
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
