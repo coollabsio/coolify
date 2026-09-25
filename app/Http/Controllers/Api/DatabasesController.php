@@ -2576,7 +2576,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database->id);
+        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database->id, $database->type());
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -2584,7 +2584,9 @@ class DatabasesController extends Controller
             ], 400);
         }
 
-        $container = $containers->first();
+        $container = $containers->first(function ($c) use ($database) {
+            return str_contains(data_get($c, 'Names', ''), $database->uuid);
+        }) ?? $containers->first();
 
         $status = getContainerStatus($database->destination->server, $container['Names']);
         if ($status !== 'running') {
