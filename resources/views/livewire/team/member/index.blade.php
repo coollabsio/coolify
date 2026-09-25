@@ -80,6 +80,7 @@
                                 ['value' => 'all', 'label' => 'All roles'],
                                 ['value' => 'owner', 'label' => 'Owner'],
                                 ['value' => 'admin', 'label' => 'Admin'],
+                                ['value' => 'operator', 'label' => 'Operator'],
                                 ['value' => 'member', 'label' => 'Member'],
                             ]" />
                     </div>

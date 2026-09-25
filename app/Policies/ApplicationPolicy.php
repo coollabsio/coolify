@@ -31,7 +31,7 @@ class ApplicationPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -45,11 +45,11 @@ class ApplicationPolicy
             return Response::deny('Application team not found.');
         }
 
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($user->canManageResourcesOfTeam($teamId)) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to update this application.');
+        return Response::deny('You need at least operator permissions to update this application.');
     }
 
     /**
@@ -59,7 +59,7 @@ class ApplicationPolicy
     {
         $teamId = $this->getTeamId($application);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -89,11 +89,11 @@ class ApplicationPolicy
             return Response::deny('Application team not found.');
         }
 
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($user->canManageResourcesOfTeam($teamId)) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to upload backups for this application.');
+        return Response::deny('You need at least operator permissions to upload backups for this application.');
     }
 
     /**
@@ -103,7 +103,7 @@ class ApplicationPolicy
     {
         $teamId = $this->getTeamId($application);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -113,7 +113,7 @@ class ApplicationPolicy
     {
         $teamId = $this->getTeamId($application);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -123,7 +123,7 @@ class ApplicationPolicy
     {
         $teamId = $this->getTeamId($application);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -131,7 +131,7 @@ class ApplicationPolicy
      */
     public function cleanupDeploymentQueue(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     private function getTeamId(Application $application): ?int

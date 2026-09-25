@@ -100,8 +100,8 @@ class ConfigurationChecker extends Component
 
             $array = $diff->toArray();
 
-            // Fail closed: only owners/admins may see unlocked env values.
-            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            // Fail closed: only operators and above may see unlocked env values.
+            $redactEnvironment = ! (bool) auth()->user()?->canManageResources();
             $array['changes'] = $this->redactEnvironmentChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 

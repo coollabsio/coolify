@@ -120,7 +120,7 @@ class Form extends Component
     {
         $this->syncData(false);
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->storage) ?? false);
         if ($this->isPasswordHiddenForMember) {
             $this->key = '';
             $this->secret = '';

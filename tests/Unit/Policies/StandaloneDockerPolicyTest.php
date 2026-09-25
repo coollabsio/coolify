@@ -52,6 +52,7 @@ it('allows admin to create standalone docker', function () {
 it('denies non-admin from creating standalone docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new StandaloneDockerPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -71,6 +72,7 @@ it('allows team admin to update standalone docker', function () {
 it('denies non-admin from updating standalone docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $standaloneDocker = Mockery::mock(StandaloneDocker::class)->makePartial();
     $standaloneDocker->shouldReceive('getAttribute')->with('server')->andReturn((object) ['team_id' => 1]);
@@ -93,6 +95,7 @@ it('allows team admin to delete standalone docker', function () {
 it('denies non-admin from deleting standalone docker', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $standaloneDocker = Mockery::mock(StandaloneDocker::class)->makePartial();
     $standaloneDocker->shouldReceive('getAttribute')->with('server')->andReturn((object) ['team_id' => 1]);

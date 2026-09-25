@@ -29,7 +29,7 @@ class ScheduledTaskPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -37,8 +37,8 @@ class ScheduledTaskPolicy
      */
     public function update(User $user, ScheduledTask $scheduledTask): Response
     {
-        if (! $user->isAdminOfTeam($scheduledTask->team_id)) {
-            return Response::deny('You need at least admin or owner permissions to update this scheduled task.');
+        if (! $user->canManageResourcesOfTeam($scheduledTask->team_id)) {
+            return Response::deny('You need at least operator permissions to update this scheduled task.');
         }
 
         return Response::allow();
@@ -49,7 +49,7 @@ class ScheduledTaskPolicy
      */
     public function delete(User $user, ScheduledTask $scheduledTask): bool
     {
-        return $user->isAdminOfTeam($scheduledTask->team_id);
+        return $user->canManageResourcesOfTeam($scheduledTask->team_id);
     }
 
     /**

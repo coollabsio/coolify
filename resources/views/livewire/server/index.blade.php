@@ -16,7 +16,7 @@
                     </a>
                 @endcan
             @endif
-            @can('createAnyResource')
+            @can('create', App\Models\Server::class)
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
                     <x-reicon name="plus" class="size-3.5" />

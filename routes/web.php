@@ -442,8 +442,8 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            if ($user->isAdminFromSession() === false && $user->isOperator() === false) {
+                return response()->json(['message' => 'Only team operators/admins/owners can download backups.'], 403);
             }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
@@ -485,8 +485,8 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if ($user->isAdminFromSession() === false) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            if ($user->isAdminFromSession() === false && $user->isOperator() === false) {
+                return response()->json(['message' => 'Only team operators/admins/owners can download backups.'], 403);
             }
 
             $execution = ScheduledVolumeBackupExecution::query()
