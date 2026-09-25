@@ -128,7 +128,6 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
             }
-            $this->auditLogDrain($this->{$enabledProperty} ? 'enabled' : 'disabled', $type);
         }
     }
 
@@ -210,6 +209,7 @@ class LogDrains extends Component
             }
 
             $this->syncData(true);
+            $this->auditLogDrain($this->{$enabledProperty} ? 'enabled' : 'disabled', $type);
 
             if ($this->server->isLogDrainEnabled()) {
                 StartLogDrain::run($this->server);

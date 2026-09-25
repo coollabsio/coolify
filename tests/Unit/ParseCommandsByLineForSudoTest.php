@@ -276,7 +276,7 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo chmod -R o-rwx /data/coolify/logs');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -286,7 +286,7 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo chmod -R o-rwx /tmp/coolify/cache');
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
 });
 
 test('ownership changes work where root may not use sudo', function (string $parser) {
@@ -310,7 +310,47 @@ test('ownership changes work where root may not use sudo', function (string $par
         ->and($process->getErrorOutput())->toBe('')
         ->and($process->isSuccessful())->toBeTrue()
         ->and(is_dir($path))->toBeTrue()
-        ->and(file_get_contents("{$directory}/log"))->toBe("chown -R ubuntu:ubuntu {$path}\nchmod -R o-rwx {$path}\n");
+        ->and(file_get_contents("{$directory}/log"))->toContain("chmod o-rwx {$path}\n");
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
+
+test('ownership changes keep container-owned files and file modes', function (string $parser) {
+    if (posix_geteuid() !== 0 || posix_getpwnam('daemon') === false) {
+        $this->markTestSkipped('Needs root and a daemon user to change file owners.');
+    }
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("{$directory}/sudo", 0755);
+    $path = '/tmp/coolify/ownership-test-'.bin2hex(random_bytes(4));
+    // A file mount that Coolify wrote with sudo, and a database folder that belongs to the container user.
+    mkdir("{$path}/pgdata", 0700, true);
+    file_put_contents("{$path}/index.html", 'mounted');
+    chmod("{$path}/index.html", 0644);
+    file_put_contents("{$path}/pgdata/PG_VERSION", '17');
+    chmod("{$path}/pgdata/PG_VERSION", 0600);
+    chown("{$path}/pgdata", 999);
+    chown("{$path}/pgdata/PG_VERSION", 999);
+
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('daemon');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH')]);
+    $process->run();
+    clearstatcache();
+
+    expect($process->getErrorOutput())->toBe('')
+        ->and(fileowner($path))->toBe(1)
+        ->and(fileperms($path) & 0007)->toBe(0)
+        ->and(fileowner("{$path}/index.html"))->toBe(1)
+        ->and(fileperms("{$path}/index.html") & 0777)->toBe(0644)
+        ->and(fileowner("{$path}/pgdata"))->toBe(999)
+        ->and(fileowner("{$path}/pgdata/PG_VERSION"))->toBe(999)
+        ->and(fileperms("{$path}/pgdata/PG_VERSION") & 0777)->toBe(0600);
 
     (new Process(['rm', '-rf', $directory, $path]))->run();
 })->with(['command list', 'deployment line']);

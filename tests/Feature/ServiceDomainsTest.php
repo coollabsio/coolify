@@ -189,17 +189,16 @@ it('deletes the managed dns record when removing a service domain by key with de
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->apiApp->getMorphClass(),
-        'resource_id' => $this->apiApp->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'api.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->apiApp);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -207,6 +206,7 @@ it('deletes the managed dns record when removing a service domain by key with de
             'type' => 'A',
             'name' => 'api.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 

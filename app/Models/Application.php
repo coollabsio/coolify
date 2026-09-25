@@ -17,12 +17,14 @@ use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\ReleasesManagedDnsRecords;
 use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -127,7 +129,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -1458,9 +1460,10 @@ class Application extends BaseModel
         return application_configuration_dir()."/{$this->uuid}";
     }
 
-    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $gitSshCommand = null, ?string $git_ssh_command = null, ?string $gitConfigOptions = null)
+    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $gitSshCommand = null, ?string $git_ssh_command = null, ?string $gitConfigOptions = null, ?string $baseDir = null, bool $onlyCheckout = false)
     {
-        $baseDir = $this->generateBaseDir($deployment_uuid);
+        // The folder the repository was cloned into; a checkout on the server passes its own folder.
+        $baseDir ??= $this->generateBaseDir($deployment_uuid);
         $escapedBaseDir = escapeshellarg($baseDir);
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
         $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
@@ -1486,7 +1489,8 @@ class Application extends BaseModel
                 $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
         }
-        if ($this->settings->is_git_submodules_enabled) {
+        // A checkout that only reads files (the Compose file) needs neither submodules nor LFS objects.
+        if ($this->settings->is_git_submodules_enabled && ! $onlyCheckout) {
             // Check if .gitmodules file exists before running submodule commands
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if [ -f .gitmodules ]; then";
             if ($public) {
@@ -1496,7 +1500,7 @@ class Application extends BaseModel
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
             $git_clone_command = "{$git_clone_command} {$gitCommand} submodule sync && {$sshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
         }
-        if ($this->settings->is_git_lfs_enabled) {
+        if ($this->settings->is_git_lfs_enabled && ! $onlyCheckout) {
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} lfs pull";
         }
 
@@ -1796,7 +1800,7 @@ class Application extends BaseModel
                     $gitConfigOptions = $this->withGitHttpTransportConfig();
                     $git_clone_command = $this->applyGitConfigOptionsToCloneCommand($git_clone_command, $gitConfigOptions);
                     if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     }
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
@@ -1825,7 +1829,7 @@ class Application extends BaseModel
                     }
                     $git_clone_command = $this->applyGitConfigOptionsToCloneCommand($git_clone_command, $gitConfigOptions);
                     if (! $only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOptions, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     }
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
@@ -1873,7 +1877,7 @@ class Application extends BaseModel
                     if ($only_checkout) {
                         $git_clone_command = $git_clone_command_base;
                     } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOptions, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     }
 
                     if ($pull_request_id !== 0) {
@@ -1914,7 +1918,7 @@ class Application extends BaseModel
                     if ($only_checkout) {
                         $git_clone_command = $git_clone_command_base;
                     } else {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
                     }
                     $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
 
@@ -1948,7 +1952,7 @@ class Application extends BaseModel
                 if ($gitConfigOptions) {
                     $git_clone_command = $this->applyGitConfigOptionsToCloneCommand($git_clone_command, $gitConfigOptions);
                 }
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions, baseDir: $baseDir, onlyCheckout: $only_checkout);
 
                 if ($exec_in_docker) {
                     $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
@@ -1977,7 +1981,7 @@ class Application extends BaseModel
             if ($only_checkout) {
                 $git_clone_command = $git_clone_command_base;
             } else {
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand);
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
             }
             $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
             if ($pull_request_id !== 0) {
@@ -2027,7 +2031,7 @@ class Application extends BaseModel
             if ($gitConfigOptions) {
                 $git_clone_command = $this->applyGitConfigOptionsToCloneCommand($git_clone_command, $gitConfigOptions);
             }
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions);
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOptions, baseDir: $baseDir, onlyCheckout: $only_checkout);
             $otherSshCommand = "ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa";
 
             if ($pull_request_id !== 0) {
@@ -2150,32 +2154,44 @@ class Application extends BaseModel
         }
     }
 
-    public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
+    /**
+     * Logs a failed git command on the server and returns its last error line for the user.
+     * Credentials in URLs (such as GitHub App or GitLab tokens) are removed from both, and the
+     * line is HTML-escaped because error toasts render HTML.
+     */
+    private function gitFailureReason(string $summary, string $errorOutput): string
     {
-        // Use provided restore values or capture current values as fallback
-        $initialDockerComposeLocation = $restoreDockerComposeLocation ?? $this->docker_compose_location;
-        $initialBaseDirectory = $restoreBaseDirectory ?? $this->base_directory;
-        if ($isInit && $this->docker_compose_raw) {
-            return;
-        }
-        $uuid = new_public_id();
-        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: 'checkout');
-        $cloneCommand = $this->gitCommandsAsShellCommand($cloneCommand);
-        $cloneCommand = str_replace(' clone ', ' clone --quiet ', $cloneCommand);
+        $errorOutput = (string) preg_replace('~([a-z][a-z0-9+.-]*://)[^/\s@\'"]+@~i', '$1***@', trim($errorOutput));
+        Log::warning($summary, [
+            'application_uuid' => $this->uuid,
+            'server_uuid' => $this->destination?->server?->uuid,
+            'error' => $errorOutput,
+        ]);
+
+        $reason = collect(explode("\n", $errorOutput))->map(fn (string $line) => trim($line))->filter()->last();
+
+        return $reason ? '<br><br>Reason: '.e(str($reason)->limit(300)->value()) : '';
+    }
+
+    /**
+     * Commands that check out only the Compose file on the server and print it. They run on the
+     * server itself, not in a helper container, so the checkout uses an absolute folder in /tmp.
+     *
+     * @return Collection<int, string>
+     */
+    private function composeFileReadCommands(string $uuid, string $gitVersion): Collection
+    {
+        $checkoutDir = "/tmp/{$uuid}/checkout";
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+        $cloneCommand = str_replace(' clone ', ' clone --quiet ', $this->gitCommandsAsShellCommand($cloneCommand));
         $workdir = rtrim($this->base_directory, '/');
-        $composeFile = $this->docker_compose_location;
-        $fileList = collect([".$workdir$composeFile"]);
-        $composeFilePath = escapeshellarg(".$workdir$composeFile");
+        $fileList = collect([".{$workdir}{$this->docker_compose_location}"]);
+        $composeFilePath = escapeshellarg(".{$workdir}{$this->docker_compose_location}");
         $composeReadLimit = self::MAX_DOCKER_COMPOSE_SIZE_BYTES + 1;
         $readComposeFile = "if [ \"$(wc -c < {$composeFilePath})\" -gt ".self::MAX_DOCKER_COMPOSE_SIZE_BYTES." ]; then echo '__COOLIFY_COMPOSE_TOO_LARGE__'; else head -c {$composeReadLimit} {$composeFilePath}; fi";
-        $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
-        if (! $gitRemoteStatus['is_accessible']) {
-            throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
-        }
-        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
-        $gitVersion = str($getGitVersion)->explode(' ')->last();
 
-        if (version_compare($gitVersion, '2.35.1', '<')) {
+        $isConeMode = version_compare($gitVersion, '2.35.1', '>=');
+        if (! $isConeMode) {
             $fileList = $fileList->map(function ($file) {
                 $parts = explode('/', trim($file, '.'));
                 $paths = collect();
@@ -2189,30 +2205,39 @@ class Application extends BaseModel
 
                 return $paths;
             })->flatten()->unique()->values();
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'cd checkout',
-                'git sparse-checkout init',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
-                $readComposeFile,
-            ]);
-        } else {
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-                "mkdir -p /tmp/{$uuid}",
-                "cd /tmp/{$uuid}",
-                $cloneCommand,
-                'cd checkout',
-                'git sparse-checkout init --cone',
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                'git read-tree -mu HEAD',
-                $readComposeFile,
-            ]);
         }
+
+        return collect([
+            "rm -rf /tmp/{$uuid}",
+            "mkdir -p /tmp/{$uuid}",
+            "cd /tmp/{$uuid}",
+            // One sh -c line: the non-root sudo parser would turn `&& if ...; then` into invalid `&& sudo if`.
+            'sh -c '.escapeshellarg($cloneCommand),
+            "cd {$checkoutDir}",
+            $isConeMode ? 'git sparse-checkout init --cone' : 'git sparse-checkout init',
+            "git sparse-checkout set {$fileList->implode(' ')}",
+            'git read-tree -mu HEAD',
+            $readComposeFile,
+        ]);
+    }
+
+    public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
+    {
+        // Use provided restore values or capture current values as fallback
+        $initialDockerComposeLocation = $restoreDockerComposeLocation ?? $this->docker_compose_location;
+        $initialBaseDirectory = $restoreBaseDirectory ?? $this->base_directory;
+        if ($isInit && $this->docker_compose_raw) {
+            return;
+        }
+        $uuid = new_public_id();
+        $workdir = rtrim($this->base_directory, '/');
+        $composeFile = $this->docker_compose_location;
+        $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
+        if (! $gitRemoteStatus['is_accessible']) {
+            throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.'.$this->gitFailureReason('Failed to read Git source.', (string) $gitRemoteStatus['error']));
+        }
+        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
+        $commands = $this->composeFileReadCommands($uuid, (string) str($getGitVersion)->explode(' ')->last());
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
             if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
@@ -2236,7 +2261,7 @@ class Application extends BaseModel
             if (str($e->getMessage())->contains('exceeds the 5 MiB size limit')) {
                 throw $e;
             }
-            throw new RuntimeException('Failed to read the Docker Compose file from the repository.');
+            throw new RuntimeException('Failed to read the Docker Compose file from the repository.'.$this->gitFailureReason('Failed to read the Docker Compose file from the repository.', $e->getMessage()));
         } finally {
             // Cleanup only - restoration happens in catch block
             $commands = collect([

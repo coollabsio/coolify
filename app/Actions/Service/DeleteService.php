@@ -51,14 +51,16 @@ class DeleteService
             throw new RuntimeException('Server is not functional.');
         }
 
-        $this->removeContainers($service, $resource->id);
+        $this->removeContainers($service, $resource);
     }
 
-    private function removeContainers(Service $service, ?int $subresourceId = null): void
+    private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
     {
         $filters = "--filter 'label=coolify.serviceId={$service->id}'";
-        if ($subresourceId !== null) {
-            $filters .= " --filter 'label=coolify.service.subId={$subresourceId}'";
+        if ($subresource !== null) {
+            // Applications and databases are separate tables, so an id alone can match the other type.
+            $subType = $subresource instanceof ServiceDatabase ? 'database' : 'application';
+            $filters .= " --filter 'label=coolify.service.subId={$subresource->id}' --filter 'label=coolify.service.subType={$subType}'";
         }
 
         $command = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";

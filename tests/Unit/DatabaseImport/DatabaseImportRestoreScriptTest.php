@@ -285,26 +285,31 @@ test('restores single PostgreSQL archives with pg_restore and SQL with psql', fu
     expect($run['exit'])->toBe(0, $run['stderr']);
     restoreScriptExpectCalls($run['calls'], $expectedCalls);
 })->with([
-    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error -U postgres -d app']]]],
-    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --clean --if-exists -U postgres -d app']]]],
-    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error -U postgres -d app']]]],
-    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --clean --if-exists -U postgres -d app']]]],
-    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error -U postgres -d app']]]],
-    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error -U postgres -d app']]]],
-    'plain SQL' => ['pg-sql', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 -U postgres -d app']]]],
-    'gzip SQL' => ['pg-sql-gz', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 -U postgres -d app']]]],
-    // SQL cannot replace single objects, so replacing recreates the target database first.
+    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
+    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
+    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'plain SQL' => ['pg-sql', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
+    'gzip SQL' => ['pg-sql-gz', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
+    // SQL cannot replace single objects: it restores into a new database, and only a
+    // successful restore replaces the current one, so a failure changes nothing.
     'plain SQL replacing existing objects' => ['pg-sql', true, [
-        ['psql', 'SELEC', ['-v db=app -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists app']],
-        ['createdb', '', ['-U postgres app']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 -U postgres -d app']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
+        ['createdb', '', ['-U postgres coolify_restore_new']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
     ]],
     'gzip SQL replacing existing objects' => ['pg-sql-gz', true, [
-        ['psql', 'SELEC', ['-v db=app -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists app']],
-        ['createdb', '', ['-U postgres app']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 -U postgres -d app']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
+        ['createdb', '', ['-U postgres coolify_restore_new']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
     ]],
 ]);
 

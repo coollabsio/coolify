@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
 use App\Support\DomainPortOverrides;
+use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
-use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -160,10 +159,7 @@ class Service extends BaseModel
     public function isStarting(): bool
     {
         try {
-            $activity = Activity::where('properties->type_uuid', $this->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-
-            return $status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value;
+            return ResourceStartActivity::latestRunning($this->uuid) !== null;
         } catch (\Throwable) {
             return false;
         }

@@ -187,8 +187,8 @@
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
 
-    // Group that holds the current page (item or nested child) — the only one
-    // expanded by default.
+    // Group that holds the current page (item or nested child) — always kept
+    // open, even if collapsed before.
     $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
         fn ($item) => ($item['active'] ?? false)
             || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)

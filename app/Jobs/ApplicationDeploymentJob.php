@@ -758,8 +758,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $this->validateComposeBuildPaths($composeFile);
-
             // Add build secrets to compose file if enabled and BuildKit is supported
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
                 $composeFile = $this->add_build_secrets_to_compose($composeFile);
@@ -2068,15 +2066,40 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Build-time names go into shell and Docker build commands, so they must be valid. Runtime-only
+     * variables only go into the .env file: existing ones with names that new variables can no longer
+     * use (such as my-var) keep working, unless the name would break a .env line.
+     */
     private function validateDeploymentEnvironmentVariableKeys(): void
     {
         $environmentVariables = $this->pull_request_id === 0
-            ? $this->application->environment_variables()->get(['key'])
-            : $this->application->environment_variables_preview()->get(['key']);
+            ? $this->application->environment_variables()->get(['key', 'is_buildtime'])
+            : $this->application->environment_variables_preview()->get(['key', 'is_buildtime']);
 
         foreach ($environmentVariables as $environmentVariable) {
-            $this->validatedBuildtimeEnvironmentVariableKey((string) $environmentVariable->key, 'the deployment environment');
+            $key = (string) $environmentVariable->key;
+            $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
+            if ($environmentVariable->is_buildtime || ! $isEnvFileSafe) {
+                $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
+
+                continue;
+            }
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $this->logLegacyRuntimeEnvironmentVariableKey($key);
+            }
         }
+    }
+
+    private function logLegacyRuntimeEnvironmentVariableKey(string $key): void
+    {
+        $suggestedKey = (string) preg_replace('/[^A-Za-z0-9_]/', '_', $key);
+        if (preg_match('/\A[0-9]/', $suggestedKey) === 1) {
+            $suggestedKey = '_'.$suggestedKey;
+        }
+
+        $this->application_deployment_queue->addLogEntry('⚠️ Runtime variable '.ValidationPatterns::displayShellEnvironmentVariableKey($key).' uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.', 'stderr');
+        $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
     }
 
     private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void
@@ -4915,7 +4938,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
-            $fullDockerfilePath = escapeshellarg("{$this->workdir}/{$dockerfilePath}");
+            if ($dockerfilePath === null) {
+                $this->application_deployment_queue->addLogEntry("The build context of service {$serviceName} is remote or uses variables, skipping ARG injection.");
+
+                continue;
+            }
+            // Compose resolves relative paths from the project directory (the workdir).
+            $fullDockerfilePath = escapeshellarg(str_starts_with($dockerfilePath, '/') ? $dockerfilePath : "{$this->workdir}/{$dockerfilePath}");
 
             // BusyBox realpath in the helper image accepts no options; a missing file prints nothing.
             $this->execute_remote_command([
@@ -4924,8 +4953,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'save' => 'dockerfile_check_'.$serviceName,
             ]);
 
+            // A monorepo context may leave the base directory, but never the cloned repository.
             $resolvedDockerfilePath = str($this->saved_outputs->get('dockerfile_check_'.$serviceName))->trim()->toString();
-            if (! str_starts_with($resolvedDockerfilePath, "{$this->workdir}/")) {
+            if (! str_starts_with($resolvedDockerfilePath, "{$this->basedir}/")) {
                 $this->application_deployment_queue->addLogEntry("Dockerfile not found for service {$serviceName} at {$dockerfilePath}, skipping ARG injection.");
 
                 continue;
@@ -5042,60 +5072,29 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
-    private function validateComposeBuildPaths(array|Collection $composeFile): void
-    {
-        foreach (data_get($composeFile, 'services', []) as $service) {
-            if (isset($service['build'])) {
-                $this->resolveComposeDockerfilePath($service['build']);
-            }
-        }
-    }
-
-    private function resolveComposeDockerfilePath(mixed $build): string
+    /**
+     * Returns the Dockerfile path of a Compose build as written (relative to the project directory,
+     * or absolute), or null when Coolify cannot inspect it locally: a remote git context, a path that
+     * Compose fills in from variables, or an inline Dockerfile. The path is untrusted: the caller
+     * quotes it and only uses the resolved file when it is inside the cloned repository.
+     */
+    private function resolveComposeDockerfilePath(mixed $build): ?string
     {
         if (! is_string($build) && ! is_array($build)) {
-            throw new \RuntimeException('Invalid Docker Compose build definition.');
+            return null;
         }
 
         $context = is_string($build) ? $build : data_get($build, 'context', '.');
         $dockerfile = is_array($build) ? data_get($build, 'dockerfile', 'Dockerfile') : 'Dockerfile';
 
-        if (! is_string($context) || ! is_string($dockerfile)) {
-            throw new \RuntimeException('Invalid Docker Compose build path: context and dockerfile must be strings.');
+        if (! is_string($context) || ! is_string($dockerfile) || $context === '' || (is_array($build) && array_key_exists('dockerfile_inline', $build))) {
+            return null;
+        }
+        if (str_contains($context.$dockerfile, '$') || preg_match('~^[a-z][a-z0-9+.-]*://|^git@~i', $context) === 1) {
+            return null;
         }
 
-        $this->validateComposeBuildPath($context, 'context');
-        $this->validateComposeBuildPath($dockerfile, 'dockerfile');
-
-        return $this->normalizeComposeBuildPath("{$context}/{$dockerfile}", 'dockerfile');
-    }
-
-    private function validateComposeBuildPath(string $path, string $fieldName): void
-    {
-        if ($path === '' || str_starts_with($path, '/') || ! preg_match('/^[a-zA-Z0-9._\-\/@+]+$/', $path)) {
-            throw new \RuntimeException("Invalid Docker Compose build.{$fieldName} path.");
-        }
-    }
-
-    private function normalizeComposeBuildPath(string $path, string $fieldName): string
-    {
-        $segments = [];
-        foreach (explode('/', $path) as $segment) {
-            if ($segment === '' || $segment === '.') {
-                continue;
-            }
-            if ($segment === '..') {
-                if ($segments === []) {
-                    throw new \RuntimeException("Invalid Docker Compose build.{$fieldName} path: path traversal outside the repository.");
-                }
-                array_pop($segments);
-
-                continue;
-            }
-            $segments[] = $segment;
-        }
-
-        return $segments === [] ? '.' : implode('/', $segments);
+        return str_starts_with($dockerfile, '/') ? $dockerfile : rtrim($context, '/').'/'.$dockerfile;
     }
 
     private function add_build_secrets_to_compose($composeFile)

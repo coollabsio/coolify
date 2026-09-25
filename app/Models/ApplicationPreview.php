@@ -5,13 +5,14 @@ namespace App\Models;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRestartLimit;
+use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RuntimeException;
 use Spatie\Url\Url;
 
 class ApplicationPreview extends BaseModel
 {
-    use HasRestartLimit, SoftDeletes;
+    use HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
 
     protected $attributes = [
         'max_restart_count' => 0,
