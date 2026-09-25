@@ -12089,8 +12089,14 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
                     "422": {
                         "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [
@@ -12114,8 +12120,14 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
                     "422": {
                         "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [
@@ -12139,8 +12151,14 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
                     "422": {
                         "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [
@@ -12164,8 +12182,14 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
                     "422": {
                         "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [
@@ -12189,8 +12213,14 @@
                     "401": {
                         "$ref": "#\/components\/responses\/401"
                     },
+                    "403": {
+                        "description": "Hostinger denied access to this resource for the cloud provider token."
+                    },
                     "422": {
                         "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [

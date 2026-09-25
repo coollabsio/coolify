@@ -47,6 +47,10 @@ class ByHostinger extends Component
 
     public ?int $selected_template_id = null;
 
+    public ?int $selected_os_template_id = null;
+
+    public ?int $selected_app_template_id = null;
+
     public ?string $selected_price_id = null;
 
     public array $selected_public_key_ids = [];
@@ -57,7 +61,7 @@ class ByHostinger extends Component
 
     public ?int $private_key_id = null;
 
-    public bool $enable_backups = true;
+    public bool $enable_backups = false;
 
     public bool $loading_data = false;
 
@@ -208,6 +212,7 @@ class ByHostinger extends Component
             $this->catalog_items = $hostingerService->getCatalogItems();
             $this->hostinger_public_keys = $this->optionalProviderData(fn () => $hostingerService->getPublicKeys());
             $this->post_install_scripts = $this->optionalProviderData(fn () => $hostingerService->getPostInstallScripts());
+            $this->selectDefaultTemplate();
         } catch (\Throwable $e) {
             $this->provider_data_error = $e->getMessage();
             $this->dispatch('error', $this->provider_data_error);
@@ -216,17 +221,60 @@ class ByHostinger extends Component
         }
     }
 
+    public function updatedSelectedOsTemplateId(): void
+    {
+        if ($this->selected_os_template_id !== null) {
+            $this->selected_app_template_id = null;
+        }
+
+        $this->selected_template_id = $this->selected_os_template_id ?? $this->selected_app_template_id;
+    }
+
+    public function updatedSelectedAppTemplateId(): void
+    {
+        if ($this->selected_app_template_id !== null) {
+            $this->selected_os_template_id = null;
+        }
+
+        $this->selected_template_id = $this->selected_app_template_id ?? $this->selected_os_template_id;
+    }
+
+    /**
+     * Plain operating system templates.
+     */
+    public function getOsTemplatesProperty(): array
+    {
+        return collect($this->templates)
+            ->reject(fn (array $template): bool => $this->templateIncludesApplication($template))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Operating system templates that also install an application or control panel.
+     */
+    public function getAppTemplatesProperty(): array
+    {
+        return collect($this->templates)
+            ->filter(fn (array $template): bool => $this->templateIncludesApplication($template))
+            ->values()
+            ->all();
+    }
+
     public function getPriceOptionsProperty(): array
     {
         return collect($this->catalog_items)
             ->flatMap(function (array $item): array {
+                $planSize = $this->planSize($item);
+
                 return collect($item['prices'] ?? [])
                     ->map(fn (array $price): array => array_merge($price, [
                         'plan_name' => $item['name'] ?? $item['id'] ?? 'VPS',
+                        'plan_size' => $planSize,
                     ]))
                     ->all();
             })
-            ->sortBy(fn (array $price) => ($price['plan_name'] ?? '').str_pad((string) ($price['period'] ?? 0), 4, '0', STR_PAD_LEFT))
+            ->sort(fn (array $a, array $b): int => [$a['plan_size'], $this->periodInMonths($a)] <=> [$b['plan_size'], $this->periodInMonths($b)])
             ->values()
             ->toArray();
     }
@@ -367,6 +415,50 @@ class ByHostinger extends Component
         $token = $this->available_tokens->firstWhere('id', $this->selected_token_id);
 
         return $token?->token ?? '';
+    }
+
+    private function selectDefaultTemplate(): void
+    {
+        if ($this->selected_template_id !== null) {
+            return;
+        }
+
+        $defaultTemplate = collect($this->osTemplates)->firstWhere('name', 'Ubuntu 24.04 LTS');
+
+        if ($defaultTemplate) {
+            $this->selected_os_template_id = (int) $defaultTemplate['id'];
+            $this->selected_template_id = $this->selected_os_template_id;
+        }
+    }
+
+    private function templateIncludesApplication(array $template): bool
+    {
+        return str_contains((string) ($template['name'] ?? ''), ' with ');
+    }
+
+    /**
+     * The plan size from the KVM plan id (hostingercom-vps-kvm4 is 4), falling back to its CPU count.
+     */
+    private function planSize(array $item): int
+    {
+        if (preg_match('/-vps-kvm(\d+)$/', (string) ($item['id'] ?? ''), $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return (int) ($item['metadata']['cpus'] ?? 0);
+    }
+
+    private function periodInMonths(array $price): float
+    {
+        $period = (int) ($price['period'] ?? 0);
+
+        return match ($price['period_unit'] ?? 'month') {
+            'day' => $period / 30,
+            'week' => $period * 7 / 30,
+            'year' => $period * 12,
+            'none' => PHP_INT_MAX,
+            default => $period,
+        };
     }
 
     /**

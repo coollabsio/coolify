@@ -71,6 +71,31 @@ it('uses the current cloud provider UI and Hostinger affiliate link', function (
         ->assertSee('Buy and create');
 });
 
+it('leaves paid Hostinger backups off by default', function () {
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->assertSet('enable_backups', false)
+        ->set('loading_data', false)
+        ->assertSee('Enable weekly Hostinger backups (extra cost)')
+        ->assertSee('Hostinger charges extra for backups. Check the price in hPanel before you enable them.');
+});
+
+it('selects Hostinger account SSH keys with the same dropdown as Hetzner', function () {
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->set('loading_data', false)
+        ->set('hostinger_public_keys', [['id' => 42, 'name' => '<b>Operations</b>']])
+        ->assertSee('Extra SSH keys')
+        ->assertSee('Existing keys from the Hostinger account.')
+        ->assertSee('Search SSH keys')
+        ->assertSeeHtml('<option value="42">&lt;b&gt;Operations&lt;/b&gt;</option>')
+        ->assertDontSeeHtml('<b>Operations</b>')
+        ->assertDontSeeHtml('id="hostinger-public-key-42-');
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->set('loading_data', false)
+        ->set('hostinger_public_keys', [])
+        ->assertSee('No account keys found');
+});
+
 it('purchases a Hostinger VPS and creates the linked Coolify server', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
@@ -139,7 +164,7 @@ it('keeps a purchased Hostinger VPS linked while its public IP is pending', func
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19, 'name' => 'nl-ams', 'city' => null]]),
         'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([['id' => 1130, 'name' => 'Ubuntu']]),
         'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
-            ['name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
+            ['id' => 'hostingercom-vps-kvm2', 'name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
         ]),
         'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['data' => []]),
         'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['data' => []]),
@@ -170,7 +195,7 @@ it('loads the Hostinger form when optional provider lists are not authorized', f
         'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([['id' => 19, 'name' => 'nl-ams', 'city' => 'Amsterdam']]),
         'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([['id' => 1130, 'name' => 'Ubuntu']]),
         'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
-            ['name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
+            ['id' => 'hostingercom-vps-kvm2', 'name' => 'KVM 2', 'prices' => [['id' => 'kvm2-monthly']]],
         ]),
         'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['message' => '[VPS:2000] Unauthorized'], 403),
         'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['message' => '[VPS:2000] Unauthorized'], 403),
@@ -221,6 +246,131 @@ it('revalidates the selected Hostinger price before making a purchase', function
         ->set('selected_data_center_id', 19)
         ->set('selected_template_id', 1130)
         ->set('selected_price_id', 'tampered-price-id')
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertHasErrors('selected_price_id');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST');
+});
+
+function fakeHostingerProvisioningOptions(array $overrides = []): void
+{
+    $price = fn (string $plan, int $period, string $unit, string $suffix) => [
+        'id' => "hostingercom-vps-{$plan}-usd-{$suffix}",
+        'currency' => 'USD',
+        'price' => 1000,
+        'first_period_price' => 500,
+        'period' => $period,
+        'period_unit' => $unit,
+    ];
+    $prices = fn (string $plan) => [
+        $price($plan, 2, 'year', '2y'),
+        $price($plan, 1, 'month', '1m'),
+        $price($plan, 1, 'year', '1y'),
+    ];
+
+    Http::fake(array_merge([
+        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
+            ['id' => 19, 'name' => 'nl-ams', 'city' => 'Amsterdam', 'location' => 'nl'],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([
+            ['id' => 1121, 'name' => 'AlmaLinux 9 with CyberPanel'],
+            ['id' => 1130, 'name' => 'Ubuntu 24.04 LTS'],
+            ['id' => 1077, 'name' => 'Debian 13'],
+            ['id' => 1150, 'name' => 'Ubuntu 24.04 with Coolify'],
+        ]),
+        'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
+            ['id' => 'hostingercom-vps-kvm8', 'name' => 'KVM 8', 'metadata' => ['cpus' => 8], 'prices' => $prices('kvm8')],
+            ['id' => 'hostingercom-vps-kvmminecraftalex', 'name' => 'Game Panel 1', 'metadata' => ['cpus' => 1], 'prices' => $prices('kvmminecraftalex')],
+            ['id' => 'hostingercom-vps-kvm1', 'name' => 'KVM 1', 'metadata' => ['cpus' => 1], 'prices' => $prices('kvm1')],
+            ['id' => 'hostingercom-vps-kvm2', 'name' => 'KVM 2', 'metadata' => ['cpus' => 2], 'prices' => $prices('kvm2')],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response(['data' => []]),
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response(['data' => []]),
+    ], $overrides));
+}
+
+it('lists only Hostinger KVM plans sorted by size and billing period', function () {
+    fakeHostingerProvisioningOptions();
+
+    $component = Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData');
+
+    expect(collect($component->instance()->priceOptions)->pluck('id')->all())->toBe([
+        'hostingercom-vps-kvm1-usd-1m',
+        'hostingercom-vps-kvm1-usd-1y',
+        'hostingercom-vps-kvm1-usd-2y',
+        'hostingercom-vps-kvm2-usd-1m',
+        'hostingercom-vps-kvm2-usd-1y',
+        'hostingercom-vps-kvm2-usd-2y',
+        'hostingercom-vps-kvm8-usd-1m',
+        'hostingercom-vps-kvm8-usd-1y',
+        'hostingercom-vps-kvm8-usd-2y',
+    ]);
+
+    $component->assertDontSee('Game Panel');
+});
+
+it('splits Hostinger templates into plain operating systems and operating systems with applications', function () {
+    fakeHostingerProvisioningOptions();
+
+    $component = Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->assertSet('selected_os_template_id', 1130)
+        ->assertSet('selected_app_template_id', null)
+        ->assertSet('selected_template_id', 1130)
+        ->assertSee('Operating system with application')
+        ->assertSee('can conflict with the Coolify proxy on ports 80 and 443', false);
+
+    expect(collect($component->instance()->osTemplates)->pluck('name')->all())
+        ->toBe(['Debian 13', 'Ubuntu 24.04 LTS'])
+        ->and(collect($component->instance()->appTemplates)->pluck('name')->all())
+        ->toBe(['AlmaLinux 9 with CyberPanel', 'Ubuntu 24.04 with Coolify']);
+});
+
+it('keeps only one Hostinger operating system selection', function () {
+    fakeHostingerProvisioningOptions();
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->set('selected_app_template_id', 1150)
+        ->assertSet('selected_os_template_id', null)
+        ->assertSet('selected_template_id', 1150)
+        ->set('selected_os_template_id', 1077)
+        ->assertSet('selected_app_template_id', null)
+        ->assertSet('selected_template_id', 1077);
+});
+
+it('purchases a Hostinger VPS with an operating system that includes an application', function () {
+    fakeHostingerProvisioningOptions([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'virtual_machine' => ['id' => 17923, 'state' => 'creating', 'ipv4' => [['address' => '203.0.113.10']]],
+        ]),
+    ]);
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->set('server_name', 'app-template.example.com')
+        ->set('selected_data_center_id', 19)
+        ->set('selected_price_id', 'hostingercom-vps-kvm2-usd-1m')
+        ->set('selected_app_template_id', 1150)
+        ->set('private_key_id', $this->privateKey->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+        && $request['setup']['template_id'] === 1150);
+});
+
+it('rejects a Game Panel Hostinger plan before making a purchase', function () {
+    fakeHostingerProvisioningOptions();
+
+    Livewire::test(ByHostinger::class, ['selectedTokenUuid' => $this->token->uuid])
+        ->call('loadHostingerData')
+        ->set('server_name', 'game-panel.example.com')
+        ->set('selected_data_center_id', 19)
+        ->set('selected_price_id', 'hostingercom-vps-kvmminecraftalex-usd-1m')
         ->set('private_key_id', $this->privateKey->id)
         ->call('submit')
         ->assertHasErrors('selected_price_id');

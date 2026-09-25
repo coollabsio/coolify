@@ -27,7 +27,9 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'List of Hostinger VPS data centers.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Hostinger denied access to this resource for the cloud provider token.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
+            new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
     )]
     public function dataCenters(Request $request): JsonResponse
@@ -44,7 +46,9 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'List of Hostinger VPS plans and prices.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Hostinger denied access to this resource for the cloud provider token.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
+            new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
     )]
     public function catalog(Request $request): JsonResponse
@@ -61,7 +65,9 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'List of Hostinger VPS templates.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Hostinger denied access to this resource for the cloud provider token.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
+            new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
     )]
     public function templates(Request $request): JsonResponse
@@ -78,7 +84,9 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'List of Hostinger account SSH keys.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Hostinger denied access to this resource for the cloud provider token.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
+            new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
     )]
     public function sshKeys(Request $request): JsonResponse
@@ -95,7 +103,9 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'List of Hostinger post-install scripts.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Hostinger denied access to this resource for the cloud provider token.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
+            new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
     )]
     public function postInstallScripts(Request $request): JsonResponse
@@ -196,7 +206,7 @@ class HostingerController extends Controller
                 'data_center_id' => $request->integer('data_center_id'),
                 'template_id' => $request->integer('template_id'),
                 'hostname' => $normalizedServerName,
-                'enable_backups' => $request->boolean('enable_backups', true),
+                'enable_backups' => $request->boolean('enable_backups'),
                 'public_key' => [
                     'name' => $privateKey->name,
                     'key' => $privateKey->getPublicKey(),
@@ -265,12 +275,7 @@ class HostingerController extends Controller
                 'provisioning' => $ipAddress === Server::PLACEHOLDER_IP,
             ])->setStatusCode(201);
         } catch (RateLimitException $e) {
-            $response = response()->json(['message' => $e->getMessage()], 429);
-            if ($e->retryAfter !== null) {
-                $response->header('Retry-After', $e->retryAfter);
-            }
-
-            return $response;
+            return $this->rateLimitResponse($e);
         } catch (\Throwable $e) {
             logger()->error('Failed to create Hostinger server', [
                 'error' => $e->getMessage(),
@@ -305,9 +310,28 @@ class HostingerController extends Controller
 
         try {
             return response()->json((new HostingerService($token->token))->{$method}());
-        } catch (\Throwable) {
+        } catch (RateLimitException $e) {
+            return $this->rateLimitResponse($e);
+        } catch (\Throwable $e) {
+            $hostingerErrorPrefix = 'Hostinger API error: ';
+            if (in_array($e->getCode(), [401, 403], true) && str_starts_with($e->getMessage(), $hostingerErrorPrefix)) {
+                $hostingerMessage = substr($e->getMessage(), strlen($hostingerErrorPrefix));
+
+                return response()->json(['message' => "Hostinger denied access to {$resource}: {$hostingerMessage}"], 403);
+            }
+
             return response()->json(['message' => "Failed to fetch Hostinger {$resource}."], 500);
         }
+    }
+
+    private function rateLimitResponse(RateLimitException $e): JsonResponse
+    {
+        $response = response()->json(['message' => $e->getMessage()], 429);
+        if ($e->retryAfter !== null) {
+            $response->header('Retry-After', $e->retryAfter);
+        }
+
+        return $response;
     }
 
     private function hostingerToken(Request $request, int $teamId): CloudProviderToken|JsonResponse

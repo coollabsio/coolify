@@ -44,10 +44,12 @@
                         'value' => $price['id'],
                         'label' => $this->priceLabel($price),
                     ])->values()->all();
-                    $templateOptions = collect($templates)->map(fn ($template) => [
+                    $templateOption = fn ($template) => [
                         'value' => $template['id'],
                         'label' => $template['name'] ?? $template['description'] ?? $template['id'],
-                    ])->values()->all();
+                    ];
+                    $osTemplateOptions = collect($this->osTemplates)->map($templateOption)->values()->all();
+                    $appTemplateOptions = collect($this->appTemplates)->map($templateOption)->values()->all();
                     $privateKeyOptions = $private_keys->map(fn ($key) => [
                         'value' => $key->id,
                         'label' => $key->name,
@@ -80,9 +82,13 @@
                             <x-forms.listbox id="selected_price_id" label="Plan and billing period" required live
                                 :disabled="!$selected_data_center_id" placeholder="Select a plan"
                                 :options="$priceOptions" />
-                            <x-forms.listbox id="selected_template_id" label="Operating system" required
+                            <x-forms.listbox id="selected_os_template_id" label="Operating system" required live
                                 :disabled="!$selected_price_id" placeholder="Select an operating system"
-                                :options="$templateOptions" />
+                                :options="$osTemplateOptions" />
+                            <x-forms.listbox id="selected_app_template_id" label="Operating system with application"
+                                live :disabled="!$selected_price_id" placeholder="Or select an operating system with an application"
+                                :options="$appTemplateOptions"
+                                helper="Replaces the operating system selected above. Applications and panels, such as another Coolify or CyberPanel, can conflict with the Coolify proxy on ports 80 and 443." />
                             @if ($private_keys->isEmpty())
                                 <div>
                                     <label class="mb-1.5 flex w-fit items-center gap-1.5">Private key
@@ -110,24 +116,18 @@
                     <x-application.settings-section title="Advanced options"
                         description="Provider backups, account SSH keys, and post-install automation.">
                         <div class="flex flex-col gap-4">
-                            <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups" fullWidth />
-                            @if ($hostinger_public_keys)
-                                <div>
-                                    <div class="mb-2 text-sm font-medium">Additional Hostinger SSH keys</div>
-                                    <div class="flex flex-col gap-2">
-                                        @foreach ($hostinger_public_keys as $publicKey)
-                                            <label class="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-xs hover:bg-neutral-100/80 dark:hover:bg-white/[0.035]">
-                                                <span>{{ $publicKey['name'] }}</span>
-                                                <input class="rounded" type="checkbox" wire:model="selected_public_key_ids"
-                                                    value="{{ $publicKey['id'] }}">
-                                            </label>
-                                        @endforeach
-                                    </div>
-                                    @error('selected_public_key_ids')
-                                        <div class="mt-1 text-xs text-error">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            @endif
+                            <div class="-mx-2.5 grid gap-3 lg:grid-cols-2">
+                                <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups (extra cost)" fullWidth
+                                    helper="Hostinger charges extra for backups. Check the price in hPanel before you enable them." />
+                            </div>
+                            <x-forms.datalist label="Extra SSH keys" id="selected_public_key_ids"
+                                helper="Existing keys from the Hostinger account." :multiple="true"
+                                :disabled="count($hostinger_public_keys) === 0"
+                                :placeholder="count($hostinger_public_keys) ? 'Search SSH keys' : 'No account keys found'">
+                                @foreach ($hostinger_public_keys as $publicKey)
+                                    <option value="{{ $publicKey['id'] }}">{{ $publicKey['name'] }}</option>
+                                @endforeach
+                            </x-forms.datalist>
                             @if ($post_install_scripts)
                                 <x-forms.listbox id="selected_post_install_script_id"
                                     label="Hostinger post-install script"

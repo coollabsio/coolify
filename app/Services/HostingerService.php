@@ -56,9 +56,15 @@ class HostingerService
         return $this->request('get', '/api/vps/v1/templates');
     }
 
+    /**
+     * Get the KVM VPS plans. Game Panel plans share the VPS category but are not offered for Coolify servers.
+     */
     public function getCatalogItems(): array
     {
-        return $this->request('get', '/api/billing/v1/catalog', ['category' => 'VPS']);
+        return collect($this->request('get', '/api/billing/v1/catalog', ['category' => 'VPS']))
+            ->filter(fn ($item) => is_array($item) && preg_match('/-vps-kvm\d+$/', (string) ($item['id'] ?? '')) === 1)
+            ->values()
+            ->all();
     }
 
     public function getPublicKeys(): array
@@ -74,7 +80,7 @@ class HostingerService
     public function attachPublicKeys(int $virtualMachineId, array $publicKeyIds): array
     {
         return $this->request('post', "/api/vps/v1/public-keys/attach/{$virtualMachineId}", [
-            'ids' => array_values($publicKeyIds),
+            'ids' => array_map('intval', array_values($publicKeyIds)),
         ]);
     }
 
@@ -151,7 +157,10 @@ class HostingerService
         return $this->request('get', '/api/vps/v1/virtual-machines');
     }
 
-    public function waitForPublicIp(array $virtualMachine, int $attempts = 30, int $sleepMilliseconds = 1000): array
+    /**
+     * Briefly wait for a public IP. VPS setup usually takes longer, so the server status check fills in the IP later.
+     */
+    public function waitForPublicIp(array $virtualMachine, int $attempts = 10, int $sleepMilliseconds = 1000): array
     {
         if ($this->getPublicIpAddress($virtualMachine) || empty($virtualMachine['id'])) {
             return $virtualMachine;

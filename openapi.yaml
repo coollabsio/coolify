@@ -7739,8 +7739,12 @@ paths:
           description: 'List of Hostinger VPS data centers.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
         '422':
           description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -7755,8 +7759,12 @@ paths:
           description: 'List of Hostinger VPS plans and prices.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
         '422':
           description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -7771,8 +7779,12 @@ paths:
           description: 'List of Hostinger VPS templates.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
         '422':
           description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -7787,8 +7799,12 @@ paths:
           description: 'List of Hostinger account SSH keys.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
         '422':
           description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []
@@ -7803,8 +7819,12 @@ paths:
           description: 'List of Hostinger post-install scripts.'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: 'Hostinger denied access to this resource for the cloud provider token.'
         '422':
           description: 'Validation failed.'
+        '429':
+          description: 'Hostinger rate limit exceeded.'
       security:
         -
           bearerAuth: []

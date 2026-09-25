@@ -71,6 +71,62 @@ it('gets Hostinger SSH keys and post-install scripts', function () {
         ->assertJsonFragment(['id' => 73, 'name' => 'Bootstrap Coolify']);
 });
 
+it('gets only Hostinger KVM plans through the API', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/billing/v1/catalog*' => Http::response([
+            ['id' => 'hostingercom-vps-kvm1', 'name' => 'KVM 1', 'prices' => []],
+            ['id' => 'hostingercom-vps-kvmminecraftalex', 'name' => 'Game Panel 1', 'prices' => []],
+        ]),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/catalog?cloud_provider_token_id='.$this->hostingerToken->uuid)
+        ->assertSuccessful()
+        ->assertJsonCount(1)
+        ->assertJsonFragment(['id' => 'hostingercom-vps-kvm1'])
+        ->assertJsonMissing(['id' => 'hostingercom-vps-kvmminecraftalex']);
+});
+
+it('returns 403 with the Hostinger message when Hostinger denies a provider list', function (int $hostingerStatus) {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/post-install-scripts' => Http::response([
+            'message' => '[VPS:2000] Unauthorized',
+        ], $hostingerStatus),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/post-install-scripts?cloud_provider_token_id='.$this->hostingerToken->uuid)
+        ->assertForbidden()
+        ->assertExactJson(['message' => 'Hostinger denied access to post-install scripts: [VPS:2000] Unauthorized']);
+})->with([401, 403]);
+
+it('returns 429 when Hostinger rate limits a provider list', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/templates' => Http::response([
+            'message' => 'Too many requests.',
+        ], 429, ['Retry-After' => '30']),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/templates?cloud_provider_token_id='.$this->hostingerToken->uuid)
+        ->assertStatus(429)
+        ->assertHeader('Retry-After', '30')
+        ->assertExactJson(['message' => 'Rate limit exceeded. Please try again later.']);
+});
+
+it('returns a generic error when a Hostinger provider list fails', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/data-centers' => Http::response([
+            'message' => 'Invalid request',
+        ], 422),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->getJson('/api/v1/hostinger/data-centers?cloud_provider_token_id='.$this->hostingerToken->uuid)
+        ->assertServerError()
+        ->assertExactJson(['message' => 'Failed to fetch Hostinger data centers.']);
+});
+
 it('creates a Hostinger VPS server through the API', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
@@ -104,6 +160,36 @@ it('creates a Hostinger VPS server through the API', function () {
         'hostinger_virtual_machine_id' => 17923,
         'ip' => '203.0.113.10',
     ]);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+        && $request['setup']['enable_backups'] === true);
+});
+
+it('turns paid Hostinger backups off when the API request does not enable them', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            'virtual_machine' => [
+                'id' => 17923,
+                'state' => 'creating',
+                'ipv4' => [['address' => '203.0.113.10']],
+            ],
+        ]),
+    ]);
+
+    $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/servers/hostinger', [
+            'cloud_provider_token_uuid' => $this->hostingerToken->uuid,
+            'item_id' => 'hostingercom-vps-kvm1-usd-1m',
+            'data_center_id' => 19,
+            'template_id' => 1130,
+            'private_key_uuid' => $this->privateKey->uuid,
+        ])
+        ->assertCreated();
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://developers.hostinger.com/api/vps/v1/virtual-machines'
+        && $request['setup']['enable_backups'] === false);
 });
 
 it('keeps a charged Hostinger VPS when the purchase returns an error through the API', function () {

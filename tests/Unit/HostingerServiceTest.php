@@ -46,6 +46,21 @@ it('fetches Hostinger provisioning options', function () {
         ->and($service->getCatalogItems()[0]['prices'][0]['price'])->toBe(1799);
 });
 
+it('returns only KVM plans from the Hostinger VPS catalog', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/billing/v1/catalog?category=VPS' => Http::response([
+            ['id' => 'hostingercom-vps-kvm1', 'name' => 'KVM 1', 'prices' => []],
+            ['id' => 'hostingercom-vps-kvmminecraftalex', 'name' => 'Game Panel 1', 'prices' => []],
+            ['id' => 'hostingercom-vps-kvm8', 'name' => 'KVM 8', 'prices' => []],
+            ['id' => 'hostingercom-vps-kvmminecraftwolf', 'name' => 'Game Panel 8', 'prices' => []],
+            ['name' => 'Missing id', 'prices' => []],
+        ]),
+    ]);
+
+    expect(collect((new HostingerService('test-token'))->getCatalogItems())->pluck('id')->all())
+        ->toBe(['hostingercom-vps-kvm1', 'hostingercom-vps-kvm8']);
+});
+
 it('fetches and attaches Hostinger account SSH keys', function () {
     Http::fake([
         'https://developers.hostinger.com/api/vps/v1/public-keys' => Http::response([
@@ -60,7 +75,7 @@ it('fetches and attaches Hostinger account SSH keys', function () {
     $service = new HostingerService('test-token');
 
     expect($service->getPublicKeys()[0]['id'])->toBe(42)
-        ->and($service->attachPublicKeys(17923, [42])['id'])->toBe(456);
+        ->and($service->attachPublicKeys(17923, ['42'])['id'])->toBe(456);
 
     Http::assertSent(fn ($request) => $request->url() === 'https://developers.hostinger.com/api/vps/v1/public-keys/attach/17923'
         && $request['ids'] === [42]);
@@ -258,6 +273,26 @@ it('waits for Hostinger to assign a public IP', function () {
     ], sleepMilliseconds: 0);
 
     expect($service->getPublicIpAddress($virtualMachine))->toBe('203.0.113.10');
+});
+
+it('stops waiting for a Hostinger public IP after 10 attempts by default', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/17923' => Http::response([
+            'id' => 17923,
+            'state' => 'initial',
+            'ipv4' => [],
+        ]),
+    ]);
+
+    $service = new HostingerService('test-token');
+    $virtualMachine = $service->waitForPublicIp([
+        'id' => 17923,
+        'state' => 'initial',
+        'ipv4' => [],
+    ], sleepMilliseconds: 0);
+
+    expect($service->getPublicIpAddress($virtualMachine))->toBeNull();
+    Http::assertSentCount(10);
 });
 
 it('finds a Hostinger virtual machine by public IP', function () {
