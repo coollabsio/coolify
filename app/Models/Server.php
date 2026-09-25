@@ -1062,6 +1062,35 @@ $siteAddress {
     }
 
     /**
+     * Traffic analytics reads the access log of a Coolify-managed Traefik or Caddy proxy.
+     */
+    public function hasTrafficAnalyticsProxy(): bool
+    {
+        return in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true);
+    }
+
+    /**
+     * Why traffic analytics cannot be enabled on this server, or null when it can.
+     */
+    public function trafficAnalyticsUnsupportedReason(): ?string
+    {
+        if ($this->isSwarm() || $this->isBuildServer()) {
+            return 'Traffic analytics is not supported on Swarm/Build servers.';
+        }
+
+        if (! $this->hasTrafficAnalyticsProxy()) {
+            return 'Traffic analytics needs the Traefik or Caddy proxy.';
+        }
+
+        return null;
+    }
+
+    public function supportsTrafficAnalytics(): bool
+    {
+        return $this->trafficAnalyticsUnsupportedReason() === null;
+    }
+
+    /**
      * Caddy's `log_append` tags access-log lines with the app UUID for traffic analytics. It needs
      * Caddy 2.8+, which caddy-docker-proxy ships from 2.9: the 2.8 image (the default before 2.13)
      * runs Caddy 2.7.6, which rejects the whole Caddyfile. A saved change that is not applied yet may still run the

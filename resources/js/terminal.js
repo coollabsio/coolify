@@ -6,6 +6,13 @@ import {
     TERMINAL_SESSION_WARNING_SECONDS,
     formatTerminalSessionRemainingTime,
 } from './terminal-session-timer.js';
+import {
+    TERMINAL_CONNECT_TIMEOUT_MS,
+    TERMINAL_CONNECTION_ERRORS,
+    TERMINAL_SESSION_START_TIMEOUT_MS,
+    classifyTerminalServerMessage,
+    resolveTerminalCloseOutcome,
+} from './terminal-connection.js';
 import { FitAddon } from '@xterm/addon-fit';
 
 const terminalDebugParameter = new URLSearchParams(window.location.search).get('terminal-debug');
@@ -178,6 +185,11 @@ export function initializeTerminalComponent() {
             maxReconnectDelay: 30000,
             connectionTimeout: 10000,
             connectionTimeoutId: null,
+            // Shown instead of "connecting…" once a connection or session start failed.
+            connectionError: null,
+            // Set when the server rejected authentication; disables automatic reconnects.
+            authRejected: false,
+            sessionStartTimeoutId: null,
             lastPingTime: null,
             pingTimeout: 35000, // 5 seconds longer than ping interval
             pingTimeoutId: null,
@@ -287,6 +299,13 @@ export function initializeTerminalComponent() {
                 this.setupTerminalEventListeners();
 
                 this.$wire.on('send-terminal-token', ([token]) => {
+                    // A token requested before the rejection arrived must not reconnect;
+                    // only a user-initiated start (terminal-starting) retries.
+                    if (this.authRejected) {
+                        logTerminal('warn', '[Terminal] Ignoring terminal token after authentication was rejected.');
+                        return;
+                    }
+                    this.beginTerminalSessionStart();
                     this.sendCommandWhenReady({ terminalToken: token });
                 });
 
@@ -365,6 +384,7 @@ export function initializeTerminalComponent() {
                 clearTimeout(this.keyboardInsetSettleTimeout);
                 this.checkIfProcessIsRunningAndKillIt();
                 this.clearAllTimers();
+                this.clearSessionStartTimeout();
                 this.connectionState = 'disconnected';
                 this.pendingCommand = null;
                 this.resetTerminalSessionCountdown();
@@ -621,12 +641,15 @@ export function initializeTerminalComponent() {
                     this.socket = new WebSocket(url);
 
                     // Set connection timeout - increased for initial connection
-                    const timeoutMs = this.reconnectAttempts === 0 ? 15000 : this.connectionTimeout;
+                    const timeoutMs = this.reconnectAttempts === 0 ? TERMINAL_CONNECT_TIMEOUT_MS : this.connectionTimeout;
                     this.connectionTimeoutId = setTimeout(() => {
                         if (this.connectionState === 'connecting') {
                             logTerminal('error', `[Terminal] Connection timeout after ${timeoutMs}ms`);
+                            if (this.isTerminalSessionPending()) {
+                                this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
+                            }
+                            // The resulting close event schedules the (bounded) reconnect.
                             this.socket.close();
-                            this.handleConnectionError('Connection timeout');
                         }
                     }, timeoutMs);
 
@@ -659,6 +682,8 @@ export function initializeTerminalComponent() {
                 if (this.pendingCommand) {
                     this.sendMessage(this.pendingCommand);
                     this.pendingCommand = null;
+                    this.connectionError = null;
+                    this.starting = true;
                 }
 
                 // (Re)start application-level keepalive on every successful connect.
@@ -679,7 +704,11 @@ export function initializeTerminalComponent() {
                 logTerminal('error', '[Terminal] WebSocket error:', error);
                 logTerminal('error', '[Terminal] WebSocket state:', this.socket ? this.socket.readyState : 'No socket');
                 logTerminal('error', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
-                this.handleConnectionError('WebSocket error occurred');
+                // Browsers always follow an error event with a close event, which
+                // schedules the reconnect. Only surface the failure here.
+                if (this.isTerminalSessionPending()) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
+                }
             },
 
             handleSocketClose(event) {
@@ -687,9 +716,30 @@ export function initializeTerminalComponent() {
                 logTerminal('log', '[Terminal] Was clean close:', event.code === 1000);
                 logTerminal('log', '[Terminal] Connection attempt:', this.reconnectAttempts + 1);
 
+                const outcome = resolveTerminalCloseOutcome({
+                    code: event.code,
+                    sessionPending: this.isTerminalSessionPending(),
+                    reconnectAttempts: this.reconnectAttempts,
+                    maxReconnectAttempts: this.maxReconnectAttempts,
+                });
+
                 this.connectionState = 'disconnected';
                 this.clearAllTimers();
                 this.resetTerminalSessionCountdown();
+
+                if (outcome.authRejected) {
+                    // Reconnecting would be rejected again; wait for a reload or a new session request.
+                    logTerminal('error', '[Terminal] Server rejected terminal authentication:', event.reason);
+                    this.authRejected = true;
+                    this.pendingCommand = null;
+                    if (this.terminalActive) {
+                        this.exitFullscreen();
+                        this.terminalActive = false;
+                        this.$wire.dispatch('terminalDisconnected');
+                    }
+                    this.failTerminalConnection(outcome.error, { override: true });
+                    return;
+                }
 
                 // Only reset terminal and reconnect if it wasn't a clean close
                 if (event.code !== 1000) {
@@ -699,6 +749,9 @@ export function initializeTerminalComponent() {
                         this.message = '(connection closed)';
                         this.terminalActive = false;
                     }
+                    if (outcome.error) {
+                        this.failTerminalConnection(outcome.error);
+                    }
                     this.scheduleReconnect();
                 }
             },
@@ -707,19 +760,91 @@ export function initializeTerminalComponent() {
                 logTerminal('error', `[Terminal] Connection error: ${reason} (attempt ${this.reconnectAttempts + 1})`);
                 this.connectionState = 'disconnected';
 
-                // Only dispatch error to UI after a few failed attempts to avoid immediate error on page load
-                if (this.reconnectAttempts >= 2) {
-                    this.$wire.dispatch('error', `Terminal connection error: ${reason}`);
+                if (this.isTerminalSessionPending() || this.reconnectAttempts >= 2) {
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                 }
 
                 this.scheduleReconnect();
             },
 
+            /** A session was requested and the UI shows "connecting…" until `pty-ready`. */
+            isTerminalSessionPending() {
+                return this.starting && !this.terminalActive;
+            },
+
+            /**
+             * Leave the "connecting" state and show why. The first reason wins unless
+             * `override` is set (auth rejections replace generic connection errors).
+             */
+            failTerminalConnection(message, { override = false } = {}) {
+                this.starting = false;
+                this.clearSessionStartTimeout();
+
+                if (this.connectionError === message || (this.connectionError && !override)) {
+                    return;
+                }
+
+                this.connectionError = message;
+                this.$wire.dispatch('error', message);
+            },
+
+            /** Called whenever a new terminal session is requested (target chosen or token issued). */
+            beginTerminalSessionStart() {
+                this.starting = true;
+                this.connectionError = null;
+                this.authRejected = false;
+                this.clearSessionStartTimeout();
+                this.sessionStartTimeoutId = setTimeout(() => {
+                    this.sessionStartTimeoutId = null;
+                    if (this.isTerminalSessionPending()) {
+                        logTerminal('error', `[Terminal] Session did not start within ${TERMINAL_SESSION_START_TIMEOUT_MS}ms`);
+                        // Single-use tokens must not be sent after the user was told to retry.
+                        this.pendingCommand = null;
+                        this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout);
+                    }
+                }, TERMINAL_SESSION_START_TIMEOUT_MS);
+                this.ensureWebSocketConnection();
+            },
+
+            clearSessionStartTimeout() {
+                if (this.sessionStartTimeoutId) {
+                    clearTimeout(this.sessionStartTimeoutId);
+                    this.sessionStartTimeoutId = null;
+                }
+            },
+
+            /** Reconnect immediately for a user-requested session if the socket is closed. */
+            ensureWebSocketConnection() {
+                if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+                    return;
+                }
+
+                if (this.reconnectInterval) {
+                    clearTimeout(this.reconnectInterval);
+                    this.reconnectInterval = null;
+                }
+                this.reconnectAttempts = 0;
+                this.initializeWebSocket();
+            },
+
+            reloadTerminalPage() {
+                window.location.reload();
+            },
+
             scheduleReconnect() {
+                if (this.authRejected) {
+                    return;
+                }
+
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                     logTerminal('error', '[Terminal] Max reconnection attempts reached');
                     this.message = '(connection failed - max retries exceeded)';
+                    this.failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed);
                     return;
+                }
+
+                if (this.reconnectInterval) {
+                    return; // A reconnect is already scheduled.
                 }
 
                 this.connectionState = 'reconnecting';
@@ -733,6 +858,7 @@ export function initializeTerminalComponent() {
                 logTerminal('warn', `[Terminal] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
 
                 this.reconnectInterval = setTimeout(() => {
+                    this.reconnectInterval = null;
                     this.reconnectAttempts++;
                     this.initializeWebSocket();
                 }, delay);
@@ -769,6 +895,8 @@ export function initializeTerminalComponent() {
 
                 if (event.data === 'pty-ready') {
                     this.starting = false;
+                    this.connectionError = null;
+                    this.clearSessionStartTimeout();
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
@@ -809,6 +937,7 @@ export function initializeTerminalComponent() {
                     this.$wire.dispatch('terminalConnected');
                 } else if (event.data === 'unprocessable') {
                     this.starting = false;
+                    this.clearSessionStartTimeout();
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
@@ -827,14 +956,18 @@ export function initializeTerminalComponent() {
 
                     // Notify parent component that terminal disconnected
                     this.$wire.dispatch('terminalDisconnected');
-                } else if (
-                    typeof event.data === 'string' &&
-                    (event.data.startsWith('Unauthorized:') || event.data.startsWith('Invalid SSH command:'))
-                ) {
+                } else if (classifyTerminalServerMessage(event.data) !== null) {
                     logTerminal('error', '[Terminal] Backend rejected terminal startup:', event.data);
-                    this.$wire.dispatch('error', event.data);
+                    this.pendingCommand = null;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
+                    // Newer servers follow an auth rejection with a 4401/4403 close.
+                    this.failTerminalConnection(
+                        classifyTerminalServerMessage(event.data) === 'auth-rejected'
+                            ? TERMINAL_CONNECTION_ERRORS.authRejected
+                            : event.data,
+                        { override: true },
+                    );
                 } else {
                     try {
                         this.pendingWrites++;
@@ -985,7 +1118,7 @@ export function initializeTerminalComponent() {
             keepAlive() {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.sendMessage({ ping: true });
-                } else if (this.connectionState === 'disconnected') {
+                } else if (this.connectionState === 'disconnected' && !this.authRejected) {
                     // Attempt to reconnect if we're disconnected
                     this.initializeWebSocket();
                 }
@@ -1025,7 +1158,7 @@ export function initializeTerminalComponent() {
                                 // ignore — close handler will run on its own
                             }
                         }, 5000);
-                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected') {
+                    } else if (this.wasConnectedBeforeHidden && this.connectionState !== 'connected' && !this.authRejected) {
                         // Was connected before but now disconnected - attempt reconnection
                         this.reconnectAttempts = 0;
                         this.initializeWebSocket();

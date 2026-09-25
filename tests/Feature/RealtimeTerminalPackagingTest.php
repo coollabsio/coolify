@@ -143,7 +143,7 @@ it('shows connection progress in the terminal body instead of the header', funct
         ->not->toContain('wire:loading.flex wire:target="selected_container,connectToContainer"')
         ->not->toContain('wire:loading.flex wire:target="selected_uuid,connectToContainer"')
         ->and($terminalView)
-        ->toContain("x-on:terminal-starting.window=\"starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')\"")
+        ->toContain("x-on:terminal-starting.window=\"beginTerminalSessionStart(); setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')\"")
         ->toContain('data-auto-start="{{ $autoStart ? \'true\' : \'false\' }}"')
         ->toContain("starting ? 'connecting…'")
         ->and($terminalClient)
@@ -577,4 +577,44 @@ it('fits the terminal with FitAddon and keeps xterm within the host after resize
         ->toContain("this.term.element.style.maxHeight = '100%'")
         ->toContain('scrollback: 5000')
         ->not->toContain('Math.floor(height / charSize.height) - 1');
+});
+
+it('reports terminal authentication rejections with readable WebSocket close codes', function () {
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
+    $terminalUtils = file_get_contents(base_path('docker/coolify-terminal/terminal-utils.js'));
+
+    expect($terminalUtils)
+        ->toContain('AUTH_REJECTED: 4401')
+        ->toContain('TOKEN_REJECTED: 4403')
+        ->and($terminalServer)
+        ->toContain("new WebSocketServer({ noServer: true, path: '/terminal/ws' })")
+        ->toContain("server.on('upgrade', createTerminalUpgradeHandler({ wss, authenticate: verifyClient }))")
+        ->toContain("rejectTerminalToken(userSession, 'Unauthorized: Invalid terminal token')")
+        ->toContain("rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected')")
+        ->toContain("typeof token !== 'string' || !/^[a-zA-Z0-9]{64}$/.test(token)")
+        ->toContain("response.status !== 200 || typeof response.data?.command !== 'string'")
+        ->not->toContain('verifyClient: verifyClient')
+        ->not->toContain('ws.close(401');
+});
+
+it('leaves the terminal connecting state when the connection is rejected, lost, or times out', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+
+    expect($terminalClient)
+        ->toContain("from './terminal-connection.js'")
+        ->toContain('connectionError: null')
+        ->toContain('const outcome = resolveTerminalCloseOutcome({')
+        ->toContain('this.authRejected = true;')
+        ->toContain('if (this.authRejected) {')
+        ->toContain('Ignoring terminal token after authentication was rejected.')
+        ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout)')
+        ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed)')
+        ->toContain('TERMINAL_SESSION_START_TIMEOUT_MS')
+        ->toContain('this.beginTerminalSessionStart();')
+        ->and($terminalView)
+        ->toContain('data-terminal-connection-error')
+        ->toContain('x-text="connectionError"')
+        ->toContain('x-on:click="reloadTerminalPage()"')
+        ->toContain('x-show="!connectionError" class="terminal-loading-label');
 });

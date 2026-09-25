@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
+use App\Enums\ServerRole;
 use App\Livewire\Analytics;
 use App\Livewire\Server\TrafficAnalyticsSettings;
 use App\Models\InstanceSettings;
@@ -24,9 +25,13 @@ it('toggles traffic analytics via the sentinel settings component', function () 
     ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
         $server->settings->is_traffic_analytics_enabled = $enable;
         $server->settings->save();
+
+        return true;
     });
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
     // New servers default analytics on; start from the disabled state to exercise enabling.
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
@@ -43,6 +48,8 @@ it('toggles traffic analytics via the sentinel settings component', function () 
 
 it('warns about the application interruption before enabling traffic analytics', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
@@ -65,6 +72,8 @@ it('does not enable traffic analytics on a swarm server', function () {
     ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
     $server->settings->is_swarm_manager = true;
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
@@ -73,6 +82,7 @@ it('does not enable traffic analytics on a swarm server', function () {
 
     Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
+        ->assertDispatched('error', 'Traffic analytics is not supported on Swarm/Build servers.')
         ->assertHasNoErrors();
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
@@ -117,7 +127,9 @@ it('does not enable traffic analytics on a build server', function () {
     ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $server->settings->is_build_server = true;
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->server_role = ServerRole::BUILD;
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
@@ -125,7 +137,103 @@ it('does not enable traffic analytics on a build server', function () {
 
     Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
+        ->assertDispatched('error', 'Traffic analytics is not supported on Swarm/Build servers.')
         ->assertHasNoErrors();
+
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
+});
+
+it('disables the analytics toggle and explains why when the server has no traefik or caddy proxy', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'NONE');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    $html = Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertSee('Traffic analytics needs the Traefik or Caddy proxy.')
+        ->assertDontSee('Enable traffic analytics?')
+        ->assertDontSeeHtml('submitAction')
+        ->html();
+
+    expect($html)->toMatch('/<button disabled[^>]*>(?:\s|<!--.*?-->)*Enable traffic analytics\s*<\/button>/s');
+});
+
+it('rejects enabling analytics from the component when the server has no traefik or caddy proxy', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'NONE');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('error', 'Traffic analytics needs the Traefik or Caddy proxy.')
+        ->assertSet('isTrafficAnalyticsEnabled', false);
+
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
+});
+
+it('lets analytics be disabled on a server whose proxy was removed', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return false;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'NONE');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertDontSee('Traffic analytics needs the Traefik or Caddy proxy.')
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics disabled.')
+        ->assertSet('isTrafficAnalyticsEnabled', false);
+});
+
+it('tells the user a stopped proxy picks up the change on its next start', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return false;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'exited');
+    $server->proxy->set('force_stop', true);
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics enabled. The proxy is stopped, so the new configuration applies the next time you start it.');
+});
+
+it('does not let a team member toggle traffic analytics', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertForbidden();
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 });
