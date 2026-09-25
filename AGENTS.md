@@ -15,20 +15,21 @@ For UI/UX design specifications, principles, and visual standards, consult the l
 Docker Compose-based dev setup with services: coolify (app, which also runs Reverb WebSockets and the terminal server), postgres, redis, vite, testing-host, mailpit, minio.
 
 ```bash
-# Start dev environment (uses docker-compose.dev.yml)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down                        # stop services
+# One dev instance per git branch (containers, volumes, KVM VMs named after the branch)
+./scripts/dev start [qemu-profile]           # KVM VM as localhost when /dev/kvm + root/sudo, else testing-host
+./scripts/dev stop                           # stop containers and VMs; data is kept for the next start
+./scripts/dev run                            # start + follow logs, stop on exit (Jean run script)
+./scripts/dev urls                           # all instances, URLs, ports, and checkouts
+./scripts/dev exec php artisan migrate       # run a command in this branch's Coolify container
+./scripts/dev destroy <name>                 # delete containers, volumes, VMs, and the port slot
+./scripts/dev teardown                       # destroy this worktree's instance (Jean teardown before worktree deletion)
+# Compose: docker-compose.dev-multi.yml  Env + slots: <main checkout>/.dev-instances/ (gitignored)
 
-# Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
-./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
-./scripts/dev-instances up a --with vite     # HMR only when starting a single instance
-./scripts/dev-instances urls
-./scripts/dev-instances down
-# Compose: docker-compose.dev-multi.yml  Env: .dev-instances/{a,b}.env (gitignored)
-# Note: dual Vite HMR is unsupported (shared public/hot); multi-instance always uses public/build.
+# Legacy fixed-name stack (not used by scripts/dev)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The app runs at `localhost:8000` by default. Instance **b** is on `8001` (db `5433`, redis `6380`, …); see `./scripts/dev-instances`.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 

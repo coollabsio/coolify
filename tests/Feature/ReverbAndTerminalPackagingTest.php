@@ -304,7 +304,8 @@ it('resolves the browser websocket port like 4.3.23', function (string $pageUrl,
 ]);
 
 it('uses current Reverb and terminal names in development tooling', function () {
-    expect(file_get_contents(base_path('scripts/dev-instances')))
-        ->toContain('"REVERB" "TERMINAL"')
-        ->not->toContain('"SOKETI"');
+    expect(file_get_contents(base_path('scripts/dev')))
+        ->toContain('FORWARD_PUSHER_PORT')
+        ->toContain('FORWARD_TERMINAL_PORT')
+        ->not->toContain('SOKETI');
 });

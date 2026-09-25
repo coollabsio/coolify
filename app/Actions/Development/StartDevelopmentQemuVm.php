@@ -12,11 +12,14 @@ class StartDevelopmentQemuVm
 {
     use AsAction;
 
-    public function handle(string $profileName, bool $resetManagedVms = true): void
+    /**
+     * Start the VM of a profile, creating it only when its libvirt domain does not exist yet.
+     * With $fresh, only this profile's VM is destroyed, undefined, and deleted before it is created again.
+     */
+    public function handle(string $profileName, bool $fresh = false): void
     {
         $this->ensureDevelopmentEnvironment();
-        $profiles = config('development-qemu.profiles');
-        $profile = $profiles[$profileName] ?? null;
+        $profile = config("development-qemu.profiles.{$profileName}");
 
         if (! is_array($profile)) {
             throw new InvalidArgumentException("Unknown development QEMU profile: {$profileName}");
@@ -25,15 +28,24 @@ class StartDevelopmentQemuVm
         ConfigureDevelopmentQemuHost::run();
         $this->configureDhcpReservation($profile);
 
-        if ($resetManagedVms) {
-            foreach ($profiles as $managedProfile) {
-                Process::run('virsh destroy '.escapeshellarg($managedProfile['domain']));
-                Process::run('virsh undefine '.escapeshellarg($managedProfile['domain']));
-                $this->deleteVmData($managedProfile['domain']);
-            }
+        if ($fresh) {
+            $this->destroyVm($profile['domain']);
         }
 
-        $preparedImage = $this->preparedImage($profile['domain']);
+        if (! $fresh && $this->domainExists($profile['domain'])) {
+            $this->startExistingVm($profile['domain']);
+        } else {
+            $this->createPreparedVm($profile);
+        }
+
+        ConfigureDevelopmentQemuHost::run();
+        $this->waitForSsh($profile['ip']);
+    }
+
+    /** @param array{domain: string, template: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
+    private function createPreparedVm(array $profile): void
+    {
+        $preparedImage = $this->preparedImage($profile['template']);
 
         if (! File::exists($preparedImage)) {
             $this->createVm($profile, false);
@@ -46,19 +58,39 @@ class StartDevelopmentQemuVm
         }
 
         $this->createVm($profile, true);
-
-        ConfigureDevelopmentQemuHost::run();
-        $this->waitForSsh($profile['ip']);
     }
 
-    /** @param array{domain: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
+    private function domainExists(string $domain): bool
+    {
+        return Process::run('virsh dominfo '.escapeshellarg($domain))->successful();
+    }
+
+    private function startExistingVm(string $domain): void
+    {
+        $state = trim(Process::run('virsh domstate '.escapeshellarg($domain))->output());
+
+        if ($state === 'running') {
+            return;
+        }
+
+        $this->runOrFail(($state === 'paused' ? 'virsh resume ' : 'virsh start ').escapeshellarg($domain));
+    }
+
+    private function destroyVm(string $domain): void
+    {
+        Process::run('virsh destroy '.escapeshellarg($domain));
+        Process::run('virsh undefine '.escapeshellarg($domain));
+        $this->deleteVmData($domain);
+    }
+
+    /** @param array{domain: string, template: string, ip: string, user: string, mac: string, image: string, image_url: string, os_variant: string, provisioner: string} $profile */
     private function createVm(array $profile, bool $prepared): void
     {
         $directory = config('development-qemu.storage_path');
         File::ensureDirectoryExists($directory);
         File::chmod($directory, 0777);
         $this->moveLegacyFiles($directory);
-        $baseImage = $prepared ? $this->preparedImage($profile['domain']) : "{$directory}/{$profile['image']}";
+        $baseImage = $prepared ? $this->preparedImage($profile['template']) : "{$directory}/{$profile['image']}";
         $disk = $this->vmDisk($profile['domain']);
         $userData = "{$directory}/{$profile['domain']}-user-data.yaml";
         $metaData = "{$directory}/{$profile['domain']}-meta-data.yaml";
@@ -92,7 +124,7 @@ class StartDevelopmentQemuVm
 
         if (! $prepared) {
             File::put($userData, $this->userData($profile));
-            File::put($metaData, "instance-id: {$profile['domain']}\nlocal-hostname: {$profile['domain']}\n");
+            File::put($metaData, "instance-id: {$profile['domain']}\nlocal-hostname: {$profile['template']}\n");
             File::put($networkConfig, $this->networkConfig($profile));
             $this->runOrFail(sprintf(
                 'xorriso -as mkisofs -V cidata -graft-points -o %s %s %s %s',
@@ -104,9 +136,11 @@ class StartDevelopmentQemuVm
         }
 
         $seedDisk = $prepared ? '' : ' --disk path='.escapeshellarg($seedImage).',format=raw,bus=virtio,readonly=on';
+        // Instance networks are isolated, so VMs of different instances may share the profile MAC.
+        $macCheck = config('development-qemu.instance') === null ? '' : ' --check mac_in_use=off';
 
         $this->runOrFail(sprintf(
-            'virt-install --connect qemu:///system --name %s --memory %d --vcpus %d --import --os-variant %s --disk path=%s,format=qcow2,bus=virtio%s --network network=%s,model=virtio,mac=%s --noautoconsole',
+            'virt-install --connect qemu:///system --name %s --memory %d --vcpus %d --import --os-variant %s --disk path=%s,format=qcow2,bus=virtio%s --network network=%s,model=virtio,mac=%s --noautoconsole'.$macCheck,
             escapeshellarg($profile['domain']),
             config('development-qemu.memory'),
             config('development-qemu.vcpus'),
@@ -123,9 +157,12 @@ class StartDevelopmentQemuVm
         return config('development-qemu.storage_path')."/{$domain}.qcow2";
     }
 
-    private function preparedImage(string $domain): string
+    /**
+     * Prepared images are keyed by the instance-independent template name so every dev instance reuses them.
+     */
+    private function preparedImage(string $template): string
     {
-        return config('development-qemu.storage_path')."/{$domain}-prepared.qcow2";
+        return config('development-qemu.storage_path')."/{$template}-prepared.qcow2";
     }
 
     private function waitForPreparation(string $domain): void
@@ -227,7 +264,7 @@ ethernets:
 YAML;
     }
 
-    /** @param array{domain: string, ip: string, mac: string} $profile */
+    /** @param array{template: string, ip: string, mac: string} $profile */
     private function configureDhcpReservation(array $profile): void
     {
         $network = escapeshellarg(config('development-qemu.libvirt_network'));
@@ -241,7 +278,7 @@ YAML;
             return;
         }
 
-        $host = sprintf("<host mac='%s' name='%s' ip='%s'/>", $profile['mac'], $profile['domain'], $profile['ip']);
+        $host = sprintf("<host mac='%s' name='%s' ip='%s'/>", $profile['mac'], $profile['template'], $profile['ip']);
         $this->runOrFail("virsh net-update {$network} add-last ip-dhcp-host ".escapeshellarg($host).' --live --config');
     }
 
