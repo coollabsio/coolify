@@ -909,10 +909,24 @@ $siteAddress {
             return false;
         }
 
+        if ($this->proxy->get('certificates_restart_required')) {
+            return true;
+        }
+
         $savedSettings = $this->proxy->get('last_saved_settings');
         $appliedSettings = $this->proxy->get('last_applied_settings');
 
         return filled($savedSettings) && filled($appliedSettings) && $savedSettings !== $appliedSettings;
+    }
+
+    /**
+     * Record the configuration the proxy runs with after a start or restart.
+     */
+    public function markProxyConfigurationApplied(string $configuration): void
+    {
+        $this->proxy->last_applied_settings = str(base64_encode($configuration))->pipe('md5')->value();
+        $this->proxy->certificates_restart_required = false;
+        $this->save();
     }
 
     public function hasCurrentTraefikOutdatedInfo(): bool
@@ -1948,6 +1962,7 @@ $siteAddress {
             $this->proxy->set('last_saved_proxy_configuration', null);
             $this->proxy->set('last_saved_settings', null);
             $this->proxy->set('last_applied_settings', null);
+            $this->proxy->set('certificates_restart_required', false);
             $this->detected_traefik_version = null;
             $this->traefik_outdated_info = null;
             $this->save();

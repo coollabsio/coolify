@@ -37,6 +37,10 @@
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
                         <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to stop serving deleted TLS certificates.
+                        </x-callout>
                     @else
                         <div class="flex items-start gap-3">
                             <div
@@ -82,7 +86,7 @@
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <x-application.settings-section id="server-proxy-certificates-section" title="TLS certificates"
                         x-init="$wire.loadTraefikCertificates()"
-                        helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority.">
+                        helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
                         <x-slot:actions>
                             <x-forms.button type="button" wire:click="loadTraefikCertificates"
                                 wire:loading.attr="disabled" wire:target="loadTraefikCertificates">
@@ -151,7 +155,7 @@
                                                                     submitAction="deleteTraefikCertificate({{ $certificate['id'] }})"
                                                                     :actions="[
                                                                         'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
-                                                                        'Restart Traefik before the running proxy stops using the certificate.',
+                                                                        'Restart the proxy before it stops using the certificate. If a route still uses the domain, Traefik requests a new certificate after the restart.',
                                                                     ]"
                                                                     confirmationText="{{ $certificate['main_domain'] }}"
                                                                     confirmationLabel="Confirm by entering the domain"

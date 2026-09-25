@@ -37,9 +37,7 @@ class StartProxy
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
         SaveProxyConfiguration::run($server, $configuration);
-        $docker_compose_yml_base64 = base64_encode($configuration);
-        $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
-        $server->save();
+        $server->markProxyConfigurationApplied($configuration);
 
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([

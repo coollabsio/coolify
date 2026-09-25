@@ -17,7 +17,8 @@ class DeleteTraefikCertificate
         private TraefikAcmeService $acmeService,
     ) {}
 
-    public function handle(Server $server, string $certificateId): void
+    /** @return array{id: string, resolver: string, main_domain: string, sans: array<int, string>, store: ?string, expires_at: ?string} */
+    public function handle(Server $server, string $certificateId): array
     {
         if ($server->proxyType() !== ProxyTypes::TRAEFIK->value) {
             throw new RuntimeException('TLS certificates can only be managed for Traefik proxies.');
@@ -40,18 +41,12 @@ class DeleteTraefikCertificate
             $certificateId,
         );
 
-        $path = rtrim($server->proxyPath(), '/').'/acme.json';
-        $temporaryPath = $path.'.coolify-'.bin2hex(random_bytes(8));
-        $encodedContents = base64_encode($updatedContents);
-        $script = sprintf(
-            'set -e; umask 077; printf %%s %s | base64 -d > %s; chmod 600 %s; mv -- %s %s',
-            escapeshellarg($encodedContents),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($temporaryPath),
-            escapeshellarg($path),
-        );
+        SaveTraefikAcmeFile::run($server, $updatedContents);
 
-        instant_remote_process(['sh -c '.escapeshellarg($script)], $server);
+        // Traefik keeps loaded certificates in memory until it restarts.
+        $server->proxy->certificates_restart_required = true;
+        $server->save();
+
+        return $certificate;
     }
 }
