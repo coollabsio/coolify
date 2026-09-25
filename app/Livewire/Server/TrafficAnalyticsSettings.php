@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
+use App\Enums\ProxyTypes;
 use App\Livewire\Analytics;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -110,10 +111,29 @@ class TrafficAnalyticsSettings extends Component
     {
         return view('livewire.server.traffic-analytics-settings', [
             'unsupportedReason' => $this->server->trafficAnalyticsUnsupportedReason(),
+            'caddyRedeployNote' => $this->caddyRedeployNote(),
         ]);
     }
 
+    /**
+     * Caddy gets its log labels at deploy time, so resources that already run are not logged until a redeploy.
+     */
+    private function caddyRedeployNote(): ?string
+    {
+        return $this->server->proxyType() === ProxyTypes::CADDY->value
+            ? 'Caddy logs a resource only after you redeploy it.'
+            : null;
+    }
+
     private function toggleMessage(bool $enabled, bool $proxyRestarted): string
+    {
+        $message = $this->proxyToggleMessage($enabled, $proxyRestarted);
+        $caddyRedeployNote = $this->caddyRedeployNote();
+
+        return $enabled && $caddyRedeployNote !== null ? "{$message} {$caddyRedeployNote}" : $message;
+    }
+
+    private function proxyToggleMessage(bool $enabled, bool $proxyRestarted): string
     {
         $state = $enabled ? 'enabled' : 'disabled';
 

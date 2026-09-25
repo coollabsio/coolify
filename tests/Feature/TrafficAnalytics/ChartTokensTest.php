@@ -168,7 +168,8 @@ it('shows values with local and UTC timestamps in analytics chart tooltips', fun
 
     foreach ([
         app_path('Livewire/Analytics.php'),
-        app_path('Livewire/Project/Application/Analytics.php'),
+        // Shared by the application and service analytics tabs.
+        app_path('Livewire/Project/Shared/ResourceTrafficAnalytics.php'),
         app_path('Livewire/Dashboard/TrafficAnalytics.php'),
     ] as $component) {
         expect(file_get_contents($component))->toContain("'sparkCategories' => array_column(\$this->series, 'bucket')");

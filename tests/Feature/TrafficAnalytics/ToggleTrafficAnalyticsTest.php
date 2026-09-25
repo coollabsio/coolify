@@ -237,3 +237,44 @@ it('does not let a team member toggle traffic analytics', function () {
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 });
+
+it('tells the user that Caddy logs a resource only after a redeploy', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return true;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'CADDY');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->assertDontSee('Caddy logs a resource only after you redeploy it.')
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics enabled. Restarting proxy and Sentinel. Caddy logs a resource only after you redeploy it.')
+        ->assertSee('Caddy logs a resource only after you redeploy it.');
+});
+
+it('does not show the Caddy redeploy note on a Traefik server', function () {
+    ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->once()->andReturnUsing(function ($server, $enable) {
+        $server->settings->is_traffic_analytics_enabled = $enable;
+        $server->settings->save();
+
+        return true;
+    });
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+
+    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
+        ->call('toggleTrafficAnalytics')
+        ->assertDispatched('success', 'Traffic analytics enabled. Restarting proxy and Sentinel.')
+        ->assertDontSee('Caddy logs a resource only after you redeploy it.');
+});

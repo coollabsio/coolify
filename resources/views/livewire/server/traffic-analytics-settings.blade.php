@@ -27,6 +27,9 @@
             </x-slot:actions>
 
             @if ($isTrafficAnalyticsEnabled)
+                @if ($caddyRedeployNote)
+                    <x-callout type="info" title="Redeploy to start logging">{{ $caddyRedeployNote }}</x-callout>
+                @endif
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="trafficTopn" label="Top-N cap" required

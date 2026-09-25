@@ -17,9 +17,18 @@ class StartSentinel
             : rtrim($server->proxyPath(), '/');
     }
 
+    /**
+     * Sentinel reads the proxy access log only when analytics is on and a Traefik or Caddy proxy writes it.
+     * After a switch to a proxy without analytics support, Sentinel must not keep the old log mount.
+     */
+    public static function collectsTraffic(Server $server): bool
+    {
+        return $server->isTrafficAnalyticsEnabled() && $server->hasTrafficAnalyticsProxy();
+    }
+
     public static function sentinelTrafficEnvironment(Server $server): array
     {
-        if (! $server->isTrafficAnalyticsEnabled()) {
+        if (! self::collectsTraffic($server)) {
             return [];
         }
 
@@ -104,7 +113,7 @@ class StartSentinel
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
         $trafficLogDirectory = self::trafficLogDirectory($server);
-        $trafficMount = $server->isTrafficAnalyticsEnabled()
+        $trafficMount = self::collectsTraffic($server)
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';

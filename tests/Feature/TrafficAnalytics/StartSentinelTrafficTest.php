@@ -29,7 +29,7 @@ it('produces no traffic env when disabled', function () {
 });
 
 it('produces traffic + geoip env when enabled', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server = trafficProxyServer($this);
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->geoip_maxmind_license_key = 'lic';
     $server->settings->save();
@@ -49,7 +49,7 @@ it('produces traffic + geoip env when enabled', function () {
 
 it('uses the dev proxy volume for traffic logs locally', function () {
     config()->set('app.env', 'local');
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server = trafficProxyServer($this);
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->save();
 
@@ -60,7 +60,7 @@ it('uses the dev proxy volume for traffic logs locally', function () {
 });
 
 it('passes custom traffic settings as sentinel env', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server = trafficProxyServer($this);
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->traffic_topn = 100;
     $server->settings->traffic_sample_threshold = 500;
@@ -83,7 +83,7 @@ it('passes custom traffic settings as sentinel env', function () {
 });
 
 it('injects the maxmind license key only when geoip is enabled', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server = trafficProxyServer($this);
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->is_geoip_enabled = true;
     $server->settings->geoip_maxmind_license_key = 'secret-maxmind-key';
@@ -92,6 +92,15 @@ it('injects the maxmind license key only when geoip is enabled', function () {
     $env = StartSentinel::sentinelTrafficEnvironment($server->fresh());
     expect($env['GEOIP_MAXMIND_LICENSE_KEY'])->toBe('secret-maxmind-key');
 });
+
+function trafficProxyServer(object $test): Server
+{
+    $server = Server::factory()->create(['team_id' => $test->team->id]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->save();
+
+    return $server;
+}
 
 function sentinelTrafficServer(object $test, ?string $proxyType, bool $analyticsEnabled): Server
 {
@@ -159,7 +168,9 @@ it('does not touch the access log when traffic analytics cannot run', function (
     $script = runStartSentinelAndCaptureScript($server);
 
     expect($script)->toContain('docker run -d')
-        ->not->toContain('touch ');
+        ->not->toContain('touch ')
+        ->not->toContain('/data/coolify/proxy:/data/coolify/proxy')
+        ->not->toContain('TRAFFIC_ENABLED');
 })->with([
     'analytics disabled' => ['TRAEFIK', false],
     'proxy none' => ['NONE', true],

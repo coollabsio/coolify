@@ -31,3 +31,19 @@ it('omits lumberjack roll directives when disabled', function () {
     $labels = fqdnLabelsForCaddy('coolify', 'app-uuid', collect(['https://example.com']), is_traffic_analytics_enabled: false);
     expect($labels->filter(fn ($l) => str_contains($l, 'roll_'))->isEmpty())->toBeTrue();
 });
+
+it('keys a compose service like its Traefik router', function () {
+    $labels = fqdnLabelsForCaddy('coolify', 'app-uuid', collect(['https://example.com']), service_name: 'web.app', is_traffic_analytics_enabled: true, supports_log_append: true);
+    $key = 'app-uuid-'.traefikSafeServiceNameSegment('web.app');
+
+    expect($key)->toMatch('/^[A-Za-z0-9-]+$/')
+        ->and($labels->contains("caddy_0.log_append=coolify_app_id {$key}"))->toBeTrue()
+        ->and($labels->contains('caddy_0.log.output=file /traffic/access.log'))->toBeTrue();
+});
+
+it('keeps only safe characters in the caddy traffic key', function () {
+    $labels = fqdnLabelsForCaddy('coolify', "app uuid\n{x}", collect(['https://example.com']), is_traffic_analytics_enabled: true, supports_log_append: true);
+
+    expect($labels->first(fn ($label) => str_contains($label, 'log_append')))
+        ->toBe('caddy_0.log_append=coolify_app_id app-uuid-x-');
+});

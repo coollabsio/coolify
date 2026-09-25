@@ -1,20 +1,20 @@
 <?php
 
-namespace App\Livewire\Project\Application;
+namespace App\Livewire\Project\Service;
 
 use App\Livewire\Project\Shared\ResourceTrafficAnalytics;
-use App\Models\Application;
+use App\Models\Service;
 use Livewire\Attributes\Lazy;
 
 #[Lazy]
 class Analytics extends ResourceTrafficAnalytics
 {
-    public Application $application;
+    public Service $service;
 
-    public string $chartId = 'application-analytics';
+    public string $chartId = 'service-analytics';
 
     protected function resourceProperty(): string
     {
-        return 'application';
+        return 'service';
     }
 }

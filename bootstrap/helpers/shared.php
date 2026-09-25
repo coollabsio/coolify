@@ -3190,6 +3190,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection,
                                         domainPortOverrides: $domainPortOverrides,
+                                        is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                        supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
                                     ));
                                     break;
                             }
@@ -3223,6 +3225,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection,
                                 domainPortOverrides: $domainPortOverrides,
+                                is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
                             ));
                         }
                     }
@@ -3994,6 +3998,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             domains: $fqdns,
                                             serviceLabels: $serviceLabels,
                                             image: data_get($service, 'image'),
+                                            service_name: $serviceName,
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
@@ -4001,6 +4006,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
+                                            is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                            supports_log_append: $server?->caddySupportsLogAppend() ?? false,
                                         )
                                     );
                                     break;
@@ -4029,6 +4036,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     domains: $fqdns,
                                     serviceLabels: $serviceLabels,
                                     image: data_get($service, 'image'),
+                                    service_name: $serviceName,
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
@@ -4036,6 +4044,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
+                                    is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                    supports_log_append: $server?->caddySupportsLogAppend() ?? false,
                                 )
                             );
                         }
