@@ -135,6 +135,26 @@ test('running proxy hides pending configuration warning when saved settings matc
         ->assertSee('Your configuration changed, please restart the proxy.');
 });
 
+test('navbar tells the sidebar when the proxy is not running', function () {
+    [$user, $team, $server] = setupProxyUser('admin');
+    makeServerProxyRunning($server);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
+
+    $component->call('showNotification')
+        ->assertDispatched('proxy-configuration-state-changed', proxyNotRunning: false);
+
+    $server->refresh();
+    $server->proxy->status = 'exited';
+    $server->save();
+
+    $component->call('showNotification')
+        ->assertDispatched('proxy-configuration-state-changed', proxyNotRunning: true);
+});
+
 test('admin can stop a proxy while it is starting', function () {
     [$user, $team, $server] = setupProxyUser('admin');
 
