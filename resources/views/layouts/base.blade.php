@@ -284,13 +284,12 @@
             window.Pusher = Pusher;
             const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
             window.Echo = new EchoConstructor({
-                broadcaster: 'pusher',
-                cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
+                broadcaster: 'reverb',
                 key: "{{ config('constants.pusher.app_key') }}" || 'coolify',
                 wsHost: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
-                forceTLS: false,
+                forceTLS: window.location.protocol === 'https:',
                 encrypted: true,
                 enableStats: false,
                 enableLogging: true,
@@ -314,30 +313,6 @@
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
 
-        async function copyToClipboard(text) {
-            try {
-                if (navigator.clipboard?.writeText && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                } else {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = text;
-                    textarea.setAttribute('readonly', '');
-                    textarea.style.position = 'fixed';
-                    textarea.style.left = '-9999px';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    const copied = document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    if (!copied) {
-                        throw new Error('Copy command was rejected.');
-                    }
-                }
-                window.Livewire.dispatch('success', 'Copied to clipboard.');
-            } catch (error) {
-                window.Livewire.dispatch('error', 'Failed to copy to clipboard.');
-            }
-        }
-        window.copyToClipboard = copyToClipboard;
         document.addEventListener('livewire:init', () => {
             window.Livewire.on('reloadWindow', (timeout) => {
                 if (timeout) {

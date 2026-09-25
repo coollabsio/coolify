@@ -2,6 +2,7 @@
 
 namespace App\Services\ServerTransfer;
 
+use App\Enums\ServerRole;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
@@ -34,6 +35,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Models\Team;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -207,6 +209,8 @@ class ServerTransferImporter
         }
 
         $result = DB::transaction(function () use ($bundle, $teamId, $preserveUuids, $adoptMode, $warnings, &$created) {
+            Team::ensureServerCapacity($teamId);
+
             $this->privateKeyMap = [];
             $this->githubAppMap = [];
             $this->gitlabAppMap = [];
@@ -451,8 +455,13 @@ class ServerTransferImporter
         $server->uuid = $uuid;
         $server->save();
 
-        if ($server->settings && data_get($payload, 'is_build_server')) {
-            $server->settings->is_build_server = true;
+        if ($server->settings) {
+            $serverRole = data_get($payload, 'server_role');
+            if (! in_array($serverRole, array_column(ServerRole::cases(), 'value'), true)) {
+                $serverRole = data_get($payload, 'is_build_server') ? ServerRole::BUILD->value : ServerRole::BOTH->value;
+            }
+            $server->settings->server_role = $serverRole;
+            $server->settings->is_build_server = $serverRole === ServerRole::BUILD->value;
             $server->settings->save();
         }
 
@@ -1070,6 +1079,22 @@ class ServerTransferImporter
     {
         foreach ($storages as $storage) {
             LocalFileVolume::withoutEvents(function () use ($storage, $resource) {
+                $isHostFile = (bool) data_get($storage, 'is_host_file', false);
+                $fsPath = data_get($storage, 'fs_path');
+                if (! is_string($fsPath)) {
+                    throw new RuntimeException('Invalid imported file storage path.');
+                }
+                if ($isHostFile) {
+                    $fsPath = validateHostFileMountPath($fsPath, 'imported host file source path');
+                }
+                $chown = data_get($storage, 'chown');
+                $chmod = data_get($storage, 'chmod');
+                if (filled($chown) && (! is_string($chown) || ! preg_match('/\A(?:[A-Za-z_][A-Za-z0-9_.-]*|[0-9]+)(?::(?:[A-Za-z_][A-Za-z0-9_.-]*|[0-9]+))?\z/', $chown))) {
+                    throw new RuntimeException('Invalid imported file owner.');
+                }
+                if (filled($chmod) && (! is_string($chmod) || ! preg_match('/\A[0-7]{3,4}\z/', $chmod))) {
+                    throw new RuntimeException('Invalid imported file mode.');
+                }
                 $uuid = filled(data_get($storage, 'uuid')) ? (string) data_get($storage, 'uuid') : new_public_id();
                 if (LocalFileVolume::where('uuid', $uuid)->exists()) {
                     $uuid = new_public_id();
@@ -1078,13 +1103,13 @@ class ServerTransferImporter
                 // uuid is not fillable and withoutEvents skips BaseModel's creating hook.
                 $file = new LocalFileVolume;
                 $file->forceFill([
-                    'fs_path' => data_get($storage, 'fs_path'),
+                    'fs_path' => $fsPath,
                     'mount_path' => data_get($storage, 'mount_path'),
                     'content' => data_get($storage, 'content'),
                     'is_directory' => (bool) data_get($storage, 'is_directory', false),
-                    'is_host_file' => (bool) data_get($storage, 'is_host_file', false),
-                    'chown' => data_get($storage, 'chown'),
-                    'chmod' => data_get($storage, 'chmod'),
+                    'is_host_file' => $isHostFile,
+                    'chown' => $chown,
+                    'chmod' => $chmod,
                     'is_based_on_git' => (bool) data_get($storage, 'is_based_on_git', false),
                     'is_preview_suffix_enabled' => (bool) data_get($storage, 'is_preview_suffix_enabled', false),
                     'resource_type' => $resource->getMorphClass(),

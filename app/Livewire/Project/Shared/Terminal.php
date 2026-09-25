@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Services\TerminalSessionService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
@@ -37,7 +37,7 @@ class Terminal extends Component
     }
 
     #[On('send-terminal-command')]
-    public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
+    public function sendTerminalCommand($isContainer, $identifier, $serverUuid, TerminalSessionService $terminalSessionService)
     {
         $this->authorize('canAccessTerminal');
 
@@ -65,44 +65,10 @@ class Terminal extends Component
             if (! $this->hasShell) {
                 return;
             }
-
-            // Escape the identifier for shell usage
-            $escapedIdentifier = escapeshellarg($identifier);
-            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
-                            'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
-                            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-
-            // Add sudo for non-root users to access Docker socket
-            $dockerCommand = "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'";
-            if ($server->isNonRoot()) {
-                $dockerCommand = "sudo {$dockerCommand}";
-            }
-
-            $command = SshMultiplexingHelper::generateSshCommand(
-                $server,
-                $dockerCommand,
-                commandTimeout: (int) config('constants.terminal.command_timeout')
-            );
-        } else {
-            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
-                            'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
-                            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $command = SshMultiplexingHelper::generateSshCommand(
-                $server,
-                $shellCommand,
-                commandTimeout: (int) config('constants.terminal.command_timeout')
-            );
         }
-        // ssh command is sent back to frontend then to websocket
-        // this is done because the websocket connection is not available here
-        // a better solution would be to remove websocket on NodeJS and work with something like
-        // 1. Laravel Pusher/Echo connection (not possible without a sdk)
-        // 2. Ratchet / Revolt / ReactPHP / Event Loop (possible but hard to implement and huge dependencies)
-        // 3. Just found out about this https://github.com/sirn-se/websocket-php, perhaps it can be used
-        // 4. Follow-up discussions here:
-        //     - https://github.com/coollabsio/coolify/issues/2298
-        //     - https://github.com/coollabsio/coolify/discussions/3362
-        $this->dispatch('send-back-command', $command);
+
+        $token = $terminalSessionService->issue(auth()->user(), $server, $isContainer ? $identifier : null);
+        $this->dispatch('send-terminal-token', $token);
     }
 
     #[On('terminalConnected')]

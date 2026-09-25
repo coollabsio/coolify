@@ -85,7 +85,7 @@ class InviteLink extends Component
                 $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
                 $link = $this->invitationUrl('auth.link', ['token' => $token]);
             }
-            $invitation = TeamInvitation::whereEmail($this->email)->first();
+            $invitation = TeamInvitation::ownedByCurrentTeam()->whereEmail($this->email)->first();
             if (! is_null($invitation)) {
                 $invitationValid = $invitation->isValid();
                 if ($invitationValid) {
@@ -102,6 +102,13 @@ class InviteLink extends Component
                 'role' => $this->role,
                 'link' => $link,
                 'via' => $sendEmail ? 'email' : 'link',
+            ]);
+            auditLog('ui.team_invitation.created', [
+                'team_id' => currentTeam()->id,
+                'invitation_uuid' => $invitation->uuid,
+                'invitation_email' => $invitation->email,
+                'role' => $invitation->role,
+                'via' => $invitation->via,
             ]);
             if ($sendEmail) {
                 $mail = new MailMessage;

@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -122,6 +123,31 @@ describe('Destination::addServer GHSA-j395-3pqh-9r5g', function () {
         expect($additional)->toHaveCount(1);
         expect($additional->first()->id)->toBe($this->destinationA2->id);
         expect($additional->first()->pivot->server_id)->toBe($this->serverA2->id);
+    });
+
+    test('attaching the same server twice does not create duplicate destinations', function () {
+        Livewire::test(Destination::class, ['resource' => $this->applicationA])
+            ->call('addServer', $this->destinationA2->id, $this->serverA2->id)
+            ->call('addServer', $this->destinationA2->id, $this->serverA2->id);
+
+        expect(DB::table('additional_destinations')
+            ->where('application_id', $this->applicationA->id)
+            ->where('standalone_docker_id', $this->destinationA2->id)
+            ->where('server_id', $this->serverA2->id)
+            ->count())->toBe(1);
+    });
+
+    test('the database rejects duplicate application server destinations', function () {
+        $destination = [
+            'application_id' => $this->applicationA->id,
+            'server_id' => $this->serverA2->id,
+            'standalone_docker_id' => $this->destinationA2->id,
+        ];
+
+        DB::table('additional_destinations')->insert($destination);
+
+        expect(fn () => DB::table('additional_destinations')->insert($destination))
+            ->toThrow(QueryException::class);
     });
 });
 

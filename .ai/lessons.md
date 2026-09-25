@@ -5,6 +5,7 @@
 - When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
 - Test old reports against the current branch because later changes can make the report obsolete.
 - Use the same regression test before and after the production change so the result shows the behavior difference.
+- Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
@@ -41,3 +42,25 @@
 - For container image changes, inspect Compose services and every relevant Dockerfile build stage.
 - Pin a stable release tag instead of using a floating `latest` tag.
 - A successful image pull does not prove that the complete application build no longer uses the old image.
+- Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
+
+## Make distributed schedules durable
+- Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
+- Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
+- Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
+
+## Fail closed at public webhook boundaries
+- Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.
+
+## Pass identities to Livewire actions
+- Pass record IDs to Livewire actions instead of display values, and resolve team-scoped records on the server. When JavaScript needs text, use `@js()` or `Js::from()`.
+- Mark Livewire properties that select records or feed server-side lookups as `#[Locked]`; clients can change every other public property.
+
+## Keep host test runs away from the dev app cache
+- The repository is bind-mounted into the dev `coolify` container. Tests that call `app:init` run `optimize` and write a testing config/route cache into `bootstrap/cache`, so the dev app returns 500. For broad host test runs, set `APP_CONFIG_CACHE`, `APP_ROUTES_CACHE`, `APP_EVENTS_CACHE`, `APP_SERVICES_CACHE`, and `APP_PACKAGES_CACHE` to a temporary directory.
+
+## Test the real runtime image
+- Deployment shell commands run in the Alpine/BusyBox helper image and pass through the non-root sudo parser. Verify new flags and shell syntax in that image and with `parseCommandsByLineForSudo()`; faked command output hides both failures.
+
+## Format only your own files
+- `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.

@@ -10,11 +10,14 @@ use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Traits\Auditable;
+
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -124,10 +127,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
-
     /** @use HasFactory<ApplicationFactory> */
-    use HasFactory;
+    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -403,6 +404,7 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
+            $application->secretManagerLink()->delete();
             foreach ($application->scheduled_tasks as $task) {
                 $task->delete();
             }
@@ -2101,6 +2103,7 @@ class Application extends BaseModel
                         $source = data_get_str($volume, 'source');
                     }
                     if ($type?->value() === 'bind') {
+                        $source = str($source);
                         if ($source->value() === '/var/run/docker.sock') {
                             continue;
                         }
@@ -2108,10 +2111,12 @@ class Application extends BaseModel
                             continue;
                         }
                         if ($source->startsWith('.')) {
-                            $source = $source->after('.');
-                            $source = $workdir.$source;
+                            $source = str($workdir.$source->after('.'));
                         }
-                        $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
+                        $mkdirCommand = rawComposeBindMkdirCommand($source->value());
+                        if ($mkdirCommand !== null) {
+                            $commands->push($mkdirCommand);
+                        }
                     }
                 }
             }

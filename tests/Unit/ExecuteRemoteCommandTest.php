@@ -23,6 +23,11 @@ function remoteCommandOutputCollector(): object
         {
             $this->saveCommandOutput($output, $append);
         }
+
+        public function trimmedOutput(string $key = 'dockerfile'): string
+        {
+            return $this->trimmedSavedOutput($key)->value();
+        }
     };
 }
 
@@ -37,11 +42,28 @@ it('preserves whitespace across streamed saved output chunks', function () {
         ->toBe("FROM alpine\nARG FIRST\nARG SECOND\nRUN true\n");
 });
 
-it('replaces saved output without trimming it when append is disabled', function () {
+it('trims saved output when append is disabled', function () {
     $collector = remoteCommandOutputCollector();
     $collector->collectOutput('old');
 
     $collector->collectOutput(" new output\n", append: false);
 
-    expect((string) $collector->saved_outputs->get('dockerfile'))->toBe(" new output\n");
+    expect((string) $collector->saved_outputs->get('dockerfile'))->toBe('new output');
+});
+
+it('keeps non-appended command output safe for exact status comparisons', function () {
+    $collector = remoteCommandOutputCollector();
+
+    $collector->collectOutput("\"healthy\"\n", append: false);
+
+    expect(str($collector->saved_outputs->get('dockerfile'))->replace('"', '')->value())
+        ->toBe('healthy');
+});
+
+it('normalizes streamed scalar output without changing the saved value', function () {
+    $collector = remoteCommandOutputCollector();
+    $collector->collectOutput("node\n");
+
+    expect($collector->trimmedOutput())->toBe('node')
+        ->and((string) $collector->saved_outputs->get('dockerfile'))->toBe("node\n");
 });

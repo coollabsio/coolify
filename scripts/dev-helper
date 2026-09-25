@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 REPOSITORY=${HELPER_IMAGE_REPOSITORY:-docker.io/coollabsio/coolify-helper}
 DEFAULT_TAG="dev-$(git -C "$ROOT_DIR" rev-parse --short HEAD)"
-COOLIFY_CONTAINER=${COOLIFY_CONTAINER:-coolify}
+COOLIFY_CONTAINER=${COOLIFY_CONTAINER:-$("$ROOT_DIR/scripts/dev" container)}
 
 usage() {
     cat <<EOF

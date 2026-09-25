@@ -25,8 +25,8 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.22'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.22')
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.23'")
+        ->and($versions['coolify']['v4']['version'])->toBe('4.3.23')
         ->and($versions['coolify']['nightly']['version'])->toBe('4.4-rc.1')
         ->and($nightlyVersions)->toBe($versions);
 });
@@ -72,7 +72,6 @@ it('runs support image workflows from main', function (string $workflowFile) {
         ->not->toContain('v4.x');
 })->with([
     'helper' => 'coolify-helper.yml',
-    'realtime' => 'coolify-realtime.yml',
 ]);
 
 it('prevents the stable helper workflow from publishing an existing version', function () {
@@ -90,19 +89,22 @@ it('prevents the stable helper workflow from publishing an existing version', fu
         ->toContain('cancel-in-progress: false');
 });
 
-it('prevents the stable realtime workflow from publishing an existing version', function () {
-    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-realtime.yml');
+it('publishes the testing host only to Docker Hub', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-testing-host.yml');
+    $cleanupWorkflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/cleanup-ghcr-untagged.yml');
+    $windowsCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.windows.yml');
+    $developmentCompose = file_get_contents(dirname(__DIR__, 2).'/docker-compose.dev.yml');
 
     expect($workflow)
-        ->toContain('check-version:')
-        ->toContain('needs: check-version')
-        ->toContain('php bootstrap/getRealtimeVersion.php')
-        ->toContain('VERSION="${BASE_VERSION}"')
-        ->toContain('docker buildx imagetools inspect "$IMAGE"')
-        ->toContain('Version $VERSION already exists in $registry')
-        ->toContain('Version $VERSION is available in both registries')
-        ->toContain('Could not verify $IMAGE')
-        ->toContain('cancel-in-progress: false');
+        ->toContain('DOCKER_REGISTRY: docker.io')
+        ->toContain('IMAGE_NAME: "coollabsio/coolify-testing-host"')
+        ->toContain('docker/testing-host/Dockerfile')
+        ->not->toContain('ghcr.io')
+        ->not->toContain('GITHUB_REGISTRY')
+        ->and($cleanupWorkflow)->not->toContain('coolify-testing-host')
+        ->and($windowsCompose)->toContain('docker.io/coollabsio/coolify-testing-host:latest')
+        ->and($developmentCompose)->toContain('image: coolify-testing-host:dev')
+        ->toContain('dockerfile: ./docker/testing-host/Dockerfile');
 });
 
 it('generates the production changelog from main', function () {

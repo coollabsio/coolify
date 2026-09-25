@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd /var/www/html
+
+echo "   INFO  Terminal WebSocket server is starting..."
+exec node /terminal/terminal-server.js

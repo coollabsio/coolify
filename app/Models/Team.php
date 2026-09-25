@@ -8,12 +8,15 @@ use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
+use App\Traits\Auditable;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -28,6 +31,7 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string', 'description' => 'The date and time the team was last updated.'],
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
+        'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -39,7 +43,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
+    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
     protected $fillable = [
         'name',
@@ -48,15 +52,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'show_boarding',
         'custom_server_limit',
         'is_mcp_server_enabled',
+        'is_build_server_fallback_enabled',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
+        'is_build_server_fallback_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'is_build_server_fallback_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -86,8 +93,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             }
 
             // Transfer instance-wide sources to root team so they remain available
-            GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
-            GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
+                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
+            foreach ($systemWideSources as $source) {
+                $source->update(['team_id' => 0]);
+            }
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
@@ -117,9 +127,27 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers->count();
+        $servers = $team->servers()->count();
 
         return $servers >= $serverLimit;
+    }
+
+    public static function createServerWithinLimit(int $teamId, array $attributes): Server
+    {
+        return DB::transaction(function () use ($teamId, $attributes): Server {
+            self::ensureServerCapacity($teamId);
+
+            return Server::create($attributes);
+        });
+    }
+
+    /** Call within a transaction so the team lock lasts through the server insert. */
+    public static function ensureServerCapacity(int $teamId): void
+    {
+        $team = self::query()->lockForUpdate()->findOrFail($teamId);
+        if (self::serverLimitReached($team)) {
+            throw ValidationException::withMessages(['server' => 'Server limit reached for your subscription.']);
+        }
     }
 
     public function subscriptionPastOverDue()
@@ -303,6 +331,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(Server::class);
     }
 
+    public function usesSwarm(): bool
+    {
+        return $this->servers()
+            ->where(function ($query) {
+                $query->whereHas('settings', function ($settings) {
+                    $settings->where('is_swarm_manager', true)
+                        ->orWhere('is_swarm_worker', true);
+                })->orWhereHas('swarmDockers');
+            })
+            ->exists();
+    }
+
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);
@@ -311,6 +351,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);
+    }
+
+    public function integrationTokens()
+    {
+        return $this->hasMany(IntegrationToken::class);
     }
 
     public function sources()

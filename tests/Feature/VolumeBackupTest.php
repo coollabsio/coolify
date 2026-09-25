@@ -8,7 +8,7 @@ use App\Livewire\Project\Application\Backup\Create as CreateScheduledVolumeBacku
 use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
-use App\Livewire\Project\Shared\Storages\Show;
+use App\Livewire\Project\Shared\Storages\All;
 use App\Livewire\Project\Shared\Storages\VolumeBackups;
 use App\Models\Application;
 use App\Models\Environment;
@@ -484,11 +484,8 @@ it('shows the configure backup modal trigger inside the volume card instead of i
     signInForVolumeBackups($this, $team);
     [$application, $volume] = createVolumeBackupApplication($team);
 
-    $component = Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])
-        ->set('isReadOnly', true)
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->set("forms.{$volume->id}.isReadOnly", true)
         ->assertSee('Backup')
         ->assertDontSee('Backups made while the application is writing');
 
@@ -498,6 +495,7 @@ it('shows the configure backup modal trigger inside the volume card instead of i
     expect($html)
         ->toContain('Configure Volume Backup')
         ->toContain('data-table-row')
+        ->not->toContain('wire:submit="submit('.$volume->id.')"')
         ->toContain('Backup');
 });
 
@@ -513,10 +511,10 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
         'enabled' => false,
     ]);
 
-    $component = Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])->assertDontSee('table-badge-success', false);
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->assertDontSee('Volume backup is enabled');
+
+    expect($component->get("volumeBackupMeta.{$volume->id}.enabled"))->toBeFalse();
 
     $backup->update(['enabled' => true]);
 
@@ -529,17 +527,10 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
 
     $component
         ->dispatch('refreshVolumeBackups')
-        ->assertSee('table-badge-success', false)
         ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 
-    Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-        'isFirst' => false,
-    ])
-        ->assertSee('table-badge-success', false)
-        ->assertSee('Volume backup is enabled');
+    expect($component->get("volumeBackupMeta.{$volume->id}.url"))->toBe($backupUrl);
 });
 
 it('links the backup enabled badge to a filtered backup list when the application has multiple schedules', function () {
@@ -565,11 +556,7 @@ it('links the backup enabled badge to a filtered backup list when the applicatio
         'search' => $volume->name,
     ]);
 
-    Livewire::test(Show::class, [
-        'storage' => $volume,
-        'resource' => $application,
-    ])
-        ->assertSee('table-badge-success', false)
+    Livewire::test(All::class, ['resource' => $application])
         ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 });
@@ -1567,7 +1554,7 @@ it('deletes local archives before deleting a volume backup schedule', function (
     ]);
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->call('delete', 'password')
+        ->call('delete', 'password', ['delete_associated_backups_locally'])
         ->assertDispatched('success')
         ->assertRedirectToRoute('project.application.backup.index', [
             'project_uuid' => $application->project()->uuid,
@@ -1578,6 +1565,36 @@ it('deletes local archives before deleting a volume backup schedule', function (
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
     Process::assertRan(fn ($process) => str_contains($process->command, 'rm -f')
         && str_contains($process->command, 'archive.tar.gz'));
+});
+
+it('deletes a volume backup schedule without deleting unselected archives', function () {
+    Process::fake();
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
+        'size' => 128,
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 'danger',
+    ])
+        ->assertSee('Delete all local archives created by this schedule.')
+        ->assertSee('Delete all S3 archives created by this schedule.')
+        ->call('delete', 'password', [])
+        ->assertDispatched('success');
+
+    expect($backup->fresh())->toBeNull();
+    Process::assertNothingRan();
 });
 
 it('deletes a volume backup schedule without a password when two-step confirmation is disabled', function () {
@@ -1646,7 +1663,7 @@ it('deletes S3 archives from the storage recorded on each execution', function (
         ->andReturn($disk);
 
     Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $application])
-        ->call('delete', 'password')
+        ->call('delete', 'password', ['delete_associated_backups_s3'])
         ->assertDispatched('success');
 
     expect($backup->fresh())->toBeNull();

@@ -84,7 +84,7 @@ class ValidationPatterns
      * Pattern for Docker container names
      * Must start with alphanumeric, followed by alphanumeric, dots, hyphens, or underscores
      */
-    public const CONTAINER_NAME_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
+    public const CONTAINER_NAME_PATTERN = '/\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/';
 
     /**
      * Pattern for Docker network names

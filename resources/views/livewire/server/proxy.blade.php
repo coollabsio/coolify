@@ -90,6 +90,7 @@
 
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
                     <x-application.settings-section id="server-proxy-file-section" :title="$proxyTitle"
+                        x-init="$wire.loadProxyConfiguration()"
                         helper="Edit the generated proxy compose configuration used on this server.">
                         <x-slot:actions>
                             @can('update', $server)
@@ -109,24 +110,34 @@
                         </x-slot:actions>
 
                         @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                            @if ($server->detected_traefik_version === 'latest')
+                            @if ($this->traefikVersionForWarning === 'latest')
                                 <x-callout type="warning" title="Unpinned Traefik version">
                                     The proxy uses the <span class="font-mono">latest</span> tag. Pin
                                     <span class="font-mono">traefik:{{ $this->latestTraefikVersion }}</span>
                                     for predictable updates.
                                 </x-callout>
-                            @elseif($this->isTraefikOutdated)
+                            @endif
+                            @if ($this->isTraefikOutdated)
                                 <x-callout type="warning" title="Traefik patch update available">
-                                    Version {{ $this->latestTraefikVersion }} is available. Test the update before
-                                    applying it to production servers.
+                                    {{ $server->detected_traefik_version ? 'Running version' : 'Configured image' }}
+                                    v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
+                                    for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
+                                    to production servers.
                                 </x-callout>
-                            @elseif($this->newerTraefikBranchAvailable)
+                            @endif
+                            @if ($this->newerTraefikBranchAvailable)
                                 <x-callout type="info" title="New Traefik minor version available">
-                                    {{ $this->newerTraefikBranchAvailable }} is available. Review the Traefik
-                                    changelog for breaking changes before upgrading.
+                                    {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
+                                    {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
+                                    changes before upgrading.
                                 </x-callout>
                             @endif
                         @endif
+
+                        <div wire:loading.flex wire:target="loadProxyConfiguration"
+                            class="min-h-32 items-center justify-center">
+                            <x-loading text="Loading proxy configuration…" />
+                        </div>
 
                         @if ($proxySettings)
                             <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"

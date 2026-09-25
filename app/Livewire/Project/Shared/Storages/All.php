@@ -22,7 +22,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
      */
     public array $forms = [];
 
@@ -65,6 +65,7 @@ class All extends Component
 
     public function refreshList(): void
     {
+        $this->authorize('view', $this->resource);
         $this->resource->refresh();
         $this->resource->unsetRelation('persistentStorages');
         $this->resource->load(['persistentStorages' => fn ($query) => $query->orderBy('id')]);
@@ -96,7 +97,6 @@ class All extends Component
         $form = $this->forms[$storageId];
         $storage->name = $form['name'];
         $storage->mount_path = $form['mountPath'];
-        $storage->host_path = $form['hostPath'] ?: null;
         $storage->is_preview_suffix_enabled = (bool) $form['isPreviewSuffixEnabled'];
         $storage->save();
 
@@ -193,7 +193,6 @@ class All extends Component
             $forms[$storage->id] = [
                 'name' => $storage->name,
                 'mountPath' => $storage->mount_path,
-                'hostPath' => $storage->host_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
                 'canDeleteStale' => $this->canUpdate
@@ -282,18 +281,15 @@ class All extends Component
         $this->validate([
             "forms.{$storageId}.name" => ValidationPatterns::volumeNameRules(),
             "forms.{$storageId}.mountPath" => ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
-            "forms.{$storageId}.hostPath" => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             "forms.{$storageId}.isPreviewSuffixEnabled" => 'required|boolean',
         ], array_merge(
             ValidationPatterns::volumeNameMessages(),
             [
                 "forms.{$storageId}.mountPath.regex" => 'Mount path must start with / and only contain safe path characters.',
-                "forms.{$storageId}.hostPath.regex" => 'Host path must start with / and only contain safe path characters.',
             ]
         ), [
             "forms.{$storageId}.name" => 'name',
             "forms.{$storageId}.mountPath" => 'mount',
-            "forms.{$storageId}.hostPath" => 'host',
         ]);
     }
 

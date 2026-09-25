@@ -12,6 +12,14 @@
                 </p>
             </div>
             <div class="flex w-fit shrink-0 items-center gap-2">
+                <a href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                    {{ wireNavigate() }}
+                    class="button whitespace-nowrap"
+                    title="Shared variables for this environment"
+                    aria-label="Shared variables for {{ $environment->name }}">
+                    <x-reicon name="variables" class="size-3.5" />
+                    Shared variables
+                </a>
                 @can('update', $project)
                     <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}

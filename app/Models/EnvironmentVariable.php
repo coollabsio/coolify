@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,7 @@ use OpenApi\Attributes as OA;
         'is_runtime' => ['type' => 'boolean'],
         'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
-        'is_shown_once' => ['type' => 'boolean'],
+        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
         'key' => ['type' => 'string'],
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
@@ -34,6 +35,8 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    use Auditable;
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     protected $attributes = [
@@ -249,15 +252,19 @@ class EnvironmentVariable extends BaseModel
     protected function isShared(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
-                    return true;
-                }
-
-                return false;
-            }
+            get: fn () => $this->isSharedReference(),
         );
+    }
+
+    private function isSharedReference(): bool
+    {
+        if (blank($this->value)) {
+            return false;
+        }
+
+        $types = implode('|', SHARED_VARIABLE_TYPES);
+
+        return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
     public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
@@ -300,6 +307,48 @@ class EnvironmentVariable extends BaseModel
         }
 
         return $real_value;
+    }
+
+    /** @return array<int, string> */
+    public function logRedactionValues(): array
+    {
+        $value = $this->real_value;
+        if (! is_string($value) || $value === '') {
+            return [];
+        }
+
+        $values = [$value];
+        if ($this->is_multiline || $this->is_literal) {
+            $unquoted = str_starts_with($value, "'") && str_ends_with($value, "'")
+                ? substr($value, 1, -1)
+                : $value;
+            $values[] = $unquoted;
+            $values[] = escapeBashEnvValue($unquoted);
+            $values[] = str_replace(["\r\n", "\r", "\n"], ['\\n', '\\n', '\\n'], $unquoted);
+            if ($this->is_multiline) {
+                $values = array_merge($values, preg_split('/\r\n|\r|\n/', $unquoted) ?: []);
+            }
+        }
+
+        return array_values(array_unique(array_filter($values, static fn (string $item): bool => $item !== '')));
+    }
+
+    public function resolveReferencedValue(): ?string
+    {
+        $value = $this->value;
+
+        if ($this->is_literal || blank($value) || ! str($value)->startsWith('$')) {
+            return $value;
+        }
+
+        $referencedKey = str($value)->after('$')->trim('{}')->value();
+
+        return static::where('resourceable_type', $this->resourceable_type)
+            ->where('resourceable_id', $this->resourceable_id)
+            ->where('is_preview', (bool) $this->is_preview)
+            ->where('is_shown_once', false)
+            ->where('key', $referencedKey)
+            ->first()?->value ?? $value;
     }
 
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
@@ -389,8 +438,6 @@ class EnvironmentVariable extends BaseModel
 
     protected function updateIsShared(): void
     {
-        $type = str($this->value)->after('{{')->before('.')->value;
-        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
-        $this->is_shared = $isShared;
+        $this->is_shared = $this->isSharedReference();
     }
 }

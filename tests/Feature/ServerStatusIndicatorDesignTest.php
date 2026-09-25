@@ -14,7 +14,7 @@ test('server cards use warning icons instead of colored icon borders', function 
     expect(substr_count($serverIndex, '<x-status-badge'))->toBe(1)
         ->and($serverIndex)
         ->toContain("&& (\$server->proxy->status !== 'running' || \$server->hasCurrentTraefikOutdatedInfo())")
-        ->toContain('$sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive()')
+        ->toContain("\$sentinelNeedsAttention = \$isReady && \$server->isSentinelEnabled() && \$server->sentinelStatus() === 'out_of_sync'")
         ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => 'warning'")
         ->toContain("\$isReady => 'success'")
         ->toContain("\$isTransferredAway || \$server->settings->force_disabled => 'error'")
@@ -30,7 +30,7 @@ test('dashboard server cards warn when proxy or sentinel needs attention', funct
 
     expect($dashboard)
         ->toContain("\$proxyNeedsAttention = \$server->proxySet() && (\$server->proxy->status !== 'running' || \$server->hasCurrentTraefikOutdatedInfo())")
-        ->toContain('$sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive()')
+        ->toContain("\$sentinelNeedsAttention = \$server->isSentinelEnabled() && \$server->sentinelStatus() === 'out_of_sync'")
         ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => ['Attention required', 'warning']");
 });
 
@@ -39,13 +39,25 @@ test('server status summary uses warning indicators for proxy updates and sentin
 
     expect($summary)
         ->toContain('$server->hasCurrentTraefikOutdatedInfo()')
+        ->toContain('$sentinelStatus = $server->sentinelStatus()')
+        ->toContain("'waiting' => 'Waiting for first report'")
         ->toContain('$proxyStatusLabel = match (true)')
         ->toContain("\$proxyConfigurationPending => 'Restart required'")
         ->toContain("\$traefikUpdateAvailable => 'Update available'")
         ->toContain('{{ $proxyStatusLabel }}')
         ->toContain("'bg-warning' => \$proxyNeedsAttention && (\$proxyUpdateAvailable")
-        ->toContain("'bg-warning' => \$sentinelNeedsAttention")
+        ->toContain("'bg-warning' => \$sentinelStatus === 'out_of_sync'")
         ->not->toContain("\$server->isSentinelLive() ? 'bg-success' : 'bg-error'");
+});
+
+test('Sentinel logs show the pending first report state without an out-of-sync warning', function () {
+    $logs = file_get_contents(resource_path('views/livewire/server/sentinel/logs.blade.php'));
+
+    expect($logs)
+        ->toContain("'waiting' => ['Waiting for first report', 'neutral']")
+        ->toContain("'in_sync' => ['In sync', 'success']")
+        ->toContain("default => ['Out of sync', 'warning']")
+        ->not->toContain("\$server->isSentinelLive() ? 'In sync' : 'Out of sync'");
 });
 
 test('server table keeps status text without a badge', function () {

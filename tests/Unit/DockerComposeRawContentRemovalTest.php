@@ -38,7 +38,7 @@ it('ensures applicationParser updates docker_compose_raw from original compose, 
     // Check that docker_compose_raw is set from originalCompose, not cleanedCompose
     expect($parsersFile)
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
-        ->toContain('$resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);')
+        ->toContain("\$resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments(\$originalCompose, \$originalYaml, ['content', 'isDirectory', 'is_directory']);")
         ->not->toContain('$resource->docker_compose_raw = $cleanedCompose;');
 });
 
@@ -53,7 +53,7 @@ it('ensures serviceParser updates docker_compose_raw from original compose, not 
     // Check that docker_compose_raw is set from originalCompose within serviceParser
     expect($serviceParserContent)
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
-        ->toContain('$resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);')
+        ->toContain("\$resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments(\$originalCompose, \$originalYaml, ['content', 'isDirectory', 'is_directory']);")
         ->not->toContain('$resource->docker_compose_raw = $cleanedCompose;');
 });
 
@@ -97,4 +97,14 @@ it('ensures docker_compose_raw update is wrapped in try-catch for error handling
         ->toContain('$originalYaml = Yaml::parse($originalCompose);')
         ->toContain('} catch (Exception) {')
         ->toContain('// If parsing fails, keep the original docker_compose_raw unchanged');
+});
+
+it('does not reformat legacy raw Compose when no content is removed', function () {
+    $source = file_get_contents(__DIR__.'/../../bootstrap/helpers/shared.php');
+    $parser = substr($source, strpos($source, 'function parseDockerComposeFile('), strpos($source, 'function generate_fluentd_configuration(') - strpos($source, 'function parseDockerComposeFile('));
+
+    expect($parser)
+        ->toContain('if ($yaml !== $originalYaml) {')
+        ->toContain("data_forget(\$yaml, 'services.*.volumes.*.content')");
+    expect(substr_count($parser, "\$resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments(\$resource->docker_compose_raw, \$yaml, ['content']);"))->toBe(1);
 });

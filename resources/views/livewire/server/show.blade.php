@@ -59,7 +59,7 @@
                 @endphp
 
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
-                    {{-- isBuildServer uses instantSave; keep dirty tracking on explicit-save fields. --}}
+                    {{-- Server role saves separately; keep dirty tracking on explicit-save fields. --}}
                     <x-unsaved-bar action="submit"
                         targets="name,description,ip,user,port,connectionTimeout,serverTimezone,wildcardDomain" />
 
@@ -249,7 +249,7 @@
                                     'value' => $timezone,
                                     'label' => $timezone,
                                 ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
-                            @if (!$isSwarmWorker && !$isBuildServer)
+                            @if (!$isSwarmWorker && $serverRole !== 'build')
                                 <x-forms.input canGate="update" :canResource="$server"
                                     placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
                                     helper="New resources can receive generated subdomains from this domain."
@@ -259,16 +259,14 @@
 
                         @if (!$server->isLocalhost())
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                @if ($isBuildServerLocked)
-                                    <x-forms.checkbox disabled id="isBuildServer"
-                                        helper="This server already hosts resources and cannot become build-only."
-                                        label="Use as a dedicated build server" />
-                                @else
-                                    <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                        id="isBuildServer" label="Use as a dedicated build server"
-                                        helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
-                                        :disabled="$isValidating" />
-                                @endif
+                                <x-forms.listbox canGate="update" :canResource="$server" id="serverRole"
+                                    label="Server role" onChange="requestServerRoleChange"
+                                    helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build."
+                                    :disabled="$isValidating" :options="[
+                                        ['value' => 'deployment', 'label' => 'Deployments only'],
+                                        ['value' => 'build', 'label' => 'Builds only'],
+                                        ['value' => 'both', 'label' => 'Deployments and builds'],
+                                    ]" />
                             </div>
                         @endif
                     </x-application.settings-section>
@@ -286,4 +284,22 @@
             @endif
         </div>
     </div>
+
+    <x-modal-confirmation title="Use this server for deployments and builds?"
+        submitAction="confirmServerRoleChange" :confirmWithText="false" :confirmWithPassword="false"
+        step2ButtonText="Enable deployments and builds"
+        warningMessage="Builds can use a large amount of CPU and memory. During a build, deployed resources on this server can become slow or unreachable."
+        :actions="['Enable builds on this deployment server.']">
+        <x-slot:trigger>
+            <button id="server-role-confirmation-trigger" type="button" class="hidden" aria-hidden="true"></button>
+        </x-slot:trigger>
+    </x-modal-confirmation>
+
+    @script
+        <script>
+            $wire.on('open-server-role-confirmation', () => {
+                document.getElementById('server-role-confirmation-trigger')?.click();
+            });
+        </script>
+    @endscript
 </div>
