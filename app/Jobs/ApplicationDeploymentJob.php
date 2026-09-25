@@ -342,12 +342,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if (count($allContainers) > 0) {
                     $allContainers = $allContainers[0];
                     $allContainers = collect($allContainers)->sort()->values();
+                    // Build helper containers are named after their deployment uuid and only live for
+                    // the duration of that deployment. BuildKit keys every RUN layer on the --add-host
+                    // set, so letting one in gives the next build a different set and forces a full rebuild.
+                    $buildHelperNames = ApplicationDeploymentQueue::whereIn('deployment_uuid', $allContainers->pluck('Name')->filter())
+                        ->pluck('deployment_uuid');
                     foreach ($allContainers as $container) {
                         $containerName = data_get($container, 'Name');
                         if ($containerName === 'coolify-proxy') {
                             continue;
                         }
                         if (isGeneratedContainerName($containerName)) {
+                            continue;
+                        }
+                        if ($buildHelperNames->contains($containerName)) {
                             continue;
                         }
                         $containerIp = data_get($container, 'IPv4Address');
