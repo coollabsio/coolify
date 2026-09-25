@@ -12,6 +12,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Notifications\Internal\GeneralNotification;
@@ -179,7 +180,37 @@ it('targets a service subresource container by its Docker labels', function () {
     expect($commands->implode("\n"))
         ->toContain("label=coolify.serviceId={$service->id}")
         ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('label=coolify.service.subType=application')
         ->toContain('docker rm -f $container_ids');
+});
+
+it('removes only the database container when an application of the same service has the same id', function () {
+    // Service applications and databases are separate tables, so they can share an id.
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create(['service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:alpine']);
+    $database = ServiceDatabase::create(['service_id' => $service->id, 'name' => 'db', 'image' => 'postgres:17-alpine']);
+    $database->forceFill(['id' => $application->id])->save();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    app(DeleteService::class)->removeSubresourceContainer($database->fresh());
+
+    expect($commands->implode("\n"))
+        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('label=coolify.service.subType=database')
+        ->not->toContain('label=coolify.service.subType=application');
 });
 
 it('rolls back local metadata deletion when deleting the resource fails', function () {

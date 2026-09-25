@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
@@ -33,9 +34,6 @@ class StartPostgresql
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
-        if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
-        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -68,18 +66,7 @@ class StartPostgresql
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 

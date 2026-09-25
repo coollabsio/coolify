@@ -53,6 +53,17 @@
     @if ($labelsAreWritable)
         <x-callout type="warning" title="Domains managed via labels" class="mb-4">
             Container label readonly mode is disabled. Domains must be set in the Labels section on the General page.
+            @unless ($isCompose)
+                <a class="mt-2 block font-medium underline"
+                    href="{{ route('project.application.configuration', [
+                        'project_uuid' => data_get($application, 'environment.project.uuid'),
+                        'environment_uuid' => data_get($application, 'environment.uuid'),
+                        'application_uuid' => $application->uuid,
+                    ]) }}#container-labels-section"
+                    {{ wireNavigate() }}>
+                    Go to Container labels
+                </a>
+            @endunless
         </x-callout>
     @endif
 

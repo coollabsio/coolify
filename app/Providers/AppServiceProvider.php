@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Once;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
@@ -33,6 +35,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureGitHubHttp();
         $this->configureGitLabHttp();
         $this->configureOidcSocialite();
+        $this->configureQueue();
+    }
+
+    /**
+     * Queue workers are long-running processes, so once() values (e.g. instanceSettings())
+     * would stay stale across jobs. Flush them before each job, like a fresh web request.
+     */
+    private function configureQueue(): void
+    {
+        Queue::before(fn () => Once::flush());
     }
 
     private function configureCommands(): void

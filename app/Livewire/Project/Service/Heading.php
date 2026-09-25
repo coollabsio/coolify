@@ -10,6 +10,7 @@ use App\Enums\ProcessStatus;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ResourceStartActivity;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -103,15 +104,9 @@ class Heading extends Component
         $this->authorizeService('view');
 
         try {
-            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
-                $this->isDeploymentProgress = true;
-                $this->runningActivityId = $activity->id;
-            } else {
-                $this->isDeploymentProgress = false;
-                $this->runningActivityId = null;
-            }
+            $activity = ResourceStartActivity::latestRunning($this->service->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
             $this->runningActivityId = null;

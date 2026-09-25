@@ -97,7 +97,7 @@ test('running proxy shows pending configuration warning when saved settings diff
 
     $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
         ->assertSee('Changes pending')
-        ->assertSee('The saved proxy configuration has not been applied')
+        ->assertSee('Your configuration changed, please restart the proxy.')
         ->assertSee('Restart proxy');
 
     $server->refresh();
@@ -107,7 +107,7 @@ test('running proxy shows pending configuration warning when saved settings diff
 
     $component->call('showNotification')
         ->assertDispatched('proxy-configuration-state-changed', pending: false, traefikOutdated: false)
-        ->assertDontSee('The saved proxy configuration has not been applied');
+        ->assertDontSee('Your configuration changed, please restart the proxy.');
 });
 
 test('running proxy hides pending configuration warning when saved settings match applied settings', function () {
@@ -123,7 +123,7 @@ test('running proxy hides pending configuration warning when saved settings matc
     session(['currentTeam' => $team]);
 
     $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertDontSee('The saved proxy configuration has not been applied');
+        ->assertDontSee('Your configuration changed, please restart the proxy.');
 
     $server->refresh();
     $server->proxy->last_saved_settings = 'new-saved-hash';
@@ -132,7 +132,7 @@ test('running proxy hides pending configuration warning when saved settings matc
     $component->dispatch('refreshServerShow')
         ->assertDispatched('proxy-configuration-state-changed', pending: true, traefikOutdated: false)
         ->assertSee('Changes pending')
-        ->assertSee('The saved proxy configuration has not been applied');
+        ->assertSee('Your configuration changed, please restart the proxy.');
 });
 
 test('admin can stop a proxy while it is starting', function () {

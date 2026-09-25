@@ -60,10 +60,26 @@ it('does not apply the REST API allowlist to MCP and MCP switch routes', functio
         ->and($disable->gatherMiddleware())->not->toContain(ApiAllowed::class);
 });
 
-it('throttles every manual webhook route', function (string $provider) {
+it('throttles only failed authentication on manual webhook routes', function (string $provider) {
     $route = Route::getRoutes()->match(Request::create("/webhooks/source/{$provider}/events/manual", 'POST'));
+    $request = Request::create("/webhooks/source/{$provider}/events/manual", 'POST', server: ['REMOTE_ADDR' => '192.0.2.44']);
+    $helper = new class
+    {
+        use MatchesManualWebhookApplications;
 
-    expect($route->gatherMiddleware())->toContain('throttle:60,1');
+        public function reply(array $payloads, Request $request, string $provider): int
+        {
+            return $this->manualWebhookResponse(collect($payloads), $request, $provider)->getStatusCode();
+        }
+    };
+
+    expect($route->gatherMiddleware())->not->toContain('throttle:60,1');
+
+    $helper->reply([['status' => 'success', 'message' => 'queued']], $request, $provider);
+    expect(RateLimiter::attempts("manual-webhook-failures:{$provider}:192.0.2.44"))->toBe(0);
+
+    $helper->reply([['status' => 'failed', 'message' => 'Invalid signature.']], $request, $provider);
+    expect(RateLimiter::attempts("manual-webhook-failures:{$provider}:192.0.2.44"))->toBe(1);
 })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
 it('does not reveal how many applications share a manual webhook repository', function () {
@@ -73,7 +89,7 @@ it('does not reveal how many applications share a manual webhook repository', fu
 
         public function reply(array $payloads): string
         {
-            return $this->manualWebhookResponse(collect($payloads))->getContent();
+            return $this->manualWebhookResponse(collect($payloads), Request::create('/webhooks/source/github/events/manual', 'POST'), 'github')->getContent();
         }
     };
     $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];

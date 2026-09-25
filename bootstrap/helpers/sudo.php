@@ -20,6 +20,16 @@ function shouldChangeOwnership(string $path): bool
 
     return $isCoolifyPath;
 }
+/**
+ * Gives the SSH user the Coolify-created (root-owned) files in a directory and closes the
+ * directory to other users. Files that belong to container users (such as a database data
+ * folder) and the modes of mounted files stay as they are, so containers can still read them.
+ */
+function ownershipCommand(string $path, Server $server): string
+{
+    return "find $path -user root -exec chown $server->user:$server->user {} + && chmod o-rwx $path";
+}
+
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
@@ -84,7 +94,8 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         if (Str::startsWith($line, 'sudo mkdir -p')) {
             $path = trim(Str::after($line, 'sudo mkdir -p'));
             if (shouldChangeOwnership($path)) {
-                return "$line && sudo chown -R $server->user:$server->user $path && sudo chmod -R o-rwx $path";
+                // No sudo here: the && rule below adds it. `sudo sudo` fails where root is not in sudoers (Alpine).
+                return "$line && ".ownershipCommand($path, $server);
             }
 
             return $line;
@@ -141,7 +152,8 @@ function parseLineForSudo(string $command, Server $server): string
     if (Str::startsWith($command, 'sudo mkdir -p')) {
         $path = trim(Str::after($command, 'sudo mkdir -p'));
         if (shouldChangeOwnership($path)) {
-            $command = "$command && sudo chown -R $server->user:$server->user $path && sudo chmod -R o-rwx $path";
+            // No sudo here: the && rule below adds it.
+            $command = "$command && ".ownershipCommand($path, $server);
         }
     }
     if (str($command)->contains('$(') || str($command)->contains('`')) {
