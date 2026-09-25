@@ -346,6 +346,7 @@ class EnvironmentVariable extends BaseModel
         return static::where('resourceable_type', $this->resourceable_type)
             ->where('resourceable_id', $this->resourceable_id)
             ->where('is_preview', (bool) $this->is_preview)
+            ->where('is_shown_once', false)
             ->where('key', $referencedKey)
             ->first()?->value ?? $value;
     }
