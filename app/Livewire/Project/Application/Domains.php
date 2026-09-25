@@ -775,8 +775,11 @@ class Domains extends Component
 
     /**
      * Persist current domain row DNS results and drop statuses for removed domains.
+     *
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
      */
-    protected function persistDomainDnsStatuses(): void
+    protected function persistDomainDnsStatuses(array $startingCheckKeys = []): void
     {
         $statuses = [];
 
@@ -808,11 +811,15 @@ class Domains extends Component
             ];
         }
 
-        DB::transaction(function () use (&$statuses): void {
+        DB::transaction(function () use (&$statuses, $startingCheckKeys): void {
             $application = Application::query()->lockForUpdate()->findOrFail($this->application->id);
             $storedStatuses = $application->domain_dns_statuses ?? [];
 
             foreach ($statuses as $key => $status) {
+                if (in_array($key, $startingCheckKeys, true)) {
+                    continue;
+                }
+
                 $localCheckId = $status['check_id'] ?? null;
                 $storedCheckId = $storedStatuses[$key]['check_id'] ?? null;
 
@@ -1054,7 +1061,7 @@ class Domains extends Component
             foreach ($dnsChecks as $dnsCheck) {
                 $this->markUrlsAsChecking([$dnsCheck['url']], $serviceForCheck, $dnsCheck['check_id']);
             }
-            $this->persistDomainDnsStatuses();
+            $this->persistDomainDnsStatuses($dnsChecks->pluck('status_key')->all());
 
             $failedDnsChecks = 0;
             foreach ($dnsChecks as $dnsCheck) {
@@ -1207,7 +1214,7 @@ class Domains extends Component
         foreach ($this->dnsEntriesForUrls($urls, $service) as $statusKey => $url) {
             $checkId = new_public_id();
             $this->markUrlsAsChecking([$url], $service, $checkId);
-            $this->persistDomainDnsStatuses();
+            $this->persistDomainDnsStatuses([$statusKey]);
 
             try {
                 CheckDomainDnsJob::dispatch(
