@@ -36,9 +36,7 @@
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                        <x-callout type="warning" title="Configuration out of sync">
-                            Restart the proxy to apply the saved configuration.
-                        </x-callout>
+                        <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
                     @else
                         <div class="flex items-start gap-3">
                             <div
