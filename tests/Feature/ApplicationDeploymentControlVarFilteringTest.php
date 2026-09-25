@@ -1067,6 +1067,44 @@ it('injects Dockerfile args for plain build-time variables without a secret mana
     'preview' => [99, true],
 ]);
 
+it('checks compose Dockerfiles with a portable command that skips missing files', function (bool $dockerfileExists) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
+    $workdir = sys_get_temp_dir().'/coolify-compose-dockerfile-'.str()->random(8);
+    expect(mkdir($workdir))->toBeTrue();
+
+    if ($dockerfileExists) {
+        file_put_contents($workdir.'/Dockerfile', "FROM alpine\n");
+    }
+
+    try {
+        [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+            'workdir' => $workdir,
+            'env_args' => collect(['APP_ENV' => 'production']),
+        ]);
+
+        invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfiles_for_compose', [
+            'services' => ['api' => ['build' => ['context' => '.', 'dockerfile' => 'Dockerfile']]],
+        ]);
+
+        $checkCommand = collect($job->recordedCommands)->flatten(1)->firstWhere('save', 'dockerfile_check_api')[0];
+
+        // The helper image ships BusyBox realpath, which accepts no options.
+        expect($checkCommand)->not->toContain('realpath -');
+
+        $process = Process::fromShellCommandline(str($checkCommand)->after('docker exec deployment-uuid ')->toString());
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+        expect($process->getOutput())->toBe($dockerfileExists ? realpath($workdir.'/Dockerfile') : '');
+    } finally {
+        @unlink($workdir.'/Dockerfile');
+        @rmdir($workdir);
+    }
+})->with([
+    'existing Dockerfile' => [true],
+    'missing Dockerfile' => [false],
+]);
+
 it('builds railpack variables from generic buildtime vars railpack vars and coolify vars only', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'railpack',

@@ -4911,8 +4911,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
             $fullDockerfilePath = escapeshellarg("{$this->workdir}/{$dockerfilePath}");
 
+            // BusyBox realpath in the helper image accepts no options; a missing file prints nothing.
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath -e -- {$fullDockerfilePath}) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\""),
+                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath {$fullDockerfilePath} 2>/dev/null) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\" || true"),
                 'hidden' => true,
                 'save' => 'dockerfile_check_'.$serviceName,
             ]);
