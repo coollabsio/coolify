@@ -141,6 +141,13 @@ test('the migration fixes saved legacy configurations without connecting to serv
         ->and($caddy->fresh()->proxy->last_saved_proxy_configuration)->toBe('services: {}');
 });
 
+test('the migration saves each server outside one shared transaction', function () {
+    // In Postgres one failed update aborts a shared transaction, so later servers could not be saved.
+    $migration = require database_path('migrations/2026_09_25_210000_remove_legacy_traefik_dashboard_labels.php');
+
+    expect($migration->withinTransaction)->toBeFalse();
+});
+
 test('the pending proxy notice asks the user to restart the proxy', function () {
     $team = Team::factory()->create();
     $user = User::factory()->create();
