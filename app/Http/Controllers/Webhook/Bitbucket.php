@@ -72,7 +72,11 @@ class Bitbucket extends Controller
                     'message' => 'Nothing to do. Invalid repository.',
                 ]);
             }
-            $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
+            $applications = Application::query();
+            if ($x_bitbucket_event !== 'pullrequest:rejected' && $x_bitbucket_event !== 'pullrequest:fulfilled') {
+                $applications->where('git_branch', $branch);
+            }
+            $applications = $this->manualWebhookApplications($applications, $full_name);
             if ($applications->isEmpty()) {
                 return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
