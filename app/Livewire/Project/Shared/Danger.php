@@ -6,6 +6,7 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -72,7 +73,8 @@ class Danger extends Component
             'standalone-mariadb',
             'standalone-keydb',
             'standalone-dragonfly',
-            'standalone-clickhouse' => $this->resource->name ?? 'Database',
+            'standalone-clickhouse',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
@@ -95,6 +97,12 @@ class Danger extends Component
 
         if (! $this->resource) {
             return 'Resource not found.';
+        }
+
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->connectedVolumes()->exists()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
         }
 
         if (! empty($selectedActions)) {

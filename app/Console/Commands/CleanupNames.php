@@ -18,6 +18,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Support\ValidationPatterns;
@@ -49,6 +50,7 @@ class CleanupNames extends Command
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneSqlite' => StandaloneSqlite::class,
         'S3Storage' => S3Storage::class,
         'Tag' => Tag::class,
         'PrivateKey' => PrivateKey::class,

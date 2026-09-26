@@ -54,6 +54,7 @@ it('runs database start commands without persisting them through remote process'
     'StartMysql',
     'StartPostgresql',
     'StartRedis',
+    'StartSqlite',
 ]);
 
 it('queues database starts with identifiers instead of generated commands', function () {

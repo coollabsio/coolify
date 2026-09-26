@@ -33,6 +33,7 @@ class Dashboard extends Component
                 'mongodbs',
                 'mysqls',
                 'mariadbs',
+                'sqlites',
             ])
             ->get();
     }

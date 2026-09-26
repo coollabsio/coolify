@@ -22,6 +22,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\HasSecretManager;
@@ -259,6 +260,7 @@ test('all deployable environment-variable resources support secret managers', fu
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneSqlite::class,
 ]);
 
 test('an application has at most one secret manager source', function () {

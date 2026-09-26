@@ -14,6 +14,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Illuminate\Console\Command;
 
 use function Laravel\Prompts\confirm;
@@ -168,6 +169,13 @@ class ServicesDelete extends Command
             $key = "clickhouse_{$db->id}";
             $allDatabases->put($key, $db);
             $databaseOptions->put($key, "{$db->name} (ClickHouse)");
+        }
+
+        // Add SQLite databases
+        foreach (StandaloneSqlite::all() as $db) {
+            $key = "sqlite_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (SQLite)");
         }
 
         if ($allDatabases->count() === 0) {

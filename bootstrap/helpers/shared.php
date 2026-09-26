@@ -28,6 +28,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -4166,7 +4167,7 @@ function isAssociativeArray($array)
  *
  *  Theses variables are added in place to the $where_to_add array.
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
     // Currently disabled
     return;

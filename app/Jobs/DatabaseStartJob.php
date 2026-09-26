@@ -10,6 +10,7 @@ use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
+use App\Actions\Database\StartSqlite;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
 use App\Exceptions\DatabaseStartException;
@@ -21,6 +22,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\ResourceStartActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -120,6 +122,7 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneKeydb::class => StartKeydb::run($database, $activity),
             StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
+            StandaloneSqlite::class => StartSqlite::run($database, $activity),
         };
 
         if (! $result instanceof Activity || data_get($result, 'properties.status') !== ProcessStatus::FINISHED->value) {

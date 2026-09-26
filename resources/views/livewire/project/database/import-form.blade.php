@@ -65,12 +65,14 @@
                                 helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
                                 wire:model="restoreCommandText" canGate="update"
                                 :canResource="$this->resource" />
+                    @if ($resourceDbType !== 'standalone-sqlite')
                     <div class="max-w-sm">
                         <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
                             ['value' => true, 'label' => 'Backup contains all databases'],
                             ['value' => false, 'label' => 'Backup contains one database'],
                         ]" />
                     </div>
+                    @endif
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
                             <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"

@@ -13,6 +13,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -170,6 +171,23 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     $database->uuid = new_public_id();
     $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneSqlite
+{
+    $database = new StandaloneSqlite;
+    $database->uuid = new_public_id();
+    $database->name = 'sqlite-database-'.$database->uuid;
+    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

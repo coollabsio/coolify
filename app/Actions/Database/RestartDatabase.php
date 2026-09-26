@@ -10,6 +10,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -23,7 +24,7 @@ class RestartDatabase
      *                                    that queued this action holds the reservation; this action
      *                                    keeps it during the stop and releases it after the start.
      */
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, ?string $reservation = null)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null)
     {
         $reservation ??= DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {

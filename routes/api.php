@@ -309,6 +309,7 @@ Route::group([
     Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
     Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
+    Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.upload');
