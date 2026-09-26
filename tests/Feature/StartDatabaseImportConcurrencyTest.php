@@ -167,7 +167,7 @@ test('a stale import does not block a new import and is marked as failed', funct
 
     $stale->refresh();
     expect(data_get($stale, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
-        ->and(data_get($stale, 'properties.error'))->toBe(ResourceStartActivity::STALE_MESSAGE)
+        ->and(data_get($stale, 'properties.error'))->toBe(ResourceStartActivity::STALE_MESSAGE.' '.ResourceStartActivity::IMPORT_PARTLY_RESTORED_MESSAGE)
         ->and(data_get($stale, 'properties.exitCode'))->toBe(1);
 })->with([
     'queued' => ProcessStatus::QUEUED,
@@ -187,7 +187,7 @@ test('an import interrupted by a Coolify restart is failed at boot and no longer
 
     $interrupted->refresh();
     expect(data_get($interrupted, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
-        ->and(data_get($interrupted, 'properties.error'))->toBe(ResourceStartActivity::INTERRUPTED_MESSAGE);
+        ->and(data_get($interrupted, 'properties.error'))->toBe(ResourceStartActivity::INTERRUPTED_MESSAGE.' '.ResourceStartActivity::IMPORT_PARTLY_RESTORED_MESSAGE);
 
     expect(fn () => startImport($this->database, $this->team->id))
         ->toThrow(DatabaseImportException::class, 'The server path is invalid.');

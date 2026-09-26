@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
@@ -101,4 +102,57 @@ test('s3 import activity command does not contain storage key or secret', functi
             && ! array_key_exists('credentialTmpPath', $cleanup)
             && filled($cleanup['containerName'] ?? null);
     });
+});
+
+test('s3 import activity stores the cleanup names and paths but no credential values', function () {
+    $accessKey = 'AKIA_STORED_CLEANUP_KEY';
+    $secret = 'stored/cleanup/SECRET/value';
+    $endpoint = 'https://8.8.4.4';
+    $storage = S3Storage::create([
+        'name' => 'Import S3',
+        'region' => 'us-east-1',
+        'key' => $accessKey,
+        'secret' => $secret,
+        'bucket' => 'test-bucket',
+        'endpoint' => $endpoint,
+        'is_usable' => true,
+        'team_id' => $this->team->id,
+    ]);
+
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('exists')->once()->with('backups/restore.sql')->andReturn(true);
+    $disk->shouldReceive('size')->once()->with('backups/restore.sql')->andReturn(1024);
+    $filesystem = Mockery::mock(FilesystemManager::class, [app()])->makePartial();
+    $filesystem->shouldReceive('build')->once()->andReturn($disk);
+    Storage::swap($filesystem);
+
+    Process::fake();
+    Queue::fake();
+
+    $activity = app(StartDatabaseImport::class)->handle(
+        $this->database,
+        new DatabaseImportSource('s3', path: 'backups/restore.sql', s3StorageUuid: $storage->uuid),
+        $this->team->id,
+    );
+
+    $stored = $activity->getExtraProperty(DatabaseImportCleanup::PROPERTY);
+    $operation = $activity->getExtraProperty('operation_uuid');
+
+    expect($stored)->toBe([
+        'container' => $this->database->uuid,
+        'containerTmpPath' => "/tmp/restore_{$operation}",
+        'scriptPath' => "/tmp/restore_{$operation}.sh",
+        'serverId' => $this->server->id,
+        'operationUuid' => $operation,
+        'containerName' => "s3-restore-{$operation}",
+    ]);
+
+    $properties = json_encode($activity->properties);
+    expect($properties)
+        ->not->toContain($accessKey)
+        ->not->toContain($secret)
+        ->not->toContain($endpoint)
+        ->not->toContain('S3_ACCESS_KEY=');
+
+    Queue::assertPushed(CoolifyTask::class, fn (CoolifyTask $job) => $job->call_event_data === $stored);
 });

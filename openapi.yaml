@@ -388,6 +388,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -770,6 +774,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1152,6 +1160,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1475,6 +1487,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -1784,6 +1800,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -2247,6 +2267,10 @@ paths:
                   type: string
                   nullable: true
                   description: 'Custom internal container name.'
+                custom_container_name_prefix:
+                  type: string
+                  nullable: true
+                  description: 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'
                 preview_url_template:
                   type: string
                   description: 'Preview URL template.'
@@ -2314,12 +2338,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -2578,7 +2610,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -2639,7 +2671,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -2683,7 +2715,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -3916,7 +3948,7 @@ paths:
         '202':
           description: 'Import queued'
         '409':
-          description: 'Import already active'
+          description: 'Another start, restart or import of this database is already in progress.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -5361,12 +5393,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -5612,6 +5652,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Another start, restart or import of this database is already in progress.'
       security:
         -
           bearerAuth: []
@@ -5685,6 +5727,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'Another start, restart or import of this database is already in progress.'
       security:
         -
           bearerAuth: []
@@ -5756,7 +5800,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -5816,7 +5860,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -5862,7 +5906,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -10175,7 +10219,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  is_sentinel_enabled: { type: boolean }
+                  is_sentinel_enabled: { description: 'Sentinel is mandatory on regular managed servers.', type: boolean, readOnly: true }
                   is_metrics_enabled: { type: boolean }
                   is_sentinel_debug_enabled: { type: boolean }
                   sentinel_token: { description: 'Only present with read:sensitive.', type: string }
@@ -10221,8 +10265,6 @@ paths:
           application/json:
             schema:
               properties:
-                is_sentinel_enabled:
-                  type: boolean
                 is_metrics_enabled:
                   type: boolean
                 is_sentinel_debug_enabled:
@@ -10579,10 +10621,11 @@ paths:
                   type: string
                   example: og888os
                   description: 'The UUID of the private key.'
-                is_build_server:
-                  type: boolean
-                  example: false
-                  description: 'Is build server.'
+                server_role:
+                  type: string
+                  enum: [deployment, build, both]
+                  example: both
+                  description: 'Server role.'
                 instant_validate:
                   type: boolean
                   example: false
@@ -10717,9 +10760,10 @@ paths:
                 private_key_uuid:
                   type: string
                   description: 'The UUID of the private key.'
-                is_build_server:
-                  type: boolean
-                  description: 'Is build server.'
+                server_role:
+                  type: string
+                  enum: [deployment, build, both]
+                  description: 'Server role.'
                 instant_validate:
                   type: boolean
                   description: 'Instant validate.'
@@ -10996,12 +11040,12 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                is_force_https_enabled:
+                  type: [boolean, 'null']
                 max_restart_count:
                   description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'
                   type: [integer, 'null']
                   minimum: 0
-                is_force_https_enabled:
-                  type: [boolean, 'null']
               type: object
       responses:
         '200':
@@ -11046,12 +11090,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11094,11 +11146,20 @@ paths:
         -
           name: lines
           in: query
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11313,7 +11374,7 @@ paths:
         '202':
           description: 'Import queued'
         '409':
-          description: 'Import already active'
+          description: 'Another start, restart or import of this database is already in progress.'
         '422':
           $ref: '#/components/responses/422'
       security:
@@ -11514,11 +11575,20 @@ paths:
         -
           name: lines
           in: query
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
       responses:
         '200':
           description: Logs.
@@ -11869,6 +11939,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_from_coolify_only
+          in: query
+          description: 'Remove only Coolify metadata without deleting Docker resources.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -11995,12 +12073,20 @@ paths:
         -
           name: lines
           in: query
-          description: 'Number of lines to show from the end of the logs.'
+          description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.'
           required: false
           schema:
-            type: integer
-            format: int32
-            default: 100
+            oneOf:
+              -
+                type: integer
+                format: int32
+                default: 100
+                maximum: 10000
+                minimum: -1
+              -
+                type: string
+                enum:
+                  - all
         -
           name: show_timestamps
           in: query
@@ -12098,7 +12184,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -12161,7 +12247,7 @@ paths:
                   description: 'The flag to indicate if the environment variable is multiline.'
                 is_shown_once:
                   type: boolean
-                  description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                  description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
               type: object
       responses:
         '201':
@@ -12207,7 +12293,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values." } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.' } }, type: object }
               type: object
       responses:
         '201':
@@ -12885,8 +12971,8 @@ paths:
                 is_multiline:
                   type: boolean
                 is_shown_once:
-                  type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'
+                  type: boolean
                 comment:
                   type: [string, 'null']
               type: object
@@ -13578,6 +13664,42 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Teams
+      summary: 'Update authenticated team'
+      description: 'Update settings for the team bound to the API token.'
+      operationId: update-token-team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - is_build_server_fallback_enabled
+              properties:
+                is_build_server_fallback_enabled:
+                  type: boolean
+                  description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
+              type: object
+      responses:
+        '200':
+          description: 'Updated team.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -14702,6 +14824,9 @@ components:
         custom_internal_name:
           type: string
           nullable: true
+        custom_container_name_prefix:
+          type: string
+          nullable: true
         is_container_label_escape_enabled:
           type: boolean
         is_env_sorting_enabled:
@@ -14981,8 +15106,12 @@ components:
           type: boolean
         force_server_cleanup:
           type: boolean
-        is_build_server:
-          type: boolean
+        server_role:
+          type: string
+          enum:
+            - deployment
+            - build
+            - both
         is_cloudflare_tunnel:
           type: boolean
         is_jump_server:
@@ -15201,6 +15330,9 @@ components:
         custom_server_limit:
           type: string
           description: 'The custom server limit.'
+        is_build_server_fallback_enabled:
+          type: boolean
+          description: 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'
         members:
           description: 'The members of the team.'
           type: array

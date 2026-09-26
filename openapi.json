@@ -556,6 +556,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -1141,6 +1146,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Custom internal container name."
+                                    },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
                                     },
                                     "preview_url_template": {
                                         "type": "string",
@@ -1728,6 +1738,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -2209,6 +2224,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -2669,6 +2689,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Custom internal container name."
+                                    },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
                                     },
                                     "preview_url_template": {
                                         "type": "string",
@@ -3376,6 +3401,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -3516,12 +3546,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -6097,7 +6139,7 @@
                         "description": "Import queued"
                     },
                     "409": {
-                        "description": "Import already active"
+                        "description": "Another start, restart or import of this database is already in progress."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -8140,12 +8182,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -8554,6 +8608,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another start, restart or import of this database is already in progress."
                     }
                 },
                 "security": [
@@ -8669,6 +8726,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another start, restart or import of this database is already in progress."
                     }
                 },
                 "security": [
@@ -16033,7 +16093,9 @@
                                 "schema": {
                                     "properties": {
                                         "is_sentinel_enabled": {
-                                            "type": "boolean"
+                                            "description": "Sentinel is mandatory on regular managed servers.",
+                                            "type": "boolean",
+                                            "readOnly": true
                                         },
                                         "is_metrics_enabled": {
                                             "type": "boolean"
@@ -16132,9 +16194,6 @@
                         "application\/json": {
                             "schema": {
                                 "properties": {
-                                    "is_sentinel_enabled": {
-                                        "type": "boolean"
-                                    },
                                     "is_metrics_enabled": {
                                         "type": "boolean"
                                     },
@@ -16676,10 +16735,15 @@
                                         "example": "og888os",
                                         "description": "The UUID of the private key."
                                     },
-                                    "is_build_server": {
-                                        "type": "boolean",
-                                        "example": false,
-                                        "description": "Is build server."
+                                    "server_role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "deployment",
+                                            "build",
+                                            "both"
+                                        ],
+                                        "example": "both",
+                                        "description": "Server role."
                                     },
                                     "instant_validate": {
                                         "type": "boolean",
@@ -16889,9 +16953,14 @@
                                         "type": "string",
                                         "description": "The UUID of the private key."
                                     },
-                                    "is_build_server": {
-                                        "type": "boolean",
-                                        "description": "Is build server."
+                                    "server_role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "deployment",
+                                            "build",
+                                            "both"
+                                        ],
+                                        "description": "Server role."
                                     },
                                     "instant_validate": {
                                         "type": "boolean",
@@ -17368,6 +17437,12 @@
                                             "null"
                                         ]
                                     },
+                                    "is_force_https_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
                                     "max_restart_count": {
                                         "description": "Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.",
                                         "type": [
@@ -17375,12 +17450,6 @@
                                             "null"
                                         ],
                                         "minimum": 0
-                                    },
-                                    "is_force_https_enabled": {
-                                        "type": [
-                                            "boolean",
-                                            "null"
-                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -17449,12 +17518,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -17520,11 +17601,24 @@
                     {
                         "name": "lines",
                         "in": "query",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -17852,7 +17946,7 @@
                         "description": "Import queued"
                     },
                     "409": {
-                        "description": "Import already active"
+                        "description": "Another start, restart or import of this database is already in progress."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -18159,11 +18253,24 @@
                     {
                         "name": "lines",
                         "in": "query",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -18741,6 +18848,16 @@
                             "type": "boolean",
                             "default": true
                         }
+                    },
+                    {
+                        "name": "delete_from_coolify_only",
+                        "in": "query",
+                        "description": "Remove only Coolify metadata without deleting Docker resources.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -18985,12 +19102,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -20379,8 +20508,8 @@
                                         "type": "boolean"
                                     },
                                     "is_shown_once": {
-                                        "type": "boolean",
-                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
+                                        "type": "boolean"
                                     },
                                     "comment": {
                                         "type": [
@@ -21410,6 +21539,62 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Teams"
+                ],
+                "summary": "Update authenticated team",
+                "description": "Update settings for the team bound to the API token.",
+                "operationId": "update-token-team",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "is_build_server_fallback_enabled"
+                                ],
+                                "properties": {
+                                    "is_build_server_fallback_enabled": {
+                                        "type": "boolean",
+                                        "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated team.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Team"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -22992,6 +23177,10 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "custom_container_name_prefix": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "is_container_label_escape_enabled": {
                         "type": "boolean"
                     },
@@ -23383,8 +23572,13 @@
                     "force_server_cleanup": {
                         "type": "boolean"
                     },
-                    "is_build_server": {
-                        "type": "boolean"
+                    "server_role": {
+                        "type": "string",
+                        "enum": [
+                            "deployment",
+                            "build",
+                            "both"
+                        ]
                     },
                     "is_cloudflare_tunnel": {
                         "type": "boolean"
@@ -23692,6 +23886,10 @@
                     "custom_server_limit": {
                         "type": "string",
                         "description": "The custom server limit."
+                    },
+                    "is_build_server_fallback_enabled": {
+                        "type": "boolean",
+                        "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
                     },
                     "members": {
                         "description": "The members of the team.",
