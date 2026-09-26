@@ -5943,5 +5943,22 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "8080"
+    },
+    "dbx": {
+        "documentation": "https://dbxio.com/en/docs/getting-started?utm_source=coolify.io",
+        "slogan": "Lightweight database client supporting more than 90 databases.",
+        "compose": "c2VydmljZXM6CiAgZGJ4OgogICAgaW1hZ2U6ICd0OHkyL2RieDoke0RCWF9WRVJTSU9OOi1sYXRlc3R9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfREJYXzQyMjQKICAgICAgLSAnREJYX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9EQlh9JwogICAgdm9sdW1lczoKICAgICAgLSAnZGJ4LWRhdGE6L2FwcC9kYXRhJwp2b2x1bWVzOgogIGRieC1kYXRhOiBudWxsCg==",
+        "tags": [
+            "database",
+            "sql",
+            "client",
+            "management",
+            "development"
+        ],
+        "category": "database",
+        "logo": "svgs/dbx.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "4224"
     }
 }
