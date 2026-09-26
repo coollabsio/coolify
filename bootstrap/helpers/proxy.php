@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
@@ -181,14 +182,16 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
             ];
         }
     } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
-        $trafficVolume = $server->proxyPath().':/traffic';
+        // Caddy writes /traffic/access.log and Sentinel reads <trafficLogDirectory>/access.log, so both use one path.
+        $trafficVolume = StartSentinel::trafficLogDirectory($server).':/traffic';
         $volumes = data_get($config, 'services.caddy.volumes', []);
 
         if (! is_array($volumes)) {
             throw new RuntimeException('Caddy volumes must be a YAML list.');
         }
 
-        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => $volume !== $trafficVolume));
+        // Coolify owns /traffic: replace an older mount with a different source path.
+        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => ! isCaddyTrafficVolume($volume)));
         if ($enabled) {
             $volumes[] = $trafficVolume;
         }
@@ -197,6 +200,24 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
     }
 
     return $config;
+}
+
+/**
+ * True for a Caddy volume that mounts to the /traffic access-log directory (short or long syntax).
+ */
+function isCaddyTrafficVolume(mixed $volume): bool
+{
+    if (is_array($volume)) {
+        return rtrim((string) data_get($volume, 'target'), '/') === '/traffic';
+    }
+
+    if (! is_string($volume)) {
+        return false;
+    }
+
+    $parts = explode(':', $volume);
+
+    return count($parts) >= 2 && rtrim($parts[1], '/') === '/traffic';
 }
 
 /**
@@ -612,7 +633,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
-            $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
+            $config['services']['traefik']['volumes'][] = devCoolifyDataPath().'/proxy/:/traefik';
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
@@ -650,7 +671,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'caddy' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'lucaslorentz/caddy-docker-proxy:2.13-alpine',
+                    'image' => Server::RECOMMENDED_CADDY_PROXY_IMAGE,
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',

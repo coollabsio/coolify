@@ -182,7 +182,7 @@ it('marks interrupted database imports as failed on startup and leaves other ope
     foreach ([$queuedImport, $runningImport] as $activity) {
         $activity->refresh();
         expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
-            ->and(data_get($activity, 'properties.error'))->toBe('Interrupted by a Coolify restart.');
+            ->and(data_get($activity, 'properties.error'))->toBe('Interrupted by a Coolify restart. The database may be partly restored.');
     }
 
     expect(data_get($finishedImport->refresh(), 'properties.status'))->toBe(ProcessStatus::FINISHED->value)

@@ -11,6 +11,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -166,7 +167,7 @@ test('a stale import does not block a new import and is marked as failed', funct
 
     $stale->refresh();
     expect(data_get($stale, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
-        ->and(data_get($stale, 'properties.error'))->toBe(ResourceStartActivity::STALE_MESSAGE)
+        ->and(data_get($stale, 'properties.error'))->toBe(ResourceStartActivity::STALE_MESSAGE.' '.ResourceStartActivity::IMPORT_PARTLY_RESTORED_MESSAGE)
         ->and(data_get($stale, 'properties.exitCode'))->toBe(1);
 })->with([
     'queued' => ProcessStatus::QUEUED,
@@ -186,8 +187,58 @@ test('an import interrupted by a Coolify restart is failed at boot and no longer
 
     $interrupted->refresh();
     expect(data_get($interrupted, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
-        ->and(data_get($interrupted, 'properties.error'))->toBe(ResourceStartActivity::INTERRUPTED_MESSAGE);
+        ->and(data_get($interrupted, 'properties.error'))->toBe(ResourceStartActivity::INTERRUPTED_MESSAGE.' '.ResourceStartActivity::IMPORT_PARTLY_RESTORED_MESSAGE);
 
     expect(fn () => startImport($this->database, $this->team->id))
         ->toThrow(DatabaseImportException::class, 'The server path is invalid.');
+});
+
+test('an import is rejected while a start or restart of the database waits in the queue', function () {
+    $token = DatabaseOperationReservation::acquire($this->database->uuid);
+
+    try {
+        expect(fn () => startImport($this->database, $this->team->id))
+            ->toThrow(DatabaseImportException::class, ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE);
+    } finally {
+        DatabaseOperationReservation::release($this->database->uuid, $token);
+    }
+});
+
+test('the 409 status is used when a pending start blocks an import', function () {
+    $token = DatabaseOperationReservation::acquire($this->database->uuid);
+
+    try {
+        startImport($this->database, $this->team->id);
+        $this->fail('The import was not rejected.');
+    } catch (DatabaseImportException $exception) {
+        expect($exception->status)->toBe(409);
+    } finally {
+        DatabaseOperationReservation::release($this->database->uuid, $token);
+    }
+});
+
+test('an import is rejected while a start of the database is running', function (ProcessStatus $status) {
+    Activity::create([
+        'log_name' => 'default',
+        'description' => '[]',
+        'properties' => [
+            'team_id' => $this->team->id,
+            'type_uuid' => $this->database->uuid,
+            'operation' => ResourceStartActivity::DATABASE_START_OPERATION,
+            'status' => $status->value,
+        ],
+    ]);
+
+    expect(fn () => startImport($this->database, $this->team->id))
+        ->toThrow(DatabaseImportException::class, ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE);
+})->with([
+    'queued' => ProcessStatus::QUEUED,
+    'in progress' => ProcessStatus::IN_PROGRESS,
+]);
+
+test('an import holds the operation reservation and releases it afterwards', function () {
+    expect(fn () => startImport($this->database, $this->team->id))
+        ->toThrow(DatabaseImportException::class, 'The server path is invalid.');
+
+    expect(Cache::has(DatabaseOperationReservation::key($this->database->uuid)))->toBeFalse();
 });

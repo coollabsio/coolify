@@ -219,6 +219,14 @@ class Proxy extends Component
         return $matches[1];
     }
 
+    /**
+     * The saved caddy-docker-proxy image when it is older than 2.9 (Caddy 2.7), else null.
+     */
+    public function getOutdatedCaddyImageProperty(): ?string
+    {
+        return $this->server->outdatedCaddyProxyImage();
+    }
+
     public function loadTraefikCertificates(): void
     {
         $this->traefikCertificates = [];

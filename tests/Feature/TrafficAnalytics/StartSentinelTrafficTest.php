@@ -206,3 +206,18 @@ it('keeps the access log commands valid for non-root servers', function () {
 
     expect($syntax->isSuccessful())->toBeTrue($syntax->getErrorOutput());
 });
+
+it('mounts the configured dev data volume for traffic logs and Sentinel data', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.coolify.dev_data_volume', 'coolify-dev-feature_coolify_data');
+    $server = sentinelTrafficServer($this, 'CADDY', analyticsEnabled: true);
+    $directory = '/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy';
+
+    $script = runStartSentinelAndCaptureScript($server);
+
+    expect(StartSentinel::trafficLogDirectory($server))->toBe($directory)
+        ->and($script)->toContain(escapeshellarg("{$directory}:{$directory}:ro"))
+        ->toContain(escapeshellarg("TRAFFIC_ACCESS_LOG_PATH={$directory}/access.log"))
+        ->toContain('-v /var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/sentinel:/app/db')
+        ->not->toContain('coolify_dev_coolify_data');
+});

@@ -23,6 +23,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -73,7 +74,7 @@ class DatabasesController extends Controller
         ],
         responses: [
             new OA\Response(response: 202, description: 'Import queued'),
-            new OA\Response(response: 409, description: 'Import already active'),
+            new OA\Response(response: 409, description: 'Another start, restart or import of this database is already in progress.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -3386,10 +3387,11 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
         }
-        if ($busyError = StartDatabase::operationInProgressError($database)) {
-            return response()->json(['message' => $busyError], 409);
+        $reservation = StartDatabase::reserveOperation($database);
+        if ($reservation === null) {
+            return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
         }
-        StartDatabase::dispatch($database);
+        StartDatabase::dispatchReserved(StartDatabase::class, $database, $reservation);
 
         auditLog('api.database.started', [
             'team_id' => $teamId,
@@ -3576,10 +3578,11 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
-        if ($busyError = StartDatabase::operationInProgressError($database)) {
-            return response()->json(['message' => $busyError], 409);
+        $reservation = StartDatabase::reserveOperation($database);
+        if ($reservation === null) {
+            return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
         }
-        RestartDatabase::dispatch($database);
+        StartDatabase::dispatchReserved(RestartDatabase::class, $database, $reservation);
 
         auditLog('api.database.restarted', [
             'team_id' => $teamId,

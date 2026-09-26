@@ -13,7 +13,7 @@ class StartSentinel
     public static function trafficLogDirectory(Server $server): string
     {
         return isDev()
-            ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy'
+            ? devCoolifyDataPath().'/proxy'
             : rtrim($server->proxyPath(), '/');
     }
 
@@ -108,7 +108,7 @@ class StartSentinel
             if ($customImage && ! empty($customImage)) {
                 $image = $customImage;
             }
-            $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
+            $mountDir = devCoolifyDataPath().'/sentinel';
         }
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));

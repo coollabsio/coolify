@@ -11,28 +11,44 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Support\DatabaseOperationReservation;
+use App\Support\ResourceStartActivity;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class RestartDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database)
+    /**
+     * @param  string|null  $reservation  The token from StartDatabase::reserveOperation(). The request
+     *                                    that queued this action holds the reservation; this action
+     *                                    keeps it during the stop and releases it after the start.
+     */
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null)
     {
-        $server = $database->destination->server;
-        if (! $server->isFunctional()) {
-            return 'Server is not functional';
+        $reservation ??= DatabaseOperationReservation::acquire($database->uuid);
+        if ($reservation === null) {
+            return ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
         }
-        $busyError = StartDatabase::operationInProgressError($database);
-        if ($busyError !== null) {
-            return $busyError;
-        }
-        $prerequisiteError = StartDatabase::prerequisiteError($database);
-        if ($prerequisiteError !== null) {
-            return $prerequisiteError;
-        }
-        StopDatabase::run($database, dockerCleanup: false);
 
-        return StartDatabase::run($database);
+        try {
+            $server = $database->destination->server;
+            if (! $server->isFunctional()) {
+                return 'Server is not functional';
+            }
+            $busyError = StartDatabase::operationInProgressError($database, $reservation);
+            if ($busyError !== null) {
+                return $busyError;
+            }
+            $prerequisiteError = StartDatabase::prerequisiteError($database);
+            if ($prerequisiteError !== null) {
+                return $prerequisiteError;
+            }
+            StopDatabase::run($database, dockerCleanup: false);
+
+            return StartDatabase::run($database, $reservation);
+        } finally {
+            DatabaseOperationReservation::release($database->uuid, $reservation);
+        }
     }
 }
