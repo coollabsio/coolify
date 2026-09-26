@@ -1062,6 +1062,35 @@ $siteAddress {
     }
 
     /**
+     * Traffic analytics reads the access log of a Coolify-managed Traefik or Caddy proxy.
+     */
+    public function hasTrafficAnalyticsProxy(): bool
+    {
+        return in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true);
+    }
+
+    /**
+     * Why traffic analytics cannot be enabled on this server, or null when it can.
+     */
+    public function trafficAnalyticsUnsupportedReason(): ?string
+    {
+        if ($this->isSwarm() || $this->isBuildServer()) {
+            return 'Traffic analytics is not supported on Swarm/Build servers.';
+        }
+
+        if (! $this->hasTrafficAnalyticsProxy()) {
+            return 'Traffic analytics needs the Traefik or Caddy proxy.';
+        }
+
+        return null;
+    }
+
+    public function supportsTrafficAnalytics(): bool
+    {
+        return $this->trafficAnalyticsUnsupportedReason() === null;
+    }
+
+    /**
      * Caddy's `log_append` tags access-log lines with the app UUID for traffic analytics. It needs
      * Caddy 2.8+, which caddy-docker-proxy ships from 2.9: the 2.8 image (the default before 2.13)
      * runs Caddy 2.7.6, which rejects the whole Caddyfile. A saved change that is not applied yet may still run the
@@ -1916,6 +1945,7 @@ $siteAddress {
             return str($proxyType->value)->lower();
         });
         if ($validProxyTypes->contains(str($proxyType)->lower())) {
+            $previousProxyType = $this->proxyType();
             $this->proxy->set('type', str($proxyType)->upper());
             $this->proxy->set('status', 'exited');
             $this->proxy->set('last_saved_proxy_configuration', null);
@@ -1931,9 +1961,24 @@ $siteAddress {
                     StartProxy::run($this);
                 }
             }
+            if ($previousProxyType !== $this->proxyType() && $this->shouldRestartSentinelForTrafficAnalytics()) {
+                // Sentinel keeps the traffic log mount, path and log format of the old proxy until it is recreated.
+                $this->restartSentinel();
+            }
         } else {
             throw new \Exception('Invalid proxy type.');
         }
+    }
+
+    /**
+     * Sentinel reads the proxy access log only when it runs and traffic analytics is on.
+     * The raw setting is used, because a switch to a proxy without analytics support must also drop the old log mount.
+     */
+    private function shouldRestartSentinelForTrafficAnalytics(): bool
+    {
+        return (bool) $this->settings->is_sentinel_enabled
+            && $this->isSentinelEnabled()
+            && $this->isTrafficAnalyticsEnabled();
     }
 
     public function isEmpty()

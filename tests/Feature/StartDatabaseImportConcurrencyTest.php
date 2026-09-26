@@ -11,6 +11,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\ResourceStartActivity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -122,4 +123,71 @@ test('a failed start releases the import lock', function () {
     } finally {
         $lock->release();
     }
+});
+
+function importActivity(string $databaseUuid, int $teamId, ProcessStatus $status, int $minutesSinceLastUpdate = 0): Activity
+{
+    $activity = Activity::create([
+        'log_name' => 'default',
+        'description' => '[]',
+        'properties' => [
+            'team_id' => $teamId,
+            'type_uuid' => $databaseUuid,
+            'operation' => 'database_import',
+            'status' => $status->value,
+        ],
+    ]);
+
+    Activity::query()->whereKey($activity->id)->update([
+        'created_at' => now()->subMinutes($minutesSinceLastUpdate),
+        'updated_at' => now()->subMinutes($minutesSinceLastUpdate),
+    ]);
+
+    return $activity->refresh();
+}
+
+test('an in-progress import that is silent for a long time but within the limit still blocks', function () {
+    $minutes = intdiv(ResourceStartActivity::importStaleAfterSeconds(), 60) - 5;
+    $activity = importActivity($this->database->uuid, $this->team->id, ProcessStatus::IN_PROGRESS, $minutes);
+
+    expect(fn () => startImport($this->database, $this->team->id))
+        ->toThrow(DatabaseImportException::class, 'A database import is already running.');
+
+    expect(data_get($activity->refresh(), 'properties.status'))->toBe(ProcessStatus::IN_PROGRESS->value);
+});
+
+test('a stale import does not block a new import and is marked as failed', function (ProcessStatus $status) {
+    $minutes = intdiv(ResourceStartActivity::importStaleAfterSeconds(), 60) + 5;
+    $stale = importActivity($this->database->uuid, $this->team->id, $status, $minutes);
+
+    // The guard lets the import through, so it fails later on the invalid path instead of with 409.
+    expect(fn () => startImport($this->database, $this->team->id))
+        ->toThrow(DatabaseImportException::class, 'The server path is invalid.');
+
+    $stale->refresh();
+    expect(data_get($stale, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+        ->and(data_get($stale, 'properties.error'))->toBe(ResourceStartActivity::STALE_MESSAGE)
+        ->and(data_get($stale, 'properties.exitCode'))->toBe(1);
+})->with([
+    'queued' => ProcessStatus::QUEUED,
+    'in progress' => ProcessStatus::IN_PROGRESS,
+]);
+
+test('the stale import limit follows a raised SSH command timeout', function () {
+    config()->set('constants.ssh.command_timeout', 5 * 3600);
+
+    expect(ResourceStartActivity::importStaleAfterSeconds())->toBeGreaterThan(5 * 3600);
+});
+
+test('an import interrupted by a Coolify restart is failed at boot and no longer blocks a new import', function () {
+    $interrupted = importActivity($this->database->uuid, $this->team->id, ProcessStatus::IN_PROGRESS);
+
+    expect(ResourceStartActivity::failInterrupted())->toBe(1);
+
+    $interrupted->refresh();
+    expect(data_get($interrupted, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+        ->and(data_get($interrupted, 'properties.error'))->toBe(ResourceStartActivity::INTERRUPTED_MESSAGE);
+
+    expect(fn () => startImport($this->database, $this->team->id))
+        ->toThrow(DatabaseImportException::class, 'The server path is invalid.');
 });

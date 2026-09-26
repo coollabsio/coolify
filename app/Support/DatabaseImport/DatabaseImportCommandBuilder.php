@@ -148,25 +148,42 @@ SH;
      */
     private function postgresqlSingle(bool $replaceExisting): string
     {
+        // Every restore runs in one transaction, so a failure part-way rolls back and leaves the
+        // current data as it was, also when --clean dropped objects first.
         $clean = $replaceExisting ? ' --clean --if-exists' : '';
-        $sqlNotice = $replaceExisting ? <<<'SH'
+        $sqlRestore = $replaceExisting ? <<<'SH'
 
-  echo 'SQL backups cannot replace single objects. The database is recreated before the restore.'
-  echo "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" | psql -v db="$db" -U $POSTGRES_USER -d template1 >/dev/null || exit 1
-  dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$db" || exit 1
-  createdb -U $POSTGRES_USER "$db" || exit 1
-SH : '';
+  echo 'SQL backups cannot replace single objects. The backup is restored into a new database first; the current database is replaced only when that restore succeeds.'
+  new=coolify_restore_new
+  old=coolify_restore_old
+  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new" || exit 1
+  createdb -U $POSTGRES_USER "$new" || exit 1
+  if ! stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$new"; then
+    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
+    fail 'The SQL restore failed. The current database was not changed.'
+  fi
+  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$old" || exit 1
+  if ! printf '%s\n' "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" 'ALTER DATABASE :"db" RENAME TO :"old";' 'ALTER DATABASE :"new" RENAME TO :"db";' | psql -v ON_ERROR_STOP=1 -v db="$db" -v old="$old" -v new="$new" -U $POSTGRES_USER -d template1 >/dev/null; then
+    # Undo a half-done swap: the current database keeps its name and data.
+    printf '%s\n' 'ALTER DATABASE :"old" RENAME TO :"db";' | psql -v db="$db" -v old="$old" -U $POSTGRES_USER -d template1 >/dev/null 2>&1
+    PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
+    fail 'The current database is in use and could not be replaced. Nothing was changed.'
+  fi
+  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$old" || exit 1
+SH : <<<'SH'
+
+  stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$db"
+SH;
 
         return <<<SH
 db=\${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}
 if [ "\$(stream | head -c 5)" = PGDMP ] || is_tar; then
-  stream | pg_restore --exit-on-error{$clean} -U \$POSTGRES_USER -d "\$db"
+  stream | pg_restore --exit-on-error --single-transaction{$clean} -U \$POSTGRES_USER -d "\$db"
 elif ! is_text; then
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file.'
 elif stream | head -c 4096 | grep -q 'PostgreSQL database cluster dump'; then
   fail 'This backup contains all databases. Select "Backup contains all databases" to restore it.'
-else{$sqlNotice}
-  stream | psql -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d "\$db"
+else{$sqlRestore}
 fi
 SH;
     }

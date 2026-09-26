@@ -505,10 +505,15 @@ it('keeps the application settings sidebar below the fixed header while scrollin
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
+    // The desktop rail is fixed below the 3rem top bar and fills the rest of the viewport.
+    preg_match('/@media \(min-width: 1280px\) \{(?:(?!@media).)*?\n\s*\.application-settings-navigation \{([^}]*)\}/s', $css, $matches);
+    $railRule = $matches[1] ?? '';
+
     expect($sidebar)->toContain('application-settings-navigation')
-        ->and($css)->toContain('.application-settings-workspace > .application-settings-navigation')
-        ->and($css)->toContain('top: 4rem;')
-        ->and($css)->toContain('max-height: calc(100dvh - 5rem);');
+        ->and($railRule)->toContain('position: fixed;')
+        ->and($railRule)->toContain('top: 3rem;')
+        ->and($railRule)->toContain('height: calc(100dvh - 3rem);')
+        ->and($railRule)->toContain('overflow-y: auto;');
 });
 
 it('builds application sidebar routes independently of the current request route', function () {

@@ -21,6 +21,7 @@
             ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
             ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
             ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+            ['label' => 'Analytics', 'route' => 'project.service.analytics', 'icon' => 'analytics'],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
@@ -35,7 +36,7 @@
 
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
             'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
@@ -190,6 +191,9 @@
                             @endforeach
                         </div>
                     </div>
+                @elseif ($currentRoute === 'project.service.analytics')
+                    <livewire:project.service.analytics :service="$service"
+                        :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')

@@ -44,6 +44,10 @@ class GetProxyConfiguration
             if (empty(trim($proxy_configuration ?? ''))) {
                 $proxy_configuration = $this->backfillFromDisk($server);
             }
+
+            if (! empty(trim($proxy_configuration ?? '')) && removeLegacyTraefikDashboardExposure($server)) {
+                $proxy_configuration = $server->proxy->get('last_saved_proxy_configuration');
+            }
         }
 
         // Generate default configuration as last resort

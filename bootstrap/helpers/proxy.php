@@ -45,43 +45,139 @@ function applyTrafficAnalyticsToProxyConfiguration(Server $server, string $confi
     return Yaml::dump($config, 12, 2);
 }
 
+/**
+ * Server proxy attribute that remembers the user's own `--accesslog*` Traefik flags while
+ * traffic analytics replaces them with the managed set, so disabling can restore them exactly.
+ */
+const TRAEFIK_USER_ACCESSLOG_COMMANDS_KEY = 'traffic_analytics_user_accesslog_commands';
+
+function isTraefikAccessLogCommand(mixed $command): bool
+{
+    if (! is_string($command)) {
+        return false;
+    }
+
+    $flag = strtolower(explode('=', $command, 2)[0]);
+
+    return $flag === '--accesslog' || str_starts_with($flag, '--accesslog.');
+}
+
+/**
+ * Rotates the Traefik access log with BusyBox tools from the Alpine base image only (no package
+ * install, no network). Uses copytruncate semantics: Traefik keeps its file handle and Sentinel's
+ * tailer handles the truncation. Keeps at most 5 gzip-compressed rotations (access.log.1.gz..5.gz).
+ * The environment overrides exist for tests; the sidecar does not set them.
+ */
+function traefikAccessLogRotationScript(): string
+{
+    return <<<'SH'
+log="${TRAEFIK_ACCESS_LOG:-/traefik/access.log}"
+max_bytes="${TRAEFIK_ACCESS_LOG_MAX_BYTES:-20971520}"
+interval="${TRAEFIK_ACCESS_LOG_ROTATE_INTERVAL:-60}"
+keep=5
+while true; do
+  size=$(stat -c %s "$log" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$max_bytes" ]; then
+    rm -f "$log.$keep.gz"
+    i=$((keep - 1))
+    while [ "$i" -ge 1 ]; do
+      if [ -f "$log.$i.gz" ]; then mv -f "$log.$i.gz" "$log.$((i + 1)).gz"; fi
+      i=$((i - 1))
+    done
+    if cp "$log" "$log.1"; then
+      : > "$log"
+      gzip -f "$log.1"
+    fi
+  fi
+  sleep "$interval"
+done
+SH;
+}
+
+/**
+ * Replace the user's own access log flags with the managed set while analytics is enabled, and
+ * restore them exactly when it is disabled. Flags that were never added by Coolify are kept.
+ *
+ * @param  array<int, mixed>  $commands
+ * @return array<int, mixed>
+ */
+function applyTraefikAccessLogCommands(Server $server, array $commands, bool $enabled): array
+{
+    $managedCommands = traefikAccessLogCommands(true);
+    $storedUserCommands = $server->proxy->get(TRAEFIK_USER_ACCESSLOG_COMMANDS_KEY);
+    $hasStoredUserCommands = is_array($storedUserCommands);
+    $userCommands = $hasStoredUserCommands ? array_values($storedUserCommands) : [];
+
+    // Managed flags are Coolify's when their user flags were remembered on enable, or (analytics
+    // enabled before flags were remembered) when the complete managed set is present. Otherwise a
+    // matching flag such as `--accesslog=true` belongs to the user and is kept.
+    $managedCommandsAddedByCoolify = $hasStoredUserCommands || array_diff($managedCommands, $commands) === [];
+    if ($managedCommandsAddedByCoolify) {
+        $commands = array_values(array_filter(
+            $commands,
+            fn (mixed $command): bool => ! in_array($command, $managedCommands, true)
+        ));
+    }
+
+    if ($enabled) {
+        foreach ($commands as $command) {
+            if (isTraefikAccessLogCommand($command) && ! in_array($command, $userCommands, true)) {
+                $userCommands[] = $command;
+            }
+        }
+
+        $commands = [
+            ...array_filter($commands, fn (mixed $command): bool => ! isTraefikAccessLogCommand($command)),
+            ...$managedCommands,
+        ];
+
+        if ($storedUserCommands !== $userCommands) {
+            $server->proxy->set(TRAEFIK_USER_ACCESSLOG_COMMANDS_KEY, $userCommands);
+            $server->save();
+        }
+    } elseif ($hasStoredUserCommands) {
+        foreach ($userCommands as $command) {
+            if (! in_array($command, $commands, true)) {
+                $commands[] = $command;
+            }
+        }
+
+        $server->proxy->forget(TRAEFIK_USER_ACCESSLOG_COMMANDS_KEY);
+        $server->save();
+    }
+
+    return array_values($commands);
+}
+
 function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config): array
 {
     $enabled = $server->isTrafficAnalyticsEnabled();
 
     if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
-        $managedCommands = traefikAccessLogCommands(true);
         $commands = data_get($config, 'services.traefik.command', []);
 
         if (! is_array($commands)) {
             throw new RuntimeException('Traefik commands must be a YAML list.');
         }
 
-        $commands = array_values(array_filter(
-            $commands,
-            fn (mixed $command): bool => ! in_array($command, $managedCommands, true)
-        ));
-
-        if ($enabled) {
-            $commands = [...$commands, ...$managedCommands];
-        }
-
-        data_set($config, 'services.traefik.command', $commands);
+        data_set($config, 'services.traefik.command', applyTraefikAccessLogCommands($server, $commands, $enabled));
         unset($config['services']['traefik-logrotate']);
 
         if ($enabled && ! $server->isSwarm() && ! isDev()) {
             $proxyPath = $server->proxyPath();
             $config['services']['traefik-logrotate'] = [
                 'container_name' => 'coolify-proxy-logrotate',
-                'image' => 'alpine:3.20',
+                'image' => 'alpine:3.24',
                 'restart' => RESTART_MODE,
+                'network_mode' => 'none',
                 'volumes' => [
                     "{$proxyPath}:/traefik",
                 ],
                 'labels' => [
                     'coolify.managed=true',
                 ],
-                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+                // Docker Compose interpolates `$VAR`, so every `$` is escaped as `$$`.
+                'entrypoint' => ['/bin/sh', '-c', str_replace('$', '$$', traefikAccessLogRotationScript())],
             ];
         }
     } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
@@ -326,6 +422,97 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
 
     return $custom_commands;
 }
+
+/**
+ * Removes the dashboard router labels that older Coolify versions generated for Traefik.
+ * These labels route requests with the proxy container name as Host header to the Traefik API and dashboard.
+ * Comments and formatting are kept. A router or label set that the user changed is not touched.
+ */
+function removeLegacyTraefikDashboardLabels(string $configuration): string
+{
+    $legacyLabels = [
+        'traefik.enable=true',
+        'traefik.http.routers.traefik.entrypoints=http',
+        'traefik.http.routers.traefik.service=api@internal',
+        'traefik.http.services.traefik.loadbalancer.server.port=8080',
+    ];
+
+    try {
+        $yaml = Yaml::parse($configuration);
+    } catch (Throwable) {
+        return $configuration;
+    }
+
+    $expected = $yaml;
+    $changed = false;
+    foreach (['services.traefik.labels', 'services.traefik.deploy.labels'] as $path) {
+        $labels = data_get($yaml, $path);
+        if (! is_array($labels) || ! array_is_list($labels) || array_filter($labels, 'is_string') !== $labels) {
+            continue;
+        }
+
+        $traefikLabels = array_filter($labels, fn (string $label) => str_starts_with($label, 'traefik.'));
+        if (! in_array('traefik.http.routers.traefik.service=api@internal', $traefikLabels, true) || array_diff($traefikLabels, $legacyLabels) !== []) {
+            continue;
+        }
+
+        $newLabels = [];
+        foreach ($labels as $label) {
+            if ($label === 'traefik.enable=true') {
+                $newLabels[] = 'traefik.enable=false';
+            } elseif (! in_array($label, $legacyLabels, true)) {
+                $newLabels[] = $label;
+            }
+        }
+        data_set($expected, $path, $newLabels);
+        $changed = true;
+    }
+
+    if (! $changed) {
+        return $configuration;
+    }
+
+    $fixed = preg_replace('/^([ \t]*-[ \t]*([\'"]?))traefik\.enable=true(\2[ \t]*)(?=\R|\z)/m', '$1traefik.enable=false$3', $configuration);
+    foreach (array_slice($legacyLabels, 1) as $label) {
+        $fixed = preg_replace('/^[ \t]*-[ \t]*([\'"]?)'.preg_quote($label, '/').'\1[ \t]*(?:\R|\z)/m', '', $fixed);
+    }
+
+    // Keep the original when the line edit also changed other parts of the file.
+    try {
+        return Yaml::parse($fixed) === $expected ? $fixed : $configuration;
+    } catch (Throwable) {
+        return $configuration;
+    }
+}
+
+/**
+ * Saves the Traefik configuration without the legacy dashboard labels. The next proxy restart applies it.
+ */
+function removeLegacyTraefikDashboardExposure(Server $server): bool
+{
+    $configuration = $server->proxy->get('last_saved_proxy_configuration');
+    if ($server->proxyType() !== ProxyTypes::TRAEFIK->value || ! is_string($configuration) || blank($configuration)) {
+        return false;
+    }
+
+    $fixed = removeLegacyTraefikDashboardLabels($configuration);
+    if ($fixed === $configuration) {
+        return false;
+    }
+
+    // The running proxy still uses the old configuration, so the UI must ask for a restart.
+    if (blank($server->proxy->get('last_applied_settings'))) {
+        $server->proxy->last_applied_settings = md5(base64_encode($configuration));
+    }
+    $server->proxy->last_saved_proxy_configuration = $fixed;
+    $server->proxy->last_saved_settings = md5(base64_encode($fixed));
+    $server->save();
+
+    Log::info('Removed legacy Traefik dashboard labels from the proxy configuration', ['server_id' => $server->id]);
+
+    return true;
+}
+
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
     Log::info('Generating default proxy configuration', [

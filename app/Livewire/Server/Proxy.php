@@ -201,7 +201,6 @@ class Proxy extends Component
         }
     }
 
-<<<<<<< Updated upstream
     public function getTraefikVersionForWarningProperty(): ?string
     {
         if ($this->server->detected_traefik_version) {
@@ -218,7 +217,8 @@ class Proxy extends Component
         }
 
         return $matches[1];
-=======
+    }
+
     public function loadTraefikCertificates(): void
     {
         $this->traefikCertificates = [];
@@ -243,7 +243,6 @@ class Proxy extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
->>>>>>> Stashed changes
     }
 
     /**

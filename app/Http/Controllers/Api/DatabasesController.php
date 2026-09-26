@@ -3360,6 +3360,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_deploy(Request $request)
@@ -3381,6 +3385,9 @@ class DatabasesController extends Controller
 
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
+        }
+        if ($busyError = StartDatabase::operationInProgressError($database)) {
+            return response()->json(['message' => $busyError], 409);
         }
         StartDatabase::dispatch($database);
 
@@ -3546,6 +3553,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_restart(Request $request)
@@ -3565,6 +3576,9 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
+        if ($busyError = StartDatabase::operationInProgressError($database)) {
+            return response()->json(['message' => $busyError], 409);
+        }
         RestartDatabase::dispatch($database);
 
         auditLog('api.database.restarted', [

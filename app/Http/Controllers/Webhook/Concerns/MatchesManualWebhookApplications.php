@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Models\Application;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 
@@ -68,20 +67,25 @@ trait MatchesManualWebhookApplications
     /**
      * Respond to a delivery that could not be authenticated (no matching
      * application or no signature) and count it as a failed attempt.
+     *
+     * Deliveries without a matching application are counted too: the failure
+     * key is scoped to the repository and branch, so this cannot lock out other
+     * applications, and it keeps the 429 response from revealing which
+     * repositories exist in this instance.
      */
-    protected function unauthenticatedManualWebhookResponse(Request $request, string $provider): Response
+    protected function unauthenticatedManualWebhookResponse(string $failureKey): Response
     {
-        $this->recordManualWebhookFailure($request, $provider);
+        $this->recordManualWebhookFailure($failureKey);
 
         return response([$this->unauthenticatedManualWebhookFailurePayload()]);
     }
 
-    protected function manualWebhookResponse(Collection $payloads, Request $request, string $provider): Response
+    protected function manualWebhookResponse(Collection $payloads, string $failureKey): Response
     {
         $failure = $this->unauthenticatedManualWebhookFailurePayload();
         $authorizedPayloads = $payloads->reject(fn (array $payload): bool => $payload === $failure)->values();
         if ($authorizedPayloads->isEmpty() && $payloads->isNotEmpty()) {
-            return $this->unauthenticatedManualWebhookResponse($request, $provider);
+            return $this->unauthenticatedManualWebhookResponse($failureKey);
         }
 
         return response($authorizedPayloads);

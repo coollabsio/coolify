@@ -1510,6 +1510,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
             $onlyPort = firstDockerComposeServicePort($service);
+            $isTrafficAnalyticsEnabled = (bool) $server?->isTrafficAnalyticsEnabled();
+            $supportsLogAppend = (bool) $server?->caddySupportsLogAppend();
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1547,6 +1549,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection,
                             domainPortOverrides: $domainPortOverrides,
+                            is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                            supports_log_append: $supportsLogAppend,
                         ));
                         break;
                 }
@@ -1580,6 +1584,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection,
                     domainPortOverrides: $domainPortOverrides,
+                    is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                    supports_log_append: $supportsLogAppend,
                 ));
             }
         }
@@ -2766,6 +2772,8 @@ function serviceParser(Service $resource): Collection
             $onlyPort = $originalResource instanceof ServiceApplication
                 ? $originalResource->getRequiredPort()
                 : $predefinedPort;
+            $isTrafficAnalyticsEnabled = (bool) $server?->isTrafficAnalyticsEnabled();
+            $supportsLogAppend = (bool) $server?->caddySupportsLogAppend();
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2802,7 +2810,9 @@ function serviceParser(Service $resource): Collection
                             predefinedPort: $onlyPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                            supports_log_append: $supportsLogAppend,
                         ));
                         break;
                 }
@@ -2835,7 +2845,9 @@ function serviceParser(Service $resource): Collection
                     predefinedPort: $onlyPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_traffic_analytics_enabled: $isTrafficAnalyticsEnabled,
+                    supports_log_append: $supportsLogAppend,
                 ));
             }
         }
