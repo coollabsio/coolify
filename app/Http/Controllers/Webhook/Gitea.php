@@ -78,7 +78,10 @@ class Gitea extends Controller
                 }
             }
             if ($x_gitea_event === 'pull_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if ($action !== 'closed') {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
