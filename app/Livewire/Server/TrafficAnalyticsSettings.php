@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureTrafficAnalytics;
+use App\Enums\ProxyTypes;
 use App\Livewire\Analytics;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -74,20 +75,18 @@ class TrafficAnalyticsSettings extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            if ($this->server->isSwarm() || $this->server->isBuildServer()) {
-                $this->dispatch('error', 'Traffic analytics is not supported on Swarm/Build servers.');
+            $enable = ! $this->server->isTrafficAnalyticsEnabled();
+            if ($enable && ($reason = $this->server->trafficAnalyticsUnsupportedReason()) !== null) {
+                $this->dispatch('error', $reason);
 
                 return;
             }
 
-            $enable = ! $this->server->isTrafficAnalyticsEnabled();
-            ConfigureTrafficAnalytics::run($this->server, $enable);
+            $proxyRestarted = ConfigureTrafficAnalytics::run($this->server, $enable);
             $this->server->refresh();
             $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
             $this->dispatch('trafficAnalyticsStateChanged')->to(Analytics::class);
-            $this->dispatch('success', $enable
-                ? 'Traffic analytics enabled. Restarting proxy and Sentinel.'
-                : 'Traffic analytics disabled. Restarting proxy and Sentinel.');
+            $this->dispatch('success', $this->toggleMessage($enable, $proxyRestarted));
             auditLog($enable ? 'ui.server.traffic_analytics.enabled' : 'ui.server.traffic_analytics.disabled', $this->auditContext());
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -110,7 +109,43 @@ class TrafficAnalyticsSettings extends Component
 
     public function render(): View
     {
-        return view('livewire.server.traffic-analytics-settings');
+        return view('livewire.server.traffic-analytics-settings', [
+            'unsupportedReason' => $this->server->trafficAnalyticsUnsupportedReason(),
+            'caddyRedeployNote' => $this->caddyRedeployNote(),
+        ]);
+    }
+
+    /**
+     * Caddy gets its log labels at deploy time, so resources that already run are not logged until a redeploy.
+     */
+    private function caddyRedeployNote(): ?string
+    {
+        return $this->server->proxyType() === ProxyTypes::CADDY->value
+            ? 'Caddy logs a resource only after you redeploy it.'
+            : null;
+    }
+
+    private function toggleMessage(bool $enabled, bool $proxyRestarted): string
+    {
+        $message = $this->proxyToggleMessage($enabled, $proxyRestarted);
+        $caddyRedeployNote = $this->caddyRedeployNote();
+
+        return $enabled && $caddyRedeployNote !== null ? "{$message} {$caddyRedeployNote}" : $message;
+    }
+
+    private function proxyToggleMessage(bool $enabled, bool $proxyRestarted): string
+    {
+        $state = $enabled ? 'enabled' : 'disabled';
+
+        if ($proxyRestarted) {
+            return "Traffic analytics {$state}. Restarting proxy and Sentinel.";
+        }
+
+        if ($this->server->hasTrafficAnalyticsProxy()) {
+            return "Traffic analytics {$state}. The proxy is stopped, so the new configuration applies the next time you start it.";
+        }
+
+        return "Traffic analytics {$state}.";
     }
 
     private function auditContext(array $context = []): array

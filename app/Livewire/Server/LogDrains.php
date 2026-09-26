@@ -60,7 +60,9 @@ class LogDrains extends Component
             $this->server->settings->logdrain_newrelic_base_uri = $this->logDrainNewRelicBaseUri;
         } else {
             $this->isLogDrainNewRelicEnabled = $this->server->settings->is_logdrain_newrelic_enabled;
-            $this->logDrainNewRelicLicenseKey = $this->server->settings->logdrain_newrelic_license_key;
+            $this->logDrainNewRelicLicenseKey = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->logdrain_newrelic_license_key
+                : null;
             $this->logDrainNewRelicBaseUri = $this->server->settings->logdrain_newrelic_base_uri;
         }
     }
@@ -74,7 +76,9 @@ class LogDrains extends Component
         } else {
             $this->isLogDrainAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
             $this->logDrainAxiomDatasetName = $this->server->settings->logdrain_axiom_dataset_name;
-            $this->logDrainAxiomApiKey = $this->server->settings->logdrain_axiom_api_key;
+            $this->logDrainAxiomApiKey = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->logdrain_axiom_api_key
+                : null;
         }
     }
 
@@ -86,8 +90,12 @@ class LogDrains extends Component
             $this->server->settings->logdrain_custom_config_parser = $this->logDrainCustomConfigParser;
         } else {
             $this->isLogDrainCustomEnabled = $this->server->settings->is_logdrain_custom_enabled;
-            $this->logDrainCustomConfig = $this->server->settings->logdrain_custom_config;
-            $this->logDrainCustomConfigParser = $this->server->settings->logdrain_custom_config_parser;
+            $this->logDrainCustomConfig = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->logdrain_custom_config
+                : null;
+            $this->logDrainCustomConfigParser = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->logdrain_custom_config_parser
+                : null;
         }
     }
 
@@ -120,7 +128,6 @@ class LogDrains extends Component
                 $this->syncDataAxiom($toModel);
                 $this->syncDataCustom($toModel);
             }
-            $this->auditLogDrain($this->{$enabledProperty} ? 'enabled' : 'disabled', $type);
         }
     }
 
@@ -202,6 +209,7 @@ class LogDrains extends Component
             }
 
             $this->syncData(true);
+            $this->auditLogDrain($this->{$enabledProperty} ? 'enabled' : 'disabled', $type);
 
             if ($this->server->isLogDrainEnabled()) {
                 StartLogDrain::run($this->server);

@@ -44,32 +44,38 @@ it('uses the branded input focus state for the server filter', function () {
         ->not->toContain('<x-reicon name="check"');
 });
 
-it('lists desktop proxy controls inline and keeps Traefik and refresh in Advanced', function () {
+it('lists desktop proxy controls in one split action and links Traefik beside it', function () {
     $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
     $overflow = file_get_contents(resource_path('views/components/resource-heading-overflow.blade.php'));
-    $advanced = file_get_contents(resource_path('views/components/server/advanced.blade.php'));
     $desktopActions = str($navbar)->after("@teleport('#resource-action-hud-slot')")->before('@endteleport')->toString();
+    $splitAction = str($desktopActions)->after('id="server-desktop-actions"')->before('</x-split-action>')->toString();
+    $traefikLink = str($desktopActions)->before('<x-split-action id="server-desktop-actions"')->toString();
 
     expect($desktopActions)
         ->toContain('Restart Proxy')
         ->toContain('Stop Proxy')
         ->toContain('Start Proxy')
-        ->toContain('<x-server.advanced')
-        ->not->toContain('Traefik Dashboard')
-        ->not->toContain('Refresh Proxy Status')
+        ->toContain('<x-split-action id="server-desktop-actions"')
+        ->toContain('Traefik Dashboard')
+        ->not->toContain('<x-server.advanced')
         ->not->toContain('resource-heading-overflow-separator')
         ->not->toContain('<x-modal-confirmation');
 
-    expect(strpos($desktopActions, '<x-server.advanced'))
+    expect(strpos($desktopActions, 'Traefik Dashboard'))
         ->toBeLessThan(strpos($desktopActions, 'id="server-desktop-actions"'));
 
-    expect($advanced)
-        ->toContain('Advanced')
-        ->toContain('name="grid"')
-        ->toContain('Traefik Dashboard')
-        ->toContain('name="external-link" class="size-3! opacity-70"')
-        ->toContain('class="flex size-4 shrink-0 items-center justify-center"')
-        ->toContain('Refresh Proxy Status');
+    expect($traefikLink)
+        ->toContain('@if ($traefikDashboardAvailable)')
+        ->toContain('target="_blank"')
+        ->toContain('href="http://{{ $serverIp }}:8080"')
+        ->toContain('name="external-link" class="size-3.5 shrink-0 opacity-70"');
+
+    expect($splitAction)
+        ->toContain('<x-slot:main')
+        ->toContain('listbox-option')
+        ->toContain('wire:click="checkProxyStatus"')
+        ->toContain('Refresh Proxy Status')
+        ->not->toContain('Traefik');
 
     expect($overflow)
         ->toContain('Actions')

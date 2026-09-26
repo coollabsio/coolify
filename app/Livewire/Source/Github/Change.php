@@ -89,8 +89,8 @@ class Change extends Component
         return [
             'name' => 'required|string',
             'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
-            'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
-            'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
+            'apiUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
+            'htmlUrl' => ['required', 'string', 'url', SafeExternalUrl::forGitSource()],
             'customUser' => 'required|string',
             'customPort' => 'required|int',
             'appId' => 'nullable|int',
@@ -263,7 +263,7 @@ class Change extends Component
             }
 
             $jwt = generateGithubJwt($this->github_app);
-            $appResponse = Http::withHeaders([
+            $appResponse = Http::GitSource($this->github_app->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github+json',
             ])->timeout(10)->get("{$this->github_app->api_url}/app");

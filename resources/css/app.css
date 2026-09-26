@@ -2996,7 +2996,7 @@ input[type="search"]::-webkit-search-results-decoration {
     background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
-/* Persistent storage volumes: Name | Destination | [PR suffix] | Backup | [Actions] */
+/* Persistent storage volumes: Name | [Source] | Destination | [PR suffix] | Backup | [Actions] */
 .volumes-table-grid-readonly {
     grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 5rem;
 }
@@ -3007,6 +3007,18 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .volumes-table-grid-with-pr {
     grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
+}
+
+.volumes-table-grid-readonly.has-source {
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(10rem, 1.2fr) minmax(8rem, 1fr) 5rem;
+}
+
+.volumes-table-grid.has-source {
+    grid-template-columns: minmax(9rem, 1.1fr) minmax(14rem, 1.5fr) minmax(6rem, 1fr) 5rem 15rem;
+}
+
+.volumes-table-grid-with-pr.has-source {
+    grid-template-columns: minmax(9rem, 1fr) minmax(14rem, 1.4fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
 }
 
 .volumes-mobile-label {
@@ -3084,6 +3096,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-cell-name,
+    .volumes-cell-source,
     .volumes-col-backup,
     .volumes-cell-dest,
     .volumes-cell-actions {

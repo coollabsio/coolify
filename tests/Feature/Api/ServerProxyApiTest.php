@@ -218,7 +218,7 @@ test('PUT /api/v1/servers/{uuid}/proxy/configuration rejects command injection w
             'configuration' => base64_encode($configuration),
         ])
         ->assertUnprocessable()
-        ->assertJsonPath('errors.configuration.0', 'Proxy ports must be integers from 1 through 65535.');
+        ->assertJsonPath('errors.configuration.0', 'Proxy ports must use Docker Compose port syntax with ports from 1 through 65535.');
 
     expect($this->server->fresh()->proxy->toArray())->toBe($originalProxy);
 });

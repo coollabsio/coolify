@@ -16,7 +16,7 @@ $serverListboxOptions = array_merge(
     collect($serverOptions)->map(fn ($name, $uuid) => ['value' => $uuid, 'label' => $name])->values()->all(),
 );
 $appListboxOptions = array_merge(
-    [['value' => '', 'label' => 'All applications']],
+    [['value' => '', 'label' => 'All resources']],
     $appGroupedOptions,
 );
 ?>
@@ -54,7 +54,7 @@ $appListboxOptions = array_merge(
                      newly-scoped options (and reset value) instead of showing stale Alpine state. --}}
                 <div class="relative w-full transition-opacity sm:w-52" wire:key="app-filter-{{ $serverUuid }}"
                     wire:loading.class="pointer-events-none opacity-60" wire:target="appUuid">
-                    <x-forms.listbox id="appUuid" live :options="$appListboxOptions" placeholder="All applications" />
+                    <x-forms.listbox id="appUuid" live :options="$appListboxOptions" placeholder="All resources" />
                     <div class="absolute inset-0 hidden items-center justify-center rounded-lg bg-white/70 dark:bg-base/70"
                         wire:loading.flex wire:target="appUuid">
                         <x-loading compact aria-label="Loading analytics" />
@@ -90,7 +90,7 @@ $appListboxOptions = array_merge(
 
     {{-- Nudge: enabled-eligible servers that haven't turned traffic analytics on yet. --}}
     @if ($scopedServerUuid === null && ! empty($eligibleDisabledServers))
-        <div x-data="{ dismissed: localStorage.getItem('traffic-nudge-{{ $nudgeKey }}') === '1' }" x-show="!dismissed" x-cloak
+        <div wire:key="analytics-traffic-nudge" x-data="{ dismissed: localStorage.getItem('traffic-nudge-{{ $nudgeKey }}') === '1' }" x-show="!dismissed" x-cloak
             class="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
             <div class="min-w-0 flex-1">
                 <p class="text-[12px] font-semibold text-black dark:text-fg">
@@ -104,7 +104,7 @@ $appListboxOptions = array_merge(
             <div class="flex shrink-0 items-center gap-2">
                 @if (count($eligibleDisabledServers) === 1)
                     <a class="button" href="{{ route('server.analytics', ['server_uuid' => $eligibleDisabledServers[0]['uuid']]) }}" {{ wireNavigate() }}>
-                        Enable on {{ \Illuminate\Support\Str::limit($eligibleDisabledServers[0]['name'], 16) }}
+                        Set up on {{ \Illuminate\Support\Str::limit($eligibleDisabledServers[0]['name'], 16) }}
                     </a>
                 @else
                     <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
@@ -164,7 +164,7 @@ $appListboxOptions = array_merge(
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                         Unique visitors
                         @if ($uniquesApproximate)
-                            {!! $approxBadge('Summed across servers; visitors seen on multiple servers may be double-counted.') !!}
+                            {!! $approxBadge('Summed across servers or services; visitors seen on more than one may be double-counted.') !!}
                         @endif
                     </span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
@@ -208,7 +208,7 @@ $appListboxOptions = array_merge(
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                         p95 latency
                         @if ($latencyApproximate)
-                            {!! $approxBadge('Highest p95 latency across servers; not a true cross-server percentile.') !!}
+                            {!! $approxBadge('Highest p95 latency across servers or services; not a true merged percentile.') !!}
                         @endif
                     </span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
@@ -247,7 +247,7 @@ $appListboxOptions = array_merge(
                 </x-application.settings-section>
 
                 <x-application.settings-section id="analytics-apps-section" title="Top applications"
-                    helper="Applications ranked by request volume. Open one for its analytics." flush>
+                    helper="Applications and services ranked by request volume. Open one for its analytics." flush>
                     @if (empty($topApps))
                         <x-empty size="sm" title="No application data"
                             description="No per-application requests were recorded for the selected range."
@@ -269,6 +269,9 @@ $appListboxOptions = array_merge(
                                     ])>
                                     <span class="flex min-w-0 flex-1 items-baseline gap-1.5">
                                         <span class="truncate text-[12px] text-black dark:text-fg">{{ $row['name'] }}</span>
+                                        @if (! empty($row['isService']))
+                                            <span class="shrink-0 text-[10px] font-medium tracking-wide text-neutral-400 uppercase dark:text-fg-faint">Service</span>
+                                        @endif
                                         @if (! empty($row['domain']))
                                             <span class="hidden truncate text-[11px] text-neutral-400 sm:inline dark:text-fg-faint">{{ $row['domain'] }}</span>
                                         @endif

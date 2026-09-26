@@ -48,5 +48,6 @@ it('allows password registration when no oauth provider is enabled', function ()
         'password_confirmation' => 'password',
     ]);
 
-    expect($user->email)->toBe('password@example.com');
+    expect($user->email)->toBe('password@example.com')
+        ->and($user->email_verified_at)->toBeNull();
 });

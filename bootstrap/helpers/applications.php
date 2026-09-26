@@ -9,6 +9,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use Illuminate\Support\Facades\DB;
 use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
@@ -30,32 +31,30 @@ function queue_application_deployment(Application $application, string $deployme
         $destination_id = $destination->id;
     }
 
-    // Check if the deployment queue is full for this server
-    $serverForQueueCheck = $server ?? Server::find($server_id);
-    $queue_limit = $serverForQueueCheck->settings->deployment_queue_limit ?? 25;
-    $queued_count = ApplicationDeploymentQueue::where('server_id', $server_id)
-        ->where('status', ApplicationDeploymentStatus::QUEUED->value)
-        ->count();
+    $admission = DB::transaction(function () use ($application, $application_id, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_webhook, $no_questions_asked, $only_this_server, $pull_request_id, $restart_only, $rollback, $server_id, $server_name) {
+        // Lock stable rows because an empty deployment queue has no row to lock.
+        Application::query()->whereKey($application_id)->lockForUpdate()->firstOrFail();
+        $serverForQueueCheck = Server::query()->whereKey($server_id)->lockForUpdate()->firstOrFail();
+        $queue_limit = $serverForQueueCheck->settings->deployment_queue_limit ?? 25;
+        $queued_count = ApplicationDeploymentQueue::where('server_id', $server_id)
+            ->where('status', ApplicationDeploymentStatus::QUEUED->value)
+            ->count();
 
-    if ($queued_count >= $queue_limit) {
-        return [
-            'status' => 'queue_full',
-            'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
-        ];
-    }
+        if ($queued_count >= $queue_limit) {
+            return [
+                'status' => 'queue_full',
+                'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
+            ];
+        }
 
-    // Check if there's already a deployment in progress or queued for this application and commit
-    $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
-        ->where('commit', $commit)
-        ->where('pull_request_id', $pull_request_id)
-        ->where('docker_registry_image_tag', $docker_registry_image_tag)
-        ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
-        ->first();
+        $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
+            ->where('commit', $commit)
+            ->where('pull_request_id', $pull_request_id)
+            ->where('docker_registry_image_tag', $docker_registry_image_tag)
+            ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
+            ->first();
 
-    if ($existing_deployment) {
-        // If force_rebuild is true or rollback is true or no_questions_asked is true, we'll still create a new deployment
-        if (! $force_rebuild && ! $rollback && ! $no_questions_asked) {
-            // Return the existing deployment's details
+        if ($existing_deployment && ! $force_rebuild && ! $rollback && ! $no_questions_asked) {
             return [
                 'status' => 'skipped',
                 'message' => 'Deployment already queued for this commit.',
@@ -63,27 +62,33 @@ function queue_application_deployment(Application $application, string $deployme
                 'existing_deployment' => $existing_deployment,
             ];
         }
+
+        return ApplicationDeploymentQueue::create([
+            'application_id' => $application_id,
+            'application_name' => $application->name,
+            'server_id' => $server_id,
+            'server_name' => $server_name,
+            'destination_id' => $destination_id,
+            'deployment_uuid' => $deployment_uuid,
+            'deployment_url' => $deployment_url,
+            'pull_request_id' => $pull_request_id,
+            'docker_registry_image_tag' => $docker_registry_image_tag,
+            'force_rebuild' => $force_rebuild,
+            'is_webhook' => $is_webhook,
+            'is_api' => $is_api,
+            'restart_only' => $restart_only,
+            'commit' => $commit,
+            'rollback' => $rollback,
+            'git_type' => $git_type,
+            'only_this_server' => $only_this_server,
+        ]);
+    });
+
+    if (is_array($admission)) {
+        return $admission;
     }
 
-    $deployment = ApplicationDeploymentQueue::create([
-        'application_id' => $application_id,
-        'application_name' => $application->name,
-        'server_id' => $server_id,
-        'server_name' => $server_name,
-        'destination_id' => $destination_id,
-        'deployment_uuid' => $deployment_uuid,
-        'deployment_url' => $deployment_url,
-        'pull_request_id' => $pull_request_id,
-        'docker_registry_image_tag' => $docker_registry_image_tag,
-        'force_rebuild' => $force_rebuild,
-        'is_webhook' => $is_webhook,
-        'is_api' => $is_api,
-        'restart_only' => $restart_only,
-        'commit' => $commit,
-        'rollback' => $rollback,
-        'git_type' => $git_type,
-        'only_this_server' => $only_this_server,
-    ]);
+    $deployment = $admission;
 
     if (auth()->check() && ! $is_webhook && ! $is_api && ! $rollback) {
         auditLog($restart_only ? 'ui.application.restarted' : 'ui.application.deployed', [

@@ -26,16 +26,222 @@ CURRENT_USER=$USER
 
 if [ $EUID != 0 ]; then
     echo "Please run this script as root or with sudo"
-    exit
+    exit 1
 fi
 
-echo ""
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
+mkdir -p /data/coolify/images
+mkdir -p /data/coolify/ssh/{keys,mux}
+mkdir -p /data/coolify/proxy/dynamic
+
+chown -R 9999:root /data/coolify
+chmod -R 700 /data/coolify
+
+INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
+
+# Terminal UI: the terminal only shows the step list, everything else goes to the log file
+TOTAL_STEPS=9
+UI_STEP=0
+UI_STEP_TITLE=""
+UI_STEP_DETAIL=""
+UI_STEP_STARTED=0
+UI_SPINNER_PID=""
+UI_WARNINGS=()
+
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ]; then
+    UI_TTY=true
+else
+    UI_TTY=false
+fi
+
+if [ "$UI_TTY" = true ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+    C_PURPLE=$'\033[38;5;135m'
+    C_GREEN=$'\033[32m'
+    C_RED=$'\033[31m'
+    C_YELLOW=$'\033[33m'
+else
+    C_RESET="" C_BOLD="" C_DIM="" C_PURPLE="" C_GREEN="" C_RED="" C_YELLOW=""
+fi
+
+UI_WIDTH=$(tput cols 2>/dev/null || true)
+if ! [[ $UI_WIDTH =~ ^[0-9]+$ ]]; then
+    UI_WIDTH=80
+fi
+UI_WIDTH=$((UI_WIDTH > 100 ? 100 : UI_WIDTH < 60 ? 60 : UI_WIDTH))
+
+# Current time in milliseconds
+ui_now() {
+    if [ -n "${EPOCHREALTIME:-}" ]; then
+        local now=${EPOCHREALTIME/[.,]/}
+        echo $((now / 1000))
+    else
+        echo $(($(date +%s) * 1000))
+    fi
+}
+
+ui_duration() {
+    local ms=$1
+    if [ "$ms" -lt 60000 ]; then
+        printf '%d.%ds' $((ms / 1000)) $((ms % 1000 / 100))
+    else
+        printf '%dm %ds' $((ms / 60000)) $((ms % 60000 / 1000))
+    fi
+}
+
+ui_repeat() {
+    local out="" i
+    for ((i = 0; i < $2; i++)); do
+        out+="$1"
+    done
+    printf '%s' "$out"
+}
+
+# Prints the current step line without the trailing status symbol
+ui_render_step() {
+    local right="$1"
+    local title="$UI_STEP_TITLE"
+    local detail="$UI_STEP_DETAIL"
+    local plain_detail="${detail//·/.}"
+    local left=$((7 + ${#title}))
+    local right_width=$((${#right} + 2))
+
+    if [ -n "$detail" ] && [ $((left + 2 + ${#plain_detail} + right_width + 2)) -le "$UI_WIDTH" ]; then
+        left=$((left + 2 + ${#plain_detail}))
+    else
+        detail=""
+    fi
+
+    local pad=$((UI_WIDTH - left - right_width))
+    if [ "$pad" -lt 2 ]; then
+        pad=2
+    fi
+    printf '  %s%-5s%s%s%s%s' "$C_DIM" "${UI_STEP}/${TOTAL_STEPS}" "$C_RESET" "$C_BOLD" "$title" "$C_RESET"
+    if [ -n "$detail" ]; then
+        printf '  %s%s%s' "$C_DIM" "$detail" "$C_RESET"
+    fi
+    printf '%*s%s%s%s ' "$pad" "" "$C_DIM" "$right" "$C_RESET"
+}
+
+ui_bar() {
+    local percent=$1 label=$2
+    local cells=$((UI_WIDTH - 30 > 40 ? 40 : UI_WIDTH - 30))
+    local filled=$((percent * cells / 100))
+    printf '  %s%s%s%s%s  %s%3d%%%s  %s%s%s' \
+        "$C_PURPLE" "$(ui_repeat ■ "$filled")" "$C_DIM" "$(ui_repeat ■ $((cells - filled)))" "$C_RESET" \
+        "$C_BOLD" "$percent" "$C_RESET" "$C_DIM" "$label" "$C_RESET"
+}
+
+# Runs in the background and animates the current step line and the progress bar below it
+ui_spinner() {
+    set +x
+    local frames=(◜ ◠ ◝ ◞ ◡ ◟) i=0 stop=false
+    local line bar
+    trap 'stop=true' TERM
+    line=$(ui_render_step "")
+    bar=$(ui_bar $(((UI_STEP - 1) * 100 / TOTAL_STEPS)) "${UI_STEP_TITLE,,}…")
+    while [ "$stop" = false ]; do
+        printf '\r\033[2K%s%s%s%s\n\033[2K%s\033[1A\r' "$line" "$C_PURPLE" "${frames[i]}" "$C_RESET" "$bar" >&3
+        i=$(((i + 1) % ${#frames[@]}))
+        sleep 0.12
+    done
+}
+
+ui_stop_spinner() {
+    if [ -n "$UI_SPINNER_PID" ]; then
+        kill "$UI_SPINNER_PID" 2>/dev/null || true
+        wait "$UI_SPINNER_PID" 2>/dev/null || true
+        UI_SPINNER_PID=""
+    fi
+}
+
+# Shows a warning below the current step (or right away when no step is running)
+warn() {
+    echo "WARNING: $*"
+    UI_WARNINGS+=("$*")
+}
+
+ui_flush_warnings() {
+    local warning
+    for warning in "${UI_WARNINGS[@]}"; do
+        printf '       %s! %s%s\n' "$C_YELLOW" "$warning" "$C_RESET" >&3
+    done
+    UI_WARNINGS=()
+}
+
+step_start() {
+    UI_STEP=$((UI_STEP + 1))
+    UI_STEP_TITLE="$1"
+    UI_STEP_DETAIL="${2:-}"
+    UI_STEP_STARTED=$(ui_now)
+    log_section "Step ${UI_STEP}/${TOTAL_STEPS}: $1"
+    if [ "$UI_TTY" = true ]; then
+        ui_spinner &
+        UI_SPINNER_PID=$!
+    fi
+}
+
+# Usage: step_done [detail] - optionally replaces the detail text shown next to the step title
+step_done() {
+    if [ -n "${1:-}" ]; then
+        UI_STEP_DETAIL="$1"
+    fi
+    ui_stop_spinner
+    local elapsed
+    elapsed=$(ui_duration $(($(ui_now) - UI_STEP_STARTED)))
+    log "Step ${UI_STEP}/${TOTAL_STEPS} completed in ${elapsed}"
+    if [ "$UI_TTY" = true ]; then
+        printf '\r\033[2K' >&3
+    fi
+    printf '%s%s✓%s\n' "$(ui_render_step "$elapsed")" "$C_GREEN" "$C_RESET" >&3
+    if [ "$UI_TTY" = true ]; then
+        printf '\033[2K' >&3
+    fi
+    ui_flush_warnings
+    UI_STEP_TITLE=""
+}
+
+ui_on_exit() {
+    local code=$?
+    ui_stop_spinner
+    if [ "$code" -ne 0 ]; then
+        if [ "$UI_TTY" = true ]; then
+            printf '\r\033[2K' >&3
+        fi
+        if [ -n "$UI_STEP_TITLE" ]; then
+            printf '%s%s✗%s\n' "$(ui_render_step "$(ui_duration $(($(ui_now) - UI_STEP_STARTED)))")" "$C_RED" "$C_RESET" >&3
+        fi
+        if [ "$UI_TTY" = true ]; then
+            printf '\033[2K' >&3
+        fi
+        ui_flush_warnings
+        printf '\n  %s%sInstallation failed.%s Last lines of the log:\n\n' "$C_BOLD" "$C_RED" "$C_RESET" >&3
+        tail -n 15 "$INSTALLATION_LOG_WITH_DATE" 2>/dev/null | sed 's/^/    /' >&3
+        printf '\n  %sFull log: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
+    fi
+    if [ "$UI_TTY" = true ]; then
+        printf '\033[?25h' >&3
+    fi
+}
+
+# fd 3 is the terminal, stdout and stderr go to the log file
+exec 3>&1
+exec >>"$INSTALLATION_LOG_WITH_DATE" 2>&1
+trap ui_on_exit EXIT
+
+if [ "$UI_TTY" = true ]; then
+    printf '\033[?25l' >&3
+fi
+printf '\n  %sWelcome to Coolify Installer!%s\n' "$C_BOLD" "$C_RESET" >&3
+printf '  %sThis script will install everything for you. Sit back and relax.%s\n' "$C_DIM" "$C_RESET" >&3
+printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
+UI_INSTALL_STARTED=$(ui_now)
+
 echo "=========================================="
 echo "   Coolify Installation - ${DATE}"
 echo "=========================================="
-echo ""
-echo "Welcome to Coolify Installer!"
-echo "This script will install everything for you. Sit back and relax."
 echo "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
 
 # Predefined root user
@@ -157,9 +363,7 @@ if [ -f /etc/docker/daemon.json ]; then
                 if [ "$DOCKER_POOL_FORCE_OVERRIDE" = true ]; then
                     echo "Force override enabled - network pool will be updated with $DOCKER_ADDRESS_POOL_BASE/$DOCKER_ADDRESS_POOL_SIZE."
                 else
-                    echo "Custom pool provided but force override not enabled - using existing configuration."
-                    echo "To force override, set DOCKER_POOL_FORCE_OVERRIDE=true"
-                    echo "This won't change the existing docker networks, only the pool configuration for the newly created networks."
+                    warn "Custom Docker network pool ignored, using the existing $EXISTING_POOL_BASE/$EXISTING_POOL_SIZE. Set DOCKER_POOL_FORCE_OVERRIDE=true to override it (existing networks are not changed)."
                     DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
                     DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
                     DOCKER_POOL_BASE_PROVIDED=false
@@ -172,7 +376,7 @@ fi
 
 # Validate Docker address pool configuration
 if ! [[ $DOCKER_ADDRESS_POOL_BASE =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
-    echo "Warning: Invalid network pool base format: $DOCKER_ADDRESS_POOL_BASE"
+    warn "Invalid Docker network pool base: $DOCKER_ADDRESS_POOL_BASE"
     if [ "$EXISTING_POOL_CONFIGURED" = true ]; then
         echo "Using existing configuration: $EXISTING_POOL_BASE"
         DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
@@ -183,7 +387,7 @@ if ! [[ $DOCKER_ADDRESS_POOL_BASE =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]];
 fi
 
 if ! [[ $DOCKER_ADDRESS_POOL_SIZE =~ ^[0-9]+$ ]] || [ "$DOCKER_ADDRESS_POOL_SIZE" -lt 16 ] || [ "$DOCKER_ADDRESS_POOL_SIZE" -gt 28 ]; then
-    echo "Warning: Invalid network pool size: $DOCKER_ADDRESS_POOL_SIZE (must be 16-28)"
+    warn "Invalid Docker network pool size: $DOCKER_ADDRESS_POOL_SIZE (must be 16-28)"
     if [ "$EXISTING_POOL_CONFIGURED" = true ]; then
         echo "Using existing configuration: $EXISTING_POOL_SIZE"
         DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
@@ -201,52 +405,19 @@ WARNING_SPACE=false
 
 if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
     WARNING_SPACE=true
-    cat <<EOF
-WARNING: Insufficient total disk space!
-
-Total disk space:     ${TOTAL_SPACE}GB
-Required disk space:  ${REQUIRED_TOTAL_SPACE}GB
-
-==================
-EOF
+    warn "Insufficient total disk space: ${TOTAL_SPACE}GB (required: ${REQUIRED_TOTAL_SPACE}GB)"
 fi
 
 if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
-    cat <<EOF
-WARNING: Insufficient available disk space!
-
-Available disk space:   ${AVAILABLE_SPACE}GB
-Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
-
-==================
-EOF
+    warn "Insufficient available disk space: ${AVAILABLE_SPACE}GB (required: ${REQUIRED_AVAILABLE_SPACE}GB)"
     WARNING_SPACE=true
 fi
 
 if [ "$WARNING_SPACE" = true ]; then
+    ui_flush_warnings
     echo "Sleeping for 5 seconds."
     sleep 5
 fi
-
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
-mkdir -p /data/coolify/images
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
-
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
-
-INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
-
-exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
-
-getAJoke() {
-    JOKES=$(curl -s --max-time 2 "https://v2.jokeapi.dev/joke/Programming?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&format=txt&type=single" || true)
-    if [ "$JOKES" != "" ]; then
-        echo -e " - Until then, here's a joke for you:\n"
-        echo -e "$JOKES\n"
-    fi
-}
 
 # Helper function to log with timestamp
 log() {
@@ -330,7 +501,7 @@ case "$OS_TYPE" in
 arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos | tencentos) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
-    exit
+    exit 1
     ;;
 esac
 
@@ -349,10 +520,9 @@ echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
 echo "| Registry URL      | $REGISTRY_URL"
 echo "---------------------------------------------"
-echo ""
 
-log_section "Step 1/9: Installing required packages"
-echo "1/9 Installing required packages (curl, wget, git, jq, openssl)..."
+ui_flush_warnings
+step_start "Installing required packages" "curl wget git jq openssl"
 
 # Track if apt-get update was run to avoid redundant calls later
 APT_UPDATED=false
@@ -360,6 +530,7 @@ APT_UPDATED=false
 if all_packages_installed; then
     log "All required packages already installed, skipping installation"
     echo " - All required packages already installed."
+    UI_STEP_DETAIL="already installed"
 else
     case "$OS_TYPE" in
     arch)
@@ -394,15 +565,14 @@ else
         ;;
     *)
         echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-        exit
+        exit 1
         ;;
     esac
     log "Required packages installed successfully"
 fi
-echo "     Done."
+step_done
 
-log_section "Step 2/9: Checking OpenSSH server configuration"
-echo "2/9 Checking OpenSSH server configuration..."
+step_start "Checking OpenSSH server configuration"
 
 # Detect OpenSSH server
 SSH_DETECTED=false
@@ -477,8 +647,7 @@ SSH_PERMIT_ROOT_LOGIN=$(sshd -T | grep -i "permitrootlogin" | awk '{print $2}') 
 if [ "$SSH_PERMIT_ROOT_LOGIN" = "yes" ] || [ "$SSH_PERMIT_ROOT_LOGIN" = "without-password" ] || [ "$SSH_PERMIT_ROOT_LOGIN" = "prohibit-password" ]; then
     echo " - SSH PermitRootLogin is enabled."
 else
-    echo " - SSH PermitRootLogin is disabled."
-    echo "   If you have problems with SSH, please read this: https://coolify.io/docs/knowledge-base/server/openssh"
+    warn "SSH PermitRootLogin is disabled. If you have problems with SSH, read https://coolify.io/docs/knowledge-base/server/openssh"
 fi
 
 # Detect if docker is installed via snap
@@ -543,11 +712,11 @@ install_docker_from_rhel_repo() {
     systemctl --now enable docker
 }
 
-log_section "Step 3/9: Checking Docker installation"
-echo "3/9 Checking Docker installation..."
+step_done
+
 if ! [ -x "$(command -v docker)" ]; then
+    step_start "Installing Docker Engine"
     echo " - Docker is not installed. Installing Docker. It may take a while."
-    getAJoke
     case "$OS_TYPE" in
     "alpine" | "postmarketos")
         apk add docker docker-cli-compose >/dev/null 2>&1
@@ -617,6 +786,7 @@ if ! [ -x "$(command -v docker)" ]; then
     esac
     echo " - Docker installed successfully."
 else
+    step_start "Checking Docker Engine"
     echo " - Docker is installed."
 fi
 
@@ -624,7 +794,7 @@ fi
 MIN_DOCKER_VERSION=24
 INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1)
 if [ -z "$INSTALLED_DOCKER_VERSION" ]; then
-    echo " - WARNING: Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
+    warn "Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
 elif [ "$INSTALLED_DOCKER_VERSION" -lt "$MIN_DOCKER_VERSION" ]; then
     echo " - ERROR: Docker version $INSTALLED_DOCKER_VERSION is too old. Coolify requires Docker $MIN_DOCKER_VERSION or newer."
     echo "   Please upgrade Docker: https://docs.docker.com/engine/install/"
@@ -632,9 +802,10 @@ elif [ "$INSTALLED_DOCKER_VERSION" -lt "$MIN_DOCKER_VERSION" ]; then
 else
     echo " - Docker version $(docker version --format '{{.Server.Version}}' 2>/dev/null) meets minimum requirement ($MIN_DOCKER_VERSION+)."
 fi
+DOCKER_SERVER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
+step_done "${DOCKER_SERVER_VERSION:+v$DOCKER_SERVER_VERSION}"
 
-log_section "Step 4/9: Checking Docker configuration"
-echo "4/9 Checking Docker configuration..."
+step_start "Configuring Docker daemon" "log rotation · address pools"
 
 echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE}/${DOCKER_ADDRESS_POOL_SIZE}"
 echo " - To override existing configuration: DOCKER_POOL_FORCE_OVERRIDE=true"
@@ -763,8 +934,9 @@ else
     fi
 fi
 
-log_section "Step 5/9: Downloading required files from CDN"
-echo "5/9 Downloading required files from CDN..."
+step_done
+
+step_start "Downloading required files from CDN"
 log "Downloading configuration files in parallel..."
 
 # Download files in parallel for faster installation
@@ -794,10 +966,9 @@ fi
 
 chmod +x /data/coolify/source/upgrade.sh /data/coolify/source/upgrade-postgres.sh
 log "All configuration files downloaded successfully"
-echo "     Done."
+step_done
 
-log_section "Step 6/9: Setting up environment variable file"
-echo "6/9 Setting up environment variable file..."
+step_start "Setting up environment variables"
 
 if [ -f "$ENV_FILE" ]; then
     # If .env exists, create backup
@@ -813,10 +984,6 @@ else
     cp "/data/coolify/source/.env.production" "$ENV_FILE"
 fi
 log "Environment file setup completed"
-echo "     Done."
-
-log_section "Step 7/9: Checking and updating environment variables"
-echo "7/9 Checking and updating environment variables..."
 
 update_env_var() {
     local key="$1"
@@ -878,10 +1045,10 @@ else
     fi
 fi
 log "Environment variables check completed"
-echo "     Done."
+step_done
 
-log_section "Step 8/9: Checking SSH key for localhost access"
-echo "8/9 Checking SSH key for localhost access..."
+step_start "Checking SSH key for localhost access"
+SSH_KEY_DETAIL="existing key"
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
@@ -895,6 +1062,7 @@ set -e
 
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
+    SSH_KEY_DETAIL="generated new key"
     test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
     test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
@@ -907,20 +1075,18 @@ fi
 chown -R 9999:root /data/coolify
 chmod -R 700 /data/coolify
 log "SSH key check completed"
-echo "     Done."
+step_done "$SSH_KEY_DETAIL"
 
-log_section "Step 9/9: Installing Coolify"
-echo "9/9 Installing Coolify ($LATEST_VERSION)..."
-echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
-echo -e " - Please wait."
-getAJoke
-
+step_start "Pulling images" "coolify · postgres · redis · helper"
+# fd 3 is closed so the detached container restart in upgrade.sh does not hold the terminal open
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true" 3>&-
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true"
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true" 3>&-
 fi
-echo " - Coolify installed successfully."
+step_done
+
+step_start "Starting Coolify" "v${LATEST_VERSION}"
 echo " - Waiting for Coolify to be ready..."
 
 # Wait for upgrade.sh background process to complete
@@ -1000,14 +1166,11 @@ if [ "$HEALTH" != "healthy" ]; then
     echo " - Please check: docker logs coolify"
     exit 1
 fi
-echo -e "\033[0;35m
-   ____                            _         _       _   _                 _
-  / ___|___  _ __   __ _ _ __ __ _| |_ _   _| | __ _| |_(_) ___  _ __  ___| |
- | |   / _ \| '_ \ / _\` | '__/ _\` | __| | | | |/ _\` | __| |/ _ \| '_ \/ __| |
- | |__| (_) | | | | (_| | | | (_| | |_| |_| | | (_| | |_| | (_) | | | \__ \_|
-  \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
-                   |___/
-\033[0m"
+step_done
+
+if [ "$UI_TTY" = true ]; then
+    printf '%s\n' "$(ui_bar 100 "done")" >&3
+fi
 
 # Fetch public IPs in parallel for faster completion
 IPV4_TMP=$(mktemp)
@@ -1022,29 +1185,29 @@ IPV4_PUBLIC_IP=$(cat "$IPV4_TMP" 2>/dev/null || true)
 IPV6_PUBLIC_IP=$(cat "$IPV6_TMP" 2>/dev/null || true)
 rm -f "$IPV4_TMP" "$IPV6_TMP"
 
-echo -e "\nYour instance is ready to use!\n"
-if [ -n "$IPV4_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPV4: http://$IPV4_PUBLIC_IP:8000"
-fi
-if [ -n "$IPV6_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
-fi
-
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
 PRIVATE_IPS=$(hostname -I 2>/dev/null || ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1)
 set -e
 
-if [ -n "$PRIVATE_IPS" ]; then
-    echo -e "\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
-    for IP in $PRIVATE_IPS; do
-        if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
-            echo -e "http://$IP:8000"
-        fi
-    done
+printf '\n  %s%sCoolify is ready!%s  %sInstalled in %s%s\n\n' "$C_BOLD" "$C_PURPLE" "$C_RESET" "$C_DIM" "$(ui_duration $(($(ui_now) - UI_INSTALL_STARTED)))" "$C_RESET" >&3
+if [ -n "$IPV4_PUBLIC_IP" ]; then
+    printf '  Public IPv4   %shttp://%s:8000%s\n' "$C_BOLD" "$IPV4_PUBLIC_IP" "$C_RESET" >&3
+fi
+if [ -n "$IPV6_PUBLIC_IP" ]; then
+    printf '  Public IPv6   %shttp://[%s]:8000%s\n' "$C_BOLD" "$IPV6_PUBLIC_IP" "$C_RESET" >&3
 fi
 
-echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
+PRIVATE_IP_LABEL="Private IP  "
+for IP in $PRIVATE_IPS; do
+    if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
+        printf '  %s  %shttp://%s:8000%s\n' "$PRIVATE_IP_LABEL" "$C_DIM" "$IP" "$C_RESET" >&3
+        PRIVATE_IP_LABEL="            "
+    fi
+done
+
+printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
 
 log_section "Installation Complete"
 log "Coolify installation completed successfully"

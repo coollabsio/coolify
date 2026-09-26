@@ -72,12 +72,13 @@ class Bitbucket extends Controller
                     'message' => 'Nothing to do. Invalid repository.',
                 ]);
             }
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
-                return response([
-                    'status' => 'failed',
-                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                ]);
+                return $this->unauthenticatedManualWebhookResponse($failure_key);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -278,7 +279,7 @@ class Bitbucket extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

@@ -401,7 +401,8 @@
                         @if (
                             $application->destination->server->isSwarm() ||
                                 $application->additional_servers->count() > 0 ||
-                                $application->settings->is_build_server_enabled)
+                                $application->settings->is_build_server_enabled ||
+                                ! $application->destination->server->canBuildApplications())
                             <x-forms.input id="dockerRegistryImageName" required label="Image"
                                 placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
                             <x-forms.input id="dockerRegistryImageTag"

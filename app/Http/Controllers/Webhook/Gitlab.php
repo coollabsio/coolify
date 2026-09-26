@@ -50,7 +50,7 @@ class Gitlab extends Controller
 
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 
-            $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+            $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
                 'client_id' => $gitlabApp->client_id,
                 'client_secret' => $gitlabApp->client_secret,
                 'code' => $code,
@@ -352,16 +352,14 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
 
+            // A delivery without a token does not try a secret, so it is not
+            // counted as a failed attempt.
             if (empty($x_gitlab_token)) {
                 auditLogWebhookFailure('gitlab', 'webhook_token_missing', [
                     'event' => $x_gitlab_event,
                 ]);
-                $return_payloads->push([
-                    'status' => 'failed',
-                    'message' => 'Invalid signature.',
-                ]);
 
-                return response($return_payloads);
+                return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
 
             if ($x_gitlab_event === 'push') {
@@ -412,27 +410,22 @@ class Gitlab extends Controller
 
                 return response($return_payloads);
             }
+            $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = Application::query();
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    $return_payloads->push([
-                        'status' => 'failed',
-                        'message' => "Nothing to do. No applications found with branch '$base_branch'.",
-                    ]);
-
-                    return response($return_payloads);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             foreach ($applications as $application) {
@@ -641,7 +634,7 @@ class Gitlab extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

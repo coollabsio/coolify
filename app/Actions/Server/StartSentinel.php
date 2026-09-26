@@ -17,9 +17,18 @@ class StartSentinel
             : rtrim($server->proxyPath(), '/');
     }
 
+    /**
+     * Sentinel reads the proxy access log only when analytics is on and a Traefik or Caddy proxy writes it.
+     * After a switch to a proxy without analytics support, Sentinel must not keep the old log mount.
+     */
+    public static function collectsTraffic(Server $server): bool
+    {
+        return $server->isTrafficAnalyticsEnabled() && $server->hasTrafficAnalyticsProxy();
+    }
+
     public static function sentinelTrafficEnvironment(Server $server): array
     {
-        if (! $server->isTrafficAnalyticsEnabled()) {
+        if (! self::collectsTraffic($server)) {
             return [];
         }
 
@@ -42,6 +51,26 @@ class StartSentinel
         }
 
         return $env;
+    }
+
+    /**
+     * Sentinel opens the access log once at startup and never retries, so the file must exist
+     * before the container starts. `touch` keeps an existing log intact.
+     *
+     * @return array<int, string>
+     */
+    public static function trafficLogPreparationCommands(Server $server): array
+    {
+        if (! $server->isTrafficAnalyticsEnabled() || ! $server->supportsTrafficAnalytics()) {
+            return [];
+        }
+
+        $directory = self::trafficLogDirectory($server);
+
+        return [
+            'mkdir -p '.escapeshellarg($directory),
+            'touch '.escapeshellarg($directory.'/access.log'),
+        ];
     }
 
     public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null)
@@ -84,7 +113,7 @@ class StartSentinel
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
         $trafficLogDirectory = self::trafficLogDirectory($server);
-        $trafficMount = $server->isTrafficAnalyticsEnabled()
+        $trafficMount = self::collectsTraffic($server)
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';
@@ -96,6 +125,7 @@ class StartSentinel
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
+            ...self::trafficLogPreparationCommands($server),
             $dockerCommand,
             "chown -R 9999:root $mountDir",
             "chmod -R 700 $mountDir",

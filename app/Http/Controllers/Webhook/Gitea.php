@@ -65,17 +65,22 @@ class Gitea extends Controller
             if ($full_name === null) {
                 return response('Nothing to do. Invalid repository.');
             }
+            $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = Application::query();
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             if ($x_gitea_event === 'pull_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with branch '$base_branch'.");
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             foreach ($applications as $application) {
@@ -281,7 +286,7 @@ class Gitea extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

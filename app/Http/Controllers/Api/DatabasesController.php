@@ -1856,6 +1856,10 @@ class DatabasesController extends Controller
         // Use a generic authorization for database creation - using PostgreSQL as representative model
         $this->authorize('create', StandalonePostgresql::class);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -3234,6 +3238,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_deploy(Request $request)
@@ -3255,6 +3263,9 @@ class DatabasesController extends Controller
 
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
+        }
+        if ($busyError = StartDatabase::operationInProgressError($database)) {
+            return response()->json(['message' => $busyError], 409);
         }
         StartDatabase::dispatch($database);
 
@@ -3420,6 +3431,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_restart(Request $request)
@@ -3439,6 +3454,9 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
+        if ($busyError = StartDatabase::operationInProgressError($database)) {
+            return response()->json(['message' => $busyError], 409);
+        }
         RestartDatabase::dispatch($database);
 
         auditLog('api.database.restarted', [
@@ -3469,6 +3487,10 @@ class DatabasesController extends Controller
                 'value',
                 'real_value',
             ]);
+        }
+
+        if ($env->is_shown_once ?? false) {
+            $env->makeHidden(['value', 'real_value']);
         }
 
         return serializeApiResponse($env);
@@ -3576,7 +3598,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -3717,7 +3739,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -3848,7 +3870,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),

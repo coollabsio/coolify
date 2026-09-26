@@ -192,7 +192,7 @@ class Domains extends Component
 
         match ($status) {
             'ok' => $this->dispatch('success', "DNS is configured correctly for {$host}."),
-            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record."),
+            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later."),
             default => $this->dispatch('info', "DNS check skipped for {$host}."),
         };
     }
@@ -577,7 +577,11 @@ class Domains extends Component
         $this->persistAllDomainDnsStatuses();
     }
 
-    protected function persistAllDomainDnsStatuses(): void
+    /**
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
+     */
+    protected function persistAllDomainDnsStatuses(array $startingCheckKeys = []): void
     {
         $byApp = [];
 
@@ -617,11 +621,15 @@ class Domains extends Component
                 ->all();
             $statuses = array_intersect_key($statuses, array_flip($currentUrls));
 
-            DB::transaction(function () use ($app, &$statuses): void {
+            DB::transaction(function () use ($app, &$statuses, $startingCheckKeys): void {
                 $application = ServiceApplication::query()->lockForUpdate()->findOrFail($app->id);
                 $storedStatuses = $application->domain_dns_statuses ?? [];
 
                 foreach ($statuses as $key => $status) {
+                    if (in_array($key, $startingCheckKeys, true)) {
+                        continue;
+                    }
+
                     $localCheckId = $status['check_id'] ?? null;
                     $storedCheckId = $storedStatuses[$key]['check_id'] ?? null;
 
@@ -1096,7 +1104,7 @@ class Domains extends Component
             foreach ($dnsChecks as $dnsCheck) {
                 $this->markUrlsAsChecking([$dnsCheck['url']], $serviceApplicationId, $dnsCheck['check_id']);
             }
-            $this->persistAllDomainDnsStatuses();
+            $this->persistAllDomainDnsStatuses($dnsChecks->pluck('url')->all());
 
             $failedDnsChecks = 0;
             foreach ($dnsChecks as $dnsCheck) {
@@ -1357,9 +1365,7 @@ class Domains extends Component
                 return;
             }
 
-            if (in_array('deleteManagedDns', $selectedActions, true)) {
-                $this->deleteManagedDnsForUrl($url);
-            }
+            $this->releaseManagedDnsForUrl($url, $app, in_array('deleteManagedDns', $selectedActions, true));
 
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
@@ -1657,7 +1663,7 @@ class Domains extends Component
         foreach (array_unique($urls) as $url) {
             $checkId = new_public_id();
             $this->markUrlsAsChecking([$url], (int) $application->id, $checkId);
-            $this->persistAllDomainDnsStatuses();
+            $this->persistAllDomainDnsStatuses([$url]);
 
             try {
                 CheckDomainDnsJob::dispatch(

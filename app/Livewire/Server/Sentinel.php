@@ -43,6 +43,7 @@ class Sentinel extends Component
 
     public function mount()
     {
+        $this->authorize('viewSentinel', $this->server);
         $this->syncData();
     }
 

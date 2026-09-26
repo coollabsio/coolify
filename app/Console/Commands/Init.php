@@ -15,6 +15,7 @@ use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use App\Support\ResourceStartActivity;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -103,6 +104,16 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
+        try {
+            $interruptedStartCount = ResourceStartActivity::failInterrupted();
+
+            if ($interruptedStartCount > 0) {
+                echo "Marked {$interruptedStartCount} interrupted database/service starts and database imports as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup interrupted database/service starts and database imports: {$e->getMessage()}\n";
         }
 
         try {

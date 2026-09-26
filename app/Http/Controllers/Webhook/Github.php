@@ -75,21 +75,22 @@ class Github extends Controller
             if ($full_name === null) {
                 return response('Nothing to do. Invalid repository.');
             }
-            $applications = Application::query();
-            if ($x_github_event === 'push') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
-                if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
-                }
+            $matched_branch = match (true) {
+                $x_github_event === 'push' => $branch,
+                $action === 'closed' => null,
+                default => $base_branch,
+            };
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'github', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
             }
-            if ($x_github_event === 'pull_request') {
-                if ($action !== 'closed') {
-                    $applications->where('git_branch', $base_branch);
-                }
-                $applications = $this->manualWebhookApplications($applications, $full_name);
-                if ($applications->isEmpty()) {
-                    return response("Nothing to do. No applications found for repo $full_name and branch '$base_branch'.");
-                }
+            $applications = Application::query();
+            if ($x_github_event === 'push' || $action !== 'closed') {
+                $applications->where('git_branch', $matched_branch);
+            }
+            $applications = $this->manualWebhookApplications($applications, $full_name);
+            if ($applications->isEmpty()) {
+                return $this->unauthenticatedManualWebhookResponse($failure_key);
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
                 return $app->destination->server_id;
@@ -239,7 +240,7 @@ class Github extends Controller
                 }
             }
 
-            return response($return_payloads);
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }
@@ -520,7 +521,7 @@ class Github extends Controller
         abort_if($this->githubAppHasManifestCredentials($github_app), 403, 'GitHub App credentials are already configured.');
 
         $api_url = data_get($github_app, 'api_url');
-        $data = Http::withBody(null)
+        $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
             ->connectTimeout(5)
@@ -612,7 +613,7 @@ class Github extends Controller
 
         try {
             $jwt = generateGithubJwt($github_app);
-            $response = Http::withHeaders([
+            $response = Http::GitSource($github_app->api_url)->withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github+json',
             ])

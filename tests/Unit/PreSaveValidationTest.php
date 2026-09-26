@@ -269,3 +269,42 @@ YAML;
     expect(fn () => validateDockerComposeForInjection($validCompose))
         ->not->toThrow(Exception::class);
 });
+
+test('validateDockerComposeForInjection allows variables in compose network name fields', function (string $name) {
+    $compose = <<<YAML
+services:
+  app:
+    image: nginx:latest
+    networks:
+      - shared
+networks:
+  shared:
+    external: true
+    name: '{$name}'
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
+})->with([
+    'variable' => ['${SHARED_NETWORK}'],
+    'variable with a default' => ['${SHARED_NETWORK:-traefik_public}'],
+    'variable with an unset-only default' => ['${SHARED_NETWORK-traefik-public.1}'],
+]);
+
+test('validateDockerComposeForInjection still blocks unsafe compose network names with variables', function (string $name, string $where) {
+    $networkKey = $where === 'key' ? $name : 'shared';
+    $nameField = $where === 'name' ? $name : 'shared';
+    $compose = "services:\n  app:\n    image: nginx:latest\nnetworks:\n  ".json_encode($networkKey).":\n    name: ".json_encode($nameField)."\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->toThrow(Exception::class, 'Invalid Docker Compose network name');
+})->with([
+    'default with shell characters' => ['${NET:-bad name;id}', 'name'],
+    'default with command substitution' => ['${NET:-$(id)}', 'name'],
+    'command substitution' => ['$(id)', 'name'],
+    'backticks' => ['`id`', 'name'],
+    'text around the variable' => ['prefix_${NET}', 'name'],
+    'nested variable' => ['${NET:-${OTHER}}', 'name'],
+    'invalid variable name' => ['${1NET}', 'name'],
+    'required-variable form' => ['${NET:?missing}', 'name'],
+    'newline' => ["\${NET}\nid", 'name'],
+    'variable as network key' => ['${NET}', 'key'],
+]);

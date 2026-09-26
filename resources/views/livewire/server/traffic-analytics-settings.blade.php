@@ -27,6 +27,9 @@
             </x-slot:actions>
 
             @if ($isTrafficAnalyticsEnabled)
+                @if ($caddyRedeployNote)
+                    <x-callout type="info" title="Redeploy to start logging">{{ $caddyRedeployNote }}</x-callout>
+                @endif
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                         id="trafficTopn" label="Top-N cap" required
@@ -56,10 +59,15 @@
                 </div>
             @else
                 <x-empty size="sm" title="Traffic analytics is disabled"
-                    description="Enable traffic analytics to collect proxy access logs and geolocate visitor traffic."
+                    :description="$unsupportedReason ?? 'Enable traffic analytics to collect proxy access logs and geolocate visitor traffic.'"
                     icon-name="dashboard">
                     <x-slot:contents>
                         <div class="flex items-center gap-3">
+                            @if ($unsupportedReason)
+                                <x-forms.button disabled :tooltip="$unsupportedReason">
+                                    Enable traffic analytics
+                                </x-forms.button>
+                            @else
                             <x-loading wire:loading.flex wire:target="toggleTrafficAnalytics"
                                 text="Restarting Sentinel and proxy..." compact />
                             <x-modal-confirmation title="Enable traffic analytics?"
@@ -72,6 +80,7 @@
                                 step2ButtonText="Enable traffic analytics" isHighlightedButton
                                 :disabled="! auth()->user()->can('update', $server)"
                                 :authDisabled="! auth()->user()->can('update', $server)" />
+                            @endif
                         </div>
                     </x-slot:contents>
                 </x-empty>

@@ -12,6 +12,7 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
+use App\Exceptions\DatabaseStartException;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -20,12 +21,15 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Support\ResourceStartActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\Models\Activity;
 use Throwable;
 
@@ -53,7 +57,61 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
         abort_unless((int) $database->team()->id === $this->teamId, 403);
         $activity = Activity::query()->findOrFail($this->activityId);
 
-        match ($database->getMorphClass()) {
+        if (! $this->isStillRequested($activity, $database->uuid)) {
+            event(new DatabaseStatusChanged($this->userId));
+
+            return;
+        }
+
+        $lock = Cache::lock(ResourceStartActivity::databaseStartLockKey($database->uuid), ResourceStartActivity::DATABASE_START_LOCK_SECONDS);
+        if (! $lock->get()) {
+            ResourceStartActivity::markFailed($activity, ResourceStartActivity::ALREADY_STARTING_MESSAGE);
+            event(new DatabaseStatusChanged($this->userId));
+
+            return;
+        }
+
+        try {
+            $this->runStart($database, $activity);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * A start runs only while its activity is still queued and no newer start of the same
+     * database was requested. A start that waited in a busy queue can be treated as stale and
+     * replaced by a new one; without this check both would run one after the other.
+     */
+    private function isStillRequested(Activity $activity, string $databaseUuid): bool
+    {
+        if (data_get($activity, 'properties.status') !== ProcessStatus::QUEUED->value) {
+            return false;
+        }
+
+        $newerStartExists = Activity::query()
+            ->where('properties->type_uuid', $databaseUuid)
+            ->where('properties->operation', ResourceStartActivity::DATABASE_START_OPERATION)
+            ->whereIn('properties->status', [
+                ProcessStatus::QUEUED->value,
+                ProcessStatus::IN_PROGRESS->value,
+                ProcessStatus::FINISHED->value,
+            ])
+            ->where('id', '>', $activity->getKey())
+            ->exists();
+
+        if ($newerStartExists) {
+            ResourceStartActivity::markFailed($activity, ResourceStartActivity::SUPERSEDED_MESSAGE);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function runStart(Model $database, Activity $activity): void
+    {
+        $result = match ($database->getMorphClass()) {
             StandalonePostgresql::class => StartPostgresql::run($database, $activity),
             StandaloneRedis::class => StartRedis::run($database, $activity),
             StandaloneMongodb::class => StartMongodb::run($database, $activity),
@@ -63,6 +121,10 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
         };
+
+        if (! $result instanceof Activity || data_get($result, 'properties.status') !== ProcessStatus::FINISHED->value) {
+            throw DatabaseStartException::startCommandsDidNotRun();
+        }
 
         event(new DatabaseStatusChanged($this->userId));
     }
@@ -75,12 +137,10 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $activity->properties = $activity->properties->merge([
-                'status' => ProcessStatus::ERROR->value,
-                'error' => 'Database start failed.',
-                'failed_at' => now()->toIso8601String(),
-            ]);
-            $activity->save();
+            ResourceStartActivity::markFailed(
+                $activity,
+                $exception instanceof DatabaseStartException ? $exception->getMessage() : 'Database start failed.',
+            );
         } finally {
             event(new DatabaseStatusChanged($this->userId));
         }

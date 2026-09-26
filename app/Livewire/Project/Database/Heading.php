@@ -6,11 +6,10 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
-use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
+use App\Support\ResourceStartActivity;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Spatie\Activitylog\Models\Activity;
 
 class Heading extends Component
 {
@@ -79,15 +78,9 @@ class Heading extends Component
     public function checkDeployments()
     {
         try {
-            $activity = Activity::where('properties->type_uuid', $this->database->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
-                $this->isDeploymentProgress = true;
-                $this->runningActivityId = $activity->id;
-            } else {
-                $this->isDeploymentProgress = false;
-                $this->runningActivityId = null;
-            }
+            $activity = ResourceStartActivity::latestRunning($this->database->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
             $this->runningActivityId = null;
@@ -157,6 +150,11 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = RestartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
             $this->auditDatabaseAction('ui.database.restarted');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
@@ -172,6 +170,11 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = StartDatabase::run($this->database);
+            if (is_string($activity)) {
+                $this->dispatch('error', $activity);
+
+                return;
+            }
             $this->auditDatabaseAction('ui.database.started');
             $this->markDeploymentRunning($activity);
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");

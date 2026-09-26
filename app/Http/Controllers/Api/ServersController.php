@@ -14,10 +14,12 @@ use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Models\Team;
 use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Stringable;
 
@@ -538,7 +540,7 @@ class ServersController extends Controller
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->exists()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['server_role' => ['Add another build-capable server before you set this server to deployments only.']],
+                'errors' => ['server_role' => ['Add a usable build server before you set this server to deployments only.']],
             ], 422);
         }
         if (is_null($request->instant_validate)) {
@@ -563,21 +565,26 @@ class ServersController extends Controller
 
         $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;
 
-        $server = ModelsServer::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'ip' => $request->ip,
-            'port' => $request->port,
-            'user' => $request->user,
-            'private_key_id' => $privateKey->id,
-            'team_id' => $teamId,
-        ]);
+        try {
+            $server = Team::createServerWithinLimit($teamId, [
+                'name' => $request->name,
+                'description' => $request->description,
+                'ip' => $request->ip,
+                'port' => $request->port,
+                'user' => $request->user,
+                'private_key_id' => $privateKey->id,
+                'team_id' => $teamId,
+            ]);
+        } catch (ValidationException) {
+            return response()->json(['message' => 'Server limit reached for your subscription.'], 400);
+        }
         $server->proxy->set('type', $proxyType);
         $server->proxy->set('status', ProxyStatus::EXITED->value);
         $server->save();
 
         $server->settings()->update([
             'server_role' => $serverRole,
+            'is_build_server' => $serverRole === ServerRole::BUILD,
         ]);
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
@@ -757,7 +764,7 @@ class ServersController extends Controller
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->whereKeyNot($server->id)->exists()) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['server_role' => ['Add another build-capable server before you set this server to deployments only.']],
+                'errors' => ['server_role' => ['Add a usable build server before you set this server to deployments only.']],
             ], 422);
         }
 
@@ -765,6 +772,7 @@ class ServersController extends Controller
         if ($serverRole !== null) {
             $server->settings()->update([
                 'server_role' => $serverRole,
+                'is_build_server' => $serverRole === ServerRole::BUILD,
             ]);
         }
 

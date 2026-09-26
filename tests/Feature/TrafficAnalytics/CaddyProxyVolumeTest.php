@@ -46,3 +46,15 @@ it('mounts the traffic volume for caddy when traffic analytics is enabled', func
     expect($config['services']['caddy']['volumes'])
         ->toContain($server->proxyPath().':/traffic');
 });
+
+it('uses a default caddy image that supports per-app traffic attribution', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $server->proxy->set('type', 'CADDY');
+    $server->save();
+
+    $config = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()));
+
+    // caddy-docker-proxy 2.13 ships Caddy 2.11, which knows log_append; the old 2.8 default shipped Caddy 2.7.6.
+    expect($config['services']['caddy']['image'])->toBe('lucaslorentz/caddy-docker-proxy:2.13-alpine')
+        ->and($server->fresh()->caddySupportsLogAppend())->toBeTrue();
+});

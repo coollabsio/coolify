@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ManagedDnsDeletionResult;
 use App\Events\DnsRecordConfigurationFinished;
 use App\Exceptions\DnsRecordConflictException;
 use App\Jobs\CheckDomainDnsJob;
@@ -109,10 +110,12 @@ test('a cloudflare record is created and tracked as managed by coolify', functio
 
     $record = app(CloudflareDnsProvider::class)->createRecord($zone, 'app.example.com', '203.0.113.10');
 
-    expect($record->provider_record_id)->toBe('record-1')->and($record->content)->toBe('203.0.113.10');
+    expect($record->provider_record_id)->toBe('record-1')->and($record->content)->toBe('203.0.113.10')
+        ->and($record->owned)->toBeTrue();
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && $request->data()['name'] === 'app.example.com'
-        && $request->data()['content'] === '203.0.113.10');
+        && $request->data()['content'] === '203.0.113.10'
+        && $request->data()['comment'] === $record->ownershipComment());
 });
 
 test('queued dns configuration creates the record and broadcasts completion', function () {
@@ -201,6 +204,7 @@ test('an existing matching remote record is tracked without creating a new one',
 
     expect($record->provider_record_id)->toBe('record-1')
         ->and($record->content)->toBe('203.0.113.10')
+        ->and($record->owned)->toBeFalse()
         ->and(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeTrue();
     Http::assertNotSent(fn ($request) => $request->method() === 'POST');
 });
@@ -260,28 +264,41 @@ test('an existing remote record with different content remains a conflict', func
 });
 
 test('a managed record changed outside coolify is not deleted', function () {
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'provider_record_id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10',
     ]);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/*/dns_records/record-1' => Http::response([
         'success' => true,
-        'result' => ['id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.99'],
+        'result' => ['id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.99', 'comment' => $record->ownershipComment()],
     ])]);
 
-    expect(app(CloudflareDnsProvider::class)->deleteRecord($record))->toBeFalse()->and($record->fresh())->not->toBeNull();
+    expect(app(CloudflareDnsProvider::class)->deleteRecord($record))->toBe(ManagedDnsDeletionResult::ChangedExternally)
+        ->and($record->fresh())->not->toBeNull();
+    Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
+});
+
+test('a record coolify did not create is never deleted', function () {
+    $record = ManagedDnsRecord::factory()->create([
+        'provider_record_id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10',
+    ]);
+    Http::fake();
+
+    expect(app(CloudflareDnsProvider::class)->deleteRecord($record))->toBe(ManagedDnsDeletionResult::NotOwned)
+        ->and($record->fresh())->not->toBeNull();
+    Http::assertNothingSent();
 });
 
 test('an unchanged managed record is deleted from cloudflare and coolify', function () {
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'provider_record_id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10',
     ]);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/*/dns_records/record-1' => Http::sequence()
-        ->push(['success' => true, 'result' => ['id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10']])
+        ->push(['success' => true, 'result' => ['id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10', 'comment' => $record->ownershipComment()]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 
-    expect(app(CloudflareDnsProvider::class)->deleteRecord($record))->toBeTrue()
+    expect(app(CloudflareDnsProvider::class)->deleteRecord($record))->toBe(ManagedDnsDeletionResult::Deleted)
         ->and(ManagedDnsRecord::query()->find($record->id))->toBeNull();
 });
 
@@ -491,32 +508,30 @@ test('removing a domain deletes only the managed dns record for that resource', 
     $token = IntegrationToken::factory()->for($team)->create(['provider' => 'cloudflare', 'token' => 'secret']);
     $zone = DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
 
-    $otherRecord = ManagedDnsRecord::factory()->create([
+    $otherRecord = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $otherApplication->getMorphClass(),
-        'resource_id' => $otherApplication->getKey(),
         'provider_record_id' => 'record-other',
         'type' => 'A',
         'name' => 'app.example.com',
         'content' => '203.0.113.10',
     ]);
-    $ownRecord = ManagedDnsRecord::factory()->create([
+    $otherRecord->addReference($otherApplication);
+    $ownRecord = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $application->getMorphClass(),
-        'resource_id' => $application->getKey(),
         'provider_record_id' => 'record-own',
         'type' => 'A',
         'name' => 'app.example.com',
         'content' => '203.0.113.10',
     ]);
+    $ownRecord->addReference($application);
 
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones/*/dns_records/record-own' => Http::sequence()
-            ->push(['success' => true, 'result' => ['id' => 'record-own', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10']])
+            ->push(['success' => true, 'result' => ['id' => 'record-own', 'type' => 'A', 'name' => 'app.example.com', 'content' => '203.0.113.10', 'comment' => $ownRecord->ownershipComment()]])
             ->push(['success' => true, 'result' => ['id' => 'record-own']]),
         'https://api.cloudflare.com/client/v4/zones/*/dns_records/record-other' => Http::response([
             'success' => true,
@@ -553,11 +568,11 @@ test('replaceRecord updates the cloudflare record when the conflict still matche
         $zone, 'record-1', 'app.example.com', '203.0.113.10', expectedCurrent: '198.51.100.50',
     );
 
-    expect($record->provider_record_id)->toBe('record-1')->and($record->content)->toBe('203.0.113.10');
-    Http::assertSent(fn ($request) => $request->method() === 'PUT'
+    expect($record->provider_record_id)->toBe('record-1')->and($record->content)->toBe('203.0.113.10')
+        ->and($record->owned)->toBeFalse();
+    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_ends_with($request->url(), '/dns_records/record-1')
-        && $request->data()['name'] === 'app.example.com'
-        && $request->data()['content'] === '203.0.113.10');
+        && $request->data() === ['content' => '203.0.113.10']);
 });
 
 test('replaceRecord rejects a stale or tampered conflict without updating dns', function (string $recordId, string $current) {
@@ -576,7 +591,7 @@ test('replaceRecord rejects a stale or tampered conflict without updating dns', 
         $zone, $recordId, 'app.example.com', '203.0.113.10', expectedCurrent: $current,
     ))->toThrow(RuntimeException::class, 'The DNS conflict is no longer available. Check the record again.');
 
-    Http::assertNotSent(fn ($request) => $request->method() === 'PUT');
+    Http::assertNotSent(fn ($request) => in_array($request->method(), ['PUT', 'PATCH'], true));
 })->with([
     'wrong record id' => ['record-other', '198.51.100.50'],
     'wrong current value' => ['record-1', '203.0.113.99'],
@@ -606,10 +621,10 @@ test('replacing a managed dns record uses the server ip and live cloudflare reco
         ->call('replaceManagedDnsRecord', 'app.example.com', $zone->id)
         ->assertDispatched('success', 'DNS record replaced for app.example.com.');
 
-    Http::assertSent(fn ($request) => $request->method() === 'PUT'
+    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_ends_with($request->url(), '/dns_records/record-1')
-        && $request->data()['content'] === '203.0.113.10');
-    expect(ManagedDnsRecord::query()->where('name', 'app.example.com')->where('content', '203.0.113.10')->exists())->toBeTrue();
+        && $request->data() === ['content' => '203.0.113.10']);
+    expect(ManagedDnsRecord::query()->where('name', 'app.example.com')->where('content', '203.0.113.10')->where('owned', false)->exists())->toBeTrue();
 });
 
 test('replacing a managed dns record ignores a tampered conflict record id', function () {
@@ -637,7 +652,7 @@ test('replacing a managed dns record ignores a tampered conflict record id', fun
         ->assertDispatched('error', 'The DNS conflict is no longer available. Check the record again.')
         ->assertSet('dnsProviderConflicts', []);
 
-    Http::assertNotSent(fn ($request) => $request->method() === 'PUT');
+    Http::assertNotSent(fn ($request) => in_array($request->method(), ['PUT', 'PATCH'], true));
     expect(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeFalse();
 });
 

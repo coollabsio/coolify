@@ -49,7 +49,7 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
         'email' => 'UserName@example.edu',
         'name' => 'Example User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ]);
 
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
@@ -86,7 +86,7 @@ it('never moves an existing oauth identity when the provider email changes', fun
         'email' => 'new@example.com',
         'name' => 'Example User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ]);
 
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
@@ -154,7 +154,7 @@ it('continues oauth login when another request creates the identity first', func
             'email' => 'race@example.com',
             'name' => 'Race User',
             'id' => 'google-race-id',
-            'user' => ['verified_email' => true],
+            'user' => ['verified_email' => true, 'hd' => 'example.com'],
         ], OauthSetting::where('provider', 'google')->firstOrFail());
     } finally {
         Event::forget($eventName);
@@ -212,16 +212,62 @@ it('registers a new user from a verified provider identity', function () {
         'email' => 'verified@example.com',
         'name' => 'Verified User',
         'id' => 'verified-google-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ], OauthSetting::where('provider', 'google')->firstOrFail());
 
     expect($user->email)->toBe('verified@example.com');
+    expect($user->email_verified_at)->toBeNull();
     $this->assertAuthenticatedAs($user);
     $this->assertDatabaseHas('oauth_identities', [
         'user_id' => $user->id,
         'provider' => 'google',
         'provider_user_id' => 'verified-google-id',
     ]);
+});
+
+it('does not register a new user through a non-OIDC provider when registration is disabled', function (string $provider, array $rawClaims) {
+    // Upgraded installs have allow_registration = true on every provider row (column default).
+    OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+        'allow_registration' => true,
+    ]);
+
+    expect(fn () => app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'stranger@example.com',
+        'name' => 'Stranger',
+        'id' => 'stranger-id',
+        'user' => $rawClaims,
+    ], OauthSetting::where('provider', $provider)->firstOrFail()))->toThrow(HttpException::class, 'Registration is disabled');
+
+    $this->assertGuest();
+    expect(User::count())->toBe(0)
+        ->and(OauthIdentity::count())->toBe(0);
+})->with([
+    'github' => ['github', []],
+    'google' => ['google', ['verified_email' => true, 'hd' => 'example.com']],
+]);
+
+it('registers a new user through a non-OIDC provider when registration is enabled', function () {
+    InstanceSettings::findOrFail(0)->update(['is_registration_enabled' => true]);
+    OauthSetting::create([
+        'provider' => 'github',
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+        'allow_registration' => false,
+    ]);
+
+    $user = app(OauthLoginService::class)->login('github', (object) [
+        'email' => 'new-user@example.com',
+        'name' => 'New User',
+        'id' => 'github-new-user-id',
+        'user' => [],
+    ], OauthSetting::where('provider', 'github')->firstOrFail());
+
+    expect($user->email)->toBe('new-user@example.com');
+    $this->assertAuthenticatedAs($user);
 });
 
 it('does not link another provider identity to an account by shared email', function () {
@@ -238,7 +284,7 @@ it('does not link another provider identity to an account by shared email', func
         'email' => 'shared@example.com',
         'name' => 'Other Provider User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ], OauthSetting::where('provider', 'google')->firstOrFail()))->toThrow(HttpException::class);
 
     $this->assertGuest();
@@ -267,7 +313,7 @@ it('sends an OAuth user with confirmed two factor authentication to the Fortify 
         'email' => $user->email,
         'name' => $user->name,
         'id' => 'two-factor-google-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ]);
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
@@ -295,7 +341,7 @@ it('completes OAuth login without a challenge when two factor authentication is 
         'email' => $user->email,
         'name' => $user->name,
         'id' => 'plain-google-id',
-        'user' => ['verified_email' => true],
+        'user' => ['verified_email' => true, 'hd' => 'example.com'],
     ]);
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
@@ -381,3 +427,18 @@ it('rejects oauth logins when the provider does not return a valid user id', fun
     'false id' => [false],
     'float id' => [1.0],
 ]);
+
+it('rejects a Google account outside the configured Workspace even when its email is verified', function () {
+    $user = User::factory()->create(['email' => 'user@outside.example']);
+    $setting = OauthSetting::where('provider', 'google')->firstOrFail();
+
+    expect(fn () => app(OauthLoginService::class)->login('google', (object) [
+        'email' => $user->email,
+        'name' => 'Outside User',
+        'id' => 'google-outside-id',
+        'user' => ['verified_email' => true, 'hd' => 'outside.example'],
+    ], $setting))->toThrow(HttpException::class);
+
+    expect(OauthIdentity::count())->toBe(0);
+    $this->assertGuest();
+});
