@@ -35,6 +35,10 @@ class StartDatabase
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
+        $busyError = self::operationInProgressError($database);
+        if ($busyError !== null) {
+            return $busyError;
+        }
         $prerequisiteError = self::prerequisiteError($database);
         if ($prerequisiteError !== null) {
             return $prerequisiteError;
@@ -81,6 +85,29 @@ class StartDatabase
         }
 
         return $activity;
+    }
+
+    /**
+     * Refuse a second start/restart while a start, restart or import of this database is
+     * queued or running. The UI hides Start/Restart in this state; this is the server-side check.
+     * Stale start activities do not block and are marked as failed, so the UI stays consistent.
+     */
+    public static function operationInProgressError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database): ?string
+    {
+        if (blank($database->uuid)) {
+            return null;
+        }
+
+        $liveOperations = collect([
+            ResourceStartActivity::DATABASE_START_OPERATION,
+            ResourceStartActivity::DATABASE_IMPORT_OPERATION,
+        ])->flatMap(fn (string $operation) => ResourceStartActivity::failStale(
+            ResourceStartActivity::active($database->uuid, $operation)
+        ));
+
+        return $liveOperations->isNotEmpty() || ResourceStartActivity::latestRunning($database->uuid) !== null
+            ? ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE
+            : null;
     }
 
     /**

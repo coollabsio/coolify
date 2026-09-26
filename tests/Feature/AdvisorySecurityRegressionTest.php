@@ -67,19 +67,26 @@ it('throttles only failed authentication on manual webhook routes', function (st
     {
         use MatchesManualWebhookApplications;
 
-        public function reply(array $payloads, Request $request, string $provider): int
+        public function key(Request $request, string $provider): string
         {
-            return $this->manualWebhookResponse(collect($payloads), $request, $provider)->getStatusCode();
+            return $this->manualWebhookFailureRateLimitKey($request, $provider, 'test-org/test-repo', 'main');
+        }
+
+        public function reply(array $payloads, string $failureKey): int
+        {
+            return $this->manualWebhookResponse(collect($payloads), $failureKey)->getStatusCode();
         }
     };
+    $failureKey = $helper->key($request, $provider);
 
     expect($route->gatherMiddleware())->not->toContain('throttle:60,1');
+    expect($failureKey)->toStartWith("manual-webhook-failures:{$provider}:192.0.2.44:");
 
-    $helper->reply([['status' => 'success', 'message' => 'queued']], $request, $provider);
-    expect(RateLimiter::attempts("manual-webhook-failures:{$provider}:192.0.2.44"))->toBe(0);
+    $helper->reply([['status' => 'success', 'message' => 'queued']], $failureKey);
+    expect(RateLimiter::attempts($failureKey))->toBe(0);
 
-    $helper->reply([['status' => 'failed', 'message' => 'Invalid signature.']], $request, $provider);
-    expect(RateLimiter::attempts("manual-webhook-failures:{$provider}:192.0.2.44"))->toBe(1);
+    $helper->reply([['status' => 'failed', 'message' => 'Invalid signature.']], $failureKey);
+    expect(RateLimiter::attempts($failureKey))->toBe(1);
 })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
 it('does not reveal how many applications share a manual webhook repository', function () {
@@ -89,7 +96,7 @@ it('does not reveal how many applications share a manual webhook repository', fu
 
         public function reply(array $payloads): string
         {
-            return $this->manualWebhookResponse(collect($payloads), Request::create('/webhooks/source/github/events/manual', 'POST'), 'github')->getContent();
+            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test')->getContent();
         }
     };
     $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];

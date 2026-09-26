@@ -170,3 +170,32 @@ it('runs the interrupted start cleanup from app:init', function () {
 
     expect($source)->toContain('ResourceStartActivity::failInterrupted()');
 });
+
+it('marks interrupted database imports as failed on startup and leaves other operations alone', function () {
+    $queuedImport = startActivity($this->database->uuid, ProcessStatus::QUEUED, 'database_import');
+    $runningImport = startActivity((string) Str::uuid(), ProcessStatus::IN_PROGRESS, 'database_import');
+    $finishedImport = startActivity($this->database->uuid, ProcessStatus::FINISHED, 'database_import');
+    $otherOperation = startActivity($this->database->uuid, ProcessStatus::IN_PROGRESS, 'something-else');
+
+    expect(ResourceStartActivity::failInterrupted())->toBe(2);
+
+    foreach ([$queuedImport, $runningImport] as $activity) {
+        $activity->refresh();
+        expect(data_get($activity, 'properties.status'))->toBe(ProcessStatus::ERROR->value)
+            ->and(data_get($activity, 'properties.error'))->toBe('Interrupted by a Coolify restart.');
+    }
+
+    expect(data_get($finishedImport->refresh(), 'properties.status'))->toBe(ProcessStatus::FINISHED->value)
+        ->and(data_get($otherOperation->refresh(), 'properties.status'))->toBe(ProcessStatus::IN_PROGRESS->value);
+});
+
+it('keeps a long silent import as running with the import limit instead of the start limit', function () {
+    $activity = startActivity($this->database->uuid, ProcessStatus::IN_PROGRESS, 'database_import', 30);
+
+    expect(ResourceStartActivity::isStale($activity))->toBeFalse()
+        ->and(databaseHeadingFor($this->database)->checkDeployments())->toBeTrue();
+
+    $stale = startActivity($this->database->uuid, ProcessStatus::IN_PROGRESS, 'database_import', intdiv(ResourceStartActivity::importStaleAfterSeconds(), 60) + 1);
+
+    expect(ResourceStartActivity::isStale($stale))->toBeTrue();
+});

@@ -21,10 +21,6 @@ class Gitea extends Controller
 
     public function manual(Request $request)
     {
-        if ($this->hasTooManyManualWebhookFailures($request, 'gitea')) {
-            return $this->tooManyManualWebhookFailuresResponse($request, 'gitea');
-        }
-
         try {
             $return_payloads = collect([]);
             $x_gitea_delivery = request()->header('X-Gitea-Delivery');
@@ -69,17 +65,22 @@ class Gitea extends Controller
             if ($full_name === null) {
                 return response('Nothing to do. Invalid repository.');
             }
+            $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = Application::query();
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitea');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             if ($x_gitea_event === 'pull_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitea');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             foreach ($applications as $application) {
@@ -285,7 +286,7 @@ class Gitea extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $request, 'gitea');
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

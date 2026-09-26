@@ -336,10 +336,6 @@ class Gitlab extends Controller
 
     public function manual(Request $request)
     {
-        if ($this->hasTooManyManualWebhookFailures($request, 'gitlab')) {
-            return $this->tooManyManualWebhookFailuresResponse($request, 'gitlab');
-        }
-
         try {
             $return_payloads = collect([]);
             $payload = $request->collect();
@@ -356,12 +352,14 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
 
+            // A delivery without a token does not try a secret, so it is not
+            // counted as a failed attempt.
             if (empty($x_gitlab_token)) {
                 auditLogWebhookFailure('gitlab', 'webhook_token_missing', [
                     'event' => $x_gitlab_event,
                 ]);
 
-                return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
+                return response([$this->unauthenticatedManualWebhookFailurePayload()]);
             }
 
             if ($x_gitlab_event === 'push') {
@@ -412,17 +410,22 @@ class Gitlab extends Controller
 
                 return response($return_payloads);
             }
+            $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = Application::query();
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitlab');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key);
                 }
             }
             foreach ($applications as $application) {
@@ -631,7 +634,7 @@ class Gitlab extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $request, 'gitlab');
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

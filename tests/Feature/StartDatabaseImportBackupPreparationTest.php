@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\ResourceStartActivity;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -156,4 +158,16 @@ test('s3 backups are prepared in the s3 helper and streamed into the database co
 
     Queue::assertPushed(CoolifyTask::class, fn (CoolifyTask $job) => ! array_key_exists('serverTmpPath', $job->call_event_data)
         && str_starts_with((string) $job->call_event_data['containerName'], 's3-restore-'));
+});
+
+test('the import activity is created with its operation, before the CoolifyTask job can load it', function () {
+    $operationsAtCreation = [];
+    Activity::created(function (Activity $activity) use (&$operationsAtCreation) {
+        $operationsAtCreation[] = $activity->getExtraProperty('operation');
+    });
+
+    importServerBackup($this, '/srv/backups/app.sql', '2d2d20506f73');
+
+    expect($operationsAtCreation)->toBe([ResourceStartActivity::DATABASE_IMPORT_OPERATION]);
+    Queue::assertPushed(CoolifyTask::class);
 });

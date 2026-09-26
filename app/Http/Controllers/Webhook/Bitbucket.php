@@ -20,10 +20,6 @@ class Bitbucket extends Controller
 
     public function manual(Request $request)
     {
-        if ($this->hasTooManyManualWebhookFailures($request, 'bitbucket')) {
-            return $this->tooManyManualWebhookFailuresResponse($request, 'bitbucket');
-        }
-
         try {
             $return_payloads = collect([]);
             $payload = $request->collect();
@@ -76,9 +72,13 @@ class Bitbucket extends Controller
                     'message' => 'Nothing to do. Invalid repository.',
                 ]);
             }
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_name, $branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
-                return $this->unauthenticatedManualWebhookResponse($request, 'bitbucket');
+                return $this->unauthenticatedManualWebhookResponse($failure_key);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -279,7 +279,7 @@ class Bitbucket extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $request, 'bitbucket');
+            return $this->manualWebhookResponse($return_payloads, $failure_key);
         } catch (Exception $e) {
             return handleError($e);
         }

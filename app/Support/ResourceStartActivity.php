@@ -8,16 +8,19 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
 /**
- * State of the activity log rows that track database and service start/restart runs.
+ * State of the activity log rows that track database and service start/restart runs
+ * and database imports.
  *
  * A killed worker, a Coolify restart or a lost queue can leave such an activity queued or
  * in progress forever. Activities that have not progressed for longer than their job can
- * possibly run are treated as stale, so they no longer block Start/Restart in the UI.
+ * possibly run are treated as stale, so they no longer block Start/Restart/Import.
  * Command output is saved to the activity as it arrives, so `updated_at` is the heartbeat.
  */
 class ResourceStartActivity
 {
     public const DATABASE_START_OPERATION = 'database-start';
+
+    public const DATABASE_IMPORT_OPERATION = 'database_import';
 
     /**
      * A start that is still waiting in the queue after this long is treated as lost.
@@ -29,7 +32,33 @@ class ResourceStartActivity
      */
     public const IN_PROGRESS_STALE_AFTER_SECONDS = 900;
 
+    /**
+     * A restore can be silent for a long time (for example pg_restore without verbose output),
+     * so the output heartbeat is not reliable for imports. The remote restore process is killed
+     * after the SSH command timeout, so an import without progress for longer than that plus
+     * this margin cannot still be running.
+     */
+    public const IMPORT_STALE_MARGIN_SECONDS = 1800;
+
+    /**
+     * Lower bound for the import limit, also used when the SSH command timeout is disabled (0).
+     */
+    public const IMPORT_MIN_STALE_AFTER_SECONDS = 7200;
+
+    /**
+     * The start lock must not outlive a killed job for long: DatabaseStartJob times out after 600 seconds.
+     */
+    public const DATABASE_START_LOCK_SECONDS = self::IN_PROGRESS_STALE_AFTER_SECONDS;
+
     public const INTERRUPTED_MESSAGE = 'Interrupted by a Coolify restart.';
+
+    public const STALE_MESSAGE = 'Marked as failed: no progress was recorded for too long.';
+
+    public const SUPERSEDED_MESSAGE = 'Skipped: a newer start of this database was requested.';
+
+    public const ALREADY_STARTING_MESSAGE = 'Skipped: another start of this database is still running.';
+
+    public const DATABASE_OPERATION_IN_PROGRESS_MESSAGE = 'Another start, restart or import of this database is already in progress.';
 
     private const ACTIVE_STATUSES = [
         ProcessStatus::QUEUED->value,
@@ -65,11 +94,56 @@ class ResourceStartActivity
             return true;
         }
 
-        $staleAfterSeconds = data_get($activity, 'properties.status') === ProcessStatus::QUEUED->value
-            ? self::QUEUED_STALE_AFTER_SECONDS
-            : self::IN_PROGRESS_STALE_AFTER_SECONDS;
+        $staleAfterSeconds = match (true) {
+            data_get($activity, 'properties.operation') === self::DATABASE_IMPORT_OPERATION => self::importStaleAfterSeconds(),
+            data_get($activity, 'properties.status') === ProcessStatus::QUEUED->value => self::QUEUED_STALE_AFTER_SECONDS,
+            default => self::IN_PROGRESS_STALE_AFTER_SECONDS,
+        };
 
         return $lastProgressAt->lte(now()->subSeconds($staleAfterSeconds));
+    }
+
+    public static function importStaleAfterSeconds(): int
+    {
+        $commandTimeout = (int) config('constants.ssh.command_timeout');
+
+        return max(self::IMPORT_MIN_STALE_AFTER_SECONDS, $commandTimeout + self::IMPORT_STALE_MARGIN_SECONDS);
+    }
+
+    public static function databaseStartLockKey(string $databaseUuid): string
+    {
+        return "database-start:{$databaseUuid}";
+    }
+
+    /**
+     * Queued or in-progress activities of one operation for a resource, oldest first.
+     *
+     * @return Collection<int, Activity>
+     */
+    public static function active(string $typeUuid, string $operation, ?int $teamId = null): Collection
+    {
+        return Activity::query()
+            ->where('properties->type_uuid', $typeUuid)
+            ->where('properties->operation', $operation)
+            ->whereIn('properties->status', self::ACTIVE_STATUSES)
+            ->when($teamId !== null, fn ($query) => $query->where('properties->team_id', $teamId))
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Fail the stale activities in the list, so the UI and API stop reporting them as running.
+     *
+     * @param  Collection<int, Activity>  $activities
+     * @return Collection<int, Activity> The activities that are not stale.
+     */
+    public static function failStale(Collection $activities): Collection
+    {
+        [$stale, $live] = $activities->partition(fn (Activity $activity): bool => self::isStale($activity));
+
+        $stale->each(fn (Activity $activity) => self::markFailed($activity, self::STALE_MESSAGE));
+
+        return $live->values();
     }
 
     /**
@@ -92,8 +166,8 @@ class ResourceStartActivity
     }
 
     /**
-     * Fail database and service start activities left queued or in progress by a restart.
-     * Runs during app:init, before any queue worker is started.
+     * Fail database starts, database imports and service starts left queued or in progress
+     * by a restart. Runs during app:init, before any queue worker is started.
      */
     public static function failInterrupted(): int
     {
@@ -104,7 +178,11 @@ class ResourceStartActivity
         $serviceUuids = self::existingServiceUuids($activities);
 
         $interrupted = $activities->filter(
-            fn (Activity $activity): bool => data_get($activity, 'properties.operation') === self::DATABASE_START_OPERATION
+            fn (Activity $activity): bool => in_array(
+                data_get($activity, 'properties.operation'),
+                [self::DATABASE_START_OPERATION, self::DATABASE_IMPORT_OPERATION],
+                true,
+            )
                 || $serviceUuids->contains(data_get($activity, 'properties.type_uuid'))
         );
 
