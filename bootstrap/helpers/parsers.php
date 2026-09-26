@@ -152,6 +152,38 @@ function composeNetworkNameVariable(string $name): ?array
 }
 
 /**
+ * Creates a resource environment variable for each top-level network `name:` that is one Compose
+ * variable, like variables in `environment:`, so users can see and change it. The compose file keeps
+ * the variable and Compose resolves it from the deployment `.env`. The default from the compose file
+ * (or an empty value) is only the first value: a value that the user changed is kept. A variable with
+ * a default that is not a valid network name is not created.
+ *
+ * For applications, the EnvironmentVariable `created` hook adds the preview copy.
+ */
+function ensureComposeNetworkNameVariables(Application|Service $resource, iterable $networks): void
+{
+    foreach ($networks as $network) {
+        $name = data_get($network, 'name');
+        $variable = is_string($name) ? composeNetworkNameVariable($name) : null;
+        if ($variable === null) {
+            continue;
+        }
+        if ($variable['default'] !== null && ! ValidationPatterns::isValidDockerNetwork($variable['default'])) {
+            continue;
+        }
+
+        $resource->environment_variables()->firstOrCreate([
+            'key' => $variable['variable'],
+            'resourceable_type' => get_class($resource),
+            'resourceable_id' => $resource->id,
+        ], [
+            'value' => $variable['default'] ?? '',
+            'is_preview' => false,
+        ]);
+    }
+}
+
+/**
  * A network `name:` may be such a variable: only Docker Compose reads this value and it never runs a
  * shell; Coolify's own network commands use the network keys. The default must still be a valid
  * network name, and nothing else is allowed around the variable.
@@ -566,6 +598,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         'configs' => collect(data_get($yaml, 'configs', [])),
         'secrets' => collect(data_get($yaml, 'secrets', [])),
     ]);
+    ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
     // If there are predefined volumes, make sure they are not null
     if ($topLevel->get('volumes')->count() > 0) {
         $temp = collect([]);
@@ -1750,21 +1783,7 @@ function serviceParser(Service $resource): Collection
         'configs' => collect(data_get($yaml, 'configs', [])),
         'secrets' => collect(data_get($yaml, 'secrets', [])),
     ]);
-    // A network name like ${SHARED_NETWORK:-default} becomes a service variable, like variables in
-    // environment:, so users can see and change it. Compose resolves the name from .env at deployment.
-    foreach ($topLevel->get('networks') as $network) {
-        $variable = is_string(data_get($network, 'name')) ? composeNetworkNameVariable(data_get($network, 'name')) : null;
-        if ($variable !== null) {
-            $resource->environment_variables()->firstOrCreate([
-                'key' => $variable['variable'],
-                'resourceable_type' => get_class($resource),
-                'resourceable_id' => $resource->id,
-            ], [
-                'value' => $variable['default'] ?? '',
-                'is_preview' => false,
-            ]);
-        }
-    }
+    ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
     // If there are predefined volumes, make sure they are not null
     if ($topLevel->get('volumes')->count() > 0) {
         $temp = collect([]);
