@@ -85,3 +85,23 @@ it('sets the danger active tab from the danger route', function () {
         ->test(Change::class)
         ->assertSet('activeTab', 'general');
 });
+
+it('can delete an unconfigured github app without rendering errors', function () {
+    $githubApp = GithubApp::create([
+        'uuid' => (string) str()->uuid(),
+        'name' => 'Unconfigured Test App',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'team_id' => $this->team->id,
+        'is_system_wide' => false,
+    ]);
+
+    Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+        ->test(Change::class)
+        ->call('delete')
+        ->assertRedirect(route('source.all'));
+
+    expect(GithubApp::where('uuid', $githubApp->uuid)->exists())->toBeFalse();
+});
