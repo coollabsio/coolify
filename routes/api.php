@@ -399,6 +399,7 @@ Route::group([
     Route::post('/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+    Route::get('/services/{uuid}/activities/{activity_id}', [ServicesController::class, 'show_activity'])->middleware(['api.ability:read']);
 
     Route::get('/services/{uuid}/applications', [ServiceApplicationsController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/applications/{app_uuid}', [ServiceApplicationsController::class, 'show'])->middleware(['api.ability:read']);
