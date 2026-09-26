@@ -2,7 +2,6 @@
 
 namespace App\Actions\Database;
 
-use App\Enums\ProcessStatus;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
@@ -11,6 +10,7 @@ use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -68,12 +68,8 @@ class StartDatabaseImport
 
     private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network): Activity
     {
-        $active = Activity::query()->where('properties->team_id', $teamId)
-            ->where('properties->type_uuid', $resource->uuid)
-            ->where('properties->operation', 'database_import')
-            ->whereIn('properties->status', [ProcessStatus::QUEUED->value, ProcessStatus::IN_PROGRESS->value])
-            ->exists();
-        if ($active) {
+        $active = ResourceStartActivity::active($resource->uuid, ResourceStartActivity::DATABASE_IMPORT_OPERATION, $teamId);
+        if (ResourceStartActivity::failStale($active)->isNotEmpty()) {
             throw new DatabaseImportException('A database import is already running.', 409);
         }
 
@@ -145,11 +141,13 @@ class StartDatabaseImport
         $commandList[] = 'rm -f '.escapeshellarg($scriptPath);
         $commandList[] = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg($scriptPath);
 
-        $activity = remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup);
-        $activity->properties = $activity->properties->merge(['operation' => 'database_import', 'resource_kind' => $resource instanceof ServiceDatabase ? 'service_database' : 'standalone_database', 'operation_uuid' => $operation]);
-        $activity->save();
-
-        return $activity;
+        // The operation properties are set when the activity is created: the CoolifyTask job can
+        // load and save the activity before a later update, which would drop them again.
+        return remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup, properties: [
+            'operation' => ResourceStartActivity::DATABASE_IMPORT_OPERATION,
+            'resource_kind' => $resource instanceof ServiceDatabase ? 'service_database' : 'standalone_database',
+            'operation_uuid' => $operation,
+        ]);
     }
 
     private function target(Model $resource): array
