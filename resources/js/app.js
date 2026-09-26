@@ -3,10 +3,15 @@ import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+import { registerNavigateSnapshotGuard } from './navigate-snapshot-guard.js';
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
 });
+
+// Keep <head> first in the DOM so wire:navigate's back-button snapshot survives
+// elements that browser extensions inject before it.
+registerNavigateSnapshotGuard(document);
 
 // Livewire 3.5.19+ re-applies `x-cloak` to morphed elements during wire:navigate
 // (via replaceHtmlAttributes). With `[x-cloak]{display:none}` on the app wrapper,
