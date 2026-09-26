@@ -18500,6 +18500,11 @@
                                         "default": false,
                                         "description": "Start the service immediately after creation."
                                     },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Connect the service to the predefined docker network."
+                                    },
                                     "docker_compose_raw": {
                                         "type": "string",
                                         "description": "The base64 encoded Docker Compose content."
