@@ -39,6 +39,18 @@ trait HasDatabaseStatusInfo
         return true;
     }
 
+    /**
+     * Whether SSL material must be written as a single combined PEM file.
+     *
+     * Only MongoDB consumes a combined server.pem; every other database
+     * (Postgres, MySQL, MariaDB, Redis, KeyDB, Dragonfly) expects separate
+     * server.crt and server.key files. See coolify#10388.
+     */
+    protected function sslPemKeyFileRequired(): bool
+    {
+        return false;
+    }
+
     protected function sslModeOptions(): ?array
     {
         return null;
@@ -156,7 +168,7 @@ trait HasDatabaseStatusInfo
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
+                isPemKeyFileRequired: $this->sslPemKeyFileRequired(),
             );
 
             $this->refresh();
