@@ -1613,7 +1613,7 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$this->resolveSecretManagerEnvironmentVariable($env)}");
+            $envs->push($this->composeEnvironmentFileLine($env));
         }
         if ($envs->count() === 0) {
             $commands[] = "touch {$environmentFilename} && mv {$environmentFilename} .env";
@@ -1623,6 +1623,27 @@ class Service extends BaseModel
         }
 
         instant_remote_process($commands, $this->server);
+    }
+
+    /**
+     * Build a KEY="value" line for the service .env file, which Docker Compose reads.
+     * Only plain values allow $VAR interpolation, so $SERVICE_* references keep working.
+     */
+    public function composeEnvironmentFileLine(EnvironmentVariable $environmentVariable): string
+    {
+        $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+        if ($value === null) {
+            return "{$environmentVariable->key}=";
+        }
+
+        $isJson = json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['));
+        $allowInterpolation = ! $isJson
+            && ! $environmentVariable->is_literal
+            && ! $environmentVariable->is_multiline
+            && ! $this->environmentVariableUsesSecretManager($environmentVariable);
+
+        return $environmentVariable->key.'='.escapeComposeEnvFileValue($value, $allowInterpolation);
     }
 
     public function parse(bool $isNew = false): Collection
