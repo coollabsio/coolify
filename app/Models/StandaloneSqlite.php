@@ -306,6 +306,14 @@ class StandaloneSqlite extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
+    /**
+     * Volumes of other resources that mount this database's data volume.
+     */
+    public function connectedVolumes()
+    {
+        return $this->hasMany(LocalPersistentVolume::class, 'standalone_sqlite_id');
+    }
+
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');

@@ -96,7 +96,9 @@ it('mounts the data volume into the selected application and redirects to its st
 
     expect($volume->name)->toBe('sqlite-data-'.$this->sqlite->uuid)
         ->and($volume->mount_path)->toBe('/app/database')
-        ->and($volume->is_preview_suffix_enabled)->toBeFalse();
+        ->and($volume->is_preview_suffix_enabled)->toBeFalse()
+        ->and($volume->standalone_sqlite_id)->toBe($this->sqlite->id)
+        ->and($this->sqlite->connectedVolumes()->sole()->resource->is($this->application))->toBeTrue();
 });
 
 it('refuses to mount the volume into compose applications', function () {
@@ -148,6 +150,7 @@ it('keeps a docker volume shared with another resource when the application volu
         'name' => 'sqlite-data-'.$this->sqlite->uuid,
         'mount_path' => StandaloneSqlite::DATA_DIRECTORY,
         'host_path' => null,
+        'standalone_sqlite_id' => $this->sqlite->id,
         'resource_id' => $this->application->id,
         'resource_type' => $this->application->getMorphClass(),
         'is_preview_suffix_enabled' => false,

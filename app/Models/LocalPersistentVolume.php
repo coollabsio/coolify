@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -22,6 +23,7 @@ class LocalPersistentVolume extends BaseModel
         'name',
         'mount_path',
         'host_path',
+        'standalone_sqlite_id',
         'container_id',
         'resource_type',
         'resource_id',
@@ -57,6 +59,14 @@ class LocalPersistentVolume extends BaseModel
         return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 
+    /**
+     * The SQLite database this volume was connected from, if any.
+     */
+    public function standaloneSqlite(): BelongsTo
+    {
+        return $this->belongsTo(StandaloneSqlite::class);
+    }
+
     public function abortIfScheduledBackupsExist(): void
     {
         if ($this->scheduledBackups()->exists()) {
@@ -69,16 +79,17 @@ class LocalPersistentVolume extends BaseModel
      */
     public function isSharedWithAnotherResource(): bool
     {
-        if (filled($this->host_path)) {
+        if ($this->standalone_sqlite_id !== null) {
+            return true;
+        }
+
+        if ($this->resource_type !== StandaloneSqlite::class) {
             return false;
         }
 
         return static::query()
+            ->where('standalone_sqlite_id', $this->resource_id)
             ->where('name', $this->name)
-            ->where(function ($query): void {
-                $query->where('resource_type', '!=', $this->resource_type)
-                    ->orWhere('resource_id', '!=', $this->resource_id);
-            })
             ->exists();
     }
 

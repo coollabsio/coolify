@@ -80,13 +80,15 @@ class ConnectApplication extends Component
                 throw new \Exception('Docker Compose applications are not supported: Coolify renames named volumes in compose files.');
             }
 
-            if ($application->persistentStorages()->where('name', $this->volumeName)->exists()) {
+            if ($application->persistentStorages()->where('standalone_sqlite_id', $this->database->id)->exists()) {
                 throw new \Exception("{$application->name} already mounts this database volume.");
             }
+
             LocalPersistentVolume::create([
                 'name' => $this->volumeName,
                 'mount_path' => $this->mountPath,
                 'host_path' => null,
+                'standalone_sqlite_id' => $this->database->id,
                 'resource_id' => $application->id,
                 'resource_type' => $application->getMorphClass(),
                 'is_preview_suffix_enabled' => false,
