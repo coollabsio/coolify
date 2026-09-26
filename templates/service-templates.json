@@ -50,6 +50,23 @@
         "template_last_updated_at": "2025-08-18T18:12:16+02:00",
         "port": "3010"
     },
+    "altcha": {
+        "documentation": "https://altcha.org/docs/v2/sentinel/install/docker?utm_source=coolify.io",
+        "slogan": "ALTCHA Sentinel protects websites and APIs from spam, bots, and abuse.",
+        "compose": "c2VydmljZXM6CiAgYWx0Y2hhOgogICAgaW1hZ2U6ICdnaGNyLmlvL2FsdGNoYS1vcmcvc2VudGluZWw6JHtBTFRDSEFfVkVSU0lPTjotbGF0ZXN0fScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9BTFRDSEFfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAnYWx0Y2hhLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gImdyZXAgLXEgJzoxRjkwICcgL3Byb2MvbmV0L3RjcCAvcHJvYy9uZXQvdGNwNiIKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAxMAogICAgICBzdGFydF9wZXJpb2Q6IDEwcwp2b2x1bWVzOgogIGFsdGNoYS1kYXRhOiBudWxsCg==",
+        "tags": [
+            "captcha",
+            "anti-spam",
+            "bot protection",
+            "privacy",
+            "security"
+        ],
+        "category": "security",
+        "logo": "svgs/altcha.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "8080"
+    },
     "alexandrie": {
         "documentation": "https://github.com/Smaug6739/Alexandrie/tree/main/docs?utm_source=coolify.io",
         "slogan": "A powerful Markdown workspace designed for speed, clarity, and creativity.",
