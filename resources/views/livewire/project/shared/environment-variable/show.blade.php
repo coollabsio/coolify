@@ -7,12 +7,21 @@
     $showInterpolation = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showBuildtime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
     $showRuntime = !$is_redis_credential && !$isMagicVariable && !$isSharedVariable;
+    $isSelectable = $selectable && $canUpdate && $showBuildtime && $showRuntime;
 @endphp
 <div class="env-table-item"
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
     x-show="(typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $rowScope }}')
         && (typeof sharedSearch === 'undefined' || @js(mb_strtolower($env->key . ' ' . ($comment ?? '') . ' ' . $rowScopeLabel)).includes(sharedSearch.trim().toLowerCase()))">
-    <div class="data-table-row {{ $isSharedVariable ? 'env-table-grid-shared' : 'env-table-grid' }} {{ ! $isSharedVariable && ! $showEnvironmentType ? 'env-table-grid-no-type' : '' }}">
+    <div class="data-table-row {{ $isSharedVariable ? 'env-table-grid-shared' : 'env-table-grid' }} {{ ! $isSharedVariable && ! $showEnvironmentType ? 'env-table-grid-no-type' : '' }} {{ $selectable ? 'env-table-grid-selectable' : '' }}">
+        @if ($selectable)
+            @if ($isSelectable)
+                <x-table.checkbox label="Select {{ $env->key }}" data-env-select-id="{{ $env->id }}"
+                    x-bind:checked="isSelected({{ $env->id }})" x-on:change="toggleSelected({{ $env->id }})" />
+            @else
+                <span></span>
+            @endif
+        @endif
         <div class="flex min-w-0 items-center gap-2">
             @if ($isLocked)
                 <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"

@@ -10,6 +10,8 @@ class ShowHardcoded extends Component
 {
     public bool $showEnvironmentType = true;
 
+    public bool $selectable = false;
+
     public array $env;
 
     public string $key;

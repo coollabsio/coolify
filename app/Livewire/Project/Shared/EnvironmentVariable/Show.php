@@ -24,6 +24,8 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
+    public bool $selectable = false;
+
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
 
     protected function secretManagerResource(): ?Model
