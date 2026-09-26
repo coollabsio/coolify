@@ -859,6 +859,74 @@ class Application extends BaseModel
         );
     }
 
+    /**
+     * Split a stored status into container state and an optional health.
+     *
+     * Statuses are stored as "running:healthy" or "running (healthy)". A value
+     * with no separator, such as "running", has no health report. Str::after
+     * returns the whole string when ":" is absent, so that value must not be
+     * read as the health.
+     *
+     * @return array{0: string, 1: ?string}
+     */
+    public static function splitCompositeStatus(?string $status): array
+    {
+        $status = trim((string) $status);
+        if ($status === '') {
+            return ['unknown', null];
+        }
+
+        if (str($status)->contains('(') && str($status)->contains(')')) {
+            $state = str($status)->before('(')->trim()->value();
+            $health = str($status)->after('(')->before(')')->trim()->value();
+
+            return [$state, $health !== '' ? $health : null];
+        }
+
+        if (str($status)->contains(':')) {
+            $state = str($status)->before(':')->trim()->value();
+            $health = str($status)->after(':')->trim()->value();
+
+            return [$state, $health !== '' ? $health : null];
+        }
+
+        return [$status, null];
+    }
+
+    /**
+     * Combine the main server status with additional destination statuses.
+     *
+     * A destination whose status has no health segment is not a failed
+     * healthcheck. Health is marked unhealthy only when both sides report a
+     * health value and those values differ.
+     *
+     * @param  iterable<int, ?string>  $additionalStatuses
+     */
+    public static function aggregateMultiServerStatus(?string $mainStatus, iterable $additionalStatuses): string
+    {
+        [$mainState, $mainHealth] = self::splitCompositeStatus($mainStatus);
+        $state = $mainState;
+        $health = $mainHealth;
+
+        foreach ($additionalStatuses as $additionalStatus) {
+            [$serverState, $serverHealth] = self::splitCompositeStatus($additionalStatus);
+
+            if ($serverState !== $mainState) {
+                $state = 'degraded';
+            }
+
+            if ($mainHealth !== null && $serverHealth !== null && $mainHealth !== $serverHealth) {
+                $health = 'unhealthy';
+            }
+        }
+
+        if ($health === null || $health === '') {
+            return $state;
+        }
+
+        return "{$state}:{$health}";
+    }
+
     public function status(): Attribute
     {
         return Attribute::make(
@@ -907,23 +975,10 @@ class Application extends BaseModel
 
                     return "$status:$health";
                 } else {
-                    $complex_status = null;
-                    $complex_health = null;
-                    $complex_status = $main_server_status = str($value)->before(':')->value();
-                    $complex_health = $main_server_health = str($value)->after(':')->value() ?? 'unhealthy';
-                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                    foreach ($additional_servers_status as $status) {
-                        $server_status = str($status)->before(':')->value();
-                        $server_health = str($status)->after(':')->value() ?? 'unhealthy';
-                        if ($main_server_status !== $server_status) {
-                            $complex_status = 'degraded';
-                        }
-                        if ($main_server_health !== $server_health) {
-                            $complex_health = 'unhealthy';
-                        }
-                    }
-
-                    return "$complex_status:$complex_health";
+                    return self::aggregateMultiServerStatus(
+                        $value,
+                        $this->additional_servers->pluck('pivot.status')->all(),
+                    );
                 }
             },
         );
