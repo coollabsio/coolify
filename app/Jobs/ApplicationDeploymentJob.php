@@ -5471,7 +5471,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function sendDeploymentNotification(string $notificationClass): void
     {
         $this->application->environment->project->team?->notify(
-            new $notificationClass($this->application, $this->deployment_uuid, $this->preview)
+            new $notificationClass($this->application, $this->deployment_uuid, $this->preview, $this->application_deployment_queue)
         );
     }
 
