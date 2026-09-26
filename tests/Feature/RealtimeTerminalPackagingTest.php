@@ -610,11 +610,26 @@ it('leaves the terminal connecting state when the connection is rejected, lost, 
         ->toContain('Ignoring terminal token after authentication was rejected.')
         ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout)')
         ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed)')
-        ->toContain('TERMINAL_SESSION_START_TIMEOUT_MS')
+        ->toContain('...terminalSessionStartMethods,')
         ->toContain('this.beginTerminalSessionStart();')
+        ->and(file_get_contents(resource_path('js/terminal-connection.js')))
+        ->toContain('export const terminalSessionStartMethods = {')
+        ->toContain('}, TERMINAL_SESSION_START_TIMEOUT_MS);')
         ->and($terminalView)
         ->toContain('data-terminal-connection-error')
         ->toContain('x-text="connectionError"')
         ->toContain('x-on:click="reloadTerminalPage()"')
         ->toContain('x-show="!connectionError" class="terminal-loading-label');
+});
+
+it('ends the auto-start connecting state when no terminal token arrives', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalClient)
+        ->toMatch("/this\.starting = this\.\\\$el\.dataset\.autoStart === 'true';.*?if \(this\.starting\) \{\s*this\.armTerminalSessionStartTimeout\(\);\s*\}/s")
+        ->toContain("this.\$wire.on('terminal-session-failed', ({ message }) => {")
+        ->toContain('this.failTerminalSessionStart(message);')
+        ->toContain("this.\$wire.on('terminal-auto-start-cancelled', () => {")
+        ->toMatch('/destroy\(\) \{\s*this\.clearSessionStartTimeout\(\);/')
+        ->toMatch("/event\.data === 'pty-ready'\) \{\s*this\.completeTerminalSessionStart\(\);/");
 });
