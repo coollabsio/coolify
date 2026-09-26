@@ -16,6 +16,8 @@ trait ExecuteRemoteCommand
 {
     use SshRetryable;
 
+    private const SENSITIVE_COMMAND_PLACEHOLDER = '[command hidden because it contains sensitive data]';
+
     public ?string $save = null;
 
     public static int $batch_counter = 0;
@@ -184,7 +186,7 @@ trait ExecuteRemoteCommand
 
             $new_log_entry = [
                 'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
-                'output' => $this->redact_sensitive_info($log_output),
+                'output' => $this->redact_sensitive_info($skip_command_log ? $this->redactSensitiveCommandPayloads((string) $log_output, (string) $command) : $log_output),
                 'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
@@ -241,10 +243,52 @@ trait ExecuteRemoteCommand
                 if (empty($error)) {
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
-                $redactedCommand = $this->redact_sensitive_info($command);
-                throw new DeploymentException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
+                throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log));
             }
         }
+    }
+
+    /**
+     * Commands marked with skip_command_log embed secrets (for example base64 encoded .env files or
+     * private keys), so their text must never reach a log line or an exception message.
+     */
+    private function commandFailureMessage(string $command, int $exitCode, string $error, bool $isSensitiveCommand): string
+    {
+        if ($isSensitiveCommand) {
+            $commandText = self::SENSITIVE_COMMAND_PLACEHOLDER;
+            $error = $this->redactSensitiveCommandPayloads($error, $command);
+        } else {
+            $commandText = $this->redact_sensitive_info($command);
+        }
+
+        $error = $this->redact_sensitive_info($error);
+
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}";
+    }
+
+    /**
+     * Removes the encoded payloads of a sensitive command from output that could echo the command.
+     */
+    private function redactSensitiveCommandPayloads(string $text, string $command): string
+    {
+        if ($text === '' || preg_match_all('~[A-Za-z0-9+/]{16,}={0,2}~', $command, $matches) === false) {
+            return $text;
+        }
+
+        $payloads = collect($matches[0])
+            ->unique()
+            ->filter(function (string $candidate): bool {
+                $decoded = base64_decode($candidate, true);
+
+                return $decoded !== false
+                    && mb_check_encoding($decoded, 'UTF-8')
+                    && preg_match('/[^\P{C}\t\n\r]/u', $decoded) !== 1;
+            })
+            ->sortByDesc(fn (string $payload): int => strlen($payload))
+            ->values()
+            ->all();
+
+        return $payloads === [] ? $text : str_replace($payloads, REDACTED, $text);
     }
 
     private function saveCommandOutput(string $output, bool $append): void
