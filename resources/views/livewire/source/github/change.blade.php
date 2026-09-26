@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
+        {{ $name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
     @if (data_get($github_app, 'app_id'))
@@ -348,7 +348,7 @@
                 const {
                     organization,
                     html_url
-                } = @js($github_app->only(['organization', 'html_url']));
+                } = @js($github_app?->only(['organization', 'html_url']) ?? ['organization' => $organization, 'html_url' => $htmlUrl]);
                 const selectedEndpoint = webhook_endpoint ? webhook_endpoint.trim() : '';
                 const customEndpoint = custom_webhook_endpoint ? custom_webhook_endpoint.trim() : '';
                 if (use_custom_webhook_endpoint && !customEndpoint) {
