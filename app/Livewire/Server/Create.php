@@ -21,7 +21,7 @@ class Create extends Component
 
     public function mount(?string $selectedType = null, ?string $selectedTokenUuid = null): void
     {
-        $this->selectedType = in_array($selectedType, ['hetzner', 'vultr', 'digital-ocean', 'manual'], true)
+        $this->selectedType = in_array($selectedType, ['hetzner', 'vultr', 'digital-ocean', 'hostinger', 'manual'], true)
             ? $selectedType
             : null;
         $this->selectedTokenUuid = $this->selectedType && $this->selectedType !== 'manual' ? $selectedTokenUuid : null;

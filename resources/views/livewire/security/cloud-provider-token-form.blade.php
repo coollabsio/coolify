@@ -9,6 +9,7 @@
             get providerConsoleUrl() {
                 if (this.selectedProvider === 'hetzner') return 'https://console.hetzner.com/projects';
                 if (this.selectedProvider === 'vultr') return 'https://console.vultr.com/user/apiaccess/';
+                if (this.selectedProvider === 'hostinger') return 'https://hpanel.hostinger.com/profile/api';
                 return 'https://cloud.digitalocean.com/account/api/tokens';
             }
         }">
@@ -18,6 +19,7 @@
                 ['value' => 'hetzner', 'label' => 'Hetzner'],
                 ['value' => 'digitalocean', 'label' => 'DigitalOcean'],
                 ['value' => 'vultr', 'label' => 'Vultr'],
+                ['value' => 'hostinger', 'label' => 'Hostinger'],
             ]" />
         @else
             <input type="hidden" wire:model="provider" />

@@ -225,6 +225,30 @@ BASH);
         ->not->toContain('--profile testing-host up');
 });
 
+it('runs the host qemu command with a clean local environment', function () {
+    if (! function_exists('posix_geteuid') || posix_geteuid() !== 0 || ! file_exists('/dev/kvm') || filetype('/dev/kvm') !== 'char' || ! is_readable('/dev/kvm') || ! is_writable('/dev/kvm')) {
+        $this->markTestSkipped('KVM and root access are required for this launcher branch.');
+    }
+
+    file_put_contents($this->devRoot.'/bin/php', <<<'BASH'
+#!/usr/bin/env bash
+[[ "$APP_ENV" == local && "$APP_CONFIG_CACHE" == */bootstrap/cache/dev-qemu-*.php ]] || {
+  echo 'This command may only run in development mode.' >&2
+  exit 1
+}
+printf 'php %s ENV=%s CACHE=%s\n' "$*" "$APP_ENV" "$APP_CONFIG_CACHE" >> "$DEV_TEST_LOG"
+BASH);
+
+    $process = runDevScript('wt', ['start', 'ubuntu-root'], [
+        'COOLIFY_DEV_SERVER_BACKEND' => 'auto',
+        'APP_ENV' => 'production',
+        'APP_CONFIG_CACHE' => '/tmp/stale-config.php',
+    ]);
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+        ->and(devScriptLog())->toContain('php artisan dev:qemu ubuntu-root --as-localhost ENV=local CACHE=');
+});
+
 it('keeps fresh worktree instances writable and stable during the first composer install', function () {
     $initSetup = file_get_contents(base_path('docker/development/etc/s6-overlay/scripts/init-setup.sh'));
 

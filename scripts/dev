@@ -259,7 +259,9 @@ start_backend() {
     echo "Using KVM profile: $profile"
     # The host command must reach this instance's database, not the one in .env, and must
     # not create root-owned files in storage/logs.
-    LOG_CHANNEL=stderr DB_HOST="$host" DB_PORT="$(env_value "$instance" FORWARD_DB_PORT)" \
+    # The host command must not use an environment or config cache from another app run.
+    APP_ENV=local APP_CONFIG_CACHE="$ROOT/bootstrap/cache/dev-qemu-$$.php" \
+      LOG_CHANNEL=stderr DB_HOST="$host" DB_PORT="$(env_value "$instance" FORWARD_DB_PORT)" \
       REDIS_HOST="$host" REDIS_PORT="$(env_value "$instance" FORWARD_REDIS_PORT)" \
       DEVELOPMENT_QEMU_INSTANCE="$instance" \
       DEVELOPMENT_QEMU_SLOT="$(env_value "$instance" DEVELOPMENT_QEMU_SLOT)" \

@@ -59,24 +59,71 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
         'name' => 'Test DigitalOcean Token',
     ]);
 
+    CloudProviderToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+        'token' => 'test-hostinger-token',
+        'name' => 'Test Hostinger Token',
+    ]);
+
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Hetzner')
         ->assertSee('DigitalOcean')
         ->assertSee('Vultr')
+        ->assertSee('Hostinger')
         ->assertSee('Hetzner Token')
         ->assertSee('DigitalOcean Token')
         ->assertSee('Vultr Token')
+        ->assertSee('Hostinger Token')
         ->assertSee('Server ID')
         ->assertSee('Droplet ID')
         ->assertSee('Instance ID')
-        ->assertSee('Search by IP')
-        ->assertSee('Search');
+        ->assertSee('Virtual Machine ID')
+        ->assertSee('Search by server IP')
+        ->assertSee('Search ID');
+});
+
+it('links a manually added server to a Hostinger VPS by IP', function () {
+    $token = CloudProviderToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+        'token' => 'test-hostinger-token',
+        'name' => 'Test Hostinger Token',
+    ]);
+
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([
+            [
+                'id' => 17923,
+                'hostname' => 'hostinger.example.com',
+                'state' => 'running',
+                'ipv4' => [['address' => '1.2.3.4']],
+            ],
+        ]),
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines/17923' => Http::response([
+            'id' => 17923,
+            'hostname' => 'hostinger.example.com',
+            'state' => 'running',
+            'ipv4' => [['address' => '1.2.3.4']],
+        ]),
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->set('selectedHostingerTokenId', $token->id)
+        ->call('searchHostingerVirtualMachine')
+        ->assertSet('matchedHostingerVirtualMachine.id', 17923)
+        ->call('linkToHostinger')
+        ->assertDispatched('success');
+
+    expect($this->server->fresh()->hostinger_virtual_machine_id)->toBe(17923)
+        ->and($this->server->fresh()->hostinger_virtual_machine_status)->toBe('running')
+        ->and($this->server->fresh()->cloud_provider_token_id)->toBe($token->id);
 });
 
 it('hides link cloud provider dropdown when no providers can be linked', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertDontSee('Link Cloud Provider');
+        ->assertDontSee('Link provider');
 });
 
 it('does not list providers already linked to the server', function () {
@@ -97,7 +144,7 @@ it('does not list providers already linked to the server', function () {
     $this->server->update(['hetzner_server_id' => 123]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Vultr Token')
         ->assertDontSee('Hetzner Token');
 });
