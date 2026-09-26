@@ -957,14 +957,22 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
                 if ($type->value() === 'bind') {
                     if ($source->value() === '/var/run/docker.sock') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        if (is_array($volume)) {
+                            data_set($volume, 'source', $source->value());
+                        } else {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
                     } elseif ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                        $volume = $source->value().':'.$target->value();
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        if (is_array($volume)) {
+                            data_set($volume, 'source', $source->value());
+                        } else {
+                            $volume = $source->value().':'.$target->value();
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
                     } else {
                         if ((int) $resource->compose_parsing_version >= 4) {
@@ -1001,10 +1009,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
                             }
                         }
-                        $volume = "$source:$target";
-                        if (isset($parsed['mode']) && $parsed['mode']) {
-                            $volume .= ':'.$parsed['mode']->value();
+                        if (is_array($volume)) {
+                            data_set($volume, 'source', $source->value());
+                        } else {
+                            $volume = "$source:$target";
+                            if (isset($parsed['mode']) && $parsed['mode']) {
+                                $volume .= ':'.$parsed['mode']->value();
+                            }
                         }
+                    }
+                    if (is_array($volume)) {
+                        unset($volume['content']);
+                        unset($volume['isDirectory']);
+                        unset($volume['is_directory']);
                     }
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
