@@ -889,6 +889,69 @@ it('filters buildpack control vars from preview runtime env fallback', function 
     expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
 });
 
+it('keeps buildpack variables read at container start in the runtime env', function (int $pullRequestId, bool $isPreview) {
+    [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'nixpacks']);
+
+    foreach ([
+        'APP_NAME' => 'coolify',
+        'NIXPACKS_PHP_ROOT_DIR' => '/app/public',
+        'NIXPACKS_PHP_FALLBACK_PATH' => '/index.php',
+        'NIXPACKS_SPA_OUTPUT_DIR' => 'dist',
+        'RAILPACK_SKIP_MIGRATIONS' => 'true',
+        'NIXPACKS_NODE_VERSION' => '22',
+        'RAILPACK_NODE_VERSION' => '20',
+    ] as $key => $value) {
+        createApplicationEnvironmentVariable($application, [
+            'key' => $key,
+            'value' => $value,
+            'is_preview' => $isPreview,
+        ]);
+    }
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'pull_request_id' => $pullRequestId,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)->toContain(
+        'APP_NAME=coolify',
+        'NIXPACKS_PHP_ROOT_DIR=/app/public',
+        'NIXPACKS_PHP_FALLBACK_PATH=/index.php',
+        'NIXPACKS_SPA_OUTPUT_DIR=dist',
+        'RAILPACK_SKIP_MIGRATIONS=true',
+    );
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
+})->with([
+    'production' => [0, false],
+    'preview' => [42, true],
+]);
+
+it('keeps buildpack variables read at container start out of generic build args', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'NIXPACKS_PHP_ROOT_DIR',
+        'value' => '/app/public',
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'RAILPACK_SKIP_MIGRATIONS',
+        'value' => 'true',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+
+    expect($envArgs->has('NIXPACKS_PHP_ROOT_DIR'))->toBeFalse();
+    expect($envArgs->has('RAILPACK_SKIP_MIGRATIONS'))->toBeFalse();
+});
+
 it('filters buildpack control vars from dockerfile arg injection', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 
