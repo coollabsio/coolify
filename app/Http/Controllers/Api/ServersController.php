@@ -826,6 +826,20 @@ class ServersController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(
+                name: 'force',
+                in: 'query',
+                description: 'Also delete all resources on the server.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
+            new OA\Parameter(
+                name: 'delete_from_provider',
+                in: 'query',
+                description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
         ],
         responses: [
             new OA\Response(
@@ -886,6 +900,11 @@ class ServersController extends Controller
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
+        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN);
+        if ($deleteFromProvider && ! $server->hetzner_server_id && ! $server->vultr_instance_id && ! $server->digitalocean_droplet_id) {
+            return response()->json(['message' => 'Server is not linked to a cloud provider.'], 422);
+        }
+
         if ($force) {
             foreach ($server->definedResources() as $resource) {
                 DeleteResourceJob::dispatch($resource);
@@ -898,13 +917,13 @@ class ServersController extends Controller
         $server->delete();
         DeleteServer::dispatch(
             $server->id,
-            false, // Don't delete from Hetzner via API
+            $deleteFromProvider,
             $server->hetzner_server_id,
             $server->cloud_provider_token_id,
             $server->team_id,
-            false, // Don't delete from Vultr via API
+            $deleteFromProvider,
             $server->vultr_instance_id,
-            false, // Don't delete from DigitalOcean via API
+            $deleteFromProvider,
             $server->digitalocean_droplet_id
         );
 
@@ -914,6 +933,7 @@ class ServersController extends Controller
             'server_name' => $deletedName,
             'ip' => $deletedIp,
             'force' => $force,
+            'delete_from_provider' => $deleteFromProvider,
         ]);
 
         return response()->json(['message' => 'Server deleted.']);
