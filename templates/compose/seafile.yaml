@@ -30,16 +30,40 @@ services:
       - JWT_PRIVATE_KEY=${SERVICE_PASSWORD_64_JWT}
       - SEAFILE_LOG_TO_STDOUT=${SEAFILE_LOG_TO_STDOUT:-true}
       - 'FILE_SERVER_ROOT=${SERVICE_URL_SEAFILE}/seafhttp'
+      - ENABLE_SEADOC=true
+      - SEADOC_SERVER_URL=${SERVICE_FQDN_SEADOC}
     depends_on:
       mariadb:
         condition: service_healthy
       memcached:
+        condition: service_started
+      seadoc:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/api2/ping"]
       interval: 10s
       timeout: 20s
       retries: 5
+
+  seadoc:
+    image: seafileltd/sdoc-server:1.0-latest
+    volumes:
+      - seadoc-data:/shared
+    environment:
+      - SERVICE_FQDN_SEADOC_80
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_USER=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - DB_NAME=${SEAFILE_MYSQL_DB_SEAHUB_DB_NAME:-seahub_db}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - JWT_PRIVATE_KEY=${SERVICE_PASSWORD_64_JWT}
+      - SEAFILE_SERVER_HOSTNAME=${SERVICE_FQDN_SEAFILE}
+      - SEAFILE_SERVER_PROTOCOL=https
+      - SEAHUB_SERVICE_URL=http://seafile:80
+    depends_on:
+      mariadb:
+        condition: service_healthy
 
   mariadb:
     image: mariadb:11
