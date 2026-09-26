@@ -2788,6 +2788,12 @@ class DatabasesController extends Controller
 
         $this->authorize('delete', $database);
 
+        if ($database instanceof StandaloneSqlite && $database->connectedVolumes()->exists()) {
+            return response()->json([
+                'message' => 'This database volume is mounted by '.$database->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.',
+            ], 422);
+        }
+
         $database->delete();
 
         DeleteResourceJob::dispatch(
@@ -4738,6 +4744,12 @@ class DatabasesController extends Controller
         if ($storage->shouldBeReadOnlyInUI()) {
             return response()->json([
                 'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
+            ], 422);
+        }
+
+        if ($storage->isSharedWithAnotherResource()) {
+            return response()->json([
+                'message' => 'This volume is mounted by an application. Unlink it on the SQLite database page first.',
             ], 422);
         }
 

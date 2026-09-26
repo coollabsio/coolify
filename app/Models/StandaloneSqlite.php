@@ -11,6 +11,7 @@ use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class StandaloneSqlite extends BaseModel
 {
@@ -312,6 +313,20 @@ class StandaloneSqlite extends BaseModel
     public function connectedVolumes()
     {
         return $this->hasMany(LocalPersistentVolume::class, 'standalone_sqlite_id');
+    }
+
+    /**
+     * Names of the resources that mount this database's data volume.
+     *
+     * @return Collection<int, string>
+     */
+    public function connectedApplicationNames(): Collection
+    {
+        return $this->connectedVolumes()->with('resource')->get()
+            ->map(fn (LocalPersistentVolume $volume) => $volume->resource?->name)
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     public function scheduledBackups()

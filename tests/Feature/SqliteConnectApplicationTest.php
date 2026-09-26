@@ -1,6 +1,8 @@
 <?php
 
 use App\Livewire\Project\Database\Sqlite\ConnectApplication;
+use App\Livewire\Project\Shared\Danger;
+use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -167,4 +169,45 @@ it('keeps a docker volume shared with another resource when the application volu
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($this->application->uuid.'-data')));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'sqlite-data-'.$this->sqlite->uuid));
+});
+
+function connectSqliteVolume(Application $application, StandaloneSqlite $sqlite): LocalPersistentVolume
+{
+    return LocalPersistentVolume::create([
+        'name' => 'sqlite-data-'.$sqlite->uuid,
+        'mount_path' => StandaloneSqlite::DATA_DIRECTORY,
+        'host_path' => null,
+        'standalone_sqlite_id' => $sqlite->id,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+        'is_preview_suffix_enabled' => false,
+    ]);
+}
+
+it('unlinks an application without touching the docker volume', function () {
+    Process::fake();
+    $volume = connectSqliteVolume($this->application, $this->sqlite);
+
+    Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->call('unlink', $volume->id)
+        ->assertDispatched('success');
+
+    Process::assertNothingRan();
+    expect($volume->fresh())->toBeNull();
+});
+
+it('blocks deleting the sqlite volume or database while an application is connected', function () {
+    connectSqliteVolume($this->application, $this->sqlite);
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    Livewire::test(All::class, ['resource' => $this->sqlite])
+        ->call('delete', $databaseVolume->id, 'password')
+        ->assertDispatched('error');
+
+    Livewire::test(Danger::class, ['resource' => $this->sqlite])
+        ->call('delete', 'password')
+        ->assertDispatched('error');
+
+    expect($databaseVolume->fresh())->not->toBeNull()
+        ->and(StandaloneSqlite::find($this->sqlite->id))->not->toBeNull();
 });

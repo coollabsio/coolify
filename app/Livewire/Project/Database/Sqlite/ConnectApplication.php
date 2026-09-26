@@ -100,6 +100,31 @@ class ConnectApplication extends Component
         }
     }
 
+    /**
+     * Volumes of applications that mount this database's data volume.
+     *
+     * @return Collection<int, LocalPersistentVolume>
+     */
+    public function getConnectionsProperty(): Collection
+    {
+        return $this->database->connectedVolumes()->with('resource')->orderBy('id')->get();
+    }
+
+    /**
+     * Remove the mount from the application. The Docker volume and its data stay untouched.
+     */
+    public function unlink(int $volumeId): void
+    {
+        $this->authorize('view', $this->database);
+
+        $volume = $this->database->connectedVolumes()->with('resource')->findOrFail($volumeId);
+        $this->authorize('update', $volume->resource ?? $this->database);
+
+        $volume->delete();
+
+        $this->dispatch('success', 'Application unlinked. Redeploy it to apply the change.');
+    }
+
     public function render()
     {
         return view('livewire.project.database.sqlite.connect-application');
