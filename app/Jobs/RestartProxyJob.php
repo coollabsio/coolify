@@ -93,9 +93,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         $stopTimeout = 30;
 
         SaveProxyConfiguration::run($this->server, $configuration);
-        $docker_compose_yml_base64 = base64_encode($configuration);
-        $this->server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
-        $this->server->save();
+        $this->server->markProxyConfigurationApplied($configuration);
 
         $commands = collect([]);
 

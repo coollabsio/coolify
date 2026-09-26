@@ -33,9 +33,8 @@ class GetTraefikCertificates
         $path = escapeshellarg(rtrim($server->proxyPath(), '/').'/acme.json');
         $readLimit = self::MAX_FILE_SIZE_BYTES + 1;
         $tooLargeMarker = '__COOLIFY_ACME_FILE_TOO_LARGE__';
-        $output = instant_remote_process([
-            "if [ ! -f {$path} ]; then exit 0; elif [ \"\$(wc -c < {$path})\" -gt ".self::MAX_FILE_SIZE_BYTES." ]; then echo '{$tooLargeMarker}'; else head -c {$readLimit} {$path} | base64 | tr -d '\\n'; fi",
-        ], $server, false);
+        $script = "if [ ! -f {$path} ]; then exit 0; elif [ \"\$(wc -c < {$path})\" -gt ".self::MAX_FILE_SIZE_BYTES." ]; then echo '{$tooLargeMarker}'; else head -c {$readLimit} {$path} | base64 | tr -d '\\n'; fi";
+        $output = instant_remote_process(['sh -c '.escapeshellarg($script)], $server, false);
 
         if ($output === null || trim($output) === '') {
             return null;

@@ -237,8 +237,16 @@ class Proxy extends Component
     {
         try {
             $this->authorize('update', $this->server);
-            DeleteTraefikCertificate::run($this->server, $certificateId);
+            $certificate = DeleteTraefikCertificate::run($this->server, $certificateId);
+            auditLog('ui.proxy.certificate_deleted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'domain' => $certificate['main_domain'],
+                'resolver' => $certificate['resolver'],
+            ]);
             $this->traefikCertificates = GetTraefikCertificates::run($this->server);
+            $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'TLS certificate deleted. Restart Traefik to remove it from the running proxy.');
         } catch (\Throwable $e) {
             handleError($e, $this);
