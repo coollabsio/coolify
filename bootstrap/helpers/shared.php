@@ -969,6 +969,20 @@ function isDev(): bool
     return config('app.env') === 'local';
 }
 
+/**
+ * Host path of the Coolify data volume in development. The proxy and Sentinel on one server both mount
+ * paths below it, so they must use this value. An invalid volume name falls back to the legacy name.
+ */
+function devCoolifyDataPath(): string
+{
+    $volume = (string) config('constants.coolify.dev_data_volume');
+    if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*$/', $volume) !== 1) {
+        $volume = 'coolify_dev_coolify_data';
+    }
+
+    return "/var/lib/docker/volumes/{$volume}/_data";
+}
+
 function isCloud(): bool
 {
     return ! config('constants.coolify.self_hosted');
