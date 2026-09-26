@@ -6,6 +6,7 @@
 - Test old reports against the current branch because later changes can make the report obsolete.
 - Use the same regression test before and after the production change so the result shows the behavior difference.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
+- Run Pest with host PHP, not `./scripts/dev exec`; inside the container `RefreshDatabase` uses the instance Postgres and wipes the dev data.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
