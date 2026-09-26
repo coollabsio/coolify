@@ -58,7 +58,7 @@ function composeDockerfile(string $path): string
     return $path;
 }
 
-function runComposeArgInjection(object $test, mixed $build, string $workdir): LocallyExecutedComposeDeploymentJob
+function runComposeArgInjection(object $test, mixed $build, string $workdir, array $envArgs = ['APP_ENV' => 'production']): LocallyExecutedComposeDeploymentJob
 {
     $application = Application::factory()->create(['build_pack' => 'dockercompose']);
     $application->settings()->update(['inject_build_args_to_dockerfile' => true]);
@@ -76,7 +76,7 @@ function runComposeArgInjection(object $test, mixed $build, string $workdir): Lo
         'deployment_uuid' => 'deployment-uuid',
         'basedir' => $test->basedir,
         'workdir' => $workdir,
-        'env_args' => collect(['APP_ENV' => 'production']),
+        'env_args' => collect($envArgs),
         'saved_outputs' => collect(),
         'dockerSecretsSupported' => false,
         'pull_request_id' => 0,
@@ -106,18 +106,44 @@ test('compose deployments inject build args for Dockerfiles inside the repositor
     'custom Dockerfile in a parent folder' => [['context' => 'services/api', 'dockerfile' => '../docker/api.Dockerfile'], '', 'services/docker/api.Dockerfile'],
 ]);
 
-test('compose deployments skip build contexts they cannot inspect locally', function (mixed $build) {
+test('compose deployments skip build contexts they cannot inspect locally', function (mixed $build, string $reason) {
     $dockerfile = composeDockerfile($this->basedir.'/Dockerfile');
 
-    $job = runComposeArgInjection($this, $build, $this->basedir);
+    $job = runComposeArgInjection($this, $build, $this->basedir, [
+        'COOLIFY_URL' => 'https://secret-host.example.com',
+        'APP_ENV' => 'production-secret-value',
+        'API_TOKEN' => 'super-secret-token',
+    ]);
 
     expect(file_get_contents($dockerfile))->not->toContain('ARG APP_ENV')
-        ->and($job->logEntries)->toContain('The build context of service api is remote or uses variables, skipping ARG injection.');
+        ->and($job->logEntries)->toContain("Skipping ARG injection for service api: {$reason}. Docker ignores build-time variables that the Dockerfile does not declare, so add 'ARG <NAME>' lines to the Dockerfile for the ones you need: APP_ENV, API_TOKEN, COOLIFY_URL.")
+        ->and(implode("\n", $job->logEntries))->not->toContain('secret');
 })->with([
-    'git URL' => ['https://github.com/coollabsio/coolify.git#main:docker'],
-    'context variable' => ['${APP_DIR:-.}'],
-    'inline Dockerfile' => [['context' => '.', 'dockerfile_inline' => "FROM alpine\n"]],
+    'git URL' => ['https://github.com/coollabsio/coolify.git#main:docker', 'the build context is a remote Git URL'],
+    'git SSH URL' => [['context' => 'git@github.com:coollabsio/coolify.git'], 'the build context is a remote Git URL'],
+    'context variable' => ['${APP_DIR:-.}', 'the build context or Dockerfile path uses variables'],
+    'Dockerfile variable' => [['context' => '.', 'dockerfile' => '${DOCKERFILE}'], 'the build context or Dockerfile path uses variables'],
+    'inline Dockerfile' => [['context' => '.', 'dockerfile_inline' => "FROM alpine\n"], 'the service uses an inline Dockerfile (dockerfile_inline)'],
+    'invalid build definition' => [['context' => ['nested']], 'Coolify cannot read the build definition'],
 ]);
+
+test('skipped ARG injection lists at most ten build-time variable names', function () {
+    composeDockerfile($this->basedir.'/Dockerfile');
+    $envArgs = collect(range(1, 13))->mapWithKeys(fn (int $number) => ["VAR_{$number}" => "value-{$number}"])->all();
+
+    $job = runComposeArgInjection($this, '${APP_DIR}', $this->basedir, $envArgs);
+
+    expect($job->logEntries)->toContain("Skipping ARG injection for service api: the build context or Dockerfile path uses variables. Docker ignores build-time variables that the Dockerfile does not declare, so add 'ARG <NAME>' lines to the Dockerfile for the ones you need: VAR_1, VAR_2, VAR_3, VAR_4, VAR_5, VAR_6, VAR_7, VAR_8, VAR_9, VAR_10 and 3 more.")
+        ->and(implode("\n", $job->logEntries))->not->toContain('value-');
+});
+
+test('skipped ARG injection does not show invalid build-time variable names', function () {
+    composeDockerfile($this->basedir.'/Dockerfile');
+
+    $job = runComposeArgInjection($this, '${APP_DIR}', $this->basedir, ['BAD NAME;id' => 'x', 'GOOD_NAME' => 'y']);
+
+    expect($job->logEntries)->toContain("Skipping ARG injection for service api: the build context or Dockerfile path uses variables. Docker ignores build-time variables that the Dockerfile does not declare, so add 'ARG <NAME>' lines to the Dockerfile for the ones you need: GOOD_NAME.");
+});
 
 test('compose deployments never change Dockerfiles outside the repository', function (string $escape) {
     $outside = composeDockerfile($this->root.'/outside/Dockerfile');

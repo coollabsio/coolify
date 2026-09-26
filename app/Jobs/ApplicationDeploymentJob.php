@@ -4970,7 +4970,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
             if ($dockerfilePath === null) {
-                $this->application_deployment_queue->addLogEntry("The build context of service {$serviceName} is remote or uses variables, skipping ARG injection.");
+                $this->application_deployment_queue->addLogEntry($this->composeArgInjectionSkippedMessage((string) $serviceName, $service['build'], $variables));
 
                 continue;
             }
@@ -5126,6 +5126,41 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         return str_starts_with($dockerfile, '/') ? $dockerfile : rtrim($context, '/').'/'.$dockerfile;
+    }
+
+    /**
+     * Tells the user why Coolify cannot add ARG lines to a Compose service Dockerfile, and which
+     * build-time variables to declare there. Only valid variable names are shown, never values.
+     *
+     * @param  Collection<string, mixed>  $variables
+     */
+    private function composeArgInjectionSkippedMessage(string $serviceName, mixed $build, Collection $variables): string
+    {
+        $context = is_string($build) ? $build : data_get($build, 'context');
+        $dockerfile = is_array($build) ? data_get($build, 'dockerfile') : null;
+
+        $reason = match (true) {
+            is_array($build) && array_key_exists('dockerfile_inline', $build) => 'the service uses an inline Dockerfile (dockerfile_inline)',
+            is_string($context) && preg_match('~^[a-z][a-z0-9+.-]*://|^git@~i', $context) === 1 => 'the build context is a remote Git URL',
+            (is_string($context) && str_contains($context, '$')) || (is_string($dockerfile) && str_contains($dockerfile, '$')) => 'the build context or Dockerfile path uses variables',
+            default => 'Coolify cannot read the build definition',
+        };
+
+        $names = $variables->keys()
+            ->map(fn ($key) => (string) $key)
+            ->filter(fn (string $key) => ValidationPatterns::isValidEnvironmentVariableKey($key))
+            ->sortBy(fn (string $key) => str_starts_with($key, 'COOLIFY_') ? 1 : 0)
+            ->values();
+
+        $message = "Skipping ARG injection for service {$serviceName}: {$reason}. Docker ignores build-time variables that the Dockerfile does not declare, so add 'ARG <NAME>' lines to the Dockerfile for the ones you need";
+        if ($names->isEmpty()) {
+            return "{$message}.";
+        }
+
+        $listedNames = $names->take(10)->implode(', ');
+        $moreCount = $names->count() - 10;
+
+        return $moreCount > 0 ? "{$message}: {$listedNames} and {$moreCount} more." : "{$message}: {$listedNames}.";
     }
 
     private function add_build_secrets_to_compose($composeFile)
