@@ -235,6 +235,64 @@ function dockerNetworkEnsureCommand(string $network, bool $overlay = false, bool
     return "docker network inspect {$safe} >/dev/null 2>&1 || docker network create {$createFlags} {$safe}{$quiet}";
 }
 
+function dockerNetworkEnsureIpv6Commands(string $network, bool $quietCreate = false): array
+{
+    $safe = escapeshellarg($network);
+    $quiet = $quietCreate ? ' >/dev/null' : '';
+
+    $script = str_replace(
+        ['__RCLONE_NETWORK__', '__RCLONE_QUIET__'],
+        [$safe, $quiet],
+        <<<'BASH'
+set -eu
+if ! docker network inspect __RCLONE_NETWORK__ >/dev/null 2>&1; then
+    if ! docker network create --attachable --ipv6 __RCLONE_NETWORK____RCLONE_QUIET__; then
+        docker network create --attachable __RCLONE_NETWORK____RCLONE_QUIET__
+    fi
+fi
+ipv6_enabled=$(docker network inspect --format='{{.EnableIPv6}}' __RCLONE_NETWORK__ 2>/dev/null) || exit 1
+if [ "$ipv6_enabled" = "true" ]; then
+    exit 0
+fi
+probe_id=$(docker network create --attachable --ipv6 coolify-ipv6-probe-$$ 2>/dev/null) || exit 0
+docker network rm "$probe_id" >/dev/null 2>&1 || exit 1
+containers=$(docker network inspect --format='{{range .Containers}}{{println .Name}}{{end}}' __RCLONE_NETWORK__) || exit 1
+disconnected=""
+for container in $containers; do
+    if ! docker network disconnect __RCLONE_NETWORK__ "$container" >/dev/null 2>&1; then
+        for previous in $disconnected; do
+            docker network connect __RCLONE_NETWORK__ "$previous" >/dev/null 2>&1 || true
+        done
+        exit 1
+    fi
+    disconnected="$disconnected $container"
+done
+if ! docker network rm __RCLONE_NETWORK__ >/dev/null 2>&1; then
+    for container in $containers; do
+        docker network connect __RCLONE_NETWORK__ "$container" >/dev/null 2>&1 || true
+    done
+    exit 1
+fi
+if ! docker network create --attachable --ipv6 __RCLONE_NETWORK____RCLONE_QUIET__; then
+    if ! docker network create --attachable __RCLONE_NETWORK____RCLONE_QUIET__; then
+        exit 1
+    fi
+fi
+reconnect_failed=0
+for container in $containers; do
+    if ! docker network connect __RCLONE_NETWORK__ "$container" >/dev/null 2>&1; then
+        reconnect_failed=1
+    fi
+done
+if [ "$reconnect_failed" -ne 0 ]; then
+    exit 1
+fi
+BASH
+    );
+
+    return ['bash -c '.escapeShellValue($script)];
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -356,10 +414,13 @@ function ensureProxyNetworksExist(Server $server)
 
     $commands = $networks->map(function ($network) use ($server) {
         $safe = escapeshellarg($network);
+        $ensureCommands = $server->isSwarm()
+            ? [dockerNetworkEnsureCommand($network, overlay: true)]
+            : dockerNetworkEnsureIpv6Commands($network);
 
         return [
             "echo 'Ensuring network {$safe} exists...'",
-            dockerNetworkEnsureCommand($network, overlay: $server->isSwarm()),
+            ...$ensureCommands,
         ];
     });
 

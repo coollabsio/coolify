@@ -69,6 +69,14 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
             return $line;
         }
 
+        if (preg_match('/^\s*bash\s+-c\s+/', $line)) {
+            return "sudo $line";
+        }
+
+        if (preg_match('/^\s*sudo\s+bash\s+-c\s+/', $line)) {
+            return $line;
+        }
+
         // Negation belongs to the shell, before the elevated command.
         if (preg_match('/^\s*!\s+/', $line)) {
             return preg_replace('/^(\s*(?:!\s+)+)/', '$1sudo ', $line);
@@ -106,6 +114,11 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 
     $commands = $commands->map(function ($line) {
         $line = str($line);
+        $lineValue = $line->value();
+
+        if (str_starts_with(ltrim($lineValue), 'sudo bash -c ')) {
+            return $lineValue;
+        }
 
         // Detect complex piped commands that should be wrapped in bash -c
         $isComplexPipeCommand = (
