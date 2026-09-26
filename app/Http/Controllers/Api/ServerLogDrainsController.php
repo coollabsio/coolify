@@ -22,6 +22,10 @@ class ServerLogDrainsController extends Controller
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'is_logdrain_cloudwatch_enabled',
+        'logdrain_cloudwatch_region',
+        'logdrain_cloudwatch_group',
+        'logdrain_cloudwatch_stream_prefix',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -43,6 +47,10 @@ class ServerLogDrainsController extends Controller
             'is_logdrain_axiom_enabled' => (bool) $settings->is_logdrain_axiom_enabled,
             'logdrain_axiom_dataset_name' => $settings->logdrain_axiom_dataset_name,
             'is_logdrain_custom_enabled' => (bool) $settings->is_logdrain_custom_enabled,
+            'is_logdrain_cloudwatch_enabled' => (bool) $settings->is_logdrain_cloudwatch_enabled,
+            'logdrain_cloudwatch_region' => $settings->logdrain_cloudwatch_region,
+            'logdrain_cloudwatch_group' => $settings->logdrain_cloudwatch_group,
+            'logdrain_cloudwatch_stream_prefix' => $settings->logdrain_cloudwatch_stream_prefix,
         ];
 
         if ($this->canReadSensitive()) {
@@ -80,6 +88,10 @@ class ServerLogDrainsController extends Controller
                         new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                         new OA\Property(property: 'logdrain_custom_config', type: 'string', description: 'Only present with read:sensitive.'),
                         new OA\Property(property: 'logdrain_custom_config_parser', type: 'string', description: 'Only present with read:sensitive.'),
+                        new OA\Property(property: 'is_logdrain_cloudwatch_enabled', type: 'boolean'),
+                        new OA\Property(property: 'logdrain_cloudwatch_region', type: 'string', nullable: true),
+                        new OA\Property(property: 'logdrain_cloudwatch_group', type: 'string', nullable: true),
+                        new OA\Property(property: 'logdrain_cloudwatch_stream_prefix', type: 'string', nullable: true, description: 'Prepended to the container name to form the log stream name.'),
                     ],
                     type: 'object',
                 ),
@@ -129,6 +141,10 @@ class ServerLogDrainsController extends Controller
                     new OA\Property(property: 'is_logdrain_custom_enabled', type: 'boolean'),
                     new OA\Property(property: 'logdrain_custom_config', type: 'string'),
                     new OA\Property(property: 'logdrain_custom_config_parser', type: 'string'),
+                    new OA\Property(property: 'is_logdrain_cloudwatch_enabled', type: 'boolean'),
+                    new OA\Property(property: 'logdrain_cloudwatch_region', type: 'string', nullable: true),
+                    new OA\Property(property: 'logdrain_cloudwatch_group', type: 'string', nullable: true),
+                    new OA\Property(property: 'logdrain_cloudwatch_stream_prefix', type: 'string', nullable: true, description: 'Prepended to the container name to form the log stream name.'),
                 ],
                 type: 'object',
             ),
@@ -170,6 +186,10 @@ class ServerLogDrainsController extends Controller
             'is_logdrain_custom_enabled' => 'boolean',
             'logdrain_custom_config' => 'nullable|string',
             'logdrain_custom_config_parser' => 'nullable|string',
+            'is_logdrain_cloudwatch_enabled' => 'boolean',
+            'logdrain_cloudwatch_region' => ['nullable', 'string', 'max:64', 'regex:/^[a-z]{2}(-[a-z]+)+-\d+$/'],
+            'logdrain_cloudwatch_group' => ['nullable', 'string', 'regex:/^[\.\-_\/#A-Za-z0-9]{1,512}$/'],
+            'logdrain_cloudwatch_stream_prefix' => ['nullable', 'string', 'max:256', 'regex:/^[A-Za-z0-9_\-\.\/#]*$/'],
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
@@ -224,6 +244,27 @@ class ServerLogDrainsController extends Controller
                     'logdrain_custom_config' => ['The custom log drain config is required when custom log drain is enabled.'],
                 ],
             ], 422);
+        }
+
+        if ($settings->is_logdrain_cloudwatch_enabled) {
+            if ($settings->is_logdrain_newrelic_enabled || $settings->is_logdrain_axiom_enabled || $settings->is_logdrain_custom_enabled || $settings->is_logdrain_highlight_enabled) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'is_logdrain_cloudwatch_enabled' => ['Amazon CloudWatch Logs cannot be enabled together with another log drain.'],
+                    ],
+                ], 422);
+            }
+            $errors = [];
+            if (blank($settings->logdrain_cloudwatch_region)) {
+                $errors['logdrain_cloudwatch_region'] = ['The CloudWatch region is required when Amazon CloudWatch Logs is enabled.'];
+            }
+            if (blank($settings->logdrain_cloudwatch_group)) {
+                $errors['logdrain_cloudwatch_group'] = ['The CloudWatch log group is required when Amazon CloudWatch Logs is enabled.'];
+            }
+            if ($errors !== []) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+            }
         }
 
         $settings->save();
