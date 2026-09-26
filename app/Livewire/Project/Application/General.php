@@ -6,6 +6,7 @@ use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
+use App\Models\DockerRegistry;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -66,6 +67,10 @@ class General extends Component
     public ?string $dockerRegistryImageName = null;
 
     public ?string $dockerRegistryImageTag = null;
+
+    public ?int $dockerRegistryId = null;
+
+    public ?Collection $dockerRegistries = null;
 
     public ?string $dockerComposeLocation = null;
 
@@ -166,6 +171,7 @@ class General extends Component
             'dockerfile' => 'nullable',
             'dockerRegistryImageName' => ValidationPatterns::dockerImageNameRules(),
             'dockerRegistryImageTag' => ValidationPatterns::dockerImageTagRules(),
+            'dockerRegistryId' => ['nullable', 'integer', Rule::exists('docker_registries', 'id')->where('team_id', currentTeam()->id)],
             'dockerfileLocation' => ValidationPatterns::filePathRules(),
             'dockerComposeLocation' => ValidationPatterns::filePathRules(),
             'dockerCompose' => 'nullable',
@@ -259,6 +265,7 @@ class General extends Component
         'dockerfile' => 'Dockerfile',
         'dockerRegistryImageName' => 'Docker registry image name',
         'dockerRegistryImageTag' => 'Docker registry image tag',
+        'dockerRegistryId' => 'Docker registry credentials',
         'dockerfileLocation' => 'Dockerfile location',
         'dockerComposeLocation' => 'Docker compose location',
         'dockerCompose' => 'Docker compose',
@@ -328,6 +335,8 @@ class General extends Component
             $this->dispatch('configurationChanged');
         }
 
+        $this->dockerRegistries = DockerRegistry::ownedByCurrentTeam(['name', 'registry_url'])->get();
+
         // Sync data from model to properties at the END, after all business logic
         // This ensures any modifications to $this->application during mount() are reflected in properties
         $this->syncData();
@@ -360,6 +369,7 @@ class General extends Component
             $this->application->dockerfile_target_build = $this->dockerfileTargetBuild;
             $this->application->docker_registry_image_name = $this->dockerRegistryImageName;
             $this->application->docker_registry_image_tag = $this->dockerRegistryImageTag;
+            $this->application->docker_registry_id = $this->dockerRegistryId;
             $this->application->docker_compose_location = $this->dockerComposeLocation;
             $this->application->docker_compose = $this->dockerCompose;
             $this->application->docker_compose_raw = $this->dockerComposeRaw;
@@ -412,6 +422,7 @@ class General extends Component
             $this->dockerfileTargetBuild = $this->application->dockerfile_target_build;
             $this->dockerRegistryImageName = $this->application->docker_registry_image_name;
             $this->dockerRegistryImageTag = $this->application->docker_registry_image_tag;
+            $this->dockerRegistryId = $this->application->docker_registry_id;
             $this->dockerComposeLocation = $this->application->docker_compose_location;
             $this->dockerCompose = $this->application->docker_compose;
             $this->dockerComposeRaw = $this->application->docker_compose_raw;
