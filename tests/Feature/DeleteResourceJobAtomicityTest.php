@@ -272,3 +272,31 @@ it('deletes preview metadata locally when its application destination is missing
     expect(ApplicationPreview::withTrashed()->find($preview->id))->toBeNull()
         ->and($previewStorage->fresh())->toBeNull();
 });
+
+it('removes service containers with a command that works for non-root SSH users', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create(['service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:alpine']);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id, 'user' => 'coolify']);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    app(DeleteService::class)->removeSubresourceContainer($application);
+
+    // A leading variable assignment becomes "sudo container_ids=...", which sudo rejects.
+    expect($commands->implode("\n"))
+        ->not->toContain('sudo container_ids=')
+        ->toContain("sudo bash -c 'sh -c")
+        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('docker rm -f $container_ids');
+});
