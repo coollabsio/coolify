@@ -13,6 +13,7 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesResource;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Support\ResourceStartActivity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -140,13 +141,18 @@ class Control extends Tool
             return ['message' => 'Database is already running.'];
         }
 
+        $reservation = StartDatabase::reserveOperation($database);
+        if ($reservation === null) {
+            throw new \RuntimeException(ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE);
+        }
+
         if ($action === 'restart') {
-            RestartDatabase::dispatch($database);
+            StartDatabase::dispatchReserved(RestartDatabase::class, $database, $reservation);
 
             return ['message' => 'Database restart request queued.'];
         }
 
-        StartDatabase::dispatch($database);
+        StartDatabase::dispatchReserved(StartDatabase::class, $database, $reservation);
 
         return ['message' => 'Database starting request queued.'];
     }
