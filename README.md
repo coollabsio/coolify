@@ -1,123 +1,185 @@
-<div align="center">
 
-<img src="./public/coolify-logo.svg" alt="Coolify logo" width="120" />
+<img src=".github/assets/og.png" alt="Coolify" width="100%" />
 
-# Coolify
+[![release](https://shieldcn.dev/github/coollabsio/coolify/release.svg?variant=secondary&logo=coolify&label=Latest+Version)](https://github.com/coollabsio/coolify/releases) ![Docker Pulls](https://shieldcn.dev/docker/pulls/coollabsio/coolify.svg?variant=secondary) [![Discord Members](https://shieldcn.dev/discord/members/gTKMVqG3wu.svg?variant=secondary&label=Community)](https://coollabs.io/discord) [![last commit](https://shieldcn.dev/github/coollabsio/coolify/last-commit.svg?variant=secondary&logo=github&label=Recent+commit)](https://github.com/coollabsio/coolify/commits)
 
-**An open-source platform to deploy applications, databases, and services on your own servers.**
-
-Open source & free forever, backed by our [philosophy](https://coolify.io/philosophy).
-
-![Latest Release Version](https://img.shields.io/badge/dynamic/json?labelColor=grey&color=6366f1&label=Latest%20released%20version&url=https%3A%2F%2Fcdn.coollabs.io%2Fcoolify%2Fversions.json&query=coolify.v4.version&style=for-the-badge
-)
-
-[Website](https://coolify.io) · [Documentation](https://coolify.io/docs) · [Cloud](https://app.coolify.io) · [Discord](https://coollabs.io/discord) · [Community](https://github.com/coollabsio/coolify/discussions)
-
-</div>
+<br />
 
 ## What is Coolify?
 
-Coolify is an open-source and self-hostable alternative to Heroku, Netlify, and Vercel. It helps you manage servers, applications, and databases on your own hardware. You only need an SSH connection.
+Coolify is an open-source, self-hostable platform for deploying **any application, database, or service** on your own servers.
 
-You can use a VPS, a bare-metal server, a Raspberry Pi, or any other server that accepts SSH connections. Coolify gives you the convenience of a cloud platform while you keep control of your infrastructure.
+It gives you the experience of a managed cloud platform while running on infrastructure you control. This could be a VPS, a bare-metal server, a Raspberry Pi, or even an old laptop running Linux.
 
-Your configurations stay on your servers. If you stop using Coolify, your running resources continue to work and remain manageable.
+Coolify is fully free and open source, as described in our [philosophy](https://coolify.io/philosophy), with an optional managed service, Coolify Cloud. **Nothing is locked behind a paywall.**
 
-## What can Coolify do?
+<br />
 
-- **Deploy any application:** Build from GitHub, GitLab, Bitbucket, or Gitea with Nixpacks, Railpack, Dockerfile, Docker Compose, or a prebuilt Docker image.
-- **Run databases and services:** Deploy managed databases and more than 300 one-click services with persistent storage and generated credentials.
-- **Automate deployments:** Deploy on every Git push, create pull-request previews, call deployment webhooks, and roll back to retained application images.
-- **Manage networking:** Configure custom domains, automatic HTTPS certificates, reverse proxies, health checks, and container networks.
-- **Operate your infrastructure:** Manage multiple servers, inspect deployment and runtime logs, open container terminals, and monitor resource status.
-- **Protect your workloads:** Configure database and storage backups, scheduled tasks, environment variables, secrets, and notifications.
-- **Integrate with your workflow:** Manage resources through the dashboard, API, CLI, MCP, and team-based access controls.
+## Screenshots
 
-## Quick start
+<table>
+  <tr>
+    <td align="left" colspan="2"><b>Dashboard: projects and servers at a glance</b></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src=".github/assets/screenshots/dashboard-light.png" alt="Dashboard (light mode)" width="400" />
+    </td>
+    <td align="center">
+      <img src=".github/assets/screenshots/dashboard-dark.png" alt="Dashboard (dark mode)" width="400" />
+    </td>
+  </tr>
+  <tr>
+    <td align="left" colspan="2"><b>Application configuration: deploy and configure any application</b></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src=".github/assets/screenshots/application-light.png" alt="Application configuration (light mode)" width="400" />
+    </td>
+    <td align="center">
+      <img src=".github/assets/screenshots/application-dark.png" alt="Application configuration (dark mode)" width="400" />
+    </td>
+  </tr>
+  <tr>
+    <td align="left" colspan="2"><b>Domains: custom domains with automatic HTTPS</b></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src=".github/assets/screenshots/domains-light.png" alt="Domain management (light mode)" width="400" />
+    </td>
+    <td align="center">
+      <img src=".github/assets/screenshots/domains-dark.png" alt="Domain management (dark mode)" width="400" />
+    </td>
+  </tr>
+  <tr>
+    <td align="left" colspan="2"><b>Server metrics: real-time CPU and memory monitoring</b></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src=".github/assets/screenshots/metrics-light.png" alt="Server metrics (light mode)" width="400" />
+    </td>
+    <td align="center">
+      <img src=".github/assets/screenshots/metrics-dark.png" alt="Server metrics (dark mode)" width="400" />
+    </td>
+  </tr>
+  <tr>
+    <td align="left" colspan="2"><b>Notifications: alerts via Discord, Telegram, Slack, and more</b></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src=".github/assets/screenshots/notifications-light.png" alt="Notifications (light mode)" width="400" />
+    </td>
+    <td align="center">
+      <img src=".github/assets/screenshots/notifications-dark.png" alt="Notifications (dark mode)" width="400" />
+    </td>
+  </tr>
+</table>
 
-Install Coolify on a supported server with one command:
+<br />
 
-```bash
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
-```
+## Key features
 
-Read the [installation guide](https://coolify.io/docs/installation) for requirements and detailed instructions. You can also review the [installation script](./scripts/install.sh) before you run it.
+| Area | Highlights |
+| :--- | :--- |
+| **Deploy** | Any stack via Railpack, Dockerfile or Compose, with auto-deploy, PR previews, rolling updates & rollbacks |
+| **Databases & services** | Deploy Postgres, MongoDB, Redis & more, plus 340+ one-click services |
+| **Networking** | Reverse proxy with automatic HTTPS, custom domains & isolated Docker networks |
+| **Servers** | Manage unlimited servers over SSH, or provision new ones from hosting providers |
+| **Monitor** | Real-time metrics, logs, web terminal & health checks |
+| **Security & teams** | Scheduled backups, secrets, teams, plus a REST API, CLI & MCP server |
 
-## Self-hosted or Cloud
+This is just a highlight — there's much more.
 
-| Self-hosted | Coolify Cloud |
-| --- | --- |
-| Install Coolify on your own server. | Use a Coolify instance that we maintain. |
-| Control and maintain the complete platform. | Get high availability and less maintenance. |
-| Free and open source. | Paid service with email notifications and additional support. |
+<br />
 
-The recommended self-hosted setup uses one server for Coolify and one or more servers for deployed resources. If you do not want to maintain the Coolify server, use [Coolify Cloud](https://app.coolify.io). See [coolify.io](https://coolify.io) for current pricing.
+## Get started
 
-## Community and support
+- [Choose your path](https://coolify.io/docs/choose-your-path) — self-host or use Coolify Cloud
+- [Start with self-hosted](https://coolify.io/docs/start-with-self-hosted)
+- [Start with Coolify Cloud](https://coolify.io/docs/start-with-cloud)
+- [REST API](https://coolify.io/docs/api/overview)
+- [CLI](https://coolify.io/docs/cli/what-is-the-coolify-cli)
+- [MCP server](https://coolify.io/docs/mcp/what-is-mcp)
 
-- Read the [documentation](https://coolify.io/docs).
-- Join the community on [Discord](https://coollabs.io/discord).
-- Ask questions in [GitHub Discussions](https://github.com/coollabsio/coolify/discussions).
-- Read the [contribution guide](./CONTRIBUTING.md) before you submit a change.
-- Review the [code of conduct](./CODE_OF_CONDUCT.md).
-- Contact the team through the [support page](https://coolify.io/docs/contact).
+<br />
+
+## Resources
+
+- [Website](https://coolify.io)
+- [Documentation](https://coolify.io/docs)
+- [Discord community](https://coollabs.io/discord)
+- [Discussions](https://github.com/coollabsio/coolify/discussions)
+- [Support](https://coolify.io/docs/support)
+
+<br />
 
 ## Donations
-To stay completely free and open-source, with no feature behind the paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the project's future development.
 
-[coolify.io/sponsorships](https://coolify.io/sponsorships)
+Coolify is free and open-source, with nothing locked behind a paywall, and we want to keep it that way. If Coolify is useful to you, please consider sponsoring to help fund its future development.
 
-Thank you so much!
+- [Sponsor Coolify](https://coolify.io/sponsorships)
+
+Thank you for your support!
+
+<br />
 
 ### Huge Sponsors
 
-* [CubePath](https://cubepath.com/coolify) - Premium dedicated servers and cloud VPS hosting
-* [Context.dev](https://www.context.dev/) - Web scraping API for AI agents
-* [Ginernet](https://ginernet.com/) - Hosting powerful servers in Spain
-* [SerpAPI](https://serpapi.com) - Google Search API — Scrape Google and other search engines from our fast, easy, and complete API.
-* [MVPS](https://www.mvps.net) - Cheap VPS servers at the highest possible quality
-* [ScreenshotOne](https://screenshotone.com) - Screenshot API for devs
-* [PrivateAlps](https://privatealps.net) - Cloud Services Provider, VPS, servers infrastructure for people who care about privacy and control
-* [Seibert Group](https://seibert.link/coolifysoftware) - Boost productivity company-wide with AI agents like Claude Code
-* [Contabo](https://contabo.com/en/coolify-vps/) - Cloud VPS & dedicated servers at unbeatable prices
+| Sponsor | Description |
+| :--- | :--- |
+| [CubePath](https://cubepath.com/coolify) | Premium dedicated servers and cloud VPS hosting |
+| [Context.dev](https://www.context.dev/) | Web scraping API for AI agents |
+| [Ginernet](https://ginernet.com/) | Hosting powerful servers in Spain |
+| [SerpAPI](https://serpapi.com) | Google Search API — Scrape Google and other search engines from our fast, easy, and complete API. |
+| [MVPS](https://www.mvps.net) | Cheap VPS servers at the highest possible quality |
+| [ScreenshotOne](https://screenshotone.com) | Screenshot API for devs |
+| [PrivateAlps](https://privatealps.net) | Cloud Services Provider, VPS, servers infrastructure for people who care about privacy and control |
+| [Seibert Group](https://seibert.link/coolifysoftware) | Boost productivity company-wide with AI agents like Claude Code |
+| [Contabo](https://contabo.com/en/coolify-vps/) | Cloud VPS & dedicated servers at unbeatable prices |
+
+<br />
 
 ### Big Sponsors
 
-* [Vanaways](https://www.vanaways.co.uk) - New vans for sale and lease across the UK
-* [Cloudways](https://www.cloudways.com/en/?id=2125302) - Managed cloud hosting platform by DigitalOcean
-* [ByteBase](https://www.bytebase.com) - Database CI/CD and Security at Scale
-* [Ramnode](https://ramnode.com/) - High Performance Cloud VPS Hosting
-* [23M](https://23m.com) - Your experts for high-availability hosting solutions!
-* [Macarne](https://macarne.com) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
-* [Hetzner](http://htznr.li/CoolifyXHetzner) - Server, cloud, hosting, and data center solutions
-* [Logto](https://logto.io) - The better identity infrastructure for developers
-* [Supadata](https://supadata.ai/) - Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. 
-* [Tolgee](https://tolgee.io) - The open source localization platform
-* [Best Consultant](https://bc.direct) - Your trusted technology consulting partner
-* [ArcJet](https://arcjet.com) - Advanced web security and performance solutions
-* [SupaGuide](https://supa.guide) - Your comprehensive guide to Supabase
-* [CodeRabbit](https://coderabbit.ai) - Cut Code Review Time & Bugs in Half
-* [Convex](https://convex.link/coolify.io) - Convex is the open-source reactive database for web app developers.
-* [GoldenVM](https://billing.goldenvm.com) - Premium virtual machine hosting solutions
-* [Comit International](https://comit.international) - New York Times award–winning contractor!
-* [Compai](https://www.trycomp.ai) - The open source compliance automation platform that does everything you need to get compliant, fast. Open source alternative to Drata & Vanta.
-* [Tigris](https://www.tigrisdata.com) - Modern S3 Alternative
-* [Blacksmith](https://blacksmith.sh) - Infrastructure automation platform
-* [JobsCollider](https://jobscollider.com/remote-jobs) - 30,000+ remote jobs for developers
-* [Darweb](https://darweb.nl/?ref=coolify.io&utm_source=coolify.io) - Design. Develop. Deliver. Specialized in 3D CPQ Solutions for eCommerce.
-* [Hostinger](https://www.hostinger.com/vps/coolify-hosting) - Web hosting and VPS solutions
-* [Mobb](https://vibe.mobb.ai/) - Secure Your AI-Generated Code to Unlock Dev Productivity
-* [Ubicloud](https://www.ubicloud.com) - Open source cloud infrastructure platform
-* [PFGLabs](https://pfglabs.com) - Build Real Projects with Golang
-* [JuxtDigital](https://juxtdigital.com) - Digital PR & AI Authority Building Agency
-* [SaasyKit](https://saasykit.com) - Complete SaaS starter kit for developers
-* [American Cloud](https://americancloud.com) - US-based cloud infrastructure services
-* [Greptile](https://www.greptile.com) - The AI Code Reviewer
-* [VPSDime](https://vpsdime.com/) - Cheap VPS Hosting - 4GB for $5/month
-* [dataforest Cloud](https://cloud.dataforest.net/en) - Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany.
-* [ISHosting](https://ishosting.com/) - Hosting and VPS solutions
-* [PetroSky Cloud](https://petrosky.io) - Open source cloud deployment solutions
-* [QuickSrv](https://quicksrv.io/) - Fast and reliable server hosting
+| Sponsor | Description |
+| :--- | :--- |
+| [Vanaways](https://www.vanaways.co.uk) | New vans for sale and lease across the UK |
+| [Cloudways](https://www.cloudways.com/en/?id=2125302) | Managed cloud hosting platform by DigitalOcean |
+| [ByteBase](https://www.bytebase.com) | Database CI/CD and Security at Scale |
+| [Ramnode](https://ramnode.com/) | High Performance Cloud VPS Hosting |
+| [23M](https://23m.com) | Your experts for high-availability hosting solutions! |
+| [Macarne](https://macarne.com) | Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity |
+| [Hetzner](http://htznr.li/CoolifyXHetzner) | Server, cloud, hosting, and data center solutions |
+| [Logto](https://logto.io) | The better identity infrastructure for developers |
+| [Supadata](https://supadata.ai/) | Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. |
+| [Tolgee](https://tolgee.io) | The open source localization platform |
+| [Best Consultant](https://bc.direct) | Your trusted technology consulting partner |
+| [ArcJet](https://arcjet.com) | Advanced web security and performance solutions |
+| [SupaGuide](https://supa.guide) | Your comprehensive guide to Supabase |
+| [CodeRabbit](https://coderabbit.ai) | Cut Code Review Time & Bugs in Half |
+| [Convex](https://convex.link/coolify.io) | Convex is the open-source reactive database for web app developers. |
+| [GoldenVM](https://billing.goldenvm.com) | Premium virtual machine hosting solutions |
+| [Comit International](https://comit.international) | New York Times award–winning contractor! |
+| [Compai](https://www.trycomp.ai) | The open source compliance automation platform that does everything you need to get compliant, fast. Open source alternative to Drata & Vanta. |
+| [Tigris](https://www.tigrisdata.com) | Modern S3 Alternative |
+| [Blacksmith](https://blacksmith.sh) | Infrastructure automation platform |
+| [JobsCollider](https://jobscollider.com/remote-jobs) | 30,000+ remote jobs for developers |
+| [Darweb](https://darweb.nl/?ref=coolify.io&utm_source=coolify.io) | Design. Develop. Deliver. Specialized in 3D CPQ Solutions for eCommerce. |
+| [Hostinger](https://www.hostinger.com/vps/coolify-hosting) | Web hosting and VPS solutions |
+| [Mobb](https://vibe.mobb.ai/) | Secure Your AI-Generated Code to Unlock Dev Productivity |
+| [Ubicloud](https://www.ubicloud.com) | Open source cloud infrastructure platform |
+| [PFGLabs](https://pfglabs.com) | Build Real Projects with Golang |
+| [JuxtDigital](https://juxtdigital.com) | Digital PR & AI Authority Building Agency |
+| [SaasyKit](https://saasykit.com) | Complete SaaS starter kit for developers |
+| [American Cloud](https://americancloud.com) | US-based cloud infrastructure services |
+| [Greptile](https://www.greptile.com) | The AI Code Reviewer |
+| [VPSDime](https://vpsdime.com/) | Cheap VPS Hosting - 4GB for $5/month |
+| [dataforest Cloud](https://cloud.dataforest.net/en) | Deploy cloud servers as seeds independently in seconds. Enterprise hardware, premium network, 100% made in Germany. |
+| [ISHosting](https://ishosting.com/) | Hosting and VPS solutions |
+| [PetroSky Cloud](https://petrosky.io) | Open source cloud deployment solutions |
+| [QuickSrv](https://quicksrv.io/) | Fast and reliable server hosting |
+
+<br />
 
 ### Small Sponsors
 
@@ -170,6 +232,10 @@ Thank you so much!
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 
+<br />
+
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=coollabsio/coolify&type=Date)](https://star-history.com/#coollabsio/coolify&Date)
+<p align="center">
+  <img alt="chart" src="https://shieldcn.dev/chart/github/stars/coollabsio/coolify.svg?theme=violet&amp;font=geist&amp;icon=coolify" />
+</p>
