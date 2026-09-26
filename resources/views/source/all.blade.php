@@ -11,7 +11,7 @@
                     {{ $sources->count() }} {{ Str::plural('Git source', $sources->count()) }} connected to your team
                 </p>
             </div>
-            @can('createAnyResource')
+            @can('create', App\Models\GithubApp::class)
                 <div x-data="{ dropdownOpen: false }" class="relative w-fit shrink-0"
                     @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
                     <button type="button" @click="dropdownOpen = !dropdownOpen"

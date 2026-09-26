@@ -15,9 +15,28 @@ it('allows admin to create any resource', function () {
 it('denies member from creating any resource', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ResourceCreatePolicy;
     expect($policy->createAny($user))->toBeFalse();
+});
+
+it('allows operator to create any resource', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(true);
+
+    $policy = new ResourceCreatePolicy;
+    expect($policy->createAny($user))->toBeTrue();
+});
+
+it('allows operator to create a valid resource class', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(true);
+
+    $policy = new ResourceCreatePolicy;
+    expect($policy->create($user, Application::class))->toBeTrue();
 });
 
 it('allows admin to create a valid resource class', function () {
@@ -31,6 +50,7 @@ it('allows admin to create a valid resource class', function () {
 it('denies member from creating a valid resource class', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ResourceCreatePolicy;
     expect($policy->create($user, Application::class))->toBeFalse();
@@ -55,6 +75,7 @@ it('allows admin to authorize all resource creation', function () {
 it('denies member from authorizing all resource creation', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ResourceCreatePolicy;
     expect($policy->authorizeAllResourceCreation($user))->toBeFalse();

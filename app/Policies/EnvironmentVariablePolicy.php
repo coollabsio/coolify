@@ -30,7 +30,7 @@ class EnvironmentVariablePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -40,7 +40,7 @@ class EnvironmentVariablePolicy
     {
         $teamId = $this->getTeamId($environmentVariable);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -50,7 +50,7 @@ class EnvironmentVariablePolicy
     {
         $teamId = $this->getTeamId($environmentVariable);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -76,7 +76,7 @@ class EnvironmentVariablePolicy
     {
         $teamId = $this->getTeamId($environmentVariable);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     private function getTeamId(EnvironmentVariable $environmentVariable): ?int

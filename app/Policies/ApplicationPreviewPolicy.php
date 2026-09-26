@@ -31,7 +31,7 @@ class ApplicationPreviewPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -45,11 +45,11 @@ class ApplicationPreviewPolicy
             return Response::deny('Application preview team not found.');
         }
 
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($user->canManageResourcesOfTeam($teamId)) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to update this preview.');
+        return Response::deny('You need at least operator permissions to update this preview.');
     }
 
     /**
@@ -59,7 +59,7 @@ class ApplicationPreviewPolicy
     {
         $teamId = $this->getTeamId($applicationPreview);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -85,7 +85,7 @@ class ApplicationPreviewPolicy
     {
         $teamId = $this->getTeamId($applicationPreview);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -95,7 +95,7 @@ class ApplicationPreviewPolicy
     {
         $teamId = $this->getTeamId($applicationPreview);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     private function getTeamId(ApplicationPreview $applicationPreview): ?int

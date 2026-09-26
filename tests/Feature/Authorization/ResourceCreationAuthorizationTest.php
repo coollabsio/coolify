@@ -36,6 +36,9 @@ beforeEach(function () {
     $this->member = User::factory()->create();
     $this->member->teams()->attach($this->team, ['role' => 'member']);
 
+    $this->operator = User::factory()->create();
+    $this->operator->teams()->attach($this->team, ['role' => 'operator']);
+
     $this->project = Project::create([
         'uuid' => (string) Str::uuid(),
         'name' => 'Test Project',
@@ -75,6 +78,17 @@ test('member cannot pass create resources middleware', function () {
 
     expect(fn () => $middleware->handle($request, fn () => response('ok')))
         ->toThrow(HttpException::class, 'You do not have permission to create resources.');
+});
+
+test('operator can pass create resources middleware', function () {
+    $this->actingAs($this->operator);
+    session(['currentTeam' => $this->team]);
+
+    $middleware = new CanCreateResources;
+    $request = Request::create('/project/new', 'GET');
+    $response = $middleware->handle($request, fn () => response('ok'));
+
+    expect($response->getStatusCode())->toBe(200);
 });
 
 test('admin can pass create resources middleware', function () {

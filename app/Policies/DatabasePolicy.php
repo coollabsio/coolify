@@ -30,7 +30,7 @@ class DatabasePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -44,11 +44,11 @@ class DatabasePolicy
             return Response::deny('Database team not found.');
         }
 
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($user->canManageResourcesOfTeam($teamId)) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to update this database.');
+        return Response::deny('You need at least operator permissions to update this database.');
     }
 
     /**
@@ -58,7 +58,7 @@ class DatabasePolicy
     {
         $teamId = $this->getTeamId($database);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -84,7 +84,7 @@ class DatabasePolicy
     {
         $teamId = $this->getTeamId($database);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -98,11 +98,11 @@ class DatabasePolicy
             return Response::deny('Database team not found.');
         }
 
-        if ($user->isAdminOfTeam($teamId)) {
+        if ($user->canManageResourcesOfTeam($teamId)) {
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to upload backups for this database.');
+        return Response::deny('You need at least operator permissions to upload backups for this database.');
     }
 
     /**
@@ -112,7 +112,7 @@ class DatabasePolicy
     {
         $teamId = $this->getTeamId($database);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     /**
@@ -122,7 +122,7 @@ class DatabasePolicy
     {
         $teamId = $this->getTeamId($database);
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $teamId !== null && $user->canManageResourcesOfTeam($teamId);
     }
 
     private function getTeamId($database): ?int
