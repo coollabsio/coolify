@@ -16802,6 +16802,26 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "description": "Also delete all resources on the server.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "delete_from_provider",
+                        "in": "query",
+                        "description": "Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
