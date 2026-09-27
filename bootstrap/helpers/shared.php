@@ -3393,8 +3393,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
         // Legacy Compose applications (parser versions 1 and 2) never stored their volumes, so Coolify
-        // cannot tell which external volume already holds data. They keep the old volume names.
-        $externalTopLevelVolumes = collect([]);
+        // cannot tell which external volume already holds data. They keep the old volume names, and
+        // warnLegacyApplicationComposeExternalVolume() tells the user about it.
+        $declaredTopLevelVolumes = collect($topLevelVolumes->all());
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
@@ -3427,7 +3428,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $externalTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $declaredTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3466,7 +3467,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3484,9 +3485,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
-                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, $name->value(), legacyApplicationComposeVolumeName($resource, $name->value(), $pull_request_id))) {
-                                    // An external volume is used as written.
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
@@ -3553,10 +3553,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
-                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, (string) $source, legacyApplicationComposeVolumeName($resource, (string) $source, $pull_request_id))) {
-                                    // An external volume is used as written.
-                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
@@ -3595,7 +3593,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3613,9 +3611,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
-                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, $name->value(), legacyApplicationComposeVolumeName($resource, $name->value(), $pull_request_id))) {
-                                    // An external volume is used as written.
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
                                         $name = $uuid.'-'.addPreviewDeploymentSuffix($name, $pull_request_id);
@@ -3684,10 +3681,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
-                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, (string) $source, legacyApplicationComposeVolumeName($resource, (string) $source, $pull_request_id))) {
-                                    // An external volume is used as written.
-                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
                                     } else {
