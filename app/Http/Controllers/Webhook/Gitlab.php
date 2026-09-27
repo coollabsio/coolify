@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
@@ -15,13 +16,13 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
 class Gitlab extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ReadsWebhookPushPayload;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -123,23 +124,23 @@ class Gitlab extends Controller
                 ->where('repository_project_id', $project_id);
 
             if ($object_kind === 'push') {
-                $branch = data_get($payload, 'ref');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 if (! $branch) {
                     return response([
                         'status' => 'failed',
                         'message' => 'No branch found in the request.',
                     ]);
                 }
+                if ($this->isWebhookBranchDeletionPush($payload)) {
+                    return response([
+                        'status' => 'skipped',
+                        'message' => 'Nothing to do. Branch deleted.',
+                    ]);
+                }
 
                 $applications = $applications->where('git_branch', $branch)->get();
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
 
                 foreach ($applications as $application) {
                     if (! $application->destination->server->isFunctional()) {
@@ -162,8 +163,7 @@ class Gitlab extends Controller
                         continue;
                     }
 
-                    $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                    if (! $is_watch_path_triggered && ! blank($application->watch_paths)) {
+                    if (! $this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'failed',
@@ -363,11 +363,8 @@ class Gitlab extends Controller
             }
 
             if ($x_gitlab_event === 'push') {
-                $branch = data_get($payload, 'ref');
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 $full_name = data_get($payload, 'project.path_with_namespace');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
                 if (! $branch) {
                     $return_payloads->push([
                         'status' => 'failed',
@@ -376,23 +373,29 @@ class Gitlab extends Controller
 
                     return response($return_payloads);
                 }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                // A deleted branch has no commit to deploy. No secret is checked here.
+                if ($this->isWebhookBranchDeletionPush($payload)) {
+                    $return_payloads->push([
+                        'status' => 'skipped',
+                        'message' => 'Nothing to do. Branch deleted.',
+                    ]);
+
+                    return response($return_payloads);
+                }
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_gitlab_event === 'merge_request') {
                 $action = data_get($payload, 'object_attributes.action');
-                $branch = data_get($payload, 'object_attributes.source_branch');
-                $base_branch = data_get($payload, 'object_attributes.target_branch');
+                $branch = $this->webhookString(data_get($payload, 'object_attributes.source_branch'));
+                $base_branch = $this->webhookString(data_get($payload, 'object_attributes.target_branch'));
                 $full_name = data_get($payload, 'project.path_with_namespace');
                 $pull_request_id = data_get($payload, 'object_attributes.iid');
                 $pull_request_html_url = data_get($payload, 'object_attributes.url');
                 $pull_request_title = data_get($payload, 'object_attributes.title');
                 $latest_commit_message = data_get($payload, 'object_attributes.last_commit.message');
                 $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title, $latest_commit_message]);
-                if (! $branch) {
+                if (! $branch || ! $base_branch) {
                     $return_payloads->push([
                         'status' => 'failed',
                         'message' => 'Nothing to do. No branch found in the request.',
@@ -415,17 +418,19 @@ class Gitlab extends Controller
             if ($this->hasTooManyManualWebhookFailures($failure_key)) {
                 return $this->tooManyManualWebhookFailuresResponse($failure_key);
             }
+            // GitLab sends a static token. A repeated wrong token is one guess.
+            $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);
             $applications = Application::query();
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($failure_key);
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             foreach ($applications as $application) {
@@ -464,8 +469,7 @@ class Gitlab extends Controller
                 }
                 if ($x_gitlab_event === 'push') {
                     if ($application->isDeployable()) {
-                        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                        if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                             if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -634,7 +638,7 @@ class Gitlab extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $failure_key);
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (Exception $e) {
             return handleError($e);
         }

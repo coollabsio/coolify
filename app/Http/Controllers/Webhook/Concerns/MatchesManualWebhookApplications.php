@@ -72,20 +72,25 @@ trait MatchesManualWebhookApplications
      * key is scoped to the repository and branch, so this cannot lock out other
      * applications, and it keeps the 429 response from revealing which
      * repositories exist in this instance.
+     *
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
      */
-    protected function unauthenticatedManualWebhookResponse(string $failureKey): Response
+    protected function unauthenticatedManualWebhookResponse(string $failureKey, string $attempt): Response
     {
-        $this->recordManualWebhookFailure($failureKey);
+        $this->recordManualWebhookFailure($failureKey, $attempt);
 
         return response([$this->unauthenticatedManualWebhookFailurePayload()]);
     }
 
-    protected function manualWebhookResponse(Collection $payloads, string $failureKey): Response
+    /**
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
+     */
+    protected function manualWebhookResponse(Collection $payloads, string $failureKey, string $attempt): Response
     {
         $failure = $this->unauthenticatedManualWebhookFailurePayload();
         $authorizedPayloads = $payloads->reject(fn (array $payload): bool => $payload === $failure)->values();
         if ($authorizedPayloads->isEmpty() && $payloads->isNotEmpty()) {
-            return $this->unauthenticatedManualWebhookResponse($failureKey);
+            return $this->unauthenticatedManualWebhookResponse($failureKey, $attempt);
         }
 
         return response($authorizedPayloads);

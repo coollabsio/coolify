@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -16,6 +17,7 @@ class Bitbucket extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ReadsWebhookPushPayload;
     use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
@@ -34,16 +36,16 @@ class Bitbucket extends Controller
                 ]);
             }
             if ($x_bitbucket_event === 'repo:push') {
-                $branch = data_get($payload, 'push.changes.0.new.name');
+                // A deleted branch has no "new" state, so no branch is found.
+                $branch = $this->webhookString(data_get($payload, 'push.changes.0.new.name'));
                 $full_name = data_get($payload, 'repository.full_name');
-                $commit = data_get($payload, 'push.changes.0.new.target.hash');
+                $commit = $this->webhookString(data_get($payload, 'push.changes.0.new.target.hash'));
                 // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
                 // are evaluated only on the visible 5.
+                $changes = data_get($payload, 'push.changes');
                 $skip_deploy_commits = self::shouldSkipDeploy(
-                    collect(data_get($payload, 'push.changes', []))
-                        ->flatMap(fn ($change) => data_get($change, 'commits', []))
-                        ->pluck('message')
-                        ->filter()
+                    collect(is_array($changes) ? $changes : [])
+                        ->flatMap(fn (mixed $change): array => $this->webhookPushCommitMessages($change))
                         ->values()
                         ->all()
                 );
@@ -56,14 +58,21 @@ class Bitbucket extends Controller
                 }
             }
             if ($x_bitbucket_event === 'pullrequest:updated' || $x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
-                $branch = data_get($payload, 'pullrequest.destination.branch.name');
-                $base_branch = data_get($payload, 'pullrequest.source.branch.name');
+                $branch = $this->webhookString(data_get($payload, 'pullrequest.destination.branch.name'));
+                $base_branch = $this->webhookString(data_get($payload, 'pullrequest.source.branch.name'));
                 $full_name = data_get($payload, 'repository.full_name');
                 $pull_request_id = data_get($payload, 'pullrequest.id');
                 $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
                 $pull_request_title = data_get($payload, 'pullrequest.title');
                 $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
                 $commit = data_get($payload, 'pullrequest.source.commit.hash');
+
+                if (! $branch) {
+                    return response([
+                        'status' => 'failed',
+                        'message' => 'Nothing to do. No branch found in the request.',
+                    ]);
+                }
             }
             $full_name = $this->manualWebhookRepositoryFullName($full_name);
             if ($full_name === null) {
@@ -76,9 +85,11 @@ class Bitbucket extends Controller
             if ($this->hasTooManyManualWebhookFailures($failure_key)) {
                 return $this->tooManyManualWebhookFailuresResponse($failure_key);
             }
+            // A redelivery of the same signed payload is one guess.
+            $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
             $applications = $this->manualWebhookApplications(Application::query()->where('git_branch', $branch), $full_name);
             if ($applications->isEmpty()) {
-                return $this->unauthenticatedManualWebhookResponse($failure_key);
+                return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
             }
             foreach ($applications as $application) {
                 $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
@@ -279,7 +290,7 @@ class Bitbucket extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $failure_key);
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (Exception $e) {
             return handleError($e);
         }

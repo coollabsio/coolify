@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
@@ -22,14 +23,15 @@ class Github extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ReadsWebhookPushPayload;
 
     public function manual(Request $request)
     {
         try {
             $return_payloads = collect([]);
             $x_github_delivery = request()->header('X-GitHub-Delivery');
-            $x_github_event = Str::lower($request->header('X-GitHub-Event'));
-            $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
+            $x_github_event = Str::lower((string) $request->header('X-GitHub-Event'));
+            $x_hub_signature_256 = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');
             $payload = $request->collect();
             if ($x_github_event === 'ping') {
@@ -38,19 +40,14 @@ class Github extends Controller
             }
 
             if ($content_type !== 'application/json') {
-                $payload = json_decode(data_get($payload, 'payload'), true);
+                $form_payload = data_get($payload, 'payload');
+                $payload = is_string($form_payload) ? json_decode($form_payload, true) : null;
             }
             if ($x_github_event === 'push') {
-                $branch = data_get($payload, 'ref');
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 $full_name = data_get($payload, 'repository.full_name');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -58,8 +55,8 @@ class Github extends Controller
                 $pull_request_id = data_get($payload, 'number');
                 $pull_request_html_url = data_get($payload, 'pull_request.html_url');
                 $pull_request_title = data_get($payload, 'pull_request.title');
-                $branch = data_get($payload, 'pull_request.head.ref');
-                $base_branch = data_get($payload, 'pull_request.base.ref');
+                $branch = $this->webhookString(data_get($payload, 'pull_request.head.ref'));
+                $base_branch = $this->webhookString(data_get($payload, 'pull_request.base.ref'));
                 $before_sha = data_get($payload, 'before');
                 $after_sha = data_get($payload, 'after', data_get($payload, 'pull_request.head.sha'));
                 $author_association = data_get($payload, 'pull_request.author_association');
@@ -70,6 +67,10 @@ class Github extends Controller
             }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
+            }
+            // A deleted branch has no commit to deploy. No secret is checked here.
+            if ($x_github_event === 'push' && $this->isWebhookBranchDeletionPush($payload)) {
+                return response('Nothing to do. Branch deleted.');
             }
             $full_name = $this->manualWebhookRepositoryFullName($full_name);
             if ($full_name === null) {
@@ -84,13 +85,15 @@ class Github extends Controller
             if ($this->hasTooManyManualWebhookFailures($failure_key)) {
                 return $this->tooManyManualWebhookFailuresResponse($failure_key);
             }
+            // A redelivery of the same signed payload is one guess.
+            $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();
             if ($x_github_event === 'push' || $action !== 'closed') {
                 $applications->where('git_branch', $matched_branch);
             }
             $applications = $this->manualWebhookApplications($applications, $full_name);
             if ($applications->isEmpty()) {
-                return $this->unauthenticatedManualWebhookResponse($failure_key);
+                return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
             }
             $applicationsByServer = $applications->groupBy(function ($app) {
                 return $app->destination->server_id;
@@ -134,8 +137,7 @@ class Github extends Controller
                     }
                     if ($x_github_event === 'push') {
                         if ($application->isDeployable()) {
-                            $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                            if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                            if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                                 if ($skip_deploy_commits ?? false) {
                                     $return_payloads->push([
                                         'application' => $application->name,
@@ -240,7 +242,7 @@ class Github extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $failure_key);
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (Exception $e) {
             return handleError($e);
         }
@@ -299,15 +301,9 @@ class Github extends Controller
             }
             if ($x_github_event === 'push') {
                 $id = data_get($payload, 'repository.id');
-                $branch = data_get($payload, 'ref');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_github_event === 'pull_request') {
                 $action = data_get($payload, 'action');
@@ -327,6 +323,9 @@ class Github extends Controller
             }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
+            }
+            if ($x_github_event === 'push' && $this->isWebhookBranchDeletionPush($payload)) {
+                return response('Nothing to do. Branch deleted.');
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
@@ -365,8 +364,7 @@ class Github extends Controller
                     }
                     if ($x_github_event === 'push') {
                         if ($application->isDeployable()) {
-                            $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                            if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                            if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                                 if ($skip_deploy_commits ?? false) {
                                     $return_payloads->push([
                                         'application' => $application->name,
