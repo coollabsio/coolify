@@ -8,7 +8,9 @@ use App\Models\StandaloneSqlite;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\Yaml\Yaml;
 
 class ConnectApplication extends Component
 {
@@ -26,12 +28,18 @@ class ConnectApplication extends Component
     public string $volumeName = '';
 
     /**
-     * Applications on the same server. Compose applications are listed but disabled,
-     * because Coolify renames named volumes in compose files.
+     * Applications on the same server.
      *
-     * @var array<int, array{value: string, label: string, disabled: bool}>
+     * @var array<int, array{value: string, label: string}>
      */
     public array $applicationOptions = [];
+
+    /**
+     * Compose file lines that mount the data volume into the selected Docker Compose application.
+     */
+    public ?string $composeSnippet = null;
+
+    public ?string $composeApplicationName = null;
 
     public function mount(): void
     {
@@ -46,17 +54,19 @@ class ConnectApplication extends Component
             ->map(fn (Application $application) => [
                 'value' => $application->uuid,
                 'label' => $this->applicationLabel($application),
-                'disabled' => $this->isComposeApplication($application),
             ])
             ->all();
     }
 
     /**
-     * Mount the data volume into the selected application and open its storage page.
+     * Mount the data volume into the selected application and open its storage page. A Docker Compose
+     * application mounts volumes only from its compose file, so it gets the lines to add instead.
      */
     public function connect()
     {
         $this->authorize('view', $this->database);
+        $this->composeSnippet = null;
+        $this->composeApplicationName = null;
 
         $this->validate([
             'applicationUuid' => 'required|string',
@@ -77,7 +87,14 @@ class ConnectApplication extends Component
             }
 
             if ($this->isComposeApplication($application)) {
-                throw new \Exception('Docker Compose applications are not supported: Coolify renames named volumes in compose files.');
+                if (in_array($this->volumeName, composeExternalVolumeDockerNames($application->docker_compose_raw), true)) {
+                    throw new \Exception("{$application->name} already mounts this database volume in its compose file.");
+                }
+
+                $this->composeApplicationName = $application->name;
+                $this->composeSnippet = $this->composeVolumeSnippet($application);
+
+                return null;
             }
 
             if ($application->persistentStorages()->where('standalone_sqlite_id', $this->database->id)->exists()) {
@@ -108,6 +125,17 @@ class ConnectApplication extends Component
     public function getConnectionsProperty(): Collection
     {
         return $this->database->connectedVolumes()->with('resource')->orderBy('id')->get();
+    }
+
+    /**
+     * Docker Compose applications that declare the data volume as external in their compose file.
+     *
+     * @return Collection<int, Application>
+     */
+    #[Computed]
+    public function composeConnections(): Collection
+    {
+        return $this->database->composeApplicationsUsingDataVolume($this->volumeName);
     }
 
     /**
@@ -169,7 +197,7 @@ class ConnectApplication extends Component
         }
 
         if ($this->isComposeApplication($application)) {
-            $label .= ' · Docker Compose (not supported)';
+            $label .= ' · Docker Compose';
         }
 
         return $label;
@@ -178,6 +206,24 @@ class ConnectApplication extends Component
     private function isComposeApplication(Application $application): bool
     {
         return $application->build_pack === 'dockercompose';
+    }
+
+    /**
+     * Coolify uses an external volume as written, so the application mounts the existing data volume.
+     */
+    private function composeVolumeSnippet(Application $application): string
+    {
+        try {
+            $services = data_get(Yaml::parse((string) $application->docker_compose_raw), 'services');
+        } catch (\Throwable) {
+            $services = null;
+        }
+        $serviceName = is_array($services) && $services !== [] ? (string) array_key_first($services) : 'app';
+
+        return Yaml::dump([
+            'services' => [$serviceName => ['volumes' => ["{$this->volumeName}:{$this->mountPath}"]]],
+            'volumes' => [$this->volumeName => ['external' => true]],
+        ], 4, 2);
     }
 
     /**

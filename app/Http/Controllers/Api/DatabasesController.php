@@ -2789,7 +2789,7 @@ class DatabasesController extends Controller
 
         $this->authorize('delete', $database);
 
-        if ($database instanceof StandaloneSqlite && $database->connectedVolumes()->exists()) {
+        if ($database instanceof StandaloneSqlite && $database->hasConnectedApplications()) {
             return response()->json([
                 'message' => 'This database volume is mounted by '.$database->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.',
             ], 422);

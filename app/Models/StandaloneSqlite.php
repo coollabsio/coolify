@@ -316,6 +316,43 @@ class StandaloneSqlite extends BaseModel
     }
 
     /**
+     * Docker Compose applications of the same team and server that declare this database's data volume
+     * (or the given volume) as external. Coolify uses an external volume as written, so they mount it
+     * without a storage entry.
+     *
+     * @return Collection<int, Application>
+     */
+    public function composeApplicationsUsingDataVolume(?string $volumeName = null): Collection
+    {
+        $serverId = $this->destination?->server_id;
+        $teamId = $this->environment?->project?->team_id;
+        if ($serverId === null || $teamId === null) {
+            return collect();
+        }
+
+        $volumeNames = $volumeName !== null
+            ? collect([$volumeName])
+            : $this->persistentStorages()->whereNull('host_path')->pluck('name');
+
+        return Application::query()
+            ->where('build_pack', 'dockercompose')
+            ->whereRelation('environment.project', 'team_id', $teamId)
+            ->with('destination')
+            ->get()
+            ->filter(fn (Application $application) => $application->destination?->server_id === $serverId
+                && $volumeNames->intersect(composeExternalVolumeDockerNames($application->docker_compose_raw))->isNotEmpty())
+            ->values();
+    }
+
+    /**
+     * Whether an application mounts this database's data volume.
+     */
+    public function hasConnectedApplications(): bool
+    {
+        return $this->connectedVolumes()->exists() || $this->composeApplicationsUsingDataVolume()->isNotEmpty();
+    }
+
+    /**
      * Names of the resources that mount this database's data volume.
      *
      * @return Collection<int, string>
@@ -324,6 +361,8 @@ class StandaloneSqlite extends BaseModel
     {
         return $this->connectedVolumes()->with('resource')->get()
             ->map(fn (LocalPersistentVolume $volume) => $volume->resource?->name)
+            ->toBase()
+            ->merge($this->composeApplicationsUsingDataVolume()->pluck('name'))
             ->filter()
             ->unique()
             ->values();
