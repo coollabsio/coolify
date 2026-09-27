@@ -743,7 +743,7 @@ class Application extends BaseModel
             $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
 
-        if (! filter_var($git_repository, FILTER_VALIDATE_URL)) {
+        if (! filter_var($git_repository, FILTER_VALIDATE_URL) || ! in_array(parse_url($git_repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
             return null;
         }
 
