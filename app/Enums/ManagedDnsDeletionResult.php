@@ -19,8 +19,16 @@ enum ManagedDnsDeletionResult: string
     /** The provider could not be reached or rejected the request; retry later. */
     case Failed = 'failed';
 
+    /** Another change for the same hostname held the hostname lock; nothing was changed, retry later. */
+    case Busy = 'busy';
+
     public function removedFromProvider(): bool
     {
         return $this === self::Deleted || $this === self::AlreadyGone;
+    }
+
+    public function shouldRetry(): bool
+    {
+        return $this === self::Failed || $this === self::Busy;
     }
 }

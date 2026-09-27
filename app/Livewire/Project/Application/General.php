@@ -7,6 +7,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -771,6 +772,8 @@ class General extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+            $previousDnsHostnames = $dnsCleanup->hostnamesOf($this->application->fresh() ?? $this->application);
 
             $this->resetErrorBag();
 
@@ -911,6 +914,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $this->application->refresh();
+            $dnsCleanup->queueReleaseOfRemovedHostnames($this->application, $previousDnsHostnames, currentTeam()->id);
             $this->syncData();
             if ($oldPortsExposes !== $this->portsExposes) {
                 $this->dispatch('applicationNetworkingUpdated')->to(InternalAccess::class);

@@ -1564,10 +1564,12 @@ class Domains extends Component
             }
 
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($this->application);
             if (! $this->saveDomainList($updated, $service, noindexDomains: $noindexDomains)) {
                 return;
             }
 
+            $this->releaseManagedDnsForEditedDomains($this->application, $previousDnsHostnames);
             $this->resetDefaultLabels();
 
             $this->forceSaveDomains = false;
