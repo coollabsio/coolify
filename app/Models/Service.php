@@ -1637,7 +1637,7 @@ class Service extends BaseModel
             return "{$environmentVariable->key}=";
         }
 
-        $isJson = json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['));
+        $isJson = json_validate($value) && in_array(ltrim($value)[0] ?? '', ['{', '['], true);
         $allowInterpolation = ! $isJson
             && ! $environmentVariable->is_literal
             && ! $environmentVariable->is_multiline

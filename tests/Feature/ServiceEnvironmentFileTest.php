@@ -74,6 +74,15 @@ test('multiline json service values are quoted and not interpolated', function (
     expect($line)->toBe("CONFIG=\"{\n  \\\"price\\\": \\\"\\\$5\\\",\n  \\\"name\\\": \\\"it's\\\"\n}\"");
 });
 
+test('json service values with leading whitespace are not interpolated', function () {
+    $line = serviceEnvironmentFileLine($this->service, [
+        'key' => 'CONFIG',
+        'value' => "\n {\"price\":\"\$HOME\"}",
+    ]);
+
+    expect($line)->toBe('CONFIG="{\\"price\\":\\"\\$HOME\\"}"');
+});
+
 test('multiline service values are quoted and not interpolated', function () {
     $line = serviceEnvironmentFileLine($this->service, [
         'key' => 'CERT',
