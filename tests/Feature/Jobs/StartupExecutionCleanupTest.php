@@ -1,15 +1,26 @@
 <?php
 
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -19,6 +30,30 @@ beforeEach(function () {
 
     // Fake notifications to ensure none are sent
     Notification::fake();
+    Http::fake();
+    Process::fake();
+    Queue::fake();
+
+    InstanceSettings::forceCreate(['id' => 0, 'do_not_track' => true]);
+
+    // app:init runs `optimize`, which boots a fresh application with a new in-memory
+    // database and caches config into bootstrap/cache. Replace both with no-ops here.
+    foreach (['optimize', 'optimize:clear'] as $commandName) {
+        app(Kernel::class)->registerCommand(new class($commandName) extends Command
+        {
+            public function __construct(string $commandName)
+            {
+                $this->signature = $commandName;
+
+                parent::__construct();
+            }
+
+            public function handle(): int
+            {
+                return self::SUCCESS;
+            }
+        });
+    }
 });
 
 afterEach(function () {
@@ -86,15 +121,30 @@ test('app:init marks stuck database backup executions as failed', function () {
     $team = Team::factory()->create();
 
     // Create a database
-    $database = StandalonePostgresql::factory()->create([
-        'team_id' => $team->id,
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::firstOrCreate(
+        ['server_id' => $server->id, 'network' => 'coolify'],
+        ['uuid' => (string) Str::uuid(), 'name' => 'docker']
+    );
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandalonePostgresql::create([
+        'name' => 'db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'db',
+        'image' => 'postgres:17',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ]);
 
     // Create a scheduled backup
-    $scheduledBackup = ScheduledDatabaseBackup::factory()->create([
+    $scheduledBackup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
         'team_id' => $team->id,
         'database_id' => $database->id,
-        'database_type' => StandalonePostgresql::class,
+        'database_type' => $database->getMorphClass(),
     ]);
 
     // Create multiple backup executions with 'running' status
@@ -185,7 +235,8 @@ test('app:init handles cleanup when no stuck executions exist', function () {
 
 test('cleanup does not send notifications even when team has notification settings', function () {
     // Create a team with notification settings enabled
-    $team = Team::factory()->create([
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings->update([
         'smtp_enabled' => true,
         'smtp_from_address' => 'test@example.com',
     ]);

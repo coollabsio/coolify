@@ -1,16 +1,22 @@
 <?php
 
 use App\Livewire\Server\CaCertificate\Show;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\SslCertificate;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+    config(['constants.ssh.mux_enabled' => false]);
+    Queue::fake();
+
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);

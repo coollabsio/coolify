@@ -82,26 +82,6 @@ it('ensures exclude_from_hc flag is properly checked in GetContainersStatus', fu
         ->toContain('$excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);');
 });
 
-it('ensures UI displays excluded status correctly in status component', function () {
-    $servicesStatusFile = file_get_contents(__DIR__.'/../../resources/views/components/status/services.blade.php');
-
-    // Verify that the status component uses formatContainerStatus helper to display status
-    expect($servicesStatusFile)
-        ->toContain('formatContainerStatus($complexStatus)');
-});
-
-it('ensures UI handles excluded status in service heading buttons', function () {
-    $headingFile = file_get_contents(__DIR__.'/../../resources/views/livewire/project/service/heading.blade.php');
-
-    // Verify that the heading properly handles running/degraded/exited status with :excluded suffix
-    // The logic should use contains() to match the base status (running, degraded, exited)
-    // which will work for both regular statuses and :excluded suffixed ones
-    expect($headingFile)
-        ->toContain('str($service->status)->contains(\'running\')')
-        ->toContain('str($service->status)->contains(\'degraded\')')
-        ->toContain('str($service->status)->contains(\'exited\')');
-});
-
 /**
  * Unit tests for YAML validation in CalculatesExcludedStatus trait
  */

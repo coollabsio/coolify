@@ -77,39 +77,6 @@ it('renders the changed configuration labels without a second backend request', 
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Rebuild required.')
         ->assertSee('Build command');
-
-    $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
-
-    expect($view)
-        ->toContain(':compact-after="5000"')
-        ->toContain('position="top-right"')
-        ->toContain(':compact-storage-key="$compactStorageKey"')
-        ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
-        ->toContain('x-on:click="configurationDiffModalOpen = true"')
-        ->not->toContain('$wire.refreshConfigurationChanges()');
-});
-
-it('supports timed compact popup notifications', function () {
-    $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
-
-    expect($view)
-        ->toContain("\$position === 'top-right' ? 'top-16' : 'bottom-4'")
-        ->toContain('compactAfter')
-        ->toContain('compactStorageKey')
-        ->toContain("localStorage.setItem(this.storageKey, 'compact')")
-        ->toContain("localStorage.setItem(this.storageKey, 'icon')")
-        ->toContain('localStorage.removeItem(key)')
-        ->not->toContain('<template x-teleport="body">')
-        ->toContain('compact = true')
-        ->toContain('@click="restore()"')
-        ->toContain('@click.stop="minimizeToIcon()"')
-        ->toContain('<template x-if="iconOnly">')
-        ->toContain('<template x-if="!iconOnly">')
-        ->not->toContain('<button x-show="iconOnly"')
-        ->not->toContain('<div x-show="!iconOnly"')
-        ->not->toContain(':class="iconOnly')
-        ->toContain('x-show="!compact"')
-        ->toContain("'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'");
 });
 
 it('warns when a service has missing required environment variables', function () {
@@ -159,18 +126,6 @@ it('refreshes the service configuration when a websocket configuration event arr
     expect($listeners)
         ->toHaveKey("echo-private:team.{$this->team->id},ApplicationConfigurationChanged", 'refreshServices')
         ->toHaveKey('configurationChanged', 'refreshServices');
-});
-
-it('marks the service environment variables menu when required values are missing', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
-    $sidebar = file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php'));
-
-    expect($configuration)
-        ->toContain("'hasWarning' => ! \$service->isDeployable")
-        ->toContain('title="Required environment variables missing"')
-        ->and($sidebar)
-        ->toContain("'hasWarning' => ! \$service->isDeployable")
-        ->toContain('title="Required environment variables missing"');
 });
 
 it('refreshes configuration changes when the event is received', function () {

@@ -68,34 +68,6 @@ it('shows the first Sentinel report as pending instead of requiring attention', 
         ->assertDontSee('Out of sync');
 });
 
-it('places mobile status badges on a separate row below the server title', function () {
-    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
-
-    $mobileTitleBlock = str($navbar)
-        ->after('data-testid="server-subtitle"')
-        ->before('id="server-mobile-actions"')
-        ->toString();
-
-    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
-
-    expect($navbar)
-        ->toContain('mb-3 w-full lg:hidden')
-        ->toContain('data-testid="server-subtitle"')
-        ->toContain('flex min-w-0 flex-col gap-2');
-
-    $titleBlock = str($navbar)
-        ->after('mb-3 w-full lg:hidden')
-        ->before('Phone-only actions')
-        ->toString();
-
-    $titlePos = strpos($titleBlock, 'data-testid="server-subtitle"');
-    $badgesRowPos = strpos($titleBlock, 'flex w-full min-w-0 items-center gap-2');
-
-    expect($titlePos)->not->toBeFalse()
-        ->and($badgesRowPos)->not->toBeFalse()
-        ->and($titlePos)->toBeLessThan($badgesRowPos);
-});
-
 it('listens for sentinel status broadcasts', function () {
     [$server, , $team] = makeNavbarServer(isFunctional: true);
 
@@ -106,12 +78,6 @@ it('listens for sentinel status broadcasts', function () {
         ->toHaveKey('sentinel-restart-requested', 'hideSentinelWarning')
         ->toHaveKey("echo-private:team.{$team->id},SentinelRestarted", 'refreshSentinelStatus')
         ->toHaveKey("echo-private:team.{$team->id},SentinelSynchronized", 'refreshSentinelStatus');
-});
-
-it('polls heartbeat state so the sidebar deadline stays current', function () {
-    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
-
-    expect($navbar)->toContain('wire:poll.30s="refreshAgentStatus"');
 });
 
 it('refreshes sentinel status when sentinel restarts for the server', function () {

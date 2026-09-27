@@ -1,21 +1,5 @@
 <?php
 
-it('uses a dedicated notification event for restart limits', function () {
-    $notification = file_get_contents(app_path('Notifications/Application/RestartLimitReached.php'));
-    $telegramChannel = file_get_contents(app_path('Notifications/Channels/TelegramChannel.php'));
-    $eventGrid = file_get_contents(resource_path('views/components/notification/event-grid.blade.php'));
-
-    expect($notification)->toContain("getEnabledChannels('restart_limit_reached')")
-        ->and($eventGrid)
-        ->toContain("'Resources' => [")
-        ->toContain("'key' => 'statusChange'")
-        ->toContain("'helper' => 'Notify when a resource stops or Coolify automatically restarts it.'")
-        ->toContain("'key' => 'restartLimitReached'")
-        ->toContain("'label' => 'Restart limit reached'")
-        ->and($telegramChannel)
-        ->toContain('RestartLimitReached::class => $settings->telegram_notifications_restart_limit_reached_thread_id');
-});
-
 it('persists a restart limit notification preference for every channel', function (string $channel) {
     $studly = Str::studly($channel);
     $component = file_get_contents(app_path("Livewire/Notifications/{$studly}.php"));

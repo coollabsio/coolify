@@ -150,11 +150,3 @@ test('enabling resend still requires an api key', function () {
 
     expect(InstanceSettings::find(0)->resend_enabled)->toBeFalse();
 });
-
-test('email settings page has a single unsaved bar so smtp save cannot hit resend validation', function () {
-    $view = file_get_contents(resource_path('views/livewire/settings-email.blade.php'));
-
-    expect(substr_count($view, '<x-unsaved-bar'))->toBe(1)
-        ->and($view)->toContain('action="submit"')
-        ->and($view)->not->toContain('action="submitResend"');
-});

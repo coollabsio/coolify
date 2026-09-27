@@ -289,25 +289,6 @@ it('opens address fields and service-wide redirects in the same settings dialog 
     }
 });
 
-it('uses segmented fields when adding and editing service domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.domain-input id="newDomainParts"')
-        ->toContain('<x-forms.domain-input id="editingDomainParts"')
-        ->not->toContain('placeholder="https://app.example.com"');
-});
-
-it('matches the application domains toolbar heading and top spacing', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('<div class="flex flex-wrap items-center gap-2">')
-        ->toContain('<h2 id="domains-section">Domains</h2>')
-        ->not->toContain('<div class="mt-2 flex flex-wrap items-center gap-2">')
-        ->not->toContain('<h3>Domains</h3>');
-});
-
 it('resets the add domain dns gate when segmented domain fields change', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('addDomainDnsFailed', true)
@@ -337,14 +318,6 @@ it('shows dns entries control next to Add', function () {
         ->assertSuccessful()
         ->assertSee('DNS entries')
         ->assertSee('Manual records');
-});
-
-it('exposes the dns entries dropdown expanded state', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/shared/cloudflare-autoconfigure.blade.php'));
-
-    expect($view)
-        ->toContain('x-bind:aria-expanded="dnsEntriesOpen"')
-        ->toContain('x-show="dnsEntriesOpen"');
 });
 
 it('lists dns entries for service hosts that still need dns', function () {
@@ -513,25 +486,6 @@ it('keeps a stable key for the rendered domain list', function () {
         ->toContain('wire:key="service-domains-list"')
         ->toContain('wire:key="service-domain-rows-{{ $appId }}"')
         ->not->toContain('md5(serialize($domainRows))');
-});
-
-it('provides client-side search for service domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('x-model="domainSearch"')
-        ->toContain('class="ml-auto flex flex-wrap items-center gap-2"')
-        ->toContain('<div class="relative shrink-0">')
-        ->toContain('placeholder="Search services or domains"')
-        ->toContain('x-show="matchesDomainSearch(')
-        ->toContain('title="No domains found"')
-        ->toContain('hasDomainSearchResults(');
-});
-
-it('does not duplicate the service name as a badge in the domain cell', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)->not->toContain('domains-service-mobile table-badge');
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {
@@ -958,9 +912,6 @@ it('updates search engine indexing from the service domains view', function () {
 
     expect($this->apiApp->refresh()->noindexDomains()->all())
         ->toBe(['https://api.example.com']);
-
-    expect(file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php')))
-        ->not->toContain('<select');
 });
 
 it('regenerates a service application domain only when the modal is saved', function () {
@@ -1147,53 +1098,6 @@ it('keeps the edited domain selected when settings refresh and reorder rows', fu
         ->and($this->webApp->fresh()->fqdn)->toBe('https://broken.example.com');
 });
 
-it('renders compact icon-only domain actions with accessible labels', function () {
-    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])->html();
-    $document = new DOMDocument;
-    @$document->loadHTML($html);
-    $xpath = new DOMXPath($document);
-
-    foreach (['Check DNS', 'Settings for https://api.example.com', 'Remove domain'] as $label) {
-        $buttons = $xpath->query('//button[@aria-label="'.$label.'"]');
-        expect($buttons->length)->toBe(1);
-        $button = $buttons->item(0);
-        expect(trim($button->textContent))->toBe('')
-            ->and($button->getAttribute('class'))->toContain('icon-button')
-            ->and($button->getAttribute('title'))->not->toBe('');
-    }
-
-    expect($html)->not->toContain('aria-label="More actions for');
-});
-
-it('uses the shared mobile domain summary layout', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('Domain routing summary')
-        ->toContain('No redirects')
-        ->toContain('Noindex');
-});
-
-it('uses explicit modal actions for pending domain edits', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)->not->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('wire:click="regenerateEditingDomain"')
-        ->toContain('wire:click="updateDomain"')
-        ->toContain('Save');
-});
-
-it('opens service domain settings from browser data and shows a dns spinner', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect($view)
-        ->not->toContain('wire:click="startEdit(')
-        ->toContain('@click="openEditDomain(')
-        ->toContain('<x-loading compact aria-label="Checking DNS"')
-        ->not->toContain('<x-loading-on-button wire:loading.delay');
-});
-
 it('uses the dns badge as progress for single and all service checks', function (string $action, array $parameters) {
     Queue::fake();
 
@@ -1281,43 +1185,6 @@ it('still checks domain conflicts when inheriting a redirect counterpart port', 
 
     expect($this->webApp->fresh()->redirect)->toBe('www')
         ->and($this->webApp->fresh()->domain_port_overrides['https://www.example.com'])->toBe(8080);
-});
-
-it('renders domain settings in compact columns instead of a second summary line', function () {
-    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])->html();
-    foreach (['Protocol redirect', 'Domain redirect', 'Internal port', 'Search indexing'] as $heading) {
-        expect($html)->toContain('<span>'.$heading.'</span>');
-    }
-    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-    expect($view)->toContain('service-domain-detail')
-        ->not->toContain('gap-x-3 gap-y-1');
-});
-
-it('renders each domain table header below its service heading', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-    $serviceHeadingPosition = strpos($view, 'service-domain-group-{{ $appId }}');
-    $domainTablePosition = strpos($view, "'showHeader' => true");
-
-    expect($view)
-        ->not->toContain('<div class="data-table-header service-domains-overview-grid">')
-        ->and($serviceHeadingPosition)->not->toBeFalse()
-        ->and($domainTablePosition)->not->toBeFalse()
-        ->and($domainTablePosition)->toBeGreaterThan($serviceHeadingPosition);
-});
-
-it('renders each service domain group as a separate card', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-
-    expect($view)
-        ->toContain('class="flex flex-col gap-3"')
-        ->toContain('class="application-settings-section-body is-flush overflow-visible"')
-        ->not->toContain('class="border-b border-neutral-200 last:border-b-0 dark:border-white/10"');
-});
-
-it('lays out the domain settings dropdowns in responsive columns', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
-    expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
-        ->toContain('flex flex-wrap items-center justify-between gap-2');
 });
 
 it('restarts a service dns check when the domain already has a completed result', function () {

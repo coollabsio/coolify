@@ -158,7 +158,12 @@ describe('Git submodule credential propagation', function () {
 
         $sshCommand = 'ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa_coolify_test-uuid -o IdentitiesOnly=yes';
 
-        expect($result['commands'])
+        // Commands are a list of ['command' => ..., 'hidden' => ...] entries; assert on the joined shell script
+        $commands = collect($result['commands'])
+            ->map(fn ($command) => is_array($command) ? $command['command'] : $command)
+            ->implode(' && ');
+
+        expect($commands)
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git fetch origin merge-requests/123/head:pr-123-coolify')
             ->toContain("git checkout 'pr-123-coolify'")
             ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git submodule update --init --recursive')
