@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureCloudflared;
 use App\Models\Server;
+use App\Support\CloudflareHttpTunnel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -15,13 +16,17 @@ class CloudflareTunnel extends Component
     public Server $server;
 
     #[Validate(['required', 'string'])]
-    public string $cloudflare_token;
+    public string $cloudflare_token = '';
 
     #[Validate(['required', 'string'])]
-    public string $ssh_domain;
+    public string $ssh_domain = '';
 
     #[Validate(['required', 'boolean'])]
-    public bool $isCloudflareTunnelsEnabled;
+    public bool $isCloudflareTunnelsEnabled = false;
+
+    public bool $isCloudflareHttpTunnelEnabled = false;
+
+    public string $httpCname = '';
 
     public function getListeners()
     {
@@ -35,17 +40,17 @@ class CloudflareTunnel extends Component
     public function refresh()
     {
         $this->server->refresh();
+        $this->server->load('settings');
         $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
+        $this->hydrateHttpOrigin();
     }
 
     public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            if ($this->server->isLocalhost()) {
-                return redirect()->route('server.show', ['server_uuid' => $server_uuid]);
-            }
             $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
+            $this->hydrateHttpOrigin();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -99,8 +104,61 @@ class CloudflareTunnel extends Component
         }
     }
 
+    public function saveHttpOrigin(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $cname = CloudflareHttpTunnel::cnameTarget(null, $this->normalizedHttpCname());
+            $this->server->settings->is_cloudflare_http_tunnel = true;
+            $this->server->settings->cloudflare_http_tunnel_cname = $cname;
+            $this->server->settings->save();
+            $this->refresh();
+            $this->dispatch('success', 'HTTP origin through Cloudflare Tunnel is enabled. New domains default to HTTP with Redirect HTTP to HTTPS off.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function disableHttpOrigin(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->settings->is_cloudflare_http_tunnel = false;
+            $this->server->settings->save();
+            $this->refresh();
+            $this->dispatch('success', 'Cloudflare Tunnel HTTP origin disabled. Direct mode is restored for new domains.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         return view('livewire.server.cloudflare-tunnel');
+    }
+
+    private function hydrateHttpOrigin(): void
+    {
+        $settings = $this->server->settings;
+        $this->isCloudflareHttpTunnelEnabled = (bool) $settings->is_cloudflare_http_tunnel;
+        $this->httpCname = (string) ($settings->cloudflare_http_tunnel_cname ?? '');
+    }
+
+    private function normalizedHttpCname(): ?string
+    {
+        $value = trim($this->httpCname);
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (['https://', 'http://'] as $prefix) {
+            if (str_starts_with(strtolower($value), $prefix)) {
+                $host = parse_url($value, PHP_URL_HOST);
+
+                return is_string($host) && $host !== '' ? $host : $value;
+            }
+        }
+
+        return $value;
     }
 }

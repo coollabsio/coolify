@@ -9,6 +9,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\CloudflareHttpTunnel;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
@@ -1463,6 +1464,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 }
             }
         }
+        if ($fqdns instanceof Collection) {
+            $fqdns = CloudflareHttpTunnel::httpOriginDomains($fqdns, $server);
+        }
         $defaultLabels = defaultLabels(
             id: $resource->id,
             name: $containerName,
@@ -2718,6 +2722,7 @@ function serviceParser(Service $resource): Collection
         } else {
             $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         }
+        $fqdns = CloudflareHttpTunnel::httpOriginDomains($fqdns, $server);
         // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
         $noindexDomains = $savedService instanceof ServiceApplication
             ? $savedService->noindexDomains()

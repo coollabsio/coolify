@@ -12,6 +12,7 @@ class ServerCloudflareTunnelController extends Controller
 {
     private const ALLOWED_FIELDS = [
         'is_cloudflare_tunnel',
+        'is_cloudflare_http_tunnel',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -21,8 +22,12 @@ class ServerCloudflareTunnelController extends Controller
 
     private function transform(Server $server): array
     {
+        $settings = $server->settings;
+
         return [
-            'is_cloudflare_tunnel' => (bool) $server->settings->is_cloudflare_tunnel,
+            'is_cloudflare_tunnel' => (bool) $settings->is_cloudflare_tunnel,
+            'is_cloudflare_http_tunnel' => (bool) $settings->is_cloudflare_http_tunnel,
+            'cloudflare_http_tunnel_cname' => $settings->cloudflare_http_tunnel_cname,
             'ip' => $server->ip,
             'ip_previous' => $server->ip_previous,
         ];
@@ -45,6 +50,8 @@ class ServerCloudflareTunnelController extends Controller
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'is_cloudflare_tunnel', type: 'boolean'),
+                        new OA\Property(property: 'is_cloudflare_http_tunnel', type: 'boolean'),
+                        new OA\Property(property: 'cloudflare_http_tunnel_cname', type: 'string', nullable: true),
                         new OA\Property(property: 'ip', type: 'string'),
                         new OA\Property(property: 'ip_previous', type: 'string', nullable: true),
                     ],
@@ -88,6 +95,7 @@ class ServerCloudflareTunnelController extends Controller
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'is_cloudflare_tunnel', type: 'boolean'),
+                    new OA\Property(property: 'is_cloudflare_http_tunnel', type: 'boolean'),
                 ],
                 type: 'object',
             ),
@@ -119,18 +127,22 @@ class ServerCloudflareTunnelController extends Controller
 
         $this->authorize('update', $server);
 
-        if ($server->isLocalhost()) {
+        if ($server->isLocalhost() && $request->exists('is_cloudflare_tunnel')) {
             return response()->json(['message' => 'Cloudflare Tunnel cannot be configured on the localhost server.'], 422);
         }
 
         $validator = customApiValidator($request->all(), [
-            'is_cloudflare_tunnel' => 'required|boolean',
+            'is_cloudflare_tunnel' => 'sometimes|boolean',
+            'is_cloudflare_http_tunnel' => 'sometimes|boolean',
         ]);
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || ! empty($extraFields) || (! $request->exists('is_cloudflare_tunnel') && ! $request->exists('is_cloudflare_http_tunnel'))) {
             $errors = $validator->errors();
             foreach ($extraFields as $field) {
                 $errors->add($field, 'This field is not allowed.');
+            }
+            if (! $request->exists('is_cloudflare_tunnel') && ! $request->exists('is_cloudflare_http_tunnel')) {
+                $errors->add('is_cloudflare_tunnel', 'Provide is_cloudflare_tunnel and/or is_cloudflare_http_tunnel.');
             }
 
             return response()->json([
@@ -139,19 +151,26 @@ class ServerCloudflareTunnelController extends Controller
             ], 422);
         }
 
-        $enabled = $request->boolean('is_cloudflare_tunnel');
-        $server->settings->is_cloudflare_tunnel = $enabled;
-        $server->settings->save();
-
-        if (! $enabled && $server->ip_previous) {
-            $server->update(['ip' => $server->ip_previous]);
+        if ($request->exists('is_cloudflare_tunnel')) {
+            $enabled = $request->boolean('is_cloudflare_tunnel');
+            $server->settings->is_cloudflare_tunnel = $enabled;
+            if (! $enabled && $server->ip_previous) {
+                $server->update(['ip' => $server->ip_previous]);
+            }
         }
+
+        if ($request->exists('is_cloudflare_http_tunnel')) {
+            $server->settings->is_cloudflare_http_tunnel = $request->boolean('is_cloudflare_http_tunnel');
+        }
+
+        $server->settings->save();
 
         auditLog('api.server.cloudflare_tunnel.updated', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
-            'is_cloudflare_tunnel' => $enabled,
+            'is_cloudflare_tunnel' => (bool) $server->settings->is_cloudflare_tunnel,
+            'is_cloudflare_http_tunnel' => (bool) $server->settings->is_cloudflare_http_tunnel,
         ]);
 
         return response()->json($this->transform($server->refresh()));

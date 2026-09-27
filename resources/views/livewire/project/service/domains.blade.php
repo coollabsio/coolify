@@ -68,6 +68,14 @@
         </x-callout>
     @endcannot
 
+    @if ($this->usesCloudflareHttpTunnel())
+        <x-callout type="info" title="This server publishes through Cloudflare Tunnel">
+            DNS should be a proxied CNAME to
+            <code class="font-mono">{{ $this->cloudflareHttpTunnelCname() ?: '<tunnel-id>.cfargotunnel.com' }}</code>.
+            Do not create A records to the server public IP. Domains stay HTTP; Redirect HTTP to HTTPS stays off.
+        </x-callout>
+    @endif
+
     {{-- Toolbar --}}
     <div class="flex flex-wrap items-center gap-2">
         <div class="min-w-0 flex-1">

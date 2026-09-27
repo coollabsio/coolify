@@ -35,6 +35,27 @@ it('builds entries for every hostname without duplicates', function () {
         ->and(collect($records)->pluck('type')->unique()->all())->toBe(['A']);
 });
 
+it('builds proxied CNAME hints for Cloudflare Tunnel hostnames', function () {
+    $records = DnsRecordHints::forCloudflareTunnel([
+        'app.example.com',
+        'https://www.example.com/path',
+        'app.example.com',
+    ], 'abcd1234.cfargotunnel.com');
+
+    expect($records)->toBe([
+        [
+            'type' => 'CNAME',
+            'name' => 'app.example.com',
+            'value' => 'abcd1234.cfargotunnel.com',
+        ],
+        [
+            'type' => 'CNAME',
+            'name' => 'www.example.com',
+            'value' => 'abcd1234.cfargotunnel.com',
+        ],
+    ]);
+});
+
 it('formats a BIND-compatible zone snippet for copy all', function () {
     $text = DnsRecordHints::toCopyText([
         ['type' => 'A', 'name' => 'app.example.com', 'value' => '203.0.113.10'],

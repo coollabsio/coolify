@@ -157,11 +157,17 @@
                     </header>
                     <div class="application-settings-section-body flex flex-col gap-4">
                         <p class="text-sm leading-6 text-neutral-600 dark:text-fg-dim">
-                            Hosts that still need DNS at your provider (working domains are omitted). Create matching
-                            Type / Name / Value records so traffic reaches this server.
+                            @if ($this->usesCloudflareHttpTunnel())
+                                Hosts that still need DNS. Create a proxied CNAME to
+                                {{ $this->cloudflareHttpTunnelCname() ?: '<tunnel-id>.cfargotunnel.com' }}.
+                                Coolify will not overwrite existing records.
+                            @else
+                                Hosts that still need DNS at your provider (working domains are omitted). Create matching
+                                Type / Name / Value records so traffic reaches this server.
+                            @endif
                         </p>
 
-                        @if (blank($serverIp) && count($dnsHints) === 0)
+                        @if (! $this->usesCloudflareHttpTunnel() && blank($serverIp) && count($dnsHints) === 0)
                             <x-callout type="warning" title="No server IP">
                                 Could not determine a public IP for this destination. Set the server IP (or instance public IPv4 for localhost) first.
                             </x-callout>

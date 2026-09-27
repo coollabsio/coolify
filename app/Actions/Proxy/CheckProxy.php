@@ -73,7 +73,7 @@ class CheckProxy
 
                 return false;
             }
-            if ($server->settings->is_cloudflare_tunnel) {
+            if ($server->settings->is_cloudflare_tunnel && ! $server->isCloudflareHttpTunnel()) {
                 return false;
             }
             if (count($portsToCheck) === 0) {

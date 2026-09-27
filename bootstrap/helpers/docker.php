@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use App\Support\CloudflareHttpTunnel;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -980,7 +981,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
-            $domains = str(data_get($application, 'fqdn'))->explode(',');
+            $domains = CloudflareHttpTunnel::httpOriginDomains(
+                str(data_get($application, 'fqdn'))->explode(','),
+                $application->destination->server,
+            );
             $noindexDomains = $application->noindexDomains();
             $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
             if ($shouldGenerateLabelsExactly) {
@@ -1060,7 +1064,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         }
     } else {
         if (data_get($preview, 'fqdn')) {
-            $domains = str(data_get($preview, 'fqdn'))->explode(',');
+            $domains = CloudflareHttpTunnel::httpOriginDomains(
+                str(data_get($preview, 'fqdn'))->explode(','),
+                $application->destination->server,
+            );
         } else {
             $domains = collect([]);
         }

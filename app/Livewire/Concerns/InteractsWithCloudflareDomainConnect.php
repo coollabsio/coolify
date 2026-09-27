@@ -14,6 +14,10 @@ trait InteractsWithCloudflareDomainConnect
 
     public function domainConnectAvailable(): bool
     {
+        if (method_exists($this, 'usesCloudflareHttpTunnel') && $this->usesCloudflareHttpTunnel()) {
+            return false;
+        }
+
         return app(CloudflareDomainConnect::class)->isAvailable();
     }
 
@@ -124,6 +128,13 @@ trait InteractsWithCloudflareDomainConnect
      */
     public function dnsRecordHints(): array
     {
+        if ($this->usesCloudflareHttpTunnel()) {
+            return DnsRecordHints::forCloudflareTunnel(
+                $this->allDomainHostnames(onlyNeedingDns: true),
+                $this->cloudflareHttpTunnelCname(),
+            );
+        }
+
         [$ipv4, $ipv6] = $this->serverIpsForDnsHints();
 
         return DnsRecordHints::forHostnames($this->allDomainHostnames(onlyNeedingDns: true), $ipv4, $ipv6);
