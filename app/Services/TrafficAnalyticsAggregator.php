@@ -8,6 +8,8 @@ use App\Data\Traffic\TrafficOverviewData;
  * Merges Sentinel traffic data from several sources (servers, or the several app keys of
  * one resource) into one view. Counters are summed; latency takes the worst value and
  * uniques are summed, so both are flagged approximate once more than one source is merged.
+ * A resource on a Sentinel with resource routes is one source: Sentinel merges its keys
+ * exactly, so one server stays exact.
  */
 class TrafficAnalyticsAggregator
 {
@@ -73,17 +75,47 @@ class TrafficAnalyticsAggregator
      */
     public function collect(SentinelTrafficClient $client, ?string $appKey, string $from, string $to, string $range, callable $domainForKey, int $limit = 50): void
     {
-        $this->addOverview($client->overview($appKey, $from, $to));
-        $this->addPaths($client->paths($appKey, $from, $to, $limit), $appKey, $domainForKey);
+        $this->collectScope($client, $appKey, false, $from, $to, $range, $domainForKey, $limit);
+    }
+
+    /**
+     * Fetch every shape for one resource on one server and merge it in. Uses Sentinel's
+     * resource scope when the server has it (one exact source). Otherwise every key of the
+     * resource is fetched and merged as its own source, as before.
+     *
+     * @param  callable(string): ?string  $domainForKey  resolves a path row's app key to its domain
+     */
+    public function collectResource(SentinelTrafficClient $client, string $resourceUuid, string $from, string $to, string $range, callable $domainForKey, int $limit = 50): void
+    {
+        if ($client->prefetchResourceScope($resourceUuid, $from, $to, $this->dimensions, $range, $limit, $limit)) {
+            $this->collectScope($client, $resourceUuid, true, $from, $to, $range, $domainForKey, $limit);
+
+            return;
+        }
+
+        foreach ($client->prefetchResource($resourceUuid, $from, $to, $this->dimensions, $range, $limit, $limit) as $key) {
+            $this->collect($client, $key, $from, $to, $range, $domainForKey, $limit);
+        }
+    }
+
+    /**
+     * @param  callable(string): ?string  $domainForKey
+     */
+    private function collectScope(SentinelTrafficClient $client, ?string $key, bool $resourceScope, string $from, string $to, string $range, callable $domainForKey, int $limit): void
+    {
+        $this->addOverview($resourceScope ? $client->resourceOverview($key, $from, $to) : $client->overview($key, $from, $to));
+        $this->addPaths($resourceScope ? $client->resourcePaths($key, $from, $to, $limit) : $client->paths($key, $from, $to, $limit), $key, $domainForKey);
 
         foreach ($this->dimensions as $dimension) {
-            $this->addBreakdown($dimension, $client->breakdown($appKey, $dimension, $from, $to, $limit));
+            $this->addBreakdown($dimension, $resourceScope
+                ? $client->resourceBreakdown($key, $dimension, $from, $to, $limit)
+                : $client->breakdown($key, $dimension, $from, $to, $limit));
         }
 
         $this->attribution ??= $client->attribution();
 
         try {
-            $this->addSeries($client->series($appKey, $range));
+            $this->addSeries($resourceScope ? $client->resourceSeries($key, $range) : $client->series($key, $range));
         } catch (\Throwable) {
             // Leave this source out of the series; the donut fallback covers it.
         }

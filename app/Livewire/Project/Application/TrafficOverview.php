@@ -37,14 +37,19 @@ class TrafficOverview extends Component
         if ($this->enabled && $server) {
             try {
                 $client = app(SentinelTrafficClient::class, ['server' => $server]);
-                // Compose services and previews record under their own keys; sum all of them.
-                $keys = $client->resourceKeys($this->application->uuid);
                 [$from, $to] = SentinelTrafficClient::rangeWindow('24h');
-                if (count($keys) > 1) {
-                    $client->prefetchAppOverviews($keys, $from, $to);
+                // Compose services and previews record under their own keys. Sentinel's resource
+                // scope merges them exactly; an older Sentinel gets every key summed here.
+                $overview = $client->tryResourceOverview($this->application->uuid, $from, $to);
+                if ($overview === null) {
+                    $keys = $client->resourceKeys($this->application->uuid);
+                    if (count($keys) > 1) {
+                        $client->prefetchAppOverviews($keys, $from, $to);
+                    }
+                    $overviews = array_map(fn (string $key) => $client->overview($key, $from, $to), $keys);
+                    $overview = TrafficAnalyticsAggregator::sumOverviews($overviews)['overview'];
                 }
-                $overviews = array_map(fn (string $key) => $client->overview($key, $from, $to), $keys);
-                $this->overview = TrafficAnalyticsAggregator::sumOverviews($overviews)['overview']->toArray();
+                $this->overview = $overview->toArray();
             } catch (\Throwable $e) {
                 $this->overview = null;
             }

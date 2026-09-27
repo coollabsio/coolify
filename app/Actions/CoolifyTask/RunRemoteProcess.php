@@ -7,7 +7,8 @@ use App\Enums\ProcessStatus;
 use App\Helpers\SshMultiplexingHelper;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
-use Illuminate\Process\ProcessResult;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
@@ -80,9 +81,13 @@ class RunRemoteProcess
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
         $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
-        $this->activity->properties = $this->activity->properties->merge([
+        // Start from the stored properties and save now, so later output writes only change the log and
+        // never write back an old copy over a status that Coolify set meanwhile (for example a stopped import).
+        $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties ?? $this->activity->properties;
+        $this->activity->properties = $stored->merge([
             'process_id' => $process->id(),
         ]);
+        $this->activity->save();
 
         $processResult = $process->wait();
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
@@ -95,12 +100,25 @@ class RunRemoteProcess
             }
         }
 
-        $this->activity->properties = $this->activity->properties->merge([
+        $properties = [
             'exitCode' => $processResult->exitCode(),
             'stdout' => $processResult->output(),
             'stderr' => $processResult->errorOutput(),
             'status' => $status->value,
-        ]);
+        ];
+
+        // Coolify can stop a database import while this job runs (restart or stale import). Keep the
+        // stop status and message, because this job only has its own older copy of the properties.
+        $stored = Activity::query()->whereKey($this->activity->getKey())->first()?->properties;
+        if ($stored !== null && filled($stored->get(DatabaseImportCleanup::STOP_REQUESTED_PROPERTY))) {
+            $properties = [
+                ...$properties,
+                ...$stored->only([DatabaseImportCleanup::STOP_REQUESTED_PROPERTY, 'error'])->all(),
+                'status' => ProcessStatus::ERROR->value,
+            ];
+        }
+
+        $this->activity->properties = $this->activity->properties->merge($properties);
         $this->activity->save();
         if ($this->call_event_on_finish) {
             try {

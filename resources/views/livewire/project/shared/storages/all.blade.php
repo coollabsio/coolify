@@ -166,10 +166,14 @@
                                 <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <div class="min-w-0 flex-1">
-                                        <x-forms.input id="forms.{{ $id }}.name" required />
+                                        <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
                                     </div>
                                 </div>
-                                @if (blank($storage->host_path))
+                                @if ($storage->standaloneSqlite)
+                                    <a href="{{ $storage->standaloneSqlite->link() }}"
+                                        class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
+                                        database {{ $storage->standaloneSqlite->name }}</a>
+                                @elseif (blank($storage->host_path))
                                     <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
                             </div>
@@ -234,7 +238,7 @@
                                     Update
                                 </x-forms.button>
 
-                                @if ($showBackupAction)
+                                @if ($showBackupAction && ! $form['isShared'])
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
                                             <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
@@ -265,6 +269,7 @@
                                     </x-modal-input>
                                 @endif
 
+                                @unless ($form['isShared'])
                                 <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton
                                     buttonTitle="Delete" submitAction="delete({{ $id }})" :actions="[
                                         'The selected persistent storage/volume will be permanently deleted.',
@@ -272,6 +277,7 @@
                                     ]" confirmationText="{{ $form['name'] }}"
                                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                                     shortConfirmationLabel="Storage Name" />
+                                @endunless
                             </div>
                         </div>
                     </form>

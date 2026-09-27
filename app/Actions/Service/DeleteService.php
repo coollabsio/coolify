@@ -56,15 +56,19 @@ class DeleteService
 
     private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
     {
-        $filters = "--filter 'label=coolify.serviceId={$service->id}'";
+        $serviceId = (int) $service->id;
+        $filters = "--filter label=coolify.serviceId={$serviceId}";
         if ($subresource !== null) {
             // Applications and databases are separate tables, so an id alone can match the other type.
             $subType = $subresource instanceof ServiceDatabase ? 'database' : 'application';
-            $filters .= " --filter 'label=coolify.service.subId={$subresource->id}' --filter 'label=coolify.service.subType={$subType}'";
+            $subId = (int) $subresource->id;
+            $filters .= " --filter label=coolify.service.subId={$subId} --filter label=coolify.service.subType={$subType}";
         }
 
-        $command = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
-        instant_remote_process([$command], $service->server);
+        // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
+        // assignment would become "sudo container_ids=...", which sudo rejects.
+        $script = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
+        instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }
 
     public function deleteLocal(Service $service): void

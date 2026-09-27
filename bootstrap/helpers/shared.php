@@ -28,6 +28,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
@@ -967,6 +968,50 @@ function isProduction(): bool
 function isDev(): bool
 {
     return config('app.env') === 'local';
+}
+
+/**
+ * Path that the Docker daemon of $server must use as a bind mount source for $path, a path that Coolify
+ * writes through SSH (below base_configuration_dir()).
+ *
+ * Only the development `testing-host` server needs a different path (Server::sharesDevHostDocker()):
+ * it writes to Docker named volumes, but it starts containers on the host Docker daemon. The returned
+ * paths match its mounts in docker-compose.dev*.yml:
+ * - /data/coolify/backups/... -> /var/lib/docker/volumes/<DEV_COOLIFY_BACKUPS_VOLUME>/_data/...
+ * - /data/coolify/...         -> /var/lib/docker/volumes/<DEV_COOLIFY_DATA_VOLUME>/_data/...
+ *
+ * For all other servers (production, dev KVM VMs, remote servers) the function returns $path unchanged.
+ */
+function devHostDockerPath(?Server $server, string $path): string
+{
+    if (! $server?->sharesDevHostDocker()) {
+        return $path;
+    }
+
+    $mounts = [
+        backup_dir() => devDockerVolumeDataPath('constants.coolify.dev_backups_volume', 'coolify_dev_backups_data'),
+        base_configuration_dir() => devDockerVolumeDataPath('constants.coolify.dev_data_volume', 'coolify_dev_coolify_data'),
+    ];
+    foreach ($mounts as $containerPath => $hostPath) {
+        if ($path === $containerPath || str_starts_with($path, $containerPath.'/')) {
+            return $hostPath.substr($path, strlen($containerPath));
+        }
+    }
+
+    return $path;
+}
+
+/**
+ * Host path of a development Docker volume. An invalid volume name falls back to the legacy name.
+ */
+function devDockerVolumeDataPath(string $configKey, string $fallbackVolume): string
+{
+    $volume = (string) config($configKey);
+    if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*$/', $volume) !== 1) {
+        $volume = $fallbackVolume;
+    }
+
+    return "/var/lib/docker/volumes/{$volume}/_data";
 }
 
 function isCloud(): bool
@@ -2784,6 +2829,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                            validateComposeContentVolumeSource($volume, $savedService->service->workdir());
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
@@ -2821,6 +2867,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
+                            if (composeExternalVolumeDeclaration($topLevelVolumes, $source->value()) !== null) {
+                                // The external volume gets no row, so Coolify never removes it.
+                                return $volume;
+                            }
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
                                 if (data_get($v, 'driver_opts.type') === 'cifs') {
@@ -3340,8 +3390,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
+        // External volumes are used as written, also by previews (no prefix and no preview suffix).
+        $externalTopLevelVolumes = $topLevelVolumes->filter(fn (mixed $volume): bool => isComposeExternalVolume($volume));
         if ($pull_request_id !== 0) {
-            $topLevelVolumes = collect([]);
+            $topLevelVolumes = collect($externalTopLevelVolumes->all());
         }
 
         if ($topLevelVolumes->count() > 0) {
@@ -3372,7 +3424,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $externalTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3411,7 +3463,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3429,6 +3481,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                    // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
@@ -3496,6 +3550,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                    // An external volume is used as written.
+                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $source = addPreviewDeploymentSuffix($source, $pull_request_id);
@@ -3535,7 +3592,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3553,6 +3610,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                    // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
@@ -3622,6 +3681,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                    // An external volume is used as written.
+                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
@@ -4152,7 +4214,7 @@ function isAssociativeArray($array)
  *
  *  Theses variables are added in place to the $where_to_add array.
  */
-function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
+function add_coolify_default_environment_variables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, Collection &$where_to_add, ?Collection $where_to_check = null)
 {
     // Currently disabled
     return;

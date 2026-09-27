@@ -15,6 +15,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
@@ -175,6 +176,7 @@ it('limits restarts only for applications', function () {
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneSqlite::class,
     ];
 
     foreach ($databaseModels as $databaseModel) {
@@ -191,6 +193,7 @@ it('limits restarts only for applications', function () {
         'standalone_keydbs',
         'standalone_dragonflies',
         'standalone_clickhouses',
+        'standalone_sqlites',
     ] as $databaseTable) {
         expect(Schema::hasColumn($databaseTable, 'max_restart_count'))->toBeFalse()
             ->and(Schema::hasColumn($databaseTable, 'restart_limit_reached'))->toBeFalse();

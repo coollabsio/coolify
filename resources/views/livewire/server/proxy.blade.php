@@ -223,6 +223,8 @@
                                     changes before upgrading.
                                 </x-callout>
                             @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
                         <div wire:loading.flex wire:target="loadProxyConfiguration"

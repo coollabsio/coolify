@@ -45,6 +45,7 @@
                                 $project->mongodbs_count,
                                 $project->mysqls_count,
                                 $project->mariadbs_count,
+                                $project->sqlites_count,
                             ])->sum();
                         @endphp
 

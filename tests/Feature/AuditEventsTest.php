@@ -27,6 +27,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\Auditable;
@@ -486,6 +487,7 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneSqlite::class,
 ]);
 
 test('withoutAuditLogging suppresses mutations until the outer callback ends', function () {

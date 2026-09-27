@@ -2,7 +2,12 @@
 
 namespace App\Actions\Service;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Models\LocalFileVolume;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
@@ -32,6 +37,7 @@ class StartService
         // This is defensive programming - saveComposeConfigs() already creates it,
         // but we guarantee it here in case of any edge cases or manual deployments
         $commands[] = "touch {$workdir}/.env";
+        $commands = array_merge($commands, EnsureContentFilesOnServer::echoCommands($this->contentFileStorages($service), $service->server));
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "docker compose --project-directory {$workdir} pull";
@@ -55,6 +61,23 @@ class StartService
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+    }
+
+    /**
+     * @return Collection<int, LocalFileVolume>
+     */
+    private function contentFileStorages(Service $service): Collection
+    {
+        return LocalFileVolume::query()
+            ->where(function ($query) use ($service) {
+                $query->where('resource_type', (new ServiceApplication)->getMorphClass())
+                    ->whereIn('resource_id', $service->applications()->select('id'));
+            })
+            ->orWhere(function ($query) use ($service) {
+                $query->where('resource_type', (new ServiceDatabase)->getMorphClass())
+                    ->whereIn('resource_id', $service->databases()->select('id'));
+            })
+            ->get();
     }
 
     private function logDrainNetworkConnectCommands(Service $service): array

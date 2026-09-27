@@ -26,6 +26,10 @@
                 @endif
             </x-slot:actions>
 
+            @if ($outdatedCaddyImage)
+                <x-server.caddy-image-outdated-callout :image="$outdatedCaddyImage" />
+            @endif
+
             @if ($isTrafficAnalyticsEnabled)
                 @if ($caddyRedeployNote)
                     <x-callout type="info" title="Redeploy to start logging">{{ $caddyRedeployNote }}</x-callout>

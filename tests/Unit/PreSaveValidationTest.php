@@ -301,10 +301,21 @@ test('validateDockerComposeForInjection still blocks unsafe compose network name
     'default with command substitution' => ['${NET:-$(id)}', 'name'],
     'command substitution' => ['$(id)', 'name'],
     'backticks' => ['`id`', 'name'],
-    'text around the variable' => ['prefix_${NET}', 'name'],
+    'text around a variable with command substitution' => ['prefix_${NET}$(id)', 'name'],
     'nested variable' => ['${NET:-${OTHER}}', 'name'],
     'invalid variable name' => ['${1NET}', 'name'],
     'required-variable form' => ['${NET:?missing}', 'name'],
     'newline' => ["\${NET}\nid", 'name'],
     'variable as network key' => ['${NET}', 'key'],
+]);
+
+test('validateDockerComposeForInjection accepts network names that mix variables and text', function (string $name) {
+    $compose = "services:\n  app:\n    image: nginx:latest\nnetworks:\n  shared:\n    name: ".json_encode($name)."\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
+})->with([
+    'prefix and variable' => ['prefix_${NET}'],
+    'project default network' => ['${COMPOSE_PROJECT_NAME}_default'],
+    'variable with default inside text' => ['app-${APP_ENV:-prod}-net'],
+    'bare variable' => ['$PREFIX.edge'],
 ]);

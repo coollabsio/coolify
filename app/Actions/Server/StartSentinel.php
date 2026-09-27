@@ -10,11 +10,12 @@ class StartSentinel
 {
     use AsAction;
 
+    /**
+     * Sentinel and the proxy both mount this host path, and Sentinel reads the access log at the same path.
+     */
     public static function trafficLogDirectory(Server $server): string
     {
-        return isDev()
-            ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy'
-            : rtrim($server->proxyPath(), '/');
+        return devHostDockerPath($server, rtrim($server->proxyPath(), '/'));
     }
 
     /**
@@ -88,7 +89,7 @@ class StartSentinel
         $token = $server->settings->ensureValidSentinelToken();
         $endpoint = $server->settings->ensureSentinelUrl();
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
-        $mountDir = '/data/coolify/sentinel';
+        $mountDir = devHostDockerPath($server, base_configuration_dir().'/sentinel');
         $image = coolifyRegistryUrl().'/coollabsio/sentinel:'.$version;
         $environments = [
             'TOKEN' => $token,
@@ -108,7 +109,6 @@ class StartSentinel
             if ($customImage && ! empty($customImage)) {
                 $image = $customImage;
             }
-            $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
         }
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));

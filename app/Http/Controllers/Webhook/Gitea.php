@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -17,69 +19,77 @@ class Gitea extends Controller
 {
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
+    use ReadsWebhookPushPayload;
     use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request)
     {
-        if ($this->hasTooManyManualWebhookFailures($request, 'gitea')) {
-            return $this->tooManyManualWebhookFailuresResponse($request, 'gitea');
-        }
-
         try {
             $return_payloads = collect([]);
             $x_gitea_delivery = request()->header('X-Gitea-Delivery');
-            $x_gitea_event = Str::lower($request->header('X-Gitea-Event'));
-            $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
+            $x_gitea_event = Str::lower((string) $request->header('X-Gitea-Event'));
+            $x_hub_signature_256 = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');
             $payload = $request->collect();
             if ($x_gitea_event === 'ping') {
                 // Just pong
                 return response('pong');
             }
+            if (! in_array($x_gitea_event, ['push', 'pull_request'], true)) {
+                return response("Nothing to do. Event '$x_gitea_event' is not supported.");
+            }
 
             if ($content_type !== 'application/json') {
-                $payload = json_decode(data_get($payload, 'payload'), true);
+                $form_payload = data_get($payload, 'payload');
+                $payload = is_string($form_payload) ? json_decode($form_payload, true) : null;
             }
             if ($x_gitea_event === 'push') {
-                $branch = data_get($payload, 'ref');
+                $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 $full_name = data_get($payload, 'repository.full_name');
-                if (Str::isMatch('/refs\/heads\/*/', $branch)) {
-                    $branch = Str::after($branch, 'refs/heads/');
-                }
-                $added_files = data_get($payload, 'commits.*.added');
-                $removed_files = data_get($payload, 'commits.*.removed');
-                $modified_files = data_get($payload, 'commits.*.modified');
-                $changed_files = collect($added_files)->concat($removed_files)->concat($modified_files)->unique()->flatten();
-                $skip_deploy_commits = self::shouldSkipDeploy(data_get($payload, 'commits.*.message', []));
+                $commit = $this->webhookCommitSha($payload, 'after');
+                $changed_files = $this->webhookPushChangedFiles($payload);
+                $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_gitea_event === 'pull_request') {
-                $action = data_get($payload, 'action');
+                $action = $this->webhookPayloadString($payload, 'action');
                 $full_name = data_get($payload, 'repository.full_name');
-                $pull_request_id = data_get($payload, 'number');
-                $pull_request_html_url = data_get($payload, 'pull_request.html_url');
-                $pull_request_title = data_get($payload, 'pull_request.title');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
-                $branch = data_get($payload, 'pull_request.head.ref');
-                $base_branch = data_get($payload, 'pull_request.base.ref');
+                $pull_request_id = $this->webhookPullRequestId($payload, 'number');
+                $pull_request_html_url = $this->webhookPayloadUrl($payload, 'pull_request.html_url');
+                $skip_deploy_pr = self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pull_request.title')]);
+                $branch = $this->webhookString(data_get($payload, 'pull_request.head.ref'));
+                $base_branch = $this->webhookString(data_get($payload, 'pull_request.base.ref'));
+                // Gitea sends the head commit in pull_request.head.sha; newer versions also send it as after.
+                $commit = $this->webhookCommitSha($payload, 'pull_request.head.sha') ?? $this->webhookCommitSha($payload, 'after');
             }
-            if (! $branch) {
+            if (! $branch || ($x_gitea_event === 'pull_request' && ! $base_branch)) {
                 return response('Nothing to do. No branch found in the request.');
+            }
+            // A deleted branch has no commit to deploy. No secret is checked here.
+            if ($x_gitea_event === 'push' && $this->isWebhookBranchDeletionPush($payload)) {
+                return response('Nothing to do. Branch deleted.');
             }
             $full_name = $this->manualWebhookRepositoryFullName($full_name);
             if ($full_name === null) {
                 return response('Nothing to do. Invalid repository.');
             }
+            $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
+            $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
+            // A redelivery of the same signed payload is one guess.
+            $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
             $applications = Application::query();
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitea');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             if ($x_gitea_event === 'pull_request') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
                 if ($applications->isEmpty()) {
-                    return $this->unauthenticatedManualWebhookResponse($request, 'gitea');
+                    return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
             }
             foreach ($applications as $application) {
@@ -119,8 +129,7 @@ class Gitea extends Controller
                 }
                 if ($x_gitea_event === 'push') {
                     if ($application->isDeployable()) {
-                        $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
+                        if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
                             if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -137,7 +146,7 @@ class Gitea extends Controller
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
-                                commit: data_get($payload, 'after', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 is_webhook: true,
                             );
                             if ($result['status'] === 'queue_full') {
@@ -155,7 +164,7 @@ class Gitea extends Controller
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
                                     'deployment_uuid' => $deployment_uuid,
-                                    'commit' => data_get($payload, 'after'),
+                                    'commit' => $commit,
                                     'repository' => $full_name ?? null,
                                 ]);
                                 $return_payloads->push([
@@ -216,7 +225,7 @@ class Gitea extends Controller
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                         'docker_compose_domains' => $application->docker_compose_domains,
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
@@ -225,7 +234,7 @@ class Gitea extends Controller
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                     ]);
                                     $pr_app->generate_preview_fqdn();
                                 }
@@ -235,7 +244,7 @@ class Gitea extends Controller
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
-                                commit: data_get($payload, 'head.sha', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 is_webhook: true,
                                 git_type: 'gitea'
                             );
@@ -285,7 +294,9 @@ class Gitea extends Controller
                 }
             }
 
-            return $this->manualWebhookResponse($return_payloads, $request, 'gitea');
+            return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
+        } catch (InvalidWebhookPayloadException $e) {
+            return response($e->getMessage());
         } catch (Exception $e) {
             return handleError($e);
         }

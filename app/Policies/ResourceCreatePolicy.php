@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\User;
 
 class ResourceCreatePolicy
@@ -28,6 +29,7 @@ class ResourceCreatePolicy
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneSqlite::class,
         Service::class,
         Application::class,
         GithubApp::class,
