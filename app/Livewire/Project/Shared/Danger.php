@@ -99,7 +99,7 @@ class Danger extends Component
             return 'Resource not found.';
         }
 
-        if ($this->resource instanceof StandaloneSqlite && $this->resource->connectedVolumes()->exists()) {
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
             $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
 
             return;

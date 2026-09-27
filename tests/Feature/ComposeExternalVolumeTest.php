@@ -574,6 +574,17 @@ describe('validation', function () {
     ]);
 });
 
+describe('docker volume names', function () {
+    it('lists the Docker volumes that a compose file declares as external', function () {
+        expect(composeExternalVolumeDockerNames(EXTERNAL_VOLUME_SHORT_COMPOSE))->toBe(['shared-data'])
+            ->and(composeExternalVolumeDockerNames(EXTERNAL_VOLUME_LONG_COMPOSE))->toBe(['existing-shared-volume'])
+            ->and(composeExternalVolumeDockerNames(EXTERNAL_VOLUME_OLD_SYNTAX_COMPOSE))->toBe(['legacy-shared-volume'])
+            ->and(composeExternalVolumeDockerNames(EXTERNAL_VOLUME_NFS_COMPOSE))->toBe([])
+            ->and(composeExternalVolumeDockerNames("services:\n  web: [\n"))->toBe([])
+            ->and(composeExternalVolumeDockerNames(null))->toBe([]);
+    });
+});
+
 describe('delete', function () {
     it('never removes the external volume when a service is deleted with its volumes', function () {
         $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);

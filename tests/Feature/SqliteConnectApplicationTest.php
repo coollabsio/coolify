@@ -69,7 +69,7 @@ beforeEach(function () {
     $this->application = createSqliteConnectApplication($this->environment, $this->destination, 'Nginx App');
 });
 
-function createSqliteConnectApplication(Environment $environment, StandaloneDocker $destination, string $name, string $buildPack = 'dockerimage'): Application
+function createSqliteConnectApplication(Environment $environment, StandaloneDocker $destination, string $name, string $buildPack = 'dockerimage', ?string $compose = null): Application
 {
     return Application::factory()->create([
         'uuid' => (string) Str::uuid(),
@@ -79,7 +79,15 @@ function createSqliteConnectApplication(Environment $environment, StandaloneDock
         'destination_type' => $destination->getMorphClass(),
         'build_pack' => $buildPack,
         'docker_registry_image_name' => 'nginx',
+        'docker_compose_raw' => $compose,
     ]);
+}
+
+function sqliteVolumeCompose(StandaloneSqlite $sqlite, string $declaration = 'external: true'): string
+{
+    $volume = 'sqlite-data-'.$sqlite->uuid;
+
+    return "services:\n  web:\n    image: nginx:alpine\n    volumes:\n      - '{$volume}:/app/database'\nvolumes:\n  {$volume}:\n    {$declaration}\n";
 }
 
 it('mounts the data volume into the selected application and redirects to its storage page', function () {
@@ -103,17 +111,82 @@ it('mounts the data volume into the selected application and redirects to its st
         ->and($this->sqlite->connectedVolumes()->sole()->resource->is($this->application))->toBeTrue();
 });
 
-it('refuses to mount the volume into compose applications', function () {
-    $compose = createSqliteConnectApplication($this->environment, $this->destination, 'Compose App', 'dockercompose');
+it('shows the compose lines for compose applications instead of adding a storage entry', function () {
+    $compose = createSqliteConnectApplication($this->environment, $this->destination, 'Compose App', 'dockercompose', "services:\n  api:\n    image: nginx:alpine\n");
+    $volume = 'sqlite-data-'.$this->sqlite->uuid;
+
+    $component = Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
+        ->assertSet('applicationOptions', fn (array $options) => str_ends_with(collect($options)->firstWhere('value', $compose->uuid)['label'], '· Docker Compose'))
+        ->set('applicationUuid', $compose->uuid)
+        ->set('mountPath', '/app/database')
+        ->call('connect')
+        ->assertHasNoErrors()
+        ->assertNotDispatched('error')
+        ->assertNoRedirect()
+        ->assertSet('composeApplicationName', 'Compose App')
+        ->assertSet('composeSnippet', "services:\n  api:\n    volumes:\n      - '{$volume}:/app/database'\nvolumes:\n  {$volume}:\n    external: true\n")
+        ->assertSee('Add the volume to the compose file of Compose App');
+
+    validateDockerComposeForInjection($component->get('composeSnippet'));
+    expect(composeExternalVolumeDockerNames($component->get('composeSnippet')))->toBe([$volume])
+        ->and($compose->persistentStorages()->count())->toBe(0);
+});
+
+it('lists compose applications that declare the volume and blocks deleting it or the database', function () {
+    createSqliteConnectApplication($this->environment, $this->destination, 'Compose App', 'dockercompose', sqliteVolumeCompose($this->sqlite));
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    expect($this->sqlite->hasConnectedApplications())->toBeTrue()
+        ->and($this->sqlite->connectedApplicationNames()->all())->toBe(['Compose App'])
+        ->and($databaseVolume->isSharedWithAnotherResource())->toBeTrue();
 
     Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
-        ->assertSet('applicationOptions', fn (array $options) => collect($options)->firstWhere('value', $compose->uuid)['disabled'] === true)
+        ->assertSee('Remove it from the compose file to unlink');
+
+    Livewire::test(All::class, ['resource' => $this->sqlite])
+        ->call('delete', $databaseVolume->id, 'password')
+        ->assertDispatched('error');
+
+    Livewire::test(Danger::class, ['resource' => $this->sqlite])
+        ->call('delete', 'password')
+        ->assertDispatched('error');
+
+    expect($databaseVolume->fresh())->not->toBeNull()
+        ->and(StandaloneSqlite::find($this->sqlite->id))->not->toBeNull();
+});
+
+it('does not show the compose lines to a compose application that already declares the volume', function () {
+    $compose = createSqliteConnectApplication($this->environment, $this->destination, 'Compose App', 'dockercompose', sqliteVolumeCompose($this->sqlite));
+
+    Livewire::test(ConnectApplication::class, ['database' => $this->sqlite])
         ->set('applicationUuid', $compose->uuid)
         ->call('connect')
         ->assertDispatched('error')
-        ->assertNoRedirect();
+        ->assertSet('composeSnippet', null);
+});
 
-    expect($compose->persistentStorages()->count())->toBe(0);
+it('counts only compose applications of the same team and server that declare the volume as external', function () {
+    createSqliteConnectApplication($this->environment, $this->destination, 'Not External', 'dockercompose', sqliteVolumeCompose($this->sqlite, 'driver: local'));
+    createSqliteConnectApplication($this->environment, $this->destination, 'Other Volume', 'dockercompose', "services:\n  web:\n    image: nginx\n    volumes:\n      - 'other:/data'\nvolumes:\n  other:\n    external: true\n");
+
+    $otherServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+        'ip' => '203.0.113.11',
+    ]);
+    $otherDestination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::firstOrCreate(
+        ['server_id' => $otherServer->id, 'network' => 'coolify'],
+        ['uuid' => (string) Str::uuid(), 'name' => 'other-docker']
+    ));
+    createSqliteConnectApplication($this->environment, $otherDestination, 'Other Server', 'dockercompose', sqliteVolumeCompose($this->sqlite));
+
+    $otherProject = Project::factory()->create(['team_id' => Team::factory()->create()->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    createSqliteConnectApplication($otherEnvironment, $this->destination, 'Other Team', 'dockercompose', sqliteVolumeCompose($this->sqlite));
+
+    expect($this->sqlite->hasConnectedApplications())->toBeFalse()
+        ->and($this->sqlite->connectedApplicationNames()->all())->toBe([])
+        ->and($this->sqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeFalse();
 });
 
 it('ignores applications that belong to another team', function () {

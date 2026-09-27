@@ -87,10 +87,13 @@ class LocalPersistentVolume extends BaseModel
             return false;
         }
 
-        return static::query()
+        $isConnected = static::query()
             ->where('standalone_sqlite_id', $this->resource_id)
             ->where('name', $this->name)
             ->exists();
+
+        return $isConnected
+            || ($this->resource instanceof StandaloneSqlite && $this->resource->composeApplicationsUsingDataVolume($this->name)->isNotEmpty());
     }
 
     protected function customizeName($value)
