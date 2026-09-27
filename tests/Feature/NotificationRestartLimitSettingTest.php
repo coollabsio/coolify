@@ -29,7 +29,7 @@ it('persists a restart limit notification preference for every channel', functio
         ->toContain("\$this->{$property} = \$this->settings->{$column};")
         ->and($model)
         ->toContain("'{$column}'");
-})->with(['email', 'discord', 'telegram', 'slack', 'pushover', 'webhook']);
+})->with(['email', 'discord', 'telegram', 'slack', 'pushover', 'gotify', 'webhook']);
 
 it('enables restart limit notifications by default in every channel migration', function () {
     $migrations = collect(glob(database_path('migrations/*_add_restart_limit_reached_notifications_to_*')));

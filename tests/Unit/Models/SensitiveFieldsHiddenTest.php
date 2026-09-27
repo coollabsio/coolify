@@ -7,6 +7,7 @@ use App\Models\CloudProviderToken;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
 use App\Models\EnvironmentVariable;
+use App\Models\GotifyNotificationSettings;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\OauthSetting;
@@ -174,6 +175,12 @@ describe('Sensitive model fields are hidden by default', function () {
         $hidden = (new PushoverNotificationSettings)->getHidden();
 
         expect($hidden)->toContain('pushover_user_key', 'pushover_api_token');
+    });
+
+    test('GotifyNotificationSettings hides credentials', function () {
+        $hidden = (new GotifyNotificationSettings)->getHidden();
+
+        expect($hidden)->toContain('gotify_url', 'gotify_token');
     });
 
     test('TelegramNotificationSettings hides bot, chat, and thread identifiers', function () {

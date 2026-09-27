@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Discord as DiscordNotification;
 use App\Livewire\Notifications\Email as EmailNotification;
+use App\Livewire\Notifications\Gotify as GotifyNotification;
 use App\Livewire\Notifications\Pushover as PushoverNotification;
 use App\Livewire\Notifications\Slack as SlackNotification;
 use App\Livewire\Notifications\Telegram as TelegramNotification;
@@ -424,6 +425,43 @@ test('admin can update pushover notification settings', function () {
     expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
+// --- Gotify ---
+
+test('member cannot send test notification on gotify', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $settings = $this->team->gotifyNotificationSettings;
+    $settings->update([
+        'gotify_enabled' => true,
+        'gotify_url' => 'https://gotify.example.com',
+        'gotify_token' => 'test-token',
+    ]);
+
+    Livewire::test(GotifyNotification::class)
+        ->call('sendTestNotification')
+        ->assertDispatched('error');
+});
+
+test('the private gotify syncData helper is not remotely callable', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(GotifyNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
+});
+
+test('admin can update gotify notification settings', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $settings = $this->team->gotifyNotificationSettings;
+
+    expect($this->admin->can('update', $settings))->toBeTrue();
+});
+
 // --- Webhook ---
 
 test('member cannot send test notification on webhook', function () {
@@ -471,6 +509,7 @@ test('admin can send test on all notification channels', function () {
     expect($this->admin->can('sendTest', $this->team->telegramNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->emailNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->pushoverNotificationSettings))->toBeTrue();
+    expect($this->admin->can('sendTest', $this->team->gotifyNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->webhookNotificationSettings))->toBeTrue();
 });
 
@@ -483,6 +522,7 @@ test('member cannot send test on any notification channel', function () {
     expect($this->member->can('sendTest', $this->team->telegramNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->emailNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->pushoverNotificationSettings))->toBeFalse();
+    expect($this->member->can('sendTest', $this->team->gotifyNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->webhookNotificationSettings))->toBeFalse();
 });
 
@@ -518,6 +558,10 @@ test('member cannot view notification secrets', function (string $component, str
     'pushover credentials' => [PushoverNotification::class, 'pushoverNotificationSettings', [
         'pushover_user_key' => 'pushover-secret-user',
         'pushover_api_token' => 'pushover-secret-token',
+    ]],
+    'gotify credentials' => [GotifyNotification::class, 'gotifyNotificationSettings', [
+        'gotify_url' => 'https://gotify-secret-member.example.com',
+        'gotify_token' => 'gotify-secret-token',
     ]],
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/secret-webhook',
@@ -556,6 +600,10 @@ test('admin can view notification secrets', function (string $component, string 
     'pushover credentials' => [PushoverNotification::class, 'pushoverNotificationSettings', [
         'pushover_user_key' => 'pushover-admin-user',
         'pushover_api_token' => 'pushover-admin-token',
+    ]],
+    'gotify credentials' => [GotifyNotification::class, 'gotifyNotificationSettings', [
+        'gotify_url' => 'https://gotify-admin.example.com',
+        'gotify_token' => 'gotify-admin-token',
     ]],
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/admin-webhook',
