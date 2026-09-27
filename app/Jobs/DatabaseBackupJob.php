@@ -13,6 +13,7 @@ use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
@@ -44,7 +45,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -282,6 +283,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mariadb_database];
                 } elseif ($this->database instanceof StandaloneClickhouse) {
                     $databasesToBackup = [$this->database->clickhouse_db];
+                } elseif ($this->database instanceof StandaloneSqlite) {
+                    $databasesToBackup = $this->database->sqlite_databases;
                 } else {
                     return;
                 }
@@ -398,6 +401,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
+                    } elseif ($this->database instanceof StandaloneSqlite) {
+                        $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp.'.gz';
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        BackupCreated::dispatch($this->team->id);
+                        $this->backup_standalone_sqlite($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -622,7 +637,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return array_map('trim', explode('|', $databases));
         }
 
-        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse'])) {
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'sqlite'])) {
             return array_map('trim', explode(',', $databases));
         }
 
@@ -739,6 +754,27 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         } finally {
             $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
             instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
+        }
+    }
+
+    private function backup_standalone_sqlite(string $database): void
+    {
+        try {
+            if (! preg_match(StandaloneSqlite::DATABASES_PATTERN, $database)) {
+                throw new \Exception("Invalid database file name: {$database}");
+            }
+            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
+            $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
+            $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
         }
     }
 

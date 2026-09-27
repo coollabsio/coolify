@@ -11,6 +11,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 
@@ -31,6 +32,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneSqlite::class,
         ];
 
         foreach ($models as $modelClass) {
@@ -137,6 +139,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneSqlite::class,
         ];
 
         foreach ($models as $modelClass) {

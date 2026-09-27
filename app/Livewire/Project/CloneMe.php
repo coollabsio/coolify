@@ -190,6 +190,8 @@ class CloneMe extends Component
                         $newName = 'keydb-data-'.$newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
                         $newName = 'dragonfly-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'sqlite-data-')) {
+                        $newName = 'sqlite-data-'.$newDatabase->uuid;
                     } else {
                         if (str_starts_with($volume->name, $database->uuid)) {
                             $newName = str($volume->name)->replace($database->uuid, $newDatabase->uuid);

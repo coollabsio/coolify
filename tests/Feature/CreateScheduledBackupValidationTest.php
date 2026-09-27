@@ -12,6 +12,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -188,6 +189,19 @@ it('creates a clickhouse backup for its configured database', function () {
 
     expect($backup->database_type)->toBe(StandaloneClickhouse::class)
         ->and($backup->databases_to_backup)->toBe('analytics');
+});
+
+it('creates a sqlite backup for its configured database files', function () {
+    $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    expect($backup->database_type)->toBe(StandaloneSqlite::class)
+        ->and($backup->databases_to_backup)->toBe('app.db,jobs.db');
 });
 
 it('rejects scheduled backups for unsupported database types', function () {

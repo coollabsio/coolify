@@ -14,6 +14,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -34,7 +35,7 @@ class StartDatabase
      * @param  string|null  $reservation  The token from reserveOperation(). The request that queued
      *                                    this action holds the reservation; this action releases it.
      */
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, ?string $reservation = null): Activity|string
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): Activity|string
     {
         $reservation ??= DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {
@@ -48,7 +49,7 @@ class StartDatabase
         }
     }
 
-    private function queueStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, string $reservation): Activity|string
+    private function queueStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $reservation): Activity|string
     {
         $server = $database->destination->server;
         if (! $server->isFunctional()) {
@@ -113,7 +114,7 @@ class StartDatabase
      *
      * @return string|null The reservation token, or null when another operation is in progress.
      */
-    public static function reserveOperation(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database): ?string
+    public static function reserveOperation(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?string
     {
         $reservation = DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {
@@ -135,7 +136,7 @@ class StartDatabase
      *
      * @param  class-string<StartDatabase|RestartDatabase>  $action
      */
-    public static function dispatchReserved(string $action, StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, string $reservation): void
+    public static function dispatchReserved(string $action, StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $reservation): void
     {
         try {
             $action::dispatch($database, $reservation);
@@ -154,7 +155,7 @@ class StartDatabase
      *
      * @param  string|null  $reservation  The token of the caller's own reservation, which does not block.
      */
-    public static function operationInProgressError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, ?string $reservation = null): ?string
+    public static function operationInProgressError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): ?string
     {
         if (blank($database->uuid)) {
             return null;
@@ -180,7 +181,7 @@ class StartDatabase
      * Check prerequisites that would make the queued start fail, so the user gets the
      * error immediately instead of a queued start that can only fail later.
      */
-    public static function prerequisiteError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database): ?string
+    public static function prerequisiteError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?string
     {
         if (! $database->enable_ssl) {
             return null;

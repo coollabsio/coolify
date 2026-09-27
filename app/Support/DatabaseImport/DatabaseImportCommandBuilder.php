@@ -32,6 +32,7 @@ SH;
             'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll),
             'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll),
             'mongodb' => $this->mongodb($replaceExisting),
+            'sqlite' => $this->sqlite($resource->databaseFilePath()),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };
 
@@ -120,7 +121,7 @@ SH;
 
     public function supports(object $resource): bool
     {
-        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb'], true);
+        return in_array($this->databaseType($resource), ['postgresql', 'mysql', 'mariadb', 'mongodb', 'sqlite'], true);
     }
 
     public function databaseType(object $resource): string
@@ -135,6 +136,7 @@ SH;
             str_contains($type, 'mariadb') => 'mariadb',
             str_contains($type, 'mysql') => 'mysql',
             str_contains($type, 'mongo') => 'mongodb',
+            str_contains($type, 'sqlite') => 'sqlite',
             default => 'unsupported',
         };
     }
@@ -270,6 +272,20 @@ if is_tar; then
 fi
 [ "\$(header 4)" = 6de29981 ] || fail 'Unsupported MongoDB backup format. Use a mongodump archive or a dump directory packed as tar. Single .bson files are not supported. Nothing was changed.'
 if is_gzip; then restore --gzip --archive="\$backup"; else restore --archive="\$backup"; fi
+SH;
+    }
+
+    /**
+     * SQLite restores a plain or gzip-compressed database file into the first database
+     * file with .restore, which replaces its contents.
+     */
+    private function sqlite(string $file): string
+    {
+        $file = escapeshellarg($file);
+
+        return <<<SH
+stream > "\$backup.db" || fail 'The backup cannot be read. Nothing was changed.'
+sqlite3 -bail {$file} '.timeout 10000' ".restore \$backup.db"; status=\$?; rm -f "\$backup.db"; exit \$status
 SH;
     }
 }
