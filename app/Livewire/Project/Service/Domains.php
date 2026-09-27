@@ -1322,10 +1322,13 @@ class Domains extends Component
                 }
             }
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($app);
 
             if (! $this->saveDomainListForApp($app, $updated, noindexDomains: $noindexDomains, redirect: $this->editingRedirect)) {
                 return;
             }
+
+            $this->releaseManagedDnsForEditedDomains($app, $previousDnsHostnames);
 
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');

@@ -13,6 +13,7 @@ use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
@@ -44,7 +45,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -282,6 +283,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mariadb_database];
                 } elseif ($this->database instanceof StandaloneClickhouse) {
                     $databasesToBackup = [$this->database->clickhouse_db];
+                } elseif ($this->database instanceof StandaloneSqlite) {
+                    $databasesToBackup = $this->database->sqlite_databases;
                 } else {
                     return;
                 }
@@ -398,6 +401,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
+                    } elseif ($this->database instanceof StandaloneSqlite) {
+                        $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp.'.gz';
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        BackupCreated::dispatch($this->team->id);
+                        $this->backup_standalone_sqlite($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -622,7 +637,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return array_map('trim', explode('|', $databases));
         }
 
-        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse'])) {
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'sqlite'])) {
             return array_map('trim', explode(',', $databases));
         }
 
@@ -742,6 +757,27 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function backup_standalone_sqlite(string $database): void
+    {
+        try {
+            if (! preg_match(StandaloneSqlite::DATABASES_PATTERN, $database)) {
+                throw new \Exception("Invalid database file name: {$database}");
+            }
+            $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
+            $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
+            $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
+            $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        }
+    }
+
     private function add_to_backup_output($output): void
     {
         if ($this->backup_output) {
@@ -763,6 +799,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function calculate_size()
     {
         return instant_remote_process(['du -b '.escapeshellarg($this->backup_location).' | cut -f1'], $this->server, false, false, null, disableMultiplexing: true);
+    }
+
+    /**
+     * Host path of the backup file for the upload container. It differs from backup_location only for the
+     * development testing-host server (see devHostDockerPath()).
+     */
+    private function backupMountSource(): string
+    {
+        return devHostDockerPath($this->server, $this->backup_location);
     }
 
     private function upload_to_s3(): void
@@ -799,16 +844,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
             }
 
-            if (isDev()) {
-                if ($this->database->name === 'coolify-db') {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
-                } else {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
-                }
-            } else {
-                $backup_location_from = $this->backup_location;
-            }
-            $mount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+            $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
             $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm -v {$mount} {$fullImageName}";
 
             // Escape S3 credentials to prevent command injection

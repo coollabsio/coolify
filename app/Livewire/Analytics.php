@@ -331,7 +331,8 @@ class Analytics extends Component
         }
 
         [$from, $to] = $this->window();
-        // A selected application or service is queried under all of its Sentinel keys.
+        // A selected application or service is queried in Sentinel's resource scope, or under
+        // all of its keys on an older Sentinel.
         $resource = $this->selectedResource();
         $servers = $this->targetServers();
         $domainForKey = fn (string $key): ?string => $this->appMeta($key)['domain'];
@@ -345,10 +346,9 @@ class Analytics extends Component
                 $client = $this->trafficClient($server);
 
                 if ($resource !== null) {
-                    $keys = $client->prefetchResource($resource->uuid(), $from, $to, $this->breakdownDimensions, $this->range);
-                    foreach ($keys as $key) {
-                        $aggregator->collect($client, $key, $from, $to, $this->range, $domainForKey);
-                    }
+                    // One server in Sentinel's resource scope is exact; a merge across servers
+                    // or the per-key fallback of an older Sentinel stays approximate.
+                    $aggregator->collectResource($client, $resource->uuid(), $from, $to, $this->range, $domainForKey);
 
                     continue;
                 }

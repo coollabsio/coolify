@@ -8,6 +8,10 @@ return [
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+        // Development only: Docker volumes that the testing-host server mounts at /data/coolify and /data/coolify/backups.
+        // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
+        'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
+        'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
         'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
