@@ -112,7 +112,7 @@ class ApplicationPreview extends BaseModel
         return $volumes
             ->map(function (mixed $volume, int|string $key) use ($prefix, $suffix): ?string {
                 $key = (string) $key;
-                if (filter_var(data_get($volume, 'external', false), FILTER_VALIDATE_BOOLEAN)) {
+                if (isComposeExternalVolume($volume)) {
                     return null;
                 }
                 if (data_get($volume, 'name', $key) !== $key) {

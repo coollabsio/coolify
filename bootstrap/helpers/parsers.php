@@ -105,6 +105,14 @@ function validateDockerComposeForInjection(string $composeYaml, ?string $resourc
             }
         }
     }
+
+    if (isset($parsed['volumes']) && is_array($parsed['volumes'])) {
+        foreach ($parsed['volumes'] as $volumeName => $volumeConfig) {
+            if (isComposeExternalVolume($volumeConfig)) {
+                validateComposeExternalVolume($volumeName, $volumeConfig);
+            }
+        }
+    }
 }
 
 /**
@@ -299,6 +307,80 @@ function validateComposeNetworkName(string $networkName, string $context = 'netw
             'Invalid Docker Compose '.$context.
             '. Network names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores.'
         );
+    }
+}
+
+/**
+ * Tells if a top-level Compose volume declaration is external: `external: true` or the old
+ * `external: {name: x}` syntax. Docker Compose does not create or remove an external volume.
+ */
+function isComposeExternalVolume(mixed $declaration): bool
+{
+    if (! is_array($declaration) || ! array_key_exists('external', $declaration)) {
+        return false;
+    }
+    $external = $declaration['external'];
+    if (is_array($external)) {
+        return true;
+    }
+
+    return filter_var($external, FILTER_VALIDATE_BOOLEAN);
+}
+
+/**
+ * Returns the top-level declaration of a volume source when the Compose file declares it as
+ * external, and null for all other sources. The parsers use an external volume as written: no
+ * "{uuid}_" prefix, no preview suffix and no LocalPersistentVolume row, so that Coolify never
+ * removes a volume that it does not own.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes
+ * @return array<string, mixed>|null
+ *
+ * @throws Exception If the external volume has a name that is not safe (see validateComposeExternalVolume())
+ */
+function composeExternalVolumeDeclaration(iterable $topLevelVolumes, string $source): ?array
+{
+    $declaration = collect($topLevelVolumes)->get($source);
+    if (! isComposeExternalVolume($declaration)) {
+        return null;
+    }
+    validateComposeExternalVolume($source, $declaration);
+
+    return $declaration;
+}
+
+/**
+ * The key and the name of an external volume must be literal Docker volume names. Docker Compose
+ * can resolve variables in `name:`, but then only the deployment `.env` sets which existing volume
+ * the resource mounts, and Coolify cannot show or check that volume. Thus variables are rejected.
+ *
+ * @param  array<string, mixed>  $declaration
+ *
+ * @throws Exception If the key or the name is not a literal, valid Docker volume name
+ */
+function validateComposeExternalVolume(int|string $key, array $declaration): void
+{
+    $key = (string) $key;
+    $label = preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key) === 1 ? "volume {$key}" : 'volume';
+    $names = [$key];
+    if (array_key_exists('name', $declaration)) {
+        $names[] = $declaration['name'];
+    }
+    if (is_array($declaration['external'] ?? null) && array_key_exists('name', $declaration['external'])) {
+        $names[] = $declaration['external']['name'];
+    }
+
+    foreach ($names as $name) {
+        if (is_string($name) && str_contains($name, '$')) {
+            throw new Exception(
+                "Invalid external Docker Compose {$label}: Coolify does not resolve variables in the name of an external volume. Use the literal name of the existing Docker volume."
+            );
+        }
+        if (! is_string($name) || preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $name) !== 1) {
+            throw new Exception(
+                "Invalid external Docker Compose {$label}. Volume names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores."
+            );
+        }
     }
 }
 
@@ -1119,6 +1201,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null) {
+                        // Previews share the external volume. It gets no row, so Coolify never removes it.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
+                    }
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
@@ -2468,6 +2556,12 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null) {
+                        // The external volume gets no row, so Coolify never removes it.
+                        $volumesParsed->put($index, $volume);
+
+                        continue;
+                    }
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {

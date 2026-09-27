@@ -2867,6 +2867,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
+                            if (composeExternalVolumeDeclaration($topLevelVolumes, $source->value()) !== null) {
+                                // The external volume gets no row, so Coolify never removes it.
+                                return $volume;
+                            }
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
                                 if (data_get($v, 'driver_opts.type') === 'cifs') {
@@ -3386,8 +3390,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
+        // External volumes are used as written, also by previews (no prefix and no preview suffix).
+        $externalTopLevelVolumes = $topLevelVolumes->filter(fn (mixed $volume): bool => isComposeExternalVolume($volume));
         if ($pull_request_id !== 0) {
-            $topLevelVolumes = collect([]);
+            $topLevelVolumes = collect($externalTopLevelVolumes->all());
         }
 
         if ($topLevelVolumes->count() > 0) {
@@ -3418,7 +3424,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $externalTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3457,7 +3463,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3475,6 +3481,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                    // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
@@ -3542,6 +3550,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                    // An external volume is used as written.
+                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $source = addPreviewDeploymentSuffix($source, $pull_request_id);
@@ -3581,7 +3592,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $externalTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -3599,6 +3610,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                    // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
@@ -3668,6 +3681,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
+                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                    // An external volume is used as written.
+                                    data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
