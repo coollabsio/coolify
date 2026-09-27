@@ -1,7 +1,69 @@
 # Lessons
 
-## Alpine x-transition + tw-animate-css exit animations flash at the end
-- Symptom: a modal/overlay fades out, then flashes fully visible for 1-2 frames before it disappears.
-- Cause: `animate-out` keyframes default to `animation-fill-mode: none`. The element snaps back to its natural state when the keyframe ends. Alpine hides the element (display: none) only after its own timer (read from `transition-duration`), which starts ~2 rAF later than the animation. The gap shows the element at full opacity.
-- Rule: every `x-transition:leave` that uses tw-animate-css `animate-out` MUST also include `fill-mode-forwards`.
-- Rule: when a user reports UI flicker, check ALL layers of the animation stack (state reset timing, spinner flash, keyframe fill mode, focus restore) before you report the fix as complete. My first fix covered state reset and spinner only; the fill-mode snap was the visible one.
+## Prove regressions before changing code
+- Reproduce the reported failure on the unchanged baseline before adding a fix.
+- When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
+- Test old reports against the current branch because later changes can make the report obsolete.
+- Use the same regression test before and after the production change so the result shows the behavior difference.
+- Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
+
+## Verify the complete user flow
+- Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
+- Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
+- When the request covers more than one interface or resource type, inventory and verify each supported path.
+
+## Preserve product scope
+- Do not replace required SPA navigation with a full-page redirect to hide a lifecycle or ordering defect.
+- Do not add billing restrictions, live reconciliation, or fallback behavior unless the request includes them.
+- Treat implementation constraints as details. Do not expand a requested team-level control into a more complex policy model.
+
+## Keep dynamic Livewire identities stable
+- In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.
+- Use targeted refresh events. Do not refresh a parent and a child that the parent can remove or hide during the same operation.
+- Prove lifecycle and redirect causes directly; an effects assertion alone is not sufficient.
+
+## Keep modal structure consistent
+- Identify the parent page that owns a modal trigger and move the complete requested workflow into that modal.
+- Use a flat form layout when the modal already supplies its title and description.
+- Put destructive actions on the footer's left and primary actions last on the right.
+- Use shared section, helper, tooltip, and icon-button components instead of local variants.
+- Keep validation, preview, and save controls in a fixed footer when the body is large.
+
+## Verify layered UI behavior visually
+- Inspect the real layout with all conditional elements visible, especially compound status badges.
+- For animation flicker, inspect state timing, loading indicators, keyframe fill mode, and focus restoration.
+- Add `fill-mode-forwards` to Alpine leave transitions that use tw-animate-css `animate-out` so the element does not flash before Alpine hides it.
+
+## Preserve inherited values and clear API semantics
+- An unchanged displayed default must remain inherited; store an override only when the user selects a different value.
+- Expose named API values for special modes. Keep existing numeric sentinels only as compatibility aliases unless a breaking change is requested.
+
+## Trace infrastructure changes end to end
+- For container image changes, inspect Compose services and every relevant Dockerfile build stage.
+- Pin a stable release tag instead of using a floating `latest` tag.
+- A successful image pull does not prove that the complete application build no longer uses the old image.
+- Do not use `docker compose up --wait` for a stack with one-shot services; wait for the required long-running service's health instead.
+
+## Make distributed schedules durable
+- Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
+- Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
+- Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
+
+## Fail closed at public webhook boundaries
+- Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.
+
+## Pass identities to Livewire actions
+- Pass record IDs to Livewire actions instead of display values, and resolve team-scoped records on the server. When JavaScript needs text, use `@js()` or `Js::from()`.
+- Mark Livewire properties that select records or feed server-side lookups as `#[Locked]`; clients can change every other public property.
+
+## Keep host test runs away from the dev app cache
+- The repository is bind-mounted into the dev `coolify` container. Tests that call `app:init` run `optimize` and write a testing config/route cache into `bootstrap/cache`, so the dev app returns 500. For broad host test runs, set `APP_CONFIG_CACHE`, `APP_ROUTES_CACHE`, `APP_EVENTS_CACHE`, `APP_SERVICES_CACHE`, and `APP_PACKAGES_CACHE` to a temporary directory.
+
+## Test the real runtime image
+- Deployment shell commands run in the Alpine/BusyBox helper image and pass through the non-root sudo parser. Verify new flags and shell syntax in that image and with `parseCommandsByLineForSudo()`; faked command output hides both failures.
+- Put multi-step remote shell logic in one `sh -c '<script>' sh <args>` line. The non-root parser then only puts sudo in front of it; it rewrites `x=$(...)`, `&&`, `|` and shell keywords in any other line.
+- `Server` has an identity map. Tests that create servers in several dataset cases with `RefreshDatabase` must call `Server::flushIdentityMap()` in `beforeEach`/`afterEach`, or a case reads the cached server of the previous case.
+- Dev QEMU servers from `dev:qemu` are seeded, not validated: they have no `coolify` Docker network, and Alpine has no bash until `InstallPrerequisites` runs.
+
+## Format only your own files
+- `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.

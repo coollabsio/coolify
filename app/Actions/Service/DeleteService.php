@@ -3,13 +3,22 @@
 namespace App\Actions\Service;
 
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use RuntimeException;
 
 class DeleteService
 {
     public function cleanupRemote(Service $service, bool $deleteVolumes, bool $deleteConnectedNetworks, bool $deleteConfigurations): void
     {
         $server = data_get($service, 'server');
-        if ($deleteVolumes && $server->isFunctional()) {
+        if (! $server?->isFunctional()) {
+            throw new RuntimeException('Server is not functional.');
+        }
+
+        $this->removeContainers($service);
+
+        if ($deleteVolumes) {
             $commands = [];
             foreach ($service->applications()->get() as $application) {
                 foreach ($application->persistentStorages()->get() as $storage) {
@@ -22,7 +31,7 @@ class DeleteService
                 }
             }
             foreach ($commands as $command) {
-                instant_remote_process([$command], $server, false);
+                instant_remote_process([$command], $server);
             }
         }
 
@@ -32,7 +41,34 @@ class DeleteService
         if ($deleteConfigurations) {
             $service->deleteConfigurations();
         }
-        instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
+    }
+
+    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): void
+    {
+        $service = $resource->service;
+        $server = $service?->server;
+        if (! $server?->isFunctional()) {
+            throw new RuntimeException('Server is not functional.');
+        }
+
+        $this->removeContainers($service, $resource);
+    }
+
+    private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
+    {
+        $serviceId = (int) $service->id;
+        $filters = "--filter label=coolify.serviceId={$serviceId}";
+        if ($subresource !== null) {
+            // Applications and databases are separate tables, so an id alone can match the other type.
+            $subType = $subresource instanceof ServiceDatabase ? 'database' : 'application';
+            $subId = (int) $subresource->id;
+            $filters .= " --filter label=coolify.service.subId={$subId} --filter label=coolify.service.subType={$subType}";
+        }
+
+        // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
+        // assignment would become "sudo container_ids=...", which sudo rejects.
+        $script = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
+        instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }
 
     public function deleteLocal(Service $service): void

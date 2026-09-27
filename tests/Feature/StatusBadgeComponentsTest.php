@@ -46,6 +46,14 @@ it('uses bordered status badges in the top breadcrumb', function () {
         ->and(substr_count($breadcrumb, 'rounded-full bg-neutral-100'))->toBe(0);
 });
 
+it('keeps compound resource statuses on one line in the top breadcrumb', function () {
+    foreach (['application', 'database', 'service'] as $resourceType) {
+        $status = file_get_contents(resource_path("views/livewire/project/{$resourceType}/status.blade.php"));
+
+        expect($status)->toContain('class="flex items-center gap-1"');
+    }
+});
+
 it('renders resource statuses through reactive livewire components', function () {
     $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
 

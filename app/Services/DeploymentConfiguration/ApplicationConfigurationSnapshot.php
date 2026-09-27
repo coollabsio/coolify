@@ -170,6 +170,7 @@ class ApplicationConfigurationSnapshot
             $this->item('custom_network_aliases', 'Network aliases', $this->application->custom_network_aliases, 'redeploy'),
             $this->item('connect_to_docker_network', 'Connect to Docker network', data_get($this->application, 'settings.connect_to_docker_network'), 'redeploy'),
             $this->item('custom_internal_name', 'Custom container name', data_get($this->application, 'settings.custom_internal_name'), 'redeploy'),
+            $this->item('custom_container_name_prefix', 'Container name prefix', data_get($this->application, 'settings.custom_container_name_prefix'), 'redeploy'),
             $this->item('is_consistent_container_name_enabled', 'Consistent container name', data_get($this->application, 'settings.is_consistent_container_name_enabled'), 'redeploy'),
             $this->item('is_container_label_escape_enabled', 'Escape container labels', data_get($this->application, 'settings.is_container_label_escape_enabled'), 'redeploy'),
             $this->item('is_container_label_readonly_enabled', 'Read-only container labels', data_get($this->application, 'settings.is_container_label_readonly_enabled'), 'redeploy'),
@@ -236,7 +237,7 @@ class ApplicationConfigurationSnapshot
 
                 return $this->item(
                     key: 'volume_'.$volume->id,
-                    label: 'Volume mount',
+                    label: filled($volume->host_path) ? 'Directory mount' : 'Volume mount',
                     value: ['source' => $source, 'destination' => $volume->mount_path],
                     impact: 'redeploy',
                     displayValue: "{$source} → {$volume->mount_path}",

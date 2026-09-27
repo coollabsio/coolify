@@ -279,6 +279,61 @@ test('member cannot copy instance email settings', function () {
         ->assertForbidden();
 });
 
+test('team admin cannot copy instance email credentials', function () {
+    InstanceSettings::query()->findOrFail(0)->update([
+        'smtp_password' => 'instance-smtp-secret',
+        'resend_api_key' => 'instance-resend-secret',
+    ]);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->assertSet('smtpPassword', null)
+        ->assertSet('resendApiKey', null)
+        ->call('copyFromInstanceSettings')
+        ->assertForbidden();
+
+    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBeNull();
+    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBeNull();
+});
+
+test('instance admin can copy instance email credentials to an authorized team', function () {
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $this->admin->teams()->attach($rootTeam, ['role' => 'admin']);
+
+    InstanceSettings::query()->findOrFail(0)->update([
+        'smtp_from_address' => 'instance@example.com',
+        'smtp_from_name' => 'Instance',
+        'smtp_password' => 'instance-smtp-secret',
+        'resend_api_key' => 'instance-resend-secret',
+    ]);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->call('copyFromInstanceSettings')
+        ->assertHasNoErrors()
+        ->assertSet('smtpPassword', 'instance-smtp-secret')
+        ->assertSet('resendApiKey', 'instance-resend-secret');
+
+    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBe('instance-smtp-secret');
+    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBe('instance-resend-secret');
+});
+
+test('instance admin cannot copy credentials to a team they cannot update', function () {
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $this->member->teams()->attach($rootTeam, ['role' => 'admin']);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->call('copyFromInstanceSettings')
+        ->assertForbidden();
+});
+
 test('admin can update email notification settings', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
@@ -286,6 +341,18 @@ test('admin can update email notification settings', function () {
     $settings = $this->team->emailNotificationSettings;
 
     expect($this->admin->can('update', $settings))->toBeTrue();
+});
+
+test('admin can disable restart limit email notifications', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->assertSet('restartLimitReachedEmailNotifications', true)
+        ->call('toggleEvent', 'restartLimitReachedEmailNotifications')
+        ->assertSet('restartLimitReachedEmailNotifications', false);
+
+    expect($this->team->emailNotificationSettings->fresh()->restart_limit_reached_email_notifications)->toBeFalse();
 });
 
 test('admin can save team smtp settings without a resend api key when resend is disabled', function () {

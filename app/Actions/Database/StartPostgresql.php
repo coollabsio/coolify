@@ -2,15 +2,18 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandalonePostgresql $database;
 
@@ -22,14 +25,15 @@ class StartPostgresql
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandalonePostgresql $database)
+    private string $resolvedPostgresUser;
+
+    private string $resolvedPostgresDatabase;
+
+    public function handle(StandalonePostgresql $database, ?Activity $activity = null)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
-        if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
-        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -62,18 +66,7 @@ class StartPostgresql
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -111,7 +104,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', '-U', (string) $this->database->postgres_user, '-d', (string) $this->database->postgres_db, '-c', 'SELECT 1',
+                        'CMD', 'psql', '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -217,7 +210,7 @@ class StartPostgresql
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name postgres:postgres /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt < /dev/null";
@@ -227,7 +220,7 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -265,8 +258,17 @@ class StartPostgresql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedPostgresUser = (string) $this->database->postgres_user;
+        $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'POSTGRES_USER') {
+                $this->resolvedPostgresUser = $rawValue;
+            } elseif ($env->key === 'POSTGRES_DB') {
+                $this->resolvedPostgresDatabase = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {

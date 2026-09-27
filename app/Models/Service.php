@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
-use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
 use App\Support\DomainPortOverrides;
+use App\Support\ResourceStartActivity;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,7 +17,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
-use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -43,7 +45,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -158,10 +160,7 @@ class Service extends BaseModel
     public function isStarting(): bool
     {
         try {
-            $activity = Activity::where('properties->type_uuid', $this->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-
-            return $status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value;
+            return ResourceStartActivity::latestRunning($this->uuid) !== null;
         } catch (\Throwable) {
             return false;
         }
@@ -1587,7 +1586,7 @@ class Service extends BaseModel
         Storage::disk('local')->delete("tmp/{$filename}");
 
         $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        $environmentFilename = new_public_id().'.env.tmp';
 
         $envs = collect([]);
 
@@ -1615,13 +1614,13 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            $envs->push("{$env->key}={$this->resolveSecretManagerEnvironmentVariable($env)}");
         }
         if ($envs->count() === 0) {
-            $commands[] = 'touch .env';
+            $commands[] = "touch {$environmentFilename} && mv {$environmentFilename} .env";
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFilename} > /dev/null && mv {$environmentFilename} .env";
         }
 
         instant_remote_process($commands, $this->server);

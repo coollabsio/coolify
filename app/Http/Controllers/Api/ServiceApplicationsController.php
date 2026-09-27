@@ -25,6 +25,7 @@ class ServiceApplicationsController extends Controller
             'resourceable',
             'resourceable_id',
             'resourceable_type',
+            'service',
         ]);
 
         $serialized = serializeApiResponse($serviceApplication);
@@ -258,6 +259,7 @@ class ServiceApplicationsController extends Controller
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
                         'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
+                        'max_restart_count' => new OA\Property(property: 'max_restart_count', type: 'integer', minimum: 0, nullable: true, description: 'Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.'),
                     ]
                 )
             )
@@ -331,6 +333,7 @@ class ServiceApplicationsController extends Controller
             'is_gzip_enabled',
             'is_stripprefix_enabled',
             'is_force_https_enabled',
+            'max_restart_count',
         ];
 
         $validationRules = [
@@ -345,6 +348,7 @@ class ServiceApplicationsController extends Controller
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
             'is_force_https_enabled' => 'sometimes|boolean',
+            'max_restart_count' => 'sometimes|integer|min:0',
         ];
 
         $validator = Validator::make($payload, $validationRules);
@@ -399,9 +403,12 @@ class ServiceApplicationsController extends Controller
             new OA\Parameter(
                 name: 'lines',
                 in: 'query',
-                description: 'Number of lines to show from the end of the logs.',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
                 required: false,
-                schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ])
             ),
         ],
         responses: [
@@ -448,7 +455,16 @@ class ServiceApplicationsController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'app_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'lines', in: 'query', required: false, schema: new OA\Schema(type: 'integer', format: 'int32', default: 100)),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.',
+                required: false,
+                schema: new OA\Schema(oneOf: [
+                    new OA\Schema(type: 'integer', format: 'int32', default: 100, minimum: -1, maximum: 10000),
+                    new OA\Schema(type: 'string', enum: ['all']),
+                ]),
+            ),
         ],
         responses: [
             new OA\Response(

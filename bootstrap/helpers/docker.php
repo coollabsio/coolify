@@ -43,6 +43,19 @@ function traefikSafeServiceNameSegment(string $serviceName): string
     return $normalized.'-'.traefikServiceNameHash($serviceName);
 }
 
+/**
+ * Key that Sentinel uses to group Caddy access-log lines. It is the same key that Sentinel gets
+ * from the Traefik router name (`https-{i}-{KEY}@docker`), so both proxies report a resource the same way.
+ * Only [A-Za-z0-9-] can occur, so the value is safe in a Docker label and in a Caddyfile.
+ */
+function caddyTrafficAppKey(string $uuid, ?string $serviceName = null): string
+{
+    // Same truthiness check as fqdnLabelsForTraefik(), so the keys stay equal.
+    $key = $serviceName ? $uuid.'-'.traefikSafeServiceNameSegment($serviceName) : $uuid;
+
+    return (string) preg_replace('/[^A-Za-z0-9-]+/', '-', $key);
+}
+
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
@@ -349,17 +362,32 @@ function generateApplicationContainerName(Application $application, $pull_reques
     // TODO: refactor generateApplicationContainerName, we do not need $application and $pull_request_id
 
     $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
-    $now = now()->format('Hisu');
+    $name = $consistent_container_name ? ($application->settings->custom_internal_name ?: $application->uuid) : $application->uuid;
+    $now = now()->format('Ymd\THis');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        return $application->uuid.'-pr-'.$pull_request_id;
+        return $name.'-pr-'.$pull_request_id;
     } else {
         if ($consistent_container_name) {
-            return $application->uuid;
+            return $name;
         }
 
-        return $application->uuid.'-'.$now;
+        return ($application->settings->custom_container_name_prefix ?: $application->uuid).'-'.$now;
     }
 }
+
+/**
+ * Generated (rolling update) container names end with the timestamp from generateApplicationContainerName().
+ * Drop the legacy pattern once containers created before the ISO 8601 suffix are gone.
+ */
+function isGeneratedContainerName(string $containerName): bool
+{
+    $isoTimestampSuffix = '/-\d{8}T\d{6}$/';
+    $legacyTimestampSuffix = '/-\d{12}$/';
+
+    return preg_match($isoTimestampSuffix, $containerName) === 1
+        || preg_match($legacyTimestampSuffix, $containerName) === 1;
+}
+
 function get_port_from_dockerfile($dockerfile): ?int
 {
     $dockerfile_array = explode("\n", $dockerfile);
@@ -530,7 +558,7 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, array $domainPortOverrides = [])
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -543,6 +571,8 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     if ($is_http_basic_auth_enabled) {
         $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
     }
+
+    $trafficAppKey = caddyTrafficAppKey($uuid, $service_name);
 
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
@@ -594,7 +624,24 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
             $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}");
         }
         if ($is_http_basic_auth_enabled) {
-            $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
+            // Caddy 2.8 renamed basicauth to basic_auth; see Server::caddySupportsBasicAuthDirective().
+            $basicAuthDirective = $supports_basic_auth_directive ? 'basic_auth' : 'basicauth';
+            $labels->push("caddy_{$loop}.{$basicAuthDirective}.{$http_basic_auth_username}=\"{$hashedPassword}\"");
+        }
+        if ($is_traffic_analytics_enabled) {
+            $labels->push("caddy_{$loop}.log.output=file /traffic/access.log");
+            // Explicit lumberjack roll options so the access log doesn't grow unbounded
+            // (Caddy's defaults are undocumented). caddy-docker-proxy renders these dotted
+            // keys as a nested block: output file /traffic/access.log { roll_size 20MiB; roll_keep 5; roll_keep_for 168h }.
+            // Rotation is rename-based, which is safe for Sentinel's tailer (it reopens on inode change).
+            $labels->push("caddy_{$loop}.log.output.roll_size=20MiB");
+            $labels->push("caddy_{$loop}.log.output.roll_keep=5");
+            $labels->push("caddy_{$loop}.log.output.roll_keep_for=168h");
+            $labels->push("caddy_{$loop}.log.format=json");
+            // Only Caddy 2.8+ knows log_append; see Server::caddySupportsLogAppend().
+            if ($supports_log_append) {
+                $labels->push("caddy_{$loop}.log_append=coolify_app_id {$trafficAppKey}");
+            }
         }
     }
 
@@ -968,6 +1015,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
+                            is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
+                            supports_log_append: $application->destination->server->caddySupportsLogAppend(),
+                            supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                             domainPortOverrides: $application->domain_port_overrides ?? [],
                         ));
                         break;
@@ -1001,6 +1051,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                     noindex_domains: $noindexDomains,
+                    is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
+                    supports_log_append: $application->destination->server->caddySupportsLogAppend(),
+                    supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                     domainPortOverrides: $application->domain_port_overrides ?? [],
                 ));
             }
@@ -1045,6 +1098,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                         noindex_domains: $noindexDomains,
+                        is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
+                        supports_log_append: $application->destination->server->caddySupportsLogAppend(),
+                        supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
                     ));
                     break;
@@ -1076,6 +1132,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
                 noindex_domains: $noindexDomains,
+                is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
+                supports_log_append: $application->destination->server->caddySupportsLogAppend(),
+                supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
             ));
         }
@@ -1540,10 +1599,17 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int|string
 {
+    if ($lines === 'all') {
+        return 'all';
+    }
+
     $lines = filter_var($lines, FILTER_VALIDATE_INT);
-    if ($lines === false || $lines <= 0) {
+    if ($lines === -1) {
+        return 'all';
+    }
+    if ($lines === false || $lines < -1) {
         return $default;
     }
 
@@ -1555,7 +1621,7 @@ function parseLogTimestampFlag(mixed $showTimestamps): bool
     return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
 }
 
-function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function buildContainerLogsCommand(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $command = "docker logs -n {$lines}";
     if ($server->isSwarm()) {
@@ -1569,7 +1635,7 @@ function buildContainerLogsCommand(Server $server, string $container_id, int $li
     return "{$command} ".escapeshellarg($container_id).' 2>&1';
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
     $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);
@@ -1675,6 +1741,10 @@ function generateDockerBuildArgs($variables): Collection
     return $variables->map(function ($var) {
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
+        if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
+            throw new InvalidArgumentException('Invalid environment variable key.');
+        }
+
         // Only return the key - Docker will get the value from the environment
         return '--build-arg '.escapeshellarg((string) $key);
     });
@@ -1694,19 +1764,17 @@ function generateDockerEnvFlags($variables): string
         ->map(function ($var) {
             $key = is_array($var) ? data_get($var, 'key') : $var->key;
             $value = is_array($var) ? data_get($var, 'value') : $var->value;
-            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
 
-            if ($isMultiline) {
-                // For multiline variables, strip surrounding quotes and escape for bash
-                $raw_value = trim($value, "'");
-                $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
-
-                return "-e {$key}=\"{$escaped_value}\"";
+            if (! ValidationPatterns::isValidEnvironmentVariableKey((string) $key)) {
+                throw new InvalidArgumentException('Invalid environment variable key.');
             }
 
-            $escaped_value = escapeshellarg($value);
+            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
+            if ($isMultiline) {
+                $value = trim($value, "'");
+            }
 
-            return "-e {$key}={$escaped_value}";
+            return '-e '.escapeshellarg("{$key}={$value}");
         })
         ->implode(' ');
 }

@@ -1,7 +1,13 @@
 <?php
 
+use App\Auth\Oidc\OidcConfig;
 use App\Models\OauthSetting;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\BitbucketProvider;
+use Laravel\Socialite\Two\GithubProvider;
+use Laravel\Socialite\Two\GitlabProvider;
+use SocialiteProviders\Discord\Provider;
+use SocialiteProviders\Manager\Config;
 
 function get_socialite_provider(string $provider)
 {
@@ -12,7 +18,7 @@ function get_socialite_provider(string $provider)
     }
 
     if ($provider === 'azure') {
-        $azure_config = new \SocialiteProviders\Manager\Config(
+        $azure_config = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
@@ -23,7 +29,7 @@ function get_socialite_provider(string $provider)
     }
 
     if ($provider == 'authentik' || $provider == 'clerk') {
-        $authentik_clerk_config = new \SocialiteProviders\Manager\Config(
+        $authentik_clerk_config = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
@@ -34,7 +40,7 @@ function get_socialite_provider(string $provider)
     }
 
     if ($provider == 'zitadel') {
-        $zitadel_config = new \SocialiteProviders\Manager\Config(
+        $zitadel_config = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri,
@@ -44,8 +50,12 @@ function get_socialite_provider(string $provider)
         return Socialite::driver('zitadel')->setConfig($zitadel_config);
     }
 
+    if ($provider === 'oidc') {
+        return Socialite::driver('oidc')->setConfig(OidcConfig::fromOauthSetting($oauth_setting));
+    }
+
     if ($provider == 'google') {
-        $google_config = new \SocialiteProviders\Manager\Config(
+        $google_config = new Config(
             $oauth_setting->client_id,
             $oauth_setting->client_secret,
             $oauth_setting->redirect_uri
@@ -63,11 +73,11 @@ function get_socialite_provider(string $provider)
     ];
 
     $provider_class_map = [
-        'bitbucket' => \Laravel\Socialite\Two\BitbucketProvider::class,
-        'discord' => \SocialiteProviders\Discord\Provider::class,
-        'github' => \Laravel\Socialite\Two\GithubProvider::class,
-        'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
-        'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
+        'bitbucket' => BitbucketProvider::class,
+        'discord' => Provider::class,
+        'github' => GithubProvider::class,
+        'gitlab' => GitlabProvider::class,
+        'infomaniak' => SocialiteProviders\Infomaniak\Provider::class,
     ];
 
     $socialite = Socialite::buildProvider(

@@ -446,7 +446,7 @@ class ByVultr extends Component
             $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
             $server = DB::transaction(function () use ($ipAddress, $vultrInstanceId, $vultrInstance): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit(currentTeam()->id, [
                     'name' => strtolower(trim($this->server_name)),
                     'ip' => $ipAddress,
                     'user' => 'root',

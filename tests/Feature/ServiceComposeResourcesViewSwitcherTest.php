@@ -12,6 +12,8 @@ it('provides grid and table views for compose resources without sorting controls
         ->toContain('aria-label="Grid view"')
         ->toContain('mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')
         ->toContain('flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start')
+        ->toContain('class="view-toggle"')
+        ->not->toContain('flex h-9 items-center rounded-lg border border-neutral-200 bg-white')
         ->toContain("localStorage.setItem('service-compose-resources-view', mode)")
         ->not->toContain('>Sort</button>')
         ->and($resourceCard)

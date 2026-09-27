@@ -44,6 +44,7 @@ function coolifyVariablesForFqdn(string $fqdn, string $composeParsingVersion = '
     // The created hook resets this, so it has to be set afterwards.
     $application->compose_parsing_version = $composeParsingVersion;
     $application->save();
+    Application::withoutGlobalScopes()->whereKey($application->id)->update(['fqdn' => $fqdn]);
 
     $job = new TestableCoolifyUrlDeploymentJob;
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
@@ -91,4 +92,20 @@ it('still resolves a single domain', function () {
     expect($variables)
         ->toContain("COOLIFY_URL='https://a.example.com'")
         ->toContain("COOLIFY_FQDN='a.example.com'");
+});
+
+it('ignores a hostless stored domain while setting deployment variables', function () {
+    $variables = coolifyVariablesForFqdn('https://,https://a.example.com');
+
+    expect($variables)
+        ->toContain("COOLIFY_URL='https://a.example.com'")
+        ->toContain("COOLIFY_FQDN='a.example.com'");
+});
+
+it('does not set domain variables for a hostless stored fqdn', function () {
+    $variables = coolifyVariablesForFqdn('https://');
+
+    expect($variables)
+        ->not->toContain('COOLIFY_URL=')
+        ->not->toContain('COOLIFY_FQDN=');
 });

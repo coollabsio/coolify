@@ -45,7 +45,7 @@ it('generates and preselects a new private key without clearing server form data
         ->set('ip', '192.0.2.50')
         ->set('user', 'deploy.user')
         ->set('port', 2222)
-        ->set('is_build_server', true)
+        ->set('server_role', 'build')
         ->call('generatePrivateKey', 'ed25519')
         ->assertHasNoErrors()
         ->assertSet('name', 'Production Server')
@@ -53,7 +53,7 @@ it('generates and preselects a new private key without clearing server form data
         ->assertSet('ip', '192.0.2.50')
         ->assertSet('user', 'deploy.user')
         ->assertSet('port', 2222)
-        ->assertSet('is_build_server', true);
+        ->assertSet('server_role', 'build');
 
     $newPrivateKeyId = $component->get('private_key_id');
 
@@ -80,7 +80,7 @@ it('preselects a manually added private key without clearing server form data', 
         ->set('ip', '192.0.2.51')
         ->set('user', 'deploy.user')
         ->set('port', 2222)
-        ->set('is_build_server', true)
+        ->set('server_role', 'build')
         ->call('handlePrivateKeyCreated', $manualPrivateKey->id)
         ->assertSet('private_key_id', $manualPrivateKey->id)
         ->assertSet('name', 'Production Server')
@@ -88,6 +88,6 @@ it('preselects a manually added private key without clearing server form data', 
         ->assertSet('ip', '192.0.2.51')
         ->assertSet('user', 'deploy.user')
         ->assertSet('port', 2222)
-        ->assertSet('is_build_server', true)
+        ->assertSet('server_role', 'build')
         ->assertSee('Manual SSH Key');
 });

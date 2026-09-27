@@ -12,7 +12,6 @@ use OpenApi\Attributes as OA;
 class ServerSentinelController extends Controller
 {
     private const ALLOWED_FIELDS = [
-        'is_sentinel_enabled',
         'is_metrics_enabled',
         'is_sentinel_debug_enabled',
         'sentinel_token',
@@ -20,6 +19,13 @@ class ServerSentinelController extends Controller
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'traffic_topn',
+        'traffic_sample_threshold',
+        'traffic_retention_1h_days',
+        'traffic_retention_1d_days',
+        'is_geoip_enabled',
+        'geoip_refresh_days',
+        'geoip_maxmind_license_key',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -36,18 +42,25 @@ class ServerSentinelController extends Controller
     {
         $settings = $server->settings;
         $payload = [
-            'is_sentinel_enabled' => (bool) $settings->is_sentinel_enabled,
+            'is_sentinel_enabled' => $server->isSentinelEnabled(),
             'is_metrics_enabled' => (bool) $settings->is_metrics_enabled,
             'is_sentinel_debug_enabled' => (bool) $settings->is_sentinel_debug_enabled,
             'sentinel_metrics_refresh_rate_seconds' => (int) $settings->sentinel_metrics_refresh_rate_seconds,
             'sentinel_metrics_history_days' => (int) $settings->sentinel_metrics_history_days,
             'sentinel_push_interval_seconds' => (int) $settings->sentinel_push_interval_seconds,
             'sentinel_updated_at' => $server->sentinel_updated_at,
+            'traffic_topn' => (int) $settings->traffic_topn,
+            'traffic_sample_threshold' => (int) $settings->traffic_sample_threshold,
+            'traffic_retention_1h_days' => (int) $settings->traffic_retention_1h_days,
+            'traffic_retention_1d_days' => (int) $settings->traffic_retention_1d_days,
+            'is_geoip_enabled' => (bool) $settings->is_geoip_enabled,
+            'geoip_refresh_days' => (int) $settings->geoip_refresh_days,
         ];
 
         if ($this->canReadSensitive()) {
             $payload['sentinel_token'] = $settings->sentinel_token;
             $payload['sentinel_custom_url'] = $settings->sentinel_custom_url;
+            $payload['geoip_maxmind_license_key'] = $settings->geoip_maxmind_license_key;
         }
 
         return $payload;
@@ -69,7 +82,7 @@ class ServerSentinelController extends Controller
                 description: 'Sentinel settings.',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'is_sentinel_enabled', type: 'boolean'),
+                        new OA\Property(property: 'is_sentinel_enabled', type: 'boolean', readOnly: true, description: 'Sentinel is mandatory on regular managed servers.'),
                         new OA\Property(property: 'is_metrics_enabled', type: 'boolean'),
                         new OA\Property(property: 'is_sentinel_debug_enabled', type: 'boolean'),
                         new OA\Property(property: 'sentinel_token', type: 'string', description: 'Only present with read:sensitive.'),
@@ -78,6 +91,13 @@ class ServerSentinelController extends Controller
                         new OA\Property(property: 'sentinel_push_interval_seconds', type: 'integer'),
                         new OA\Property(property: 'sentinel_custom_url', type: 'string', description: 'Only present with read:sensitive.'),
                         new OA\Property(property: 'sentinel_updated_at', type: 'string', nullable: true),
+                        new OA\Property(property: 'traffic_topn', type: 'integer'),
+                        new OA\Property(property: 'traffic_sample_threshold', type: 'integer'),
+                        new OA\Property(property: 'traffic_retention_1h_days', type: 'integer'),
+                        new OA\Property(property: 'traffic_retention_1d_days', type: 'integer'),
+                        new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
+                        new OA\Property(property: 'geoip_refresh_days', type: 'integer'),
+                        new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', description: 'Only present with read:sensitive.'),
                     ],
                     type: 'object',
                 ),
@@ -118,7 +138,6 @@ class ServerSentinelController extends Controller
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'is_sentinel_enabled', type: 'boolean'),
                     new OA\Property(property: 'is_metrics_enabled', type: 'boolean'),
                     new OA\Property(property: 'is_sentinel_debug_enabled', type: 'boolean'),
                     new OA\Property(property: 'sentinel_token', type: 'string'),
@@ -126,6 +145,13 @@ class ServerSentinelController extends Controller
                     new OA\Property(property: 'sentinel_metrics_history_days', type: 'integer', minimum: 1),
                     new OA\Property(property: 'sentinel_push_interval_seconds', type: 'integer', minimum: 10),
                     new OA\Property(property: 'sentinel_custom_url', type: 'string', nullable: true),
+                    new OA\Property(property: 'traffic_topn', type: 'integer', minimum: 1),
+                    new OA\Property(property: 'traffic_sample_threshold', type: 'integer', minimum: 0),
+                    new OA\Property(property: 'traffic_retention_1h_days', type: 'integer', minimum: 1),
+                    new OA\Property(property: 'traffic_retention_1d_days', type: 'integer', minimum: 1),
+                    new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
+                    new OA\Property(property: 'geoip_refresh_days', type: 'integer', minimum: 1),
+                    new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', nullable: true),
                 ],
                 type: 'object',
             ),
@@ -158,7 +184,6 @@ class ServerSentinelController extends Controller
         $this->authorize('update', $server);
 
         $validator = customApiValidator($request->all(), [
-            'is_sentinel_enabled' => 'boolean',
             'is_metrics_enabled' => 'boolean',
             'is_sentinel_debug_enabled' => 'boolean',
             'sentinel_token' => ['string', 'max:500', 'regex:/\A[a-zA-Z0-9._\-+=\/]+\z/'],
@@ -166,6 +191,13 @@ class ServerSentinelController extends Controller
             'sentinel_metrics_history_days' => 'integer|min:1',
             'sentinel_push_interval_seconds' => 'integer|min:10',
             'sentinel_custom_url' => 'nullable|url',
+            'traffic_topn' => 'integer|min:1',
+            'traffic_sample_threshold' => 'integer|min:0',
+            'traffic_retention_1h_days' => 'integer|min:1',
+            'traffic_retention_1d_days' => 'integer|min:1',
+            'is_geoip_enabled' => 'boolean',
+            'geoip_refresh_days' => 'integer|min:1',
+            'geoip_maxmind_license_key' => 'nullable|string|max:255',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
@@ -189,27 +221,10 @@ class ServerSentinelController extends Controller
         }
 
         $settings = $server->settings;
-        $enablingSentinel = $request->has('is_sentinel_enabled')
-            && $request->boolean('is_sentinel_enabled')
-            && ! $settings->is_sentinel_enabled;
-
-        if ($enablingSentinel && $server->isBuildServer()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['is_sentinel_enabled' => ['Sentinel cannot be enabled on build servers.']],
-            ], 422);
-        }
-
         foreach (self::ALLOWED_FIELDS as $field) {
             if ($request->has($field)) {
                 $settings->{$field} = $request->input($field);
             }
-        }
-
-        // Disabling Sentinel also clears related toggles (matches Livewire toggleSentinel).
-        if ($request->has('is_sentinel_enabled') && ! $request->boolean('is_sentinel_enabled')) {
-            $settings->is_metrics_enabled = false;
-            $settings->is_sentinel_debug_enabled = false;
         }
 
         $settings->save();

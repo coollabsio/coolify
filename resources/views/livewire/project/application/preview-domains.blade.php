@@ -7,16 +7,26 @@
                 && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
                 && !$wire.showPortWarningModal;
         },
-        openEditDomain() {
+        editingServiceLabel: '',
+        openEditDomain(index, domain, parts, service) {
+            if (index !== undefined) {
+                $wire.set('editingIndex', index, false);
+                $wire.set('editingDomainParts', parts, false);
+            }
+            this.editingServiceLabel = service || '';
             this.editingDomainBaseline = JSON.stringify($wire.editingDomainParts);
             this.editOpen = true;
             this.$nextTick(() => this.$refs.editForm.querySelector('input[required]')?.focus());
         },
-        closeEditDomain() { this.editOpen = false; this.editingDomainBaseline = null; },
+        closeEditDomain(discardDraft = true) {
+            this.editOpen = false;
+            this.editingDomainBaseline = null;
+            if (discardDraft) this.$wire.cancelEdit();
+        },
         matchesDomainSearch(value) { return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase()); },
     }"
     @open-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) openEditDomain()"
-    @close-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) closeEditDomain()"
+    @close-preview-domain-edit.window="if ($event.detail.previewId === {{ $preview->id }}) closeEditDomain(false)"
     @keydown.escape.window="if (editOpen && !$wire.showPortWarningModal) closeEditDomain()">
     @if (collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking'))
         <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
@@ -31,7 +41,7 @@
         @endif
         @can('update', $preview->application)
             @if (count($domainRows) > 0)
-                <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
+                <x-forms.button wire:click="checkAllDns" :showLoadingIndicator="false" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
                     <x-reicon name="refresh" class="size-3.5" />
                     Check all DNS
                 </x-forms.button>
@@ -100,6 +110,10 @@
                             default => 'DNS unknown',
                         };
                         $domainKey = hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
+                        $editingParts = \App\Support\DomainUrlParts::split($row['url']);
+                        if ($row['has_port_override'] ?? false) {
+                            $editingParts['port'] = (string) $row['internal_port'];
+                        }
                     @endphp
                     <div wire:key="preview-domain-{{ md5(($row['service'] ?? '') . $row['url']) }}" x-show="matchesDomainSearch(@js(($row['service'] ?? '').' '.$row['url']))" class="env-table-item">
                         <div class="data-table-row service-domains-overview-grid">
@@ -152,7 +166,14 @@
                             </div>
 
                             <div class="service-domain-dns flex min-w-0 items-center">
-                                <x-status-badge :status="$dnsLabel" :type="$dnsType" :title="$row['dns_message']" />
+                                @if ($row['dns_status'] === 'checking')
+                                    <x-status-badge dynamic :title="$row['dns_message']">
+                                        <x-loading compact aria-label="Checking DNS" />
+                                        <span class="truncate">Checking DNS...</span>
+                                    </x-status-badge>
+                                @else
+                                    <x-status-badge :status="$dnsLabel" :type="$dnsType" :title="$row['dns_message']" />
+                                @endif
                             </div>
                             <div class="service-domain-actions flex items-center justify-end gap-1">
                                 @can('update', $preview->application)
@@ -160,12 +181,10 @@
                                         wire:loading.attr="disabled"
                                         wire:target="checkDomainDns({{ $index }}),checkAllDns"
                                         class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                                        <x-reicon name="refresh" class="size-3.5" wire:loading.remove.delay
-                                            wire:target="checkDomainDns({{ $index }}),checkAllDns" />
-                                        <x-loading-on-button wire:loading.delay
-                                            wire:target="checkDomainDns({{ $index }}),checkAllDns" />
+                                        <x-reicon name="refresh" class="size-3.5" />
                                     </button>
-                                    <button type="button" wire:click="startEdit({{ $index }})"
+                                    <button type="button"
+                                        @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js($row['service']))"
                                         class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ getFqdnWithoutPort($row['url']) }}">
                                         <x-reicon name="settings" class="size-3.5" />
                                     </button>
@@ -212,12 +231,12 @@
                     </header>
                     <div class="application-settings-section-body">
                         <form x-ref="editForm" wire:submit="updateDomain" class="flex flex-col gap-4">
-                            <template x-if="editOpen">
-                                <x-unsaved-bar action="updateDomain" dirty="hasAddressChanges" targets="updateDomain,confirmUseUnknownPort" />
-                            </template>
-                            @if ($editingIndex !== null && filled($domainRows[$editingIndex]['service'] ?? null))
-                                <x-forms.input label="Service" :value="$domainRows[$editingIndex]['service']" readonly />
-                            @endif
+                            <div x-show="editingServiceLabel" x-cloak>
+                                <div class="mb-1.5 flex h-4 items-center">
+                                    <label class="mb-0! leading-4">Service</label>
+                                </div>
+                                <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
+                            </div>
                             <x-forms.domain-input id="editingDomainParts" />
                             <div class="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2 dark:border-white/10">
                                 <x-forms.listbox id="preview-domain-indexing-{{ $preview->id }}" label="Search engine indexing"
@@ -232,6 +251,10 @@
                                         ['value' => 'www', 'label' => 'Redirect to www'],
                                         ['value' => 'non-www', 'label' => 'Redirect to non-www'],
                                     ]" />
+                            </div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 dark:border-white/10">
+                                <x-forms.button type="button" wire:click="regenerateEditingDomain">Regenerate hostname</x-forms.button>
+                                <x-forms.button type="submit" isHighlighted>Save</x-forms.button>
                             </div>
                         </form>
                     </div>

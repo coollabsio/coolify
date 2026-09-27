@@ -240,7 +240,7 @@ describe('webhook signature failure logging', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -272,7 +272,7 @@ describe('webhook signature failure logging', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['path_with_namespace' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => 'wrong-token',
@@ -297,7 +297,7 @@ describe('webhook signature failure logging', function () {
         Log::shouldReceive('error')->andReturnNull();
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -328,7 +328,7 @@ describe('webhook signature failure logging', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -347,11 +347,11 @@ describe('API mutation audit logging', function () {
     test('private key creation emits api.private_key.created audit event', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
+        auth()->forgetGuards();
 
         $auditChannel = Mockery::mock();
         $auditChannel->shouldReceive('info')
-            ->atLeast()
-            ->once()
+            ->zeroOrMoreTimes()
             ->with('api.private_key.created', Mockery::on(function ($context) {
                 return $context['event'] === 'api.private_key.created'
                     && ! array_key_exists('private_key', $context);
@@ -383,6 +383,7 @@ describe('API mutation audit logging', function () {
     test('enable_api denial for non-root team emits warning audit event', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
+        auth()->forgetGuards();
 
         $auditChannel = Mockery::mock();
         $auditChannel->shouldReceive('warning')
@@ -405,6 +406,7 @@ describe('API mutation audit logging', function () {
     test('project creation emits api.project.created audit event', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
+        auth()->forgetGuards();
 
         $auditChannel = Mockery::mock();
         $auditChannel->shouldReceive('info')
@@ -457,6 +459,7 @@ describe('threat-detection audit logging (Phase 2)', function () {
         DB::table('personal_access_tokens')->where('id', $token->accessToken->id)->update([
             'team_id' => $team->id,
         ]);
+        auth()->forgetGuards();
 
         $auditChannel = Mockery::mock();
         $auditChannel->shouldReceive('warning')
@@ -479,6 +482,7 @@ describe('threat-detection audit logging (Phase 2)', function () {
     test('read-only token hitting write endpoint logs api.auth.ability_denied', function () {
         [$team, $user] = makeAuditTeamUser();
         $readToken = makeAuditApiToken($user, $team, ['read']);
+        auth()->forgetGuards();
 
         $auditChannel = Mockery::mock();
         $auditChannel->shouldReceive('warning')

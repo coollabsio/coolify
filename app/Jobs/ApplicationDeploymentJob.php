@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
+use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
@@ -19,6 +21,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -147,6 +150,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_args;
 
+    /** @var array<string, string>|null */
+    private ?array $remote_secrets_cache = null;
+
     private $env_nixpacks_args;
 
     private $env_railpack_args;
@@ -233,7 +239,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
-        $this->commit = $this->application_deployment_queue->commit;
+        $this->commit = validateGitRef($this->application_deployment_queue->commit, 'deployment commit');
         $this->rollback = $this->application_deployment_queue->rollback;
         $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
@@ -269,7 +275,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = $this->resolveContainerName();
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
 
         $this->saved_outputs = collect();
 
@@ -307,6 +313,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        try {
+            $this->validateDeploymentEnvironmentVariableKeys();
+        } catch (Exception $e) {
+            $this->fail($e);
+            throw $e;
+        }
+
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
@@ -335,7 +348,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         if ($containerName === 'coolify-proxy') {
                             continue;
                         }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
+                        if (isGeneratedContainerName($containerName)) {
                             continue;
                         }
                         $containerIp = data_get($container, 'IPv4Address');
@@ -361,21 +374,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Check custom port
             ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
-            if (data_get($this->application, 'settings.is_build_server_enabled')) {
-                $teamId = data_get($this->application, 'environment.project.team.id');
-                $buildServers = Server::buildServers($teamId)->get();
-                if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
-                    $this->build_server = $this->server;
-                } else {
-                    $this->build_server = $buildServers->random();
-                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
-                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
-                    $this->use_build_server = true;
-                }
-            } else {
-                $this->build_server = $this->server;
-            }
+            $this->selectBuildServer();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
         } catch (Exception $e) {
@@ -422,6 +421,46 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
             }
         }
+    }
+
+    private function selectBuildServer(): void
+    {
+        $this->build_server = $this->server;
+
+        // A deployments-only server never builds. Docker image and Compose applications are exempt:
+        // the first builds nothing and the second does not support build servers.
+        $mustBuildElsewhere = ! $this->server->canBuildApplications()
+            && ! in_array($this->application->build_pack, ['dockerimage', 'dockercompose'], true);
+
+        if (! $mustBuildElsewhere && ! data_get($this->application, 'settings.is_build_server_enabled')) {
+            return;
+        }
+
+        if ($mustBuildElsewhere && ! $this->restart_only && str($this->application->docker_registry_image_name)->isEmpty()) {
+            throw new DeploymentException("The deployment server ({$this->server->name}) is set to deployments only, so this application is built on a build server. Set a Docker image name in the application's General settings so the deployment server can pull the built image.");
+        }
+
+        $team = $this->application->environment->project->team;
+        $buildServers = Server::buildServers($team->id)->whereKeyNot($this->server->id)->get();
+
+        if ($buildServers->isEmpty()) {
+            // A restart only rebuilds when the image is missing, so it may still run on the deployment server.
+            if ($mustBuildElsewhere && ! $this->restart_only) {
+                throw new DeploymentException("The deployment server ({$this->server->name}) is set to deployments only, and no usable build server was found. Add a build server or change the server role.");
+            }
+            if (! $team->is_build_server_fallback_enabled) {
+                throw new DeploymentException('No available dedicated build server was found. Enable a usable build server for this team or allow fallback to the deployment server in the team settings.');
+            }
+
+            $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
+
+            return;
+        }
+
+        $this->build_server = $buildServers->random();
+        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+        $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
+        $this->use_build_server = true;
     }
 
     private function detectBuildKitCapabilities(): void
@@ -668,10 +707,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
                 // check if the file is a directory or a file inside the repository
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+                    [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
                 );
                 if ($this->saved_outputs->has($saveName)) {
-                    $fileStat = $this->saved_outputs->get($saveName);
+                    $fileStat = $this->trimmedSavedOutput($saveName);
                     if ($fileStat->value() === 'directory' && ! $fileStorage->is_directory) {
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
@@ -693,7 +732,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->generate_build_env_variables();
 
-        $this->application->loadComposeFile(isInit: false);
+        $this->loadComposeFileForDeployment();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
@@ -704,7 +743,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
-            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
+            $composeFile = $this->parseComposeFileForDeployment();
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
@@ -731,6 +770,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
             'hidden' => true,
+            'skip_command_log' => true,
         ]);
 
         // Modify Dockerfiles for ARGs and build secrets
@@ -808,6 +848,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
 
+        $this->pull_docker_compose_images();
+
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
@@ -828,7 +870,55 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        // Start compose file
+        $this->start_docker_compose_services();
+
+        $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    /**
+     * Parses the Compose file for this deployment and writes the volume warnings of the parser
+     * (for example an external volume that the resource does not use yet) to the deployment log.
+     *
+     * @return Collection<array-key, mixed>
+     */
+    private function parseComposeFileForDeployment(): Collection
+    {
+        $composeFile = collect($this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit));
+        foreach ($this->application->composeVolumeWarnings() as $warning) {
+            $this->application_deployment_queue->addLogEntry("Warning: {$warning}", 'stderr');
+        }
+
+        return $composeFile;
+    }
+
+    private function pull_docker_compose_images(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
+
+        if ($this->use_build_server) {
+            $this->write_deployment_configurations();
+            $this->server = $this->mainServer;
+            $workdir = $this->application->workdir();
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+        } else {
+            $workdir = $this->workdir;
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+        }
+
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+        ]);
+    }
+
+    /**
+     * Starts the Compose containers. Content files are written first, because `docker compose up`
+     * creates a missing bind source as an empty directory.
+     */
+    private function start_docker_compose_services(): void
+    {
+        $this->write_missing_content_files();
+
         $server_workdir = $this->application->workdir();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
@@ -907,8 +997,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+    }
 
-        $this->application_deployment_queue->addLogEntry('New container started.');
+    /**
+     * The queued ServerStorageSaveJob writes new content files, but it can run after the containers
+     * start. Preserve-repository deployments write all file storages in write_deployment_configurations().
+     * Coolify writes file storages only on the main server of the application.
+     */
+    private function write_missing_content_files(): void
+    {
+        if ($this->preserveRepository) {
+            return;
+        }
+        if ((int) data_get($this->application, 'destination.server_id') !== (int) $this->mainServer->id) {
+            return;
+        }
+
+        EnsureContentFilesOnServer::run(
+            $this->application->fileStorages()->get(),
+            $this->mainServer,
+            function (string $message, string $type): void {
+                $this->application_deployment_queue->addLogEntry($message, $type);
+            },
+        );
     }
 
     private function deploy_dockerfile_buildpack()
@@ -1091,6 +1202,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
                 [
                     "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
+                    'skip_command_log' => true,
                 ],
                 [
                     "echo '{$readme}' > $mainDir/README.md",
@@ -1287,6 +1399,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 return true;
             }
+            if ($this->has_remote_buildtime_secret_references()) {
+                $this->application_deployment_queue->addLogEntry('Remote build-time secrets are configured. Running the build to check for updated values.');
+
+                return false;
+            }
             $configurationDiff = $this->application->pendingDeploymentConfigurationDiff();
             if (! $configurationDiff->requiresBuild()) {
                 $this->application_deployment_queue->addLogEntry("No build configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
@@ -1314,6 +1431,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return false;
     }
 
+    private function has_remote_buildtime_secret_references(): bool
+    {
+        $environmentVariables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()
+            : $this->application->environment_variables_preview();
+
+        return $environmentVariables
+            ->where('is_buildtime', true)
+            ->get(['value'])
+            ->contains(fn (EnvironmentVariable $environmentVariable) => RemoteSecretReferences::containsReference($environmentVariable->value));
+    }
+
     private function check_image_locally_or_remotely()
     {
         $this->execute_remote_command([
@@ -1333,6 +1462,123 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'save' => 'local_image_found',
             ]);
         }
+    }
+
+    /**
+     * Fetch the secrets from the application's secret manager source. Values
+     * live only in memory during the deployment and in the generated .env on
+     * the server — they are never persisted in the Coolify database. Fetched
+     * lazily (only when a variable references a secret), once per deployment.
+     * A fetch failure fails the deployment.
+     *
+     * @return array<string, string>
+     */
+    private function remote_secrets(): array
+    {
+        if ($this->remote_secrets_cache !== null) {
+            return $this->remote_secrets_cache;
+        }
+
+        $link = $this->application->secretManagerLink()->with('integrationToken')->first();
+
+        if (! $link) {
+            throw new DeploymentException('Environment variables reference remote secrets ({{vault.KEY}}), but no secret manager source is configured for this application.');
+        }
+
+        $provider = $link->integrationToken->providerName();
+        $tokenName = $link->integrationToken->name;
+
+        try {
+            $secrets = $link->fetchSecrets();
+        } catch (Throwable $e) {
+            $this->application_deployment_queue->addLogEntry("Failed to fetch secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}): {$e->getMessage()}", 'stderr');
+
+            throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
+        }
+
+        $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}).");
+
+        return $this->remote_secrets_cache = $secrets;
+    }
+
+    /**
+     * Reads the Compose file from the repository again (also for pull request previews). If the file is not
+     * safe to use, the deployment stops here with a visible log line, before a command uses the file.
+     */
+    private function loadComposeFileForDeployment(): void
+    {
+        try {
+            $this->application->loadComposeFile(isInit: false);
+        } catch (DeploymentException $e) {
+            // Deployment logs escape HTML themselves, so undo the escaping that error toasts need.
+            $message = 'Deployment stopped: '.lcfirst(html_entity_decode($e->getMessage(), ENT_QUOTES | ENT_HTML5));
+            $this->application_deployment_queue->addLogEntry($message, 'stderr');
+
+            throw DeploymentException::alreadyLogged($message, previous: $e);
+        }
+    }
+
+    /**
+     * Replace {{vault.KEY}} references with values from the configured secret
+     * manager source. Missing keys fail the deployment with a
+     * list — changing the source never re-checks references, so this is the
+     * moment problems surface. Values without references are returned as-is
+     * and never fetch secrets.
+     */
+    private function substitute_remote_secrets(string $value, string $envKey): string
+    {
+        if (! RemoteSecretReferences::containsReference($value)) {
+            return $value;
+        }
+
+        $secrets = $this->remote_secrets();
+        $missing = RemoteSecretReferences::missingKeys($value, $secrets);
+
+        if ($missing !== []) {
+            $message = 'Missing secret keys: '.implode(', ', $missing)." (referenced by {$envKey}). Check the secret manager source of this application.";
+            $this->application_deployment_queue->addLogEntry($message, 'stderr');
+
+            throw DeploymentException::alreadyLogged($message);
+        }
+
+        return RemoteSecretReferences::substitute($value, $secrets);
+    }
+
+    /**
+     * Resolve shared variables, then secret references, in a raw variable value.
+     */
+    private function resolve_environment_variable_raw(EnvironmentVariable $env): string
+    {
+        $value = $env->get_real_environment_variables_with_server($env->value, $this->application, $this->mainServer);
+
+        return $this->substitute_remote_secrets($value ?? '', $env->key);
+    }
+
+    /**
+     * Resolve a runtime variable to its dotenv representation. Values with
+     * secret references are substituted and written as literals.
+     */
+    private function resolve_environment_variable(EnvironmentVariable $env): ?string
+    {
+        if (! RemoteSecretReferences::containsReference($env->value)) {
+            return $env->getResolvedValueWithServer($this->mainServer);
+        }
+
+        return $this->format_remote_secret_value($this->resolve_environment_variable_raw($env));
+    }
+
+    /**
+     * Format a remote secret value for the runtime .env file (dotenv syntax read
+     * by docker compose). Values are treated as literals — no interpolation.
+     */
+    private function format_remote_secret_value(string $value): string
+    {
+        if (! str_contains($value, "'")) {
+            return "'".$value."'";
+        }
+
+        // Fall back to double quotes; $$ escapes compose interpolation.
+        return '"'.str_replace(['\\', '"', '$'], ['\\\\', '\\"', '$$'], $value).'"';
     }
 
     private function generate_runtime_environment_variables()
@@ -1403,7 +1649,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($env->key.'='.$this->resolve_environment_variable($env));
             }
 
             // Check for PORT environment variable mismatch with ports_exposes
@@ -1470,7 +1716,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($env->key.'='.$this->resolve_environment_variable($env));
             }
 
             // Fall back to production env vars for keys not overridden by preview vars,
@@ -1484,7 +1730,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     return $env->is_runtime && ! in_array($env->key, $previewKeys);
                 });
                 foreach ($fallback_production_vars as $env) {
-                    $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                    $envs->push($env->key.'='.$this->resolve_environment_variable($env));
                 }
             }
 
@@ -1592,16 +1838,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+                'skip_command_log' => true,
             ]
         );
 
         if (isDev()) {
-            $this->execute_remote_command(
-                [
-                    executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
-                    'hidden' => true,
-                ]
-            );
+            $this->logEnvironmentFileKeys("{$this->workdir}/.env", $environment_variables);
         }
 
         // Write .env file to configuration directory
@@ -1610,6 +1852,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                    'skip_command_log' => true,
                 ]
             );
             $this->server = $this->build_server;
@@ -1617,9 +1860,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                    'skip_command_log' => true,
                 ]
             );
         }
+    }
+
+    /**
+     * Development aid: log which variables an env file contains, without their values.
+     *
+     * @param  Collection<int, string>  $environmentVariables  Lines in KEY=VALUE format.
+     */
+    private function logEnvironmentFileKeys(string $path, Collection $environmentVariables): void
+    {
+        $keys = $environmentVariables
+            ->map(fn (string $line): string => explode('=', $line, 2)[0])
+            ->implode(', ');
+
+        $this->application_deployment_queue->addLogEntry("[DEBUG] Variable names in {$path}: {$keys}", hidden: true);
     }
 
     private function generate_buildtime_environment_variables()
@@ -1743,6 +2001,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     continue;
                 }
 
+                if (RemoteSecretReferences::containsReference($env->value)) {
+                    $envs_dict[$env->key] = escapeBashEnvValue($this->resolve_environment_variable_raw($env));
+
+                    continue;
+                }
+
                 $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
                 // For literal/multiline vars, real_value includes quotes that we need to remove
                 if ($env->is_literal || $env->is_multiline) {
@@ -1795,6 +2059,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             foreach ($sorted_environment_variables as $env) {
                 if ($this->build_pack === 'railpack' && $this->is_reserved_docker_client_env_key($env->key)) {
+                    continue;
+                }
+
+                if (RemoteSecretReferences::containsReference($env->value)) {
+                    $envs_dict[$env->key] = escapeBashEnvValue($this->resolve_environment_variable_raw($env));
+
                     continue;
                 }
 
@@ -1857,6 +2127,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function validatedBuildtimeEnvironmentVariableKey(string $key, string $origin): string
     {
+
         try {
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
                 throw new \InvalidArgumentException('Invalid build-time environment variable key.');
@@ -1866,11 +2137,70 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\InvalidArgumentException $exception) {
             $this->logInvalidBuildtimeEnvironmentVariableKey($key, $origin);
 
-            throw new DeploymentException(
+            // The log already explains the problem and how to fix it.
+            throw DeploymentException::alreadyLogged(
                 "Invalid environment variable name from {$origin}: ".ValidationPatterns::displayShellEnvironmentVariableKey($key).'. Names must start with a letter or underscore and contain only letters, numbers, underscores, and dots.',
                 previous: $exception,
             );
         }
+    }
+
+    /**
+     * Build-time names go into shell and Docker build commands, so they must be valid when the
+     * deployment builds an image. Runtime-only variables only go into the .env file: existing ones
+     * with names that new variables can no longer use (such as my-var) keep working, unless the
+     * name would break a .env line. Deployments without a build step (Docker image) treat
+     * build-time variables the same way, because no build receives them.
+     */
+    private function validateDeploymentEnvironmentVariableKeys(): void
+    {
+        $environmentVariables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()->get(['key', 'is_buildtime', 'is_runtime'])
+            : $this->application->environment_variables_preview()->get(['key', 'is_buildtime', 'is_runtime']);
+        $passesBuildtimeVariables = $this->deploymentPassesBuildtimeVariables();
+
+        foreach ($environmentVariables as $environmentVariable) {
+            $key = (string) $environmentVariable->key;
+            $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
+            if (($environmentVariable->is_buildtime && $passesBuildtimeVariables) || ! $isEnvFileSafe) {
+                $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
+
+                continue;
+            }
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $this->logLegacyEnvironmentVariableKey($key, (bool) $environmentVariable->is_buildtime, (bool) $environmentVariable->is_runtime);
+            }
+        }
+    }
+
+    /**
+     * Only Docker image deployments never build an image. Other deployments (also restarts,
+     * rollbacks, and previews) can build and pass build-time variables to the build.
+     */
+    private function deploymentPassesBuildtimeVariables(): bool
+    {
+        return $this->application->build_pack !== 'dockerimage';
+    }
+
+    private function logLegacyEnvironmentVariableKey(string $key, bool $isBuildtime, bool $isRuntime): void
+    {
+        $suggestedKey = (string) preg_replace('/[^A-Za-z0-9_]/', '_', $key);
+        if (preg_match('/\A[0-9]/', $suggestedKey) === 1) {
+            $suggestedKey = '_'.$suggestedKey;
+        }
+
+        $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
+
+        if ($isBuildtime) {
+            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. This deployment does not build an image, so it is not used as a build-time variable. Rename it before you use it in a build.", 'stderr');
+        }
+        if ($isRuntime) {
+            $this->application_deployment_queue->addLogEntry("⚠️ Runtime variable {$displayKey} uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.", 'stderr');
+        }
+        if (! $isBuildtime && ! $isRuntime) {
+            $this->application_deployment_queue->addLogEntry("⚠️ Variable {$displayKey} uses a name that new variables cannot use. This deployment does not use it.", 'stderr');
+        }
+        $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
     }
 
     private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void
@@ -1926,13 +2256,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Creating build-time .env file in /artifacts (outside Docker context).', hidden: true);
                 $this->execute_remote_command([
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
+                    'skip_command_log' => true,
                 ]);
 
                 if (isDev()) {
-                    $this->execute_remote_command([
-                        executeInDocker($this->deployment_uuid, 'cat '.self::BUILD_TIME_ENV_PATH),
-                        'hidden' => true,
-                    ]);
+                    $this->logEnvironmentFileKeys(self::BUILD_TIME_ENV_PATH, $environment_variables);
                 }
             } elseif (in_array($this->build_pack, ['dockercompose', 'dockerfile', 'railpack'], true)) {
                 $this->application_deployment_queue->addLogEntry('Creating empty build-time .env file in /artifacts (no build-time variables defined).', hidden: true);
@@ -1971,6 +2299,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $contents_base64 = base64_encode($contents);
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "echo '$contents_base64' | base64 -d | tee {$path} > /dev/null"),
+                'skip_command_log' => true,
             ]);
         }
 
@@ -2050,7 +2379,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->write_deployment_configurations();
                     $this->server = $this->mainServer;
                 }
-                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty() || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+                if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                     $this->application_deployment_queue->addLogEntry('----------------------------------------');
                     if (count($this->application->ports_mappings_array) > 0) {
                         $this->application_deployment_queue->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
@@ -2058,7 +2387,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                         $this->application_deployment_queue->addLogEntry('Consistent container name feature enabled, rolling update is not supported.');
                     }
-                    if (str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                    if ((bool) $this->application->settings->is_consistent_container_name_enabled && str($this->application->settings->custom_internal_name)->isNotEmpty()) {
                         $this->application_deployment_queue->addLogEntry('Custom internal name is set, rolling update is not supported.');
                     }
                     if ($this->pull_request_id !== 0) {
@@ -2084,19 +2413,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function resolveContainerName(): string
-    {
-        if (str($this->application->settings->custom_internal_name)->isEmpty()) {
-            return generateApplicationContainerName($this->application, $this->pull_request_id);
-        }
-
-        if ($this->pull_request_id === 0) {
-            return $this->application->settings->custom_internal_name;
-        }
-
-        return addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
-    }
-
     private function health_check()
     {
         try {
@@ -2112,6 +2428,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->application_deployment_queue->addLogEntry('Custom healthcheck found in Dockerfile.');
                 }
                 if ($this->container_name) {
+                    $escapedContainerName = escapeshellarg($this->container_name);
                     $counter = 1;
                     $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                     if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
@@ -2127,13 +2444,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     while ($counter <= $this->application->health_check_retries) {
                         $this->execute_remote_command(
                             [
-                                "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
+                                "docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}",
                                 'hidden' => true,
                                 'save' => 'health_check',
                                 'append' => false,
                             ],
                             [
-                                "docker inspect --format='{{json .State.Health.Log}}' {$this->container_name}",
+                                "docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}",
                                 'hidden' => true,
                                 'save' => 'health_check_logs',
                                 'append' => false,
@@ -2149,12 +2466,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $this->application_deployment_queue->addLogEntry("Healthcheck logs: {$health_check_logs} | Return code: {$health_check_return_code}");
                         }
 
-                        if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
+                        $healthCheckStatus = $this->trimmedSavedOutput('health_check')->replace('"', '')->value();
+                        if ($healthCheckStatus === 'healthy') {
                             $this->newVersionIsHealthy = true;
                             $this->application->update(['status' => 'running']);
                             $this->application_deployment_queue->addLogEntry('New container is healthy.');
                             break;
-                        } elseif (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        } elseif ($healthCheckStatus === 'unhealthy') {
                             $this->newVersionIsHealthy = false;
                             $this->application_deployment_queue->addLogEntry('New container is unhealthy.', type: 'error');
                             $this->query_logs();
@@ -2167,7 +2485,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             $sleeptime++;
                         }
                     }
-                    if (str($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'starting') {
+                    if ($this->trimmedSavedOutput('health_check')->replace('"', '')->value() === 'starting') {
                         $this->query_logs();
                     }
                 }
@@ -2179,11 +2497,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function query_logs()
     {
+        $escapedContainerName = escapeshellarg($this->container_name);
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Container logs:');
         $this->execute_remote_command(
             [
-                'command' => "docker logs -n 100 {$this->container_name}",
+                'command' => "docker logs -n 100 {$escapedContainerName}",
                 'type' => 'stderr',
                 'ignore_errors' => true,
             ],
@@ -2306,6 +2625,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [
                 $runCommand,
                 'hidden' => true,
+                'skip_command_log' => filled($env_flags),
             ],
             [
                 'command' => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}"),
@@ -2381,15 +2701,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $domains = str($fqdn)->explode(',')->map(fn (string $domain) => trim($domain))->filter();
-            $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
-            $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
-            if ((int) $this->application->compose_parsing_version >= 3) {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
-            } else {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+            $domains = str($fqdn)->explode(',')
+                ->map(fn (string $domain) => trim($domain))
+                ->filter()
+                ->filter(fn (string $domain) => isValidDomainUrl($domain));
+            if ($domains->isNotEmpty()) {
+                $url = $domains->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
+                $fqdn = $domains->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
+                } else {
+                    $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
+                    $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+                }
             }
         }
         if (isset($this->application->git_branch)) {
@@ -2544,7 +2869,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'));
+            $commit_message = $this->trimmedSavedOutput('commit_message');
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
@@ -2614,7 +2939,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
         );
         if ($this->saved_outputs->get('nixpacks_type')) {
-            $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
+            $this->nixpacks_type = $this->trimmedSavedOutput('nixpacks_type')->value();
             if (str($this->nixpacks_type)->isEmpty()) {
                 throw new DeploymentException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
@@ -2762,6 +3087,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function normalize_resolved_build_variable_value(EnvironmentVariable $environmentVariable): ?string
     {
+        if (RemoteSecretReferences::containsReference($environmentVariable->value)) {
+            $resolved = $this->resolve_environment_variable_raw($environmentVariable);
+
+            return $resolved === '' ? null : $resolved;
+        }
+
         $resolvedValue = $environmentVariable->getResolvedValueWithServer($this->mainServer);
         if (is_null($resolvedValue) || $resolvedValue === '') {
             return null;
@@ -2847,6 +3178,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         return 'env '.$variables
             ->map(function ($value, $key) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Railpack environment');
+
                 return escapeShellValue("{$key}={$value}");
             })
             ->implode(' ').' ';
@@ -2860,6 +3193,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         return ' '.$variables
             ->map(function ($value, $key) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Railpack environment');
+
                 return '--secret '.escapeShellValue("id={$key},env={$key}");
             })
             ->implode(' ');
@@ -3089,7 +3424,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->application_deployment_queue->addLogEntry('Generating Railpack build plan.');
         $this->execute_remote_command(
-            [executeInDocker($this->deployment_uuid, $prepare_command), 'hidden' => true],
+            [executeInDocker($this->deployment_uuid, $prepare_command), 'hidden' => true, 'skip_command_log' => true],
             [
                 executeInDocker($this->deployment_uuid, 'cat /artifacts/railpack-plan.json'),
                 'hidden' => true,
@@ -3121,7 +3456,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             : $this->production_image_name;
 
         if ($this->application->settings->is_static && $this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
 
         $build_command = $this->railpack_build_command($image_name, $railpackVariables);
@@ -3152,7 +3487,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $publishDir = trim($this->application->publish_directory, '/');
         $publishDir = $publishDir ? "/{$publishDir}" : '';
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from={$this->build_image_name} /app{$publishDir} .
@@ -3305,7 +3640,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
-                $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
+                $resolvedValue = RemoteSecretReferences::containsReference($env->value)
+                    ? $this->resolve_environment_variable_raw($env)
+                    : $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {
                     $this->env_args->put($env->key, $resolvedValue);
                 }
@@ -3321,7 +3658,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             foreach ($envs as $env) {
-                $resolvedValue = $env->getResolvedValueWithServer($this->mainServer);
+                $resolvedValue = RemoteSecretReferences::containsReference($env->value)
+                    ? $this->resolve_environment_variable_raw($env)
+                    : $env->getResolvedValueWithServer($this->mainServer);
                 if (! is_null($resolvedValue)) {
                     $this->env_args->put($env->key, $resolvedValue);
                 }
@@ -3573,7 +3912,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true, 'skip_command_log' => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -3680,12 +4019,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return $default;
     }
 
-    private function pull_latest_image($image)
+    private function staticImage(): string
     {
+        return StaticImageTypes::from($this->application->static_image)->value;
+    }
+
+    private function pull_latest_image(string $image): void
+    {
+        $image = StaticImageTypes::from($image)->value;
         $this->application_deployment_queue->addLogEntry("Pulling latest image ($image) from the registry.");
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "docker pull {$image}"),
+                executeInDocker($this->deployment_uuid, 'docker pull '.escapeshellarg($image)),
                 'hidden' => true,
             ]
         );
@@ -3696,9 +4041,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         if ($this->application->static_image) {
-            $this->pull_latest_image($this->application->static_image);
+            $this->pull_latest_image($this->staticImage());
         }
-        $dockerfile = base64_encode("FROM {$this->application->static_image}
+        $dockerfile = base64_encode("FROM {$this->staticImage()}
         WORKDIR /usr/share/nginx/html/
         LABEL coolify.deploymentId={$this->deployment_uuid}
         COPY . .
@@ -3770,7 +4115,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Traditional build args approach - generate COOLIFY_ variables locally
             $coolify_envs = $this->generate_coolify_env_variables(forBuildTime: true);
             $coolify_envs->each(function ($value, $key) {
-                $this->build_args->push("--build-arg '{$key}'");
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Coolify build environment');
+                $this->build_args->push('--build-arg '.escapeshellarg($key));
             });
         }
 
@@ -3792,12 +4138,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application->settings->is_static) {
             if ($this->application->static_image) {
-                $this->pull_latest_image($this->application->static_image);
+                $this->pull_latest_image($this->staticImage());
                 $this->application_deployment_queue->addLogEntry('Continuing with the building process.');
             }
             if ($this->application->build_pack === 'nixpacks') {
                 $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true]);
+                $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true, 'skip_command_log' => true]);
                 if ($this->force_rebuild) {
                     $this->execute_remote_command([
                         executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
@@ -3898,7 +4244,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
             $publishDir = trim($this->application->publish_directory, '/');
             $publishDir = $publishDir ? "/{$publishDir}" : '';
-            $dockerfile = base64_encode("FROM {$this->application->static_image}
+            $dockerfile = base64_encode("FROM {$this->staticImage()}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from=$this->build_image_name /app{$publishDir} .
@@ -3983,7 +4329,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true]);
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->nixpacks_plan}' | base64 -d | tee ".self::NIXPACKS_PLAN_PATH.' > /dev/null'), 'hidden' => true, 'skip_command_log' => true]);
                     if ($this->force_rebuild) {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, 'nixpacks build -c '.self::NIXPACKS_PLAN_PATH." --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
@@ -4094,11 +4440,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             if ($skipRemove) {
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
             } else {
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, escapeshellarg($containerName), $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
                 $this->removeContainerWithTimeout($containerName);
             }
@@ -4142,7 +4488,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
-                if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
+                if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
                         $this->graceful_shutdown_container($containerName);
@@ -4325,15 +4671,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->build_args = generateDockerBuildArgs($vars_with_metadata);
 
             if ($secrets_hash) {
-                $this->build_args->push("--build-arg COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
+                $this->build_args->push('--build-arg '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"));
             }
         }
     }
 
     private function generate_docker_env_flags_for_secrets()
     {
-        // Only generate env flags if build secrets are enabled
-        if (! $this->application->settings->use_build_secrets) {
+        // Only generate env flags if build secrets are enabled and the deployment builds an image
+        if (! $this->application->settings->use_build_secrets || ! $this->deploymentPassesBuildtimeVariables()) {
             return '';
         }
 
@@ -4362,6 +4708,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Map to simple array format for the helper function
         $vars_array = $variables->map(function ($value, $key) use ($env_vars) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment');
             $env = $env_vars->firstWhere('key', $key);
 
             return [
@@ -4372,7 +4719,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         });
 
         $env_flags = generateDockerEnvFlags($vars_array);
-        $env_flags .= " -e COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}";
+        $env_flags .= ' -e '.escapeshellarg("COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
 
         return $env_flags;
     }
@@ -4387,7 +4734,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $this->build_secrets = $variables
             ->map(function ($value, $key) {
-                return "--secret id={$key},env={$key}";
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build secret environment');
+
+                return '--secret '.escapeshellarg("id={$key},env={$key}");
             })
             ->implode(' ');
 
@@ -4415,7 +4764,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             $secrets_string = $variables
                 ->map(function ($env) {
-                    return "{$env->key}={$env->getResolvedValueWithServer($this->mainServer)}";
+                    return "{$env->key}={$this->resolve_environment_variable($env)}";
                 })
                 ->sort()
                 ->implode('|');
@@ -4478,11 +4827,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->where('is_buildtime', true)
                 ->get();
             foreach ($envs as $env) {
-                if (data_get($env, 'is_multiline') === true) {
-                    $argsToInsert->push("ARG {$env->key}");
-                } else {
-                    $argsToInsert->push("ARG {$env->key}={$env->getResolvedValueWithServer($this->mainServer)}");
-                }
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
+                $argsToInsert->push("ARG {$key}");
             }
             // Add Coolify variables as ARGs
             if ($this->coolify_variables) {
@@ -4500,11 +4846,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ->where('is_buildtime', true)
                 ->get();
             foreach ($envs as $env) {
-                if (data_get($env, 'is_multiline') === true) {
-                    $argsToInsert->push("ARG {$env->key}");
-                } else {
-                    $argsToInsert->push("ARG {$env->key}={$env->getResolvedValueWithServer($this->mainServer)}");
-                }
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $env->key, 'the generated Dockerfile');
+                $argsToInsert->push("ARG {$key}");
             }
             // Add Coolify variables as ARGs
             if ($this->coolify_variables) {
@@ -4515,6 +4858,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     });
                 $argsToInsert = $argsToInsert->merge($coolify_vars);
             }
+        }
+
+        if ($argsToInsert->isNotEmpty()) {
+            $environmentVariables = $envs->mapWithKeys(function ($environmentVariable) {
+                return [$environmentVariable->key => escapeBashEnvValue($this->resolve_environment_variable_raw($environmentVariable))];
+            });
+            $secretsHash = $this->generate_secrets_hash($environmentVariables);
+            $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secretsHash}");
         }
 
         // Development logging to show what ARGs are being injected
@@ -4538,11 +4889,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $dockerfile->splice($fromLineIndex + 1, 0, [$arg]);
                 }
             }
-            $envs_mapped = $envs->mapWithKeys(function ($env) {
-                return [$env->key => $env->getResolvedValueWithServer($this->mainServer)];
-            });
-            $secrets_hash = $this->generate_secrets_hash($envs_mapped);
-            $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
         }
 
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
@@ -4551,11 +4897,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             [
                 executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
                 'hidden' => true,
-            ],
-            [
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
-                'hidden' => true,
-                'ignore_errors' => true,
+                'skip_command_log' => true,
             ]);
     }
 
@@ -4625,7 +4967,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         // Generate mount strings for all secrets
-        $mountStrings = $variables->map(fn ($value, $key) => "--mount=type=secret,id={$key},env={$key}")->implode(' ');
+        $mountStrings = $variables->map(function ($value, $key) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
+
+            return "--mount=type=secret,id={$key},env={$key}";
+        })->implode(' ');
 
         // Add mount for the secrets hash to ensure cache invalidation
         $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
@@ -4690,38 +5036,33 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 continue;
             }
 
-            $context = '.';
-            $dockerfile = 'Dockerfile';
+            $dockerfilePath = $this->resolveComposeDockerfilePath($service['build']);
+            if ($dockerfilePath === null) {
+                $this->application_deployment_queue->addLogEntry($this->composeArgInjectionSkippedMessage((string) $serviceName, $service['build'], $variables));
 
-            if (is_string($service['build'])) {
-                $context = $service['build'];
-            } elseif (is_array($service['build'])) {
-                $context = data_get($service['build'], 'context', '.');
-                $dockerfile = data_get($service['build'], 'dockerfile', 'Dockerfile');
+                continue;
             }
+            // Compose resolves relative paths from the project directory (the workdir).
+            $fullDockerfilePath = escapeshellarg(str_starts_with($dockerfilePath, '/') ? $dockerfilePath : "{$this->workdir}/{$dockerfilePath}");
 
-            $dockerfilePath = rtrim($context, '/').'/'.ltrim($dockerfile, '/');
-            if (str_starts_with($dockerfilePath, './')) {
-                $dockerfilePath = substr($dockerfilePath, 2);
-            }
-            if (str_starts_with($dockerfilePath, '/')) {
-                $dockerfilePath = substr($dockerfilePath, 1);
-            }
-
+            // BusyBox realpath in the helper image accepts no options; a missing file prints nothing.
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "test -f {$this->workdir}/{$dockerfilePath} && echo 'exists' || echo 'not found'"),
+                executeInDocker($this->deployment_uuid, "resolved_path=$(realpath {$fullDockerfilePath} 2>/dev/null) && test -f \"\$resolved_path\" && printf '%s' \"\$resolved_path\" || true"),
                 'hidden' => true,
                 'save' => 'dockerfile_check_'.$serviceName,
             ]);
 
-            if (str($this->saved_outputs->get('dockerfile_check_'.$serviceName))->trim()->toString() !== 'exists') {
+            // A monorepo context may leave the base directory, but never the cloned repository.
+            $resolvedDockerfilePath = str($this->saved_outputs->get('dockerfile_check_'.$serviceName))->trim()->toString();
+            if (! str_starts_with($resolvedDockerfilePath, "{$this->basedir}/")) {
                 $this->application_deployment_queue->addLogEntry("Dockerfile not found for service {$serviceName} at {$dockerfilePath}, skipping ARG injection.");
 
                 continue;
             }
+            $fullDockerfilePath = escapeshellarg($resolvedDockerfilePath);
 
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}/{$dockerfilePath}"),
+                executeInDocker($this->deployment_uuid, "cat {$fullDockerfilePath}"),
                 'hidden' => true,
                 'save' => 'dockerfile_content_'.$serviceName,
             ]);
@@ -4750,6 +5091,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             $argsToAdd = collect([]);
             foreach ($variables as $key => $value) {
+                $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the generated Dockerfile');
                 $argsToAdd->push("ARG {$key}");
             }
 
@@ -4812,7 +5154,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($totalAdded > 0) {
                 $dockerfile_base64 = base64_encode($dockerfile_lines->implode("\n"));
                 $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}/{$dockerfilePath} > /dev/null"),
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$fullDockerfilePath} > /dev/null"),
                     'hidden' => true,
                 ]);
 
@@ -4823,11 +5165,70 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             if ($this->dockerSecretsSupported && ! empty($this->build_secrets)) {
-                $fullDockerfilePath = "{$this->workdir}/{$dockerfilePath}";
                 $this->modify_dockerfile_for_secrets($fullDockerfilePath);
                 $this->application_deployment_queue->addLogEntry("Modified Dockerfile for service {$serviceName} to use build secrets.");
             }
         }
+    }
+
+    /**
+     * Returns the Dockerfile path of a Compose build as written (relative to the project directory,
+     * or absolute), or null when Coolify cannot inspect it locally: a remote git context, a path that
+     * Compose fills in from variables, or an inline Dockerfile. The path is untrusted: the caller
+     * quotes it and only uses the resolved file when it is inside the cloned repository.
+     */
+    private function resolveComposeDockerfilePath(mixed $build): ?string
+    {
+        if (! is_string($build) && ! is_array($build)) {
+            return null;
+        }
+
+        $context = is_string($build) ? $build : data_get($build, 'context', '.');
+        $dockerfile = is_array($build) ? data_get($build, 'dockerfile', 'Dockerfile') : 'Dockerfile';
+
+        if (! is_string($context) || ! is_string($dockerfile) || $context === '' || (is_array($build) && array_key_exists('dockerfile_inline', $build))) {
+            return null;
+        }
+        if (str_contains($context.$dockerfile, '$') || preg_match('~^[a-z][a-z0-9+.-]*://|^git@~i', $context) === 1) {
+            return null;
+        }
+
+        return str_starts_with($dockerfile, '/') ? $dockerfile : rtrim($context, '/').'/'.$dockerfile;
+    }
+
+    /**
+     * Tells the user why Coolify cannot add ARG lines to a Compose service Dockerfile, and which
+     * build-time variables to declare there. Only valid variable names are shown, never values.
+     *
+     * @param  Collection<string, mixed>  $variables
+     */
+    private function composeArgInjectionSkippedMessage(string $serviceName, mixed $build, Collection $variables): string
+    {
+        $context = is_string($build) ? $build : data_get($build, 'context');
+        $dockerfile = is_array($build) ? data_get($build, 'dockerfile') : null;
+
+        $reason = match (true) {
+            is_array($build) && array_key_exists('dockerfile_inline', $build) => 'the service uses an inline Dockerfile (dockerfile_inline)',
+            is_string($context) && preg_match('~^[a-z][a-z0-9+.-]*://|^git@~i', $context) === 1 => 'the build context is a remote Git URL',
+            (is_string($context) && str_contains($context, '$')) || (is_string($dockerfile) && str_contains($dockerfile, '$')) => 'the build context or Dockerfile path uses variables',
+            default => 'Coolify cannot read the build definition',
+        };
+
+        $names = $variables->keys()
+            ->map(fn ($key) => (string) $key)
+            ->filter(fn (string $key) => ValidationPatterns::isValidEnvironmentVariableKey($key))
+            ->sortBy(fn (string $key) => str_starts_with($key, 'COOLIFY_') ? 1 : 0)
+            ->values();
+
+        $message = "Skipping ARG injection for service {$serviceName}: {$reason}. Docker ignores build-time variables that the Dockerfile does not declare, so add 'ARG <NAME>' lines to the Dockerfile for the ones you need";
+        if ($names->isEmpty()) {
+            return "{$message}.";
+        }
+
+        $listedNames = $names->take(10)->implode(', ');
+        $moreCount = $names->count() - 10;
+
+        return $moreCount > 0 ? "{$message}: {$listedNames} and {$moreCount} more." : "{$message}: {$listedNames}.";
     }
 
     private function add_build_secrets_to_compose($composeFile)
@@ -4846,6 +5247,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         $secrets = [];
         foreach ($variables as $key => $value) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the Compose build secret environment');
             $secrets[$key] = [
                 'environment' => $key,
             ];
@@ -4862,7 +5264,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (! isset($service['build']['secrets'])) {
                     $service['build']['secrets'] = [];
                 }
-                foreach ($variables as $key => $value) {
+                foreach (array_keys($secrets) as $key) {
                     if (! in_array($key, $service['build']['secrets'])) {
                         $service['build']['secrets'][] = $key;
                     }
@@ -5204,7 +5606,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $errorClass = get_class($exception);
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
-        $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
+        if ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
+            $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
+        } else {
+            $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
+        }
         $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr', hidden: true);
         $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr', hidden: true);
 

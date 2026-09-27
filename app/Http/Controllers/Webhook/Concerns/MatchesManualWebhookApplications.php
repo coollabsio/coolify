@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Models\Application;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 trait MatchesManualWebhookApplications
 {
+    use ThrottlesManualWebhookFailures;
+
     protected function manualWebhookRepositoryFullName(mixed $fullName): ?string
     {
         if (! is_string($fullName)) {
@@ -62,6 +64,38 @@ trait MatchesManualWebhookApplications
         ];
     }
 
+    /**
+     * Respond to a delivery that could not be authenticated (no matching
+     * application or no signature) and count it as a failed attempt.
+     *
+     * Deliveries without a matching application are counted too: the failure
+     * key is scoped to the repository and branch, so this cannot lock out other
+     * applications, and it keeps the 429 response from revealing which
+     * repositories exist in this instance.
+     *
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
+     */
+    protected function unauthenticatedManualWebhookResponse(string $failureKey, string $attempt): Response
+    {
+        $this->recordManualWebhookFailure($failureKey, $attempt);
+
+        return response([$this->unauthenticatedManualWebhookFailurePayload()]);
+    }
+
+    /**
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
+     */
+    protected function manualWebhookResponse(Collection $payloads, string $failureKey, string $attempt): Response
+    {
+        $failure = $this->unauthenticatedManualWebhookFailurePayload();
+        $authorizedPayloads = $payloads->reject(fn (array $payload): bool => $payload === $failure)->values();
+        if ($authorizedPayloads->isEmpty() && $payloads->isNotEmpty()) {
+            return $this->unauthenticatedManualWebhookResponse($failureKey, $attempt);
+        }
+
+        return response($authorizedPayloads);
+    }
+
     protected function canonicalManualWebhookRepository(?string $gitRepository): ?string
     {
         if (! is_string($gitRepository)) {
@@ -79,12 +113,8 @@ trait MatchesManualWebhookApplications
 
         if (is_array($parts) && isset($parts['scheme'])) {
             $path = data_get($parts, 'path');
-        } elseif (Str::startsWith($gitRepository, 'git@') && str_contains($gitRepository, ':')) {
-            $path = Str::after($gitRepository, ':');
-            // scp-style SSH URLs embed a custom port as "git@host:2222/owner/repo".
-            // Strip the leading numeric port segment so the path matches the webhook
-            // payload's owner/repo, consistent with convertGitUrl() in shared.php.
-            $path = preg_replace('#^\d+/#', '', $path) ?? $path;
+        } elseif (($scp = parseScpStyleGitUrl($gitRepository)) !== null) {
+            $path = $scp['path'];
         } else {
             $path = $gitRepository;
         }

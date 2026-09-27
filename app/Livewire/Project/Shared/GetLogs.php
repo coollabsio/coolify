@@ -16,6 +16,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Process;
@@ -37,7 +38,7 @@ class GetLogs extends Component
     public string $errors = '';
 
     #[Locked]
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource = null;
 
     #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
@@ -131,6 +132,12 @@ class GetLogs extends Component
         $this->streamLogs = ! $this->streamLogs;
     }
 
+    public function showAllLogs(): void
+    {
+        $this->numberOfLines = -1;
+        $this->getLogs(true);
+    }
+
     public function getLogs($refresh = false)
     {
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
@@ -149,22 +156,25 @@ class GetLogs extends Component
         if (! $refresh && ! $this->expandByDefault && ($this->resource?->getMorphClass() === Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
+        $logTail = $this->numberOfLines === -1 ? 'all' : $this->numberOfLines;
+        if ($logTail !== 'all' && ($logTail <= 0 || is_null($logTail))) {
             $this->numberOfLines = 1000;
+            $logTail = $this->numberOfLines;
         }
-        if ($this->numberOfLines > self::MAX_LOG_LINES) {
+        if ($logTail !== 'all' && $logTail > self::MAX_LOG_LINES) {
             $this->numberOfLines = self::MAX_LOG_LINES;
+            $logTail = $this->numberOfLines;
         }
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$this->numberOfLines} -t {$this->container}";
+                    $command = "docker service logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
+                    $command = "docker logs -n {$logTail} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
@@ -172,13 +182,13 @@ class GetLogs extends Component
                 }
             } else {
                 if ($this->server->isSwarm()) {
-                    $command = "docker service logs -n {$this->numberOfLines} {$this->container}";
+                    $command = "docker service logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
                 } else {
-                    $command = "docker logs -n {$this->numberOfLines} {$this->container}";
+                    $command = "docker logs -n {$logTail} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];

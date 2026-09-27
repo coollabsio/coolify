@@ -59,6 +59,7 @@ class InfrastructureOverviewResource extends Resource
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'sqlites',
             ])
             ->get()
             ->map(fn (Project $project) => [
@@ -74,7 +75,8 @@ class InfrastructureOverviewResource extends Resource
                         + $project->mariadbs_count
                         + $project->keydbs_count
                         + $project->dragonflies_count
-                        + $project->clickhouses_count,
+                        + $project->clickhouses_count
+                        + $project->sqlites_count,
                 ],
             ])->values()->all();
 

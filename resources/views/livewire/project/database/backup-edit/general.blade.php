@@ -1,12 +1,9 @@
 <form wire:submit="submit">
     <x-unsaved-bar action="submit" />
 
-    <section class="application-settings-section">
-        <div class="application-settings-section-header">
-            <div>
-                <h2>Backup schedule</h2>
-                <p>Choose what to back up, when it runs, and how long it may run.</p>
-            </div>
+    <x-application.settings-section title="Backup schedule"
+        description="Choose what to back up, when it runs, and how long it may run.">
+        <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (! $backupEnabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
@@ -23,9 +20,9 @@
                     :disabled="! str($status)->startsWith('running')"
                     :tooltip="! str($status)->startsWith('running') ? 'The database must be running to start a backup.' : null">Back up now</x-forms.button>
             </div>
-        </div>
+        </x-slot:actions>
 
-        <div class="application-settings-section-body space-y-5">
+        <div class="space-y-5">
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0
                     || $backup->database_type === 'App\Models\StandaloneMysql'
                     || $backup->database_type === 'App\Models\StandaloneMariadb')
@@ -82,6 +79,10 @@
                 <x-forms.input label="Databases to back up"
                     helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneSqlite')
+                <x-forms.input label="Database files to back up"
+                    helper="Comma-separated file names inside the data volume. Leave empty to back up every configured file."
+                    id="databasesToBackup" />
             @endif
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -96,5 +97,5 @@
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
         </div>
-    </section>
+    </x-application.settings-section>
 </form>

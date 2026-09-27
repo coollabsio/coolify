@@ -137,10 +137,9 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
             }
 
-            if (str($this->repository_url)->startsWith('git@')) {
-                $github_instance = str($this->repository_url)->after('git@')->before(':');
-                $repository = str($this->repository_url)->after(':')->before('.git');
-                $this->repository_url = 'https://'.str($github_instance).'/'.$repository;
+            $httpsRepositoryUrl = scpStyleGitUrlToHttps($this->repository_url);
+            if (is_string($httpsRepositoryUrl)) {
+                $this->repository_url = $httpsRepositoryUrl;
             }
             if (
                 (str($this->repository_url)->startsWith('https://') ||

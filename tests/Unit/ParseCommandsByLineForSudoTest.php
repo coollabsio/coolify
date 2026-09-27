@@ -43,6 +43,36 @@ test('preserves command substitutions inside database and volume backup scripts'
         ->not->toContain('$(sudo if');
 });
 
+test('keeps safe file-storage path expansion in non-root commands', function () {
+    $argument = filesystemVolumeShellArgument('${DATA_PATH:-/srv/app/config.yml}');
+    $commands = collect([
+        "test -f {$argument} && echo OK || echo NOK",
+        'mkdir -p -- "$(dirname -- '.$argument.')"',
+        "echo 'e30=' | base64 -d | tee -- {$argument}",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toContain('"${DATA_PATH:-/srv/app/config.yml}"')
+        ->and($result[1])->toContain('$(sudo dirname -- "${DATA_PATH:-/srv/app/config.yml}")')
+        ->and($result[2])->toContain('"${DATA_PATH:-/srv/app/config.yml}"');
+});
+
+test('rejects unsupported nested Compose defaults before non-root file commands', function () {
+    expect(fn () => filesystemVolumeShellArgument('${DATA:-${HOME}/config.yml}'))
+        ->toThrow(Exception::class);
+});
+
+test('preserves quoted backup container and file arguments for a non-root server', function () {
+    $container = escapeshellarg('db-name-uuid');
+    $path = escapeshellarg('/backups/db-name.dump');
+    $command = "docker exec {$container} pg_dump --username 'postgres' 'app' > {$path}";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result)->toBe(['sudo '.$command]);
+});
+
 test('wraps complex Docker install command with multiple fallbacks', function () {
     $commands = collect([
         'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',
@@ -246,9 +276,7 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo sudo chmod -R o-rwx /data/coolify/logs');
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -258,10 +286,74 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo sudo chmod -R o-rwx /tmp/coolify/cache');
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
 });
+
+test('ownership changes work where root may not use sudo', function (string $parser) {
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    // Like Alpine: root is not in the sudoers file, so a nested sudo fails.
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nif [ -n \"\$IN_SUDO\" ]; then echo 'root is not in the sudoers file' >&2; exit 1; fi\nexport IN_SUDO=1\nexec \"\$@\"\n");
+    foreach (['chown', 'chmod'] as $tool) {
+        file_put_contents("{$directory}/{$tool}", "#!/bin/sh\necho \"{$tool} \$*\" >> \"\$LOG\"\n");
+    }
+    array_map(fn (string $tool) => chmod("{$directory}/{$tool}", 0755), ['sudo', 'chown', 'chmod']);
+    $path = '/tmp/coolify/sudo-test-'.bin2hex(random_bytes(4));
+
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $this->server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $this->server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH'), 'LOG' => "{$directory}/log"]);
+    $process->run();
+
+    expect($command)->not->toMatch('/sudo\s+sudo/')
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->isSuccessful())->toBeTrue()
+        ->and(is_dir($path))->toBeTrue()
+        ->and(file_get_contents("{$directory}/log"))->toContain("chmod o-rwx {$path}\n");
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
+
+test('ownership changes keep container-owned files and file modes', function (string $parser) {
+    if (posix_geteuid() !== 0 || posix_getpwnam('daemon') === false) {
+        $this->markTestSkipped('Needs root and a daemon user to change file owners.');
+    }
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("{$directory}/sudo", 0755);
+    $path = '/tmp/coolify/ownership-test-'.bin2hex(random_bytes(4));
+    // A file mount that Coolify wrote with sudo, and a database folder that belongs to the container user.
+    mkdir("{$path}/pgdata", 0700, true);
+    file_put_contents("{$path}/index.html", 'mounted');
+    chmod("{$path}/index.html", 0644);
+    file_put_contents("{$path}/pgdata/PG_VERSION", '17');
+    chmod("{$path}/pgdata/PG_VERSION", 0600);
+    chown("{$path}/pgdata", 999);
+    chown("{$path}/pgdata/PG_VERSION", 999);
+
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('daemon');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH')]);
+    $process->run();
+    clearstatcache();
+
+    expect($process->getErrorOutput())->toBe('')
+        ->and(fileowner($path))->toBe(1)
+        ->and(fileperms($path) & 0007)->toBe(0)
+        ->and(fileowner("{$path}/index.html"))->toBe(1)
+        ->and(fileperms("{$path}/index.html") & 0777)->toBe(0644)
+        ->and(fileowner("{$path}/pgdata"))->toBe(999)
+        ->and(fileowner("{$path}/pgdata/PG_VERSION"))->toBe(999)
+        ->and(fileperms("{$path}/pgdata/PG_VERSION") & 0777)->toBe(0600);
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
 
 test('does not add ownership changes for system paths', function () {
     $commands = collect([

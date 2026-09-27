@@ -1,0 +1,59 @@
+name: Build Coolify Branch (ARM64)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  IMAGE_NAME: coollabsio/coolify
+
+jobs:
+  build-push:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+
+      - name: Set image tag and version
+        id: version
+        env:
+          SELECTED_BRANCH: ${{ github.ref_name }}
+        run: |
+          BRANCH_TAG=$(printf '%s' "$SELECTED_BRANCH" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9.-]+/-/g; s/^[.-]+//; s/[.-]+$//; s/-+/-/g' \
+            | cut -c1-128 \
+            | sed -E 's/[.-]+$//')
+
+          if [ -z "$BRANCH_TAG" ]; then
+            echo "The selected branch does not contain valid Docker tag characters."
+            exit 1
+          fi
+
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          echo "branch_tag=$BRANCH_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${BRANCH_TAG}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            COOLIFY_VERSION=${{ steps.version.outputs.version }}
+          tags: ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.branch_tag }}

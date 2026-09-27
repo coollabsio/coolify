@@ -57,6 +57,10 @@
                 ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
                 : null;
             $domainKey = hash('sha256', $row['url'].'|'.($row['service_application_id'] ?? ''));
+            $editingParts = \App\Support\DomainUrlParts::split($row['url']);
+            if ($row['has_port_override'] ?? false) {
+                $editingParts['port'] = (string) $row['internal_port'];
+            }
         @endphp
 
         <div wire:key="svc-domain-{{ $row['service_application_id'] ?? 'x' }}-{{ md5(($isSuggested ? 's:' : '') . $row['url']) }}"
@@ -150,6 +154,11 @@
                     @if ($row['dns_status'] === 'failed')
                         <x-status-badge as="button" @click="$dispatch('open-dns-records-modal')" :status="$dnsLabel" :type="$dnsType"
                             title="View DNS records to fix" class="cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/[0.1]" />
+                    @elseif ($row['dns_status'] === 'checking')
+                        <x-status-badge dynamic :title="$row['dns_message']">
+                            <x-loading compact aria-label="Checking DNS" />
+                            <span class="truncate">Checking DNS...</span>
+                        </x-status-badge>
                     @else
                         <x-status-badge :status="$dnsLabel" :type="$dnsType"
                             :title="$row['dns_status'] === 'ok' ? null : $row['dns_message']" />
@@ -162,11 +171,7 @@
                             wire:loading.attr="disabled"
                             wire:target="checkDomainDns({{ $index }}),checkAllDns"
                             class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
-                            <x-reicon name="refresh" class="size-3.5"
-                                wire:loading.remove.delay
-                                wire:target="checkDomainDns({{ $index }}),checkAllDns" />
-                            <x-loading-on-button wire:loading.delay
-                                wire:target="checkDomainDns({{ $index }}),checkAllDns" />
+                            <x-reicon name="refresh" class="size-3.5" />
                         </button>
                         @if ($isSuggested)
                             @if ($row['needs_force_add'] ?? false)
@@ -184,15 +189,17 @@
                             @endif
                         @else
                             <button type="button" class="icon-button shrink-0" title="Domain settings" aria-label="Settings for {{ $publicUrl }}"
-                                wire:click="startEdit({{ $index }})" wire:loading.attr="disabled" wire:target="startEdit">
+                                @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js((int) $row['service_application_id']), @js($serviceLabel), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))">
                                 <x-reicon name="settings" class="size-3.5" />
                             </button>
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                 buttonTitle="Remove" isErrorButton
+                                canGate="update" :canResource="$service"
                                 submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                     'This domain will be removed from the service application.',
                                     'Redeploy or restart may be required for proxy changes.',
-                                ]" :confirmWithPassword="false" :confirmWithText="false"
+                                ]" :checkboxes="[['id' => 'deleteManagedDns', 'label' => 'Also delete the DNS record created by Coolify, if present.']]"
+                                :confirmWithPassword="false" :confirmWithText="false"
                                 step2ButtonText="Remove domain">
                                 <x-slot:trigger>
                                     <button type="button"

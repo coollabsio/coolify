@@ -28,7 +28,7 @@ class StopApplication
 
                 if ($server->isSwarm()) {
                     $containerPresent = false;
-                    instant_remote_process(["docker stack rm {$application->uuid}"], $server);
+                    instant_remote_process(['docker stack rm '.escapeshellarg($application->uuid)], $server);
 
                     continue;
                 }
@@ -41,9 +41,10 @@ class StopApplication
                 $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
-                    $commands = [dockerStopCommand($timeout, $containerName, $server)];
+                    $escapedContainerName = escapeshellarg($containerName);
+                    $commands = [dockerStopCommand($timeout, $escapedContainerName, $server)];
                     if ($removeContainers) {
-                        $commands[] = "docker rm -f $containerName";
+                        $commands[] = "docker rm -f {$escapedContainerName}";
                     }
 
                     instant_remote_process(command: $commands, server: $server, throwError: false);

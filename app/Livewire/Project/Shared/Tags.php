@@ -67,17 +67,17 @@ class Tags extends Component
         }
     }
 
-    public function addTag(string $id, string $name)
+    public function addTag(string $id)
     {
         try {
             $this->authorize('update', $this->resource);
-            $name = strip_tags($name);
-            if ($this->resource->tags()->where('id', $id)->exists()) {
-                $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$name</span> already added.");
+            $tag = Tag::ownedByCurrentTeam()->findOrFail($id);
+            if ($this->resource->tags()->whereKey($tag->id)->exists()) {
+                $this->dispatch('error', 'Duplicate tags.', 'Tag <span class=\'dark:text-warning\'>'.e($tag->name).'</span> already added.');
 
                 return;
             }
-            $this->resource->tags()->attach($id);
+            $this->resource->tags()->attach($tag->id);
             $this->refresh();
             $this->dispatch('success', 'Tag added.');
         } catch (\Exception $e) {

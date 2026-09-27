@@ -9,7 +9,6 @@
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
             ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
-            ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'icon' => 'calendar'],
         ],
     ];
 @endphp

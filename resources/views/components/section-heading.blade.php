@@ -8,7 +8,7 @@
 
 {{--
     Shared section heading: a 14px title, an optional 11px muted subtitle, and an
-    optional right-aligned action. Pass `href` for the default ghost "View all"
+    optional right-aligned action. Pass `href` for the default "View all"
     button, or an `<x-slot:actions>` for a custom control.
 --}}
 <div {{ $attributes->merge(['class' => 'mb-3 min-w-0']) }}>
@@ -20,7 +20,7 @@
             <div class="shrink-0">{{ $actions }}</div>
         @elseif (filled($href))
             <a href="{{ $href }}" {{ wireNavigate() }}
-                class="group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[12px] font-medium text-neutral-600 transition-[color,background-color,transform] duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-[0.97] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim dark:hover:bg-white/[0.1] dark:hover:text-fg">
+                class="button group">
                 {{ $actionLabel }}
                 @if ($icon)
                     <x-reicon :name="$icon" class="size-3 opacity-70 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />

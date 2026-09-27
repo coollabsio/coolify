@@ -24,7 +24,9 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
-    Process::fake();
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'readlink -f') ? 'OK' : ''
+    ));
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],
         ['id' => 0, 'is_dns_validation_enabled' => false]
@@ -91,7 +93,7 @@ function createPerfApplicationWithVolumes(int $volumeCount = 5): array
     return [$application, $firstVolume, $team];
 }
 
-it('renders volume rows without nesting Livewire Show components', function () {
+it('renders volume rows inline without nested Livewire row components', function () {
     [$application] = createPerfApplicationWithVolumes(5);
 
     $html = Livewire::test(All::class, ['resource' => $application])->html();
@@ -100,7 +102,6 @@ it('renders volume rows without nesting Livewire Show components', function () {
         ->toContain('data-table')
         ->toContain('openBackupModal')
         ->toContain('wire:submit="submit(')
-        ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('shared-configure-volume-backup-');
 });
 

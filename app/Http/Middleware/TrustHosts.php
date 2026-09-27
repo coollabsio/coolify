@@ -14,7 +14,6 @@ class TrustHosts extends Middleware
      * Handle the incoming request.
      *
      * Skip host validation for certain routes:
-     * - Terminal auth routes (called by realtime container)
      * - API routes (use token-based authentication, not host validation)
      * - Webhook endpoints (use cryptographic signature validation)
      */
@@ -22,8 +21,6 @@ class TrustHosts extends Middleware
     {
         // Skip host validation for these routes
         if ($request->is(
-            'terminal/auth',
-            'terminal/auth/ips',
             'api/*',
             'webhooks/*'
         )) {

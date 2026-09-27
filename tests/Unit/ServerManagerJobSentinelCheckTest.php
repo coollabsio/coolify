@@ -18,7 +18,7 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-it('does not dispatch CheckAndStartSentinelJob hourly anymore', function () {
+it('dispatches an hourly Sentinel version check for a healthy Sentinel', function () {
     $settings = Mockery::mock(InstanceSettings::class);
     $settings->instance_timezone = 'UTC';
     $this->app->instance(InstanceSettings::class, $settings);
@@ -39,8 +39,18 @@ it('does not dispatch CheckAndStartSentinelJob hourly anymore', function () {
     $job = new ServerManagerJob;
     $job->handle();
 
-    // Hourly CheckAndStartSentinelJob dispatch was removed — ServerCheckJob handles it when Sentinel is out of sync
-    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
+    Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) use ($server) {
+        return $job->server->id === $server->id;
+    });
+});
+
+it('does not schedule periodic Sentinel restart checks', function () {
+    $root = dirname(__DIR__, 2);
+    $manager = file_get_contents($root.'/app/Jobs/ServerManagerJob.php');
+    $diagnostics = file_get_contents($root.'/app/Console/Commands/ScheduledJobDiagnostics.php');
+
+    expect($manager)->not->toContain('sentinel-restart:')
+        ->and($diagnostics)->not->toContain('sentinel-restart:');
 });
 
 it('skips ServerConnectionCheckJob when sentinel is live', function () {

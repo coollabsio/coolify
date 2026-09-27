@@ -46,7 +46,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->is_registration_enabled) {
+            if (! $settings->isPasswordRegistrationAllowed()) {
                 return redirect()->route('login');
             }
 
@@ -59,13 +59,13 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0) {
-                // If there are no users, redirect to registration
+            if ($users == 0 && $settings->isPasswordRegistrationAllowed()) {
+                // If there are no users and password registration is allowed, redirect to registration.
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
@@ -90,14 +90,19 @@ class FortifyServiceProvider extends ServiceProvider
                     }
                     $user->currentTeam = $invitation->team;
                     $invitation->delete();
+                    session(['currentTeam' => $user->currentTeam]);
                 } else {
-                    // Normal login - use personal team
-                    $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                    if (! $user->currentTeam) {
-                        $user->currentTeam = $user->recreate_personal_team();
+                    // Restore the last active team; only fall back when unambiguous.
+                    $team = $user->resolveStoredTeam();
+                    if (! $team && $user->teams->isEmpty()) {
+                        $team = $user->recreate_personal_team();
                     }
+                    if ($team) {
+                        session(['currentTeam' => $user->currentTeam = $team]);
+                    }
+                    // Otherwise (multiple teams, no stored choice) leave the session
+                    // team unset so the user is sent to the team-selection screen.
                 }
-                session(['currentTeam' => $user->currentTeam]);
 
                 return $user;
             }

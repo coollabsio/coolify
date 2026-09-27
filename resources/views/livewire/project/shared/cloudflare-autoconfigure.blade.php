@@ -1,6 +1,7 @@
 {{-- DNS entries: Domain Connect (Cloud only + key) and/or generic Type/Name/Value records. --}}
 @php
     $domainConnectAvailable = $this->domainConnectAvailable();
+    $dnsAuthResource = property_exists($this, 'application') ? $this->application : $this->service;
 @endphp
 
 <div x-data="{ dnsEntriesOpen: false }" class="relative" @click.outside="dnsEntriesOpen = false">
@@ -8,10 +9,12 @@
         x-bind:aria-expanded="dnsEntriesOpen" title="DNS entries for this server">
         <x-reicon name="globe" class="size-3.5" />
         DNS entries
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-            stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
-        </svg>
+        <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
+            </svg>
+        </span>
     </button>
     <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
         class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">
@@ -23,7 +26,7 @@
             </button>
         @endif
         <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-            @click="dnsEntriesOpen = false; $dispatch('open-dns-records-modal')">
+            wire:click="openManualDnsRecords" @click="dnsEntriesOpen = false">
             <x-reicon name="documentation" class="size-3.5 shrink-0 opacity-70" />
             Manual records
         </button>
@@ -176,6 +179,7 @@
                                             <th class="px-3 py-2 font-medium">Type</th>
                                             <th class="px-3 py-2 font-medium">Name</th>
                                             <th class="px-3 py-2 font-medium">Value</th>
+                                            <th class="px-3 py-2 font-medium"><span class="sr-only">Action</span></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
@@ -195,6 +199,17 @@
                                                         'label' => 'Copy value',
                                                         'break' => true,
                                                     ])
+                                                </td>
+                                                <td class="px-3 py-2.5 text-right">
+                                                    @php($recordProviders = collect($dnsProviderProposals)->where('hostname', $record['name'])->where('managed', false))
+                                                    @foreach ($recordProviders as $provider)
+                                                        <x-forms.button type="button"
+                                                            wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($record['name']) }}, {{ $provider['zone_id'] }}, {{ \Illuminate\Support\Js::from($record['value']) }})"
+                                                            wire:target="createManagedDnsRecord"
+                                                            canGate="update" :canResource="$dnsAuthResource">
+                                                            Add with {{ $provider['credential'] }}
+                                                        </x-forms.button>
+                                                    @endforeach
                                                 </td>
                                             </tr>
                                         @endforeach

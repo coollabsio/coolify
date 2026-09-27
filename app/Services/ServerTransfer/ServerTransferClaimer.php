@@ -54,7 +54,7 @@ class ServerTransferClaimer
             if ($rebindSentinel && $server->settings) {
                 $server->settings->sentinel_custom_url = $instanceUrl;
                 $server->settings->ensureValidSentinelToken();
-                // Leave sentinel disabled until operator enables metrics; endpoint is ready.
+                $server->settings->is_sentinel_enabled = true;
                 $server->settings->save();
                 $sentinelRebound = true;
             }

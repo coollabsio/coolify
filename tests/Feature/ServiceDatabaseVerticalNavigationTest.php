@@ -59,7 +59,7 @@ it('groups database and service navigation by user workflow', function () {
     foreach ($serviceSidebars as $serviceSidebar) {
         expect($serviceSidebar)
             ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage']")
-            ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+            ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics']")
             ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup']")
             ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
     }
@@ -70,10 +70,28 @@ it('groups application navigation by user workflow', function () {
 
     expect($application)
         ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics']")
         ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
         ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");
+});
+
+it('uses the same responsive settings grid for applications services and databases', function () {
+    $sidebars = [
+        resource_path('views/components/application/configuration-sidebar.blade.php'),
+        resource_path('views/components/service/configuration-sidebar.blade.php'),
+        resource_path('views/components/database/configuration-sidebar.blade.php'),
+    ];
+
+    foreach ($sidebars as $sidebar) {
+        expect(file_get_contents($sidebar))
+            ->toContain('grid grid-cols-2 gap-0.5')
+            ->toContain('sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1');
+    }
+
+    expect(file_get_contents($sidebars[0]))
+        ->not->toContain('aria-label="Configuration menu"')
+        ->not->toContain('menuOpen');
 });
 
 it('shows the database sidebar on backup pages', function () {
@@ -236,12 +254,15 @@ it('adds a back up now action to every service backup schedule row', function ()
 
     expect($index)
         ->toContain('<span class="text-right">Actions</span>')
-        ->toContain('<div class="min-w-[59rem]">')
+        ->toContain('<div class="min-w-[64rem]">')
         ->toContain("wire:click.stop=\"backupNow('database',")
         ->toContain("wire:click.stop=\"backupNow('storage',")
         ->toContain('<x-forms.button')
         ->toContain('Back up now</x-forms.button>')
-        ->not->toContain('class="icon-button shrink-0"')
+        ->toContain('defaultClass="icon-button shrink-0"')
+        ->toContain('aria-label="Edit backup schedule"')
+        ->toContain('<x-reicon name="settings" class="size-4" />')
+        ->not->toContain('>Settings</x-forms.button>')
         ->not->toContain('class="contents cursor-pointer"');
 
     expect($styles)
@@ -326,6 +347,6 @@ it('shows the service sidebar on runtime logs and terminal pages', function () {
         ->toContain("in_array(\$type, ['application', 'database', 'service', 'server'], true)")
         ->toContain('<x-service.configuration-sidebar :service="$resource" current-route="project.service.command"')
         ->and($sidebar)
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics']")
         ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
 });
