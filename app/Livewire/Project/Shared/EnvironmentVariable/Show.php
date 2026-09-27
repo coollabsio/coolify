@@ -188,7 +188,6 @@ class Show extends Component
     }
 
     private function syncData(bool $toModel = false): void
-
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
@@ -302,10 +301,13 @@ class Show extends Component
 
     public function instantSave()
     {
-        $this->submit();
+        $this->submit(useExactEscaping: false);
     }
 
-    public function submit()
+    /**
+     * An explicit save switches a legacy variable to exact escaping. Instant saves keep the old escaping.
+     */
+    public function submit(bool $useExactEscaping = true)
     {
         try {
             $this->authorize('update', $this->env);
@@ -320,6 +322,9 @@ class Show extends Component
             }
 
             $this->serialize();
+            if ($useExactEscaping && $this->env instanceof ModelsEnvironmentVariable) {
+                $this->env->uses_legacy_escaping = false;
+            }
             $this->syncData(true);
             $this->syncData(false);
             $this->dispatch('success', 'Environment variable updated.');

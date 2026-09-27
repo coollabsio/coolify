@@ -1516,6 +1516,7 @@ class ServicesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
+        $env->uses_legacy_escaping = false;
         $env->save();
 
         auditLog('api.service.env_updated', [
@@ -1650,10 +1651,10 @@ class ServicesController extends Controller
                 ], 422);
             }
             $key = str($item['key'])->trim()->replace(' ', '_')->value;
-            $env = $service->environment_variables()->updateOrCreate(
-                ['key' => $key],
-                $item
-            );
+            $env = $service->environment_variables()->firstOrNew(['key' => $key]);
+            $env->fill($item);
+            $env->uses_legacy_escaping = false;
+            $env->save();
 
             $updatedEnvs->push($this->removeSensitiveData($env));
         }

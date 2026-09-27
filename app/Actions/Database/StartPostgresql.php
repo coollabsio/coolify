@@ -265,9 +265,9 @@ class StartPostgresql
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'POSTGRES_USER') {
-                $this->resolvedPostgresUser = $rawValue;
+                $this->resolvedPostgresUser = $this->database->composeCommandValue($env, $rawValue);
             } elseif ($env->key === 'POSTGRES_DB') {
-                $this->resolvedPostgresDatabase = $rawValue;
+                $this->resolvedPostgresDatabase = $this->database->composeCommandValue($env, $rawValue);
             }
         }
 

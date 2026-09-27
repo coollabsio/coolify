@@ -25,6 +25,8 @@ class StartDragonfly
 
     private string $resolvedRedisPassword;
 
+    private bool $redisPasswordUsesLegacyEscaping = true;
+
     public function handle(StandaloneDragonfly $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -101,7 +103,7 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'redis-cli', '-a', $this->composeRedisPassword(), 'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -193,9 +195,19 @@ class StartDragonfly
         return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
+    /**
+     * Compose interpolates `$` in the command and healthcheck, so exact passwords double it.
+     */
+    private function composeRedisPassword(): string
+    {
+        return $this->redisPasswordUsesLegacyEscaping
+            ? $this->resolvedRedisPassword
+            : escapeDollarSign($this->resolvedRedisPassword);
+    }
+
     private function buildStartCommand(): string
     {
-        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
+        $escapedRedisPassword = escapeshellarg($this->composeRedisPassword());
         $command = "dragonfly --requirepass {$escapedRedisPassword}";
 
         if ($this->database->enable_ssl) {
@@ -253,6 +265,7 @@ class StartDragonfly
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
                 $this->resolvedRedisPassword = $rawValue;
+                $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
             }
         }
 

@@ -1638,13 +1638,14 @@ class Service extends BaseModel
             return "{$environmentVariable->key}=";
         }
 
-        $isJson = json_validate($value) && in_array(ltrim($value)[0] ?? '', ['{', '['], true);
-        $allowInterpolation = ! $isJson
-            && ! $environmentVariable->is_literal
-            && ! $environmentVariable->is_multiline
-            && ! $this->environmentVariableUsesSecretManager($environmentVariable);
+        if (! $this->useExactEscaping($environmentVariable)) {
+            return $environmentVariable->key.'='.$this->legacyFormatEnvironmentVariableValue($environmentVariable, $value);
+        }
 
-        return $environmentVariable->key.'='.escapeComposeEnvFileValue($value, $allowInterpolation);
+        return $environmentVariable->key.'='.escapeComposeEnvFileValue(
+            $value,
+            $this->environmentVariableAllowsInterpolation($environmentVariable, $value),
+        );
     }
 
     public function parse(bool $isNew = false): Collection
