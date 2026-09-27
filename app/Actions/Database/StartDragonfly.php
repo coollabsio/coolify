@@ -2,15 +2,18 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneDragonfly;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartDragonfly
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneDragonfly $database;
 
@@ -20,7 +23,9 @@ class StartDragonfly
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneDragonfly $database)
+    private string $resolvedRedisPassword;
+
+    public function handle(StandaloneDragonfly $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -55,18 +60,7 @@ class StartDragonfly
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -107,7 +101,7 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'redis-cli', '-a', (string) $this->database->dragonfly_password, 'ping',
+                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, 'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -186,7 +180,7 @@ class StartDragonfly
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
@@ -196,12 +190,13 @@ class StartDragonfly
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function buildStartCommand(): string
     {
-        $command = "dragonfly --requirepass {$this->database->dragonfly_password}";
+        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
+        $command = "dragonfly --requirepass {$escapedRedisPassword}";
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
@@ -251,8 +246,14 @@ class StartDragonfly
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'REDIS_PASSWORD') {
+                $this->resolvedRedisPassword = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {

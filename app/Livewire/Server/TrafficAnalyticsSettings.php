@@ -1,0 +1,160 @@
+<?php
+
+namespace App\Livewire\Server;
+
+use App\Actions\Server\ConfigureTrafficAnalytics;
+use App\Enums\ProxyTypes;
+use App\Livewire\Analytics;
+use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\View\View;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+
+class TrafficAnalyticsSettings extends Component
+{
+    use AuthorizesRequests;
+
+    public Server $server;
+
+    public bool $isTrafficAnalyticsEnabled;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficTopn;
+
+    #[Validate(['required', 'integer', 'min:0'])]
+    public int|string $trafficSampleThreshold;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficRetention1hDays;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficRetention1dDays;
+
+    public bool $isGeoipEnabled;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $geoipRefreshDays;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $geoipMaxmindLicenseKey = null;
+
+    public function mount(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->syncData();
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->server->settings->traffic_topn = $this->trafficTopn;
+            $this->server->settings->traffic_sample_threshold = $this->trafficSampleThreshold;
+            $this->server->settings->traffic_retention_1h_days = $this->trafficRetention1hDays;
+            $this->server->settings->traffic_retention_1d_days = $this->trafficRetention1dDays;
+            $this->server->settings->is_geoip_enabled = $this->isGeoipEnabled;
+            $this->server->settings->geoip_refresh_days = $this->geoipRefreshDays;
+            $this->server->settings->geoip_maxmind_license_key = $this->geoipMaxmindLicenseKey;
+            $this->server->settings->save();
+
+            return;
+        }
+
+        $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+        $this->trafficTopn = $this->server->settings->traffic_topn;
+        $this->trafficSampleThreshold = $this->server->settings->traffic_sample_threshold;
+        $this->trafficRetention1hDays = $this->server->settings->traffic_retention_1h_days;
+        $this->trafficRetention1dDays = $this->server->settings->traffic_retention_1d_days;
+        $this->isGeoipEnabled = (bool) $this->server->settings->is_geoip_enabled;
+        $this->geoipRefreshDays = $this->server->settings->geoip_refresh_days;
+        $this->geoipMaxmindLicenseKey = $this->server->settings->geoip_maxmind_license_key;
+    }
+
+    public function toggleTrafficAnalytics(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $enable = ! $this->server->isTrafficAnalyticsEnabled();
+            if ($enable && ($reason = $this->server->trafficAnalyticsUnsupportedReason()) !== null) {
+                $this->dispatch('error', $reason);
+
+                return;
+            }
+
+            $proxyRestarted = ConfigureTrafficAnalytics::run($this->server, $enable);
+            $this->server->refresh();
+            $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+            $this->dispatch('trafficAnalyticsStateChanged')->to(Analytics::class);
+            $this->dispatch('success', $this->toggleMessage($enable, $proxyRestarted));
+            auditLog($enable ? 'ui.server.traffic_analytics.enabled' : 'ui.server.traffic_analytics.disabled', $this->auditContext());
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function saveTrafficAnalyticsSettings(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->syncData(true);
+            auditLog('ui.server.traffic_analytics.updated', $this->auditContext([
+                'changed_fields' => ['traffic_topn', 'traffic_sample_threshold', 'traffic_retention_1h_days', 'traffic_retention_1d_days', 'is_geoip_enabled', 'geoip_refresh_days', 'geoip_maxmind_license_key'],
+            ]));
+            $this->dispatch('success', 'Traffic analytics settings updated. Restarting Sentinel.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function render(): View
+    {
+        return view('livewire.server.traffic-analytics-settings', [
+            'unsupportedReason' => $this->server->trafficAnalyticsUnsupportedReason(),
+            'caddyRedeployNote' => $this->caddyRedeployNote(),
+            'outdatedCaddyImage' => $this->server->outdatedCaddyProxyImage(),
+        ]);
+    }
+
+    /**
+     * Caddy gets its log labels at deploy time, so resources that already run are not logged until a redeploy.
+     */
+    private function caddyRedeployNote(): ?string
+    {
+        return $this->server->proxyType() === ProxyTypes::CADDY->value
+            ? 'Caddy logs a resource only after you redeploy it.'
+            : null;
+    }
+
+    private function toggleMessage(bool $enabled, bool $proxyRestarted): string
+    {
+        $message = $this->proxyToggleMessage($enabled, $proxyRestarted);
+        $caddyRedeployNote = $this->caddyRedeployNote();
+
+        return $enabled && $caddyRedeployNote !== null ? "{$message} {$caddyRedeployNote}" : $message;
+    }
+
+    private function proxyToggleMessage(bool $enabled, bool $proxyRestarted): string
+    {
+        $state = $enabled ? 'enabled' : 'disabled';
+
+        if ($proxyRestarted) {
+            return "Traffic analytics {$state}. Restarting proxy and Sentinel.";
+        }
+
+        if ($this->server->hasTrafficAnalyticsProxy()) {
+            return "Traffic analytics {$state}. The proxy is stopped, so the new configuration applies the next time you start it.";
+        }
+
+        return "Traffic analytics {$state}.";
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
+    }
+}

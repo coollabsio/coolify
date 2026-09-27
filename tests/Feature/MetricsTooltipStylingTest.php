@@ -29,3 +29,14 @@ test('metrics charts render custom tooltip content', function (string $view) {
     'server metrics' => 'views/livewire/server/charts.blade.php',
     'resource metrics' => 'views/livewire/project/shared/metrics.blade.php',
 ]);
+
+test('server metric tooltips show local and UTC timestamps', function (string $view) {
+    expect(file_get_contents(resource_path($view)))
+        ->toContain('formatLocalTimestamp(timestamp)')
+        ->toContain('formatUtcTimestamp(timestamp)')
+        ->toContain('Your time:')
+        ->toContain('UTC:');
+})->with([
+    'dashboard server metrics' => 'views/livewire/dashboard/server-metrics-chart.blade.php',
+    'server metrics' => 'views/livewire/server/charts.blade.php',
+]);

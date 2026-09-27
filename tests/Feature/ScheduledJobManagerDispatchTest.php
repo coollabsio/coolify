@@ -8,14 +8,16 @@ use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledJobDelivery;
+use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
@@ -74,7 +76,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     Queue::assertPushed(ScheduledTaskJob::class, 101);
 });
 
-it('skips expensive dispatch for non-due schedules while seeding dedup cache', function () {
+it('skips expensive dispatch for schedules outside the catch-up window', function () {
     config(['constants.coolify.self_hosted' => true]);
     Carbon::setTestNow(Carbon::create(2026, 5, 27, 0, 1, 0, 'UTC'));
     Queue::fake();
@@ -91,7 +93,175 @@ it('skips expensive dispatch for non-due schedules while seeding dedup cache', f
     (new ScheduledJobManager)->handle();
 
     Queue::assertNotPushed(ScheduledTaskJob::class);
-    expect(Cache::get("scheduled-task:{$task->id}"))->not->toBeNull();
+    expect(ScheduledJobDelivery::query()->where('schedule_key', "scheduled-task:{$task->id}")->exists())->toBeFalse();
+});
+
+it('dispatches a recently missed daily task when deduplication cache is empty', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 10, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+
+    ScheduledTask::factory()->create([
+        'team_id' => $application->environment->project->team_id,
+        'application_id' => $application->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+});
+
+it('dispatches one job when multiple managers evaluate the same occurrence', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $task = ScheduledTask::factory()->create([
+        'team_id' => $application->environment->project->team_id,
+        'application_id' => $application->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+    expect(ScheduledJobDelivery::query()->where('schedule_key', "scheduled-task:{$task->id}")->count())->toBe(1)
+        ->and(ScheduledJobState::query()->where('schedule_key', "scheduled-task:{$task->id}")->count())->toBe(1);
+});
+
+it('does not retry an occurrence skipped while its server is not functional', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $task = createScheduledApplicationTask($application, ['frequency' => 'daily']);
+    $server = $task->server();
+    $server->settings()->update(['is_reachable' => false]);
+
+    (new ScheduledJobManager)->handle();
+
+    $server->settings()->update(['is_reachable' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 6, 0, 'UTC'));
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertNotPushed(ScheduledTaskJob::class);
+    expect(ScheduledJobState::query()->where('schedule_key', "scheduled-task:{$task->id}")->value('last_scheduled_for'))
+        ->not->toBeNull()
+        ->and(ScheduledJobDelivery::query()->where('schedule_key', "scheduled-task:{$task->id}")->exists())
+        ->toBeFalse();
+});
+
+it('does not publish a task occurrence when its application is not running', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $application->update(['status' => 'stopped']);
+    $task = createScheduledApplicationTask($application, ['frequency' => 'daily']);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertNotPushed(ScheduledTaskJob::class);
+    expect(ScheduledJobState::query()->where('schedule_key', "scheduled-task:{$task->id}")->exists())->toBeTrue()
+        ->and(ScheduledJobDelivery::query()->where('schedule_key', "scheduled-task:{$task->id}")->exists())
+        ->toBeFalse();
+});
+
+it('publishes a pending occurrence after a previous publisher interruption', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+
+    $application = createScheduledTaskApplication();
+    $task = ScheduledTask::factory()->create([
+        'team_id' => $application->environment->project->team_id,
+        'application_id' => $application->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-task:{$task->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'),
+        'job_type' => 'scheduled-task',
+        'resource_id' => $task->id,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+    expect($occurrence->fresh()->status)->toBe('enqueued');
+});
+
+it('allows only one worker to claim an occurrence', function () {
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => 'scheduled-task:claim-test',
+        'scheduled_for' => now(),
+        'job_type' => 'scheduled-task',
+        'resource_id' => 1,
+        'status' => 'enqueued',
+    ]);
+    $service = app(ScheduledJobDeliveryService::class);
+
+    expect($service->claim($occurrence->uuid, 'worker-a'))->toBeTrue()
+        ->and($service->claim($occurrence->uuid, 'worker-b'))->toBeFalse()
+        ->and($service->claim($occurrence->uuid, 'worker-a'))->toBeTrue()
+        ->and($occurrence->fresh()->status)->toBe('claimed');
+
+    $service->complete($occurrence->uuid, 'worker-a');
+
+    expect($occurrence->fresh())->toBeNull();
+});
+
+it('deletes only failed old delivery records', function () {
+    $oldFailed = ScheduledJobDelivery::create([
+        'schedule_key' => 'scheduled-task:old-failed',
+        'scheduled_for' => now()->subDays(31),
+        'job_type' => 'scheduled-task',
+        'resource_id' => 1,
+        'status' => 'failed',
+    ]);
+    $oldPending = ScheduledJobDelivery::create([
+        'schedule_key' => 'scheduled-task:old-pending',
+        'scheduled_for' => now()->subDays(31),
+        'job_type' => 'scheduled-task',
+        'resource_id' => 1,
+        'status' => 'pending',
+    ]);
+    $oldFailed->timestamps = false;
+    $oldFailed->forceFill(['created_at' => now()->subDays(31)])->save();
+    $oldPending->timestamps = false;
+    $oldPending->forceFill(['created_at' => now()->subDays(31)])->save();
+
+    app(ScheduledJobDeliveryService::class)->deleteOldOccurrences();
+
+    expect($oldFailed->fresh())->toBeNull()
+        ->and($oldPending->fresh())->not->toBeNull();
+});
+
+it('marks stale claimed deliveries as failed', function () {
+    $delivery = ScheduledJobDelivery::create([
+        'schedule_key' => 'scheduled-task:stale-claim',
+        'scheduled_for' => now()->subDays(3),
+        'job_type' => 'scheduled-task',
+        'resource_id' => 1,
+        'status' => 'claimed',
+        'claim_token' => 'lost-worker',
+    ]);
+    $delivery->timestamps = false;
+    $delivery->forceFill(['updated_at' => now()->subDays(3)])->save();
+
+    app(ScheduledJobDeliveryService::class)->deleteOldOccurrences();
+
+    expect($delivery->fresh()->status)->toBe('failed');
 });
 
 it('dispatches the instance coolify-db backup even when its id is zero', function () {

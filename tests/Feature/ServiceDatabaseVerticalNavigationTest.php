@@ -59,7 +59,7 @@ it('groups database and service navigation by user workflow', function () {
     foreach ($serviceSidebars as $serviceSidebar) {
         expect($serviceSidebar)
             ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage']")
-            ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+            ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics']")
             ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup']")
             ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
     }
@@ -70,7 +70,7 @@ it('groups application navigation by user workflow', function () {
 
     expect($application)
         ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics']")
         ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
         ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");
@@ -347,6 +347,6 @@ it('shows the service sidebar on runtime logs and terminal pages', function () {
         ->toContain("in_array(\$type, ['application', 'database', 'service', 'server'], true)")
         ->toContain('<x-service.configuration-sidebar :service="$resource" current-route="project.service.command"')
         ->and($sidebar)
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Analytics']")
         ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
 });

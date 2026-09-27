@@ -19,6 +19,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -86,6 +87,14 @@ class ResourceOperations extends Component
             if (! $server->canHostResources()) {
                 return $this->addError('destination_id', 'The selected server cannot host resources.');
             }
+            auditLog('ui.resource.clone_started', [
+                'team_id' => $this->resource->team()?->id,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+                'resource_type' => class_basename($this->resource),
+                'destination_uuid' => $new_destination->uuid,
+                'environment_id' => $new_environment->id,
+            ]);
 
             if ($this->resource->getMorphClass() === Application::class) {
                 $new_resource = clone_application($this->resource, $new_destination, [
@@ -108,7 +117,8 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneRedis::class ||
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
-                $this->resource->getMorphClass() === StandaloneClickhouse::class
+                $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
@@ -153,6 +163,8 @@ class ResourceOperations extends Component
                         $newName = 'keydb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
                         $newName = 'dragonfly-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'sqlite-data-')) {
+                        $newName = 'sqlite-data-'.$new_resource->uuid;
                     } else {
                         if (str_starts_with($volume->name, $this->resource->uuid)) {
                             $newName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid);

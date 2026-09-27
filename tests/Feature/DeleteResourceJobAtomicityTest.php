@@ -1,18 +1,25 @@
 <?php
 
+use App\Actions\Service\DeleteService;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
@@ -43,13 +50,167 @@ beforeEach(function () {
     Queue::fake();
 });
 
-it('deletes the Coolify resource when remote cleanup fails', function () {
+it('deletes a non-service Coolify resource when remote cleanup fails', function () {
     Process::fake(['*' => Process::result(errorOutput: 'SSH connection timed out', exitCode: 255)]);
 
     (new DeleteResourceJob($this->application))->handle();
 
     expect(Application::withTrashed()->find($this->application->id))->toBeNull();
     Queue::assertNotPushed(QueuedCommand::class);
+});
+
+it('keeps a service when remote cleanup fails', function () {
+    Notification::fake();
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
+    ]);
+    $service->server->team->webhookNotificationSettings()->update([
+        'webhook_enabled' => true,
+        'webhook_url' => 'https://example.com/webhook',
+    ]);
+    $service->delete();
+    Process::fake();
+
+    expect(fn () => (new DeleteResourceJob($service))->handle())
+        ->toThrow(RuntimeException::class, 'Server is not functional.');
+
+    expect(Service::find($service->id))->not->toBeNull()
+        ->and(ServiceApplication::where('service_id', $service->id)->exists())->toBeTrue();
+    Notification::assertCount(1);
+    Notification::assertSentTo(
+        $service->team(),
+        GeneralNotification::class,
+        fn (GeneralNotification $notification): bool => ! $notification->success
+            && str_contains($notification->message, 'Remove from Coolify only')
+    );
+});
+
+it('deletes only local service metadata when explicitly requested', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
+    ]);
+    Process::fake();
+
+    (new DeleteResourceJob($service, deleteFromCoolifyOnly: true))->handle();
+
+    Process::assertNothingRan();
+    expect(Service::withTrashed()->find($service->id))->toBeNull()
+        ->and(ServiceApplication::withTrashed()->where('service_id', $service->id)->exists())->toBeFalse();
+});
+
+it('removes service containers before its volumes and local metadata', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
+    ]);
+    $application->persistentStorages()->create([
+        'name' => "{$service->uuid}_web-data",
+        'mount_path' => '/data',
+        'host_path' => null,
+    ]);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    (new DeleteResourceJob($service))->handle();
+
+    $commandList = $commands->implode("\n");
+    expect($commandList)
+        ->toContain("label=coolify.serviceId={$service->id}")
+        ->toContain('docker rm -f $container_ids')
+        ->toContain("docker volume rm -f '{$service->uuid}_web-data'")
+        ->and(strpos($commandList, 'docker rm -f $container_ids'))
+        ->toBeLessThan(strpos($commandList, 'docker volume rm -f'));
+    expect(Service::withTrashed()->find($service->id))->toBeNull();
+});
+
+it('targets a service subresource container by its Docker labels', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
+    ]);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    app(DeleteService::class)->removeSubresourceContainer($application);
+
+    expect($commands->implode("\n"))
+        ->toContain("label=coolify.serviceId={$service->id}")
+        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('label=coolify.service.subType=application')
+        ->toContain('docker rm -f $container_ids');
+});
+
+it('removes only the database container when an application of the same service has the same id', function () {
+    // Service applications and databases are separate tables, so they can share an id.
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create(['service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:alpine']);
+    $database = ServiceDatabase::create(['service_id' => $service->id, 'name' => 'db', 'image' => 'postgres:17-alpine']);
+    $database->forceFill(['id' => $application->id])->save();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    app(DeleteService::class)->removeSubresourceContainer($database->fresh());
+
+    expect($commands->implode("\n"))
+        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('label=coolify.service.subType=database')
+        ->not->toContain('label=coolify.service.subType=application');
 });
 
 it('rolls back local metadata deletion when deleting the resource fails', function () {
@@ -110,4 +271,32 @@ it('deletes preview metadata locally when its application destination is missing
     Process::assertNothingRan();
     expect(ApplicationPreview::withTrashed()->find($preview->id))->toBeNull()
         ->and($previewStorage->fresh())->toBeNull();
+});
+
+it('removes service containers with a command that works for non-root SSH users', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $application = ServiceApplication::create(['service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:alpine']);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id, 'user' => 'coolify']);
+    $service->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push($process->command);
+
+        return Process::result(output: '');
+    });
+
+    app(DeleteService::class)->removeSubresourceContainer($application);
+
+    // A leading variable assignment becomes "sudo container_ids=...", which sudo rejects.
+    expect($commands->implode("\n"))
+        ->not->toContain('sudo container_ids=')
+        ->toContain("sudo bash -c 'sh -c")
+        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain('docker rm -f $container_ids');
 });

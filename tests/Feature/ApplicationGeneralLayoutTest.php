@@ -21,6 +21,12 @@ test('compose file loading waits for the user to confirm the file location', fun
         ->not->toContain('x-init="$wire.dispatch(\'loadCompose\', true)"');
 });
 
+test('traffic analytics is only shown on the dedicated analytics page', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+
+    expect($view)->not->toContain('<livewire:project.application.traffic-overview');
+});
+
 test('docker compose heading separates its title and action', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
 
@@ -54,4 +60,17 @@ test('onboarding uses the reusable advanced settings component', function () {
         ->not->toContain('The following commands are for advanced use cases.')
         ->and($onboarding)
         ->toContain('<x-forms.collapsible title="Advanced Connection Settings"');
+});
+
+test('deployments-only servers require a registry image because builds run elsewhere', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+    $requiredImageCondition = str($view)
+        ->after("@if (\$application->build_pack === 'dockerimage')")
+        ->after('@else')
+        ->before('<x-forms.input id="dockerRegistryImageName" required label="Image"')
+        ->toString();
+
+    expect($requiredImageCondition)
+        ->toContain('$application->settings->is_build_server_enabled')
+        ->toContain('! $application->destination->server->canBuildApplications()');
 });

@@ -166,6 +166,12 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        if ($server->isSentinelEnabled()
+            && shouldRunCronNow('0 * * * *', $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
+        ) {
+            CheckAndStartSentinelJob::dispatch($server);
+        }
+
         // Dispatch ServerStorageCheckJob if due (only when Sentinel is out of sync or disabled)
         // When Sentinel is active, PushServerUpdateJob handles storage checks with real-time data
         if ($sentinelOutOfSync) {

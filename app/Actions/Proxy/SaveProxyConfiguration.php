@@ -3,6 +3,8 @@
 namespace App\Actions\Proxy;
 
 use App\Models\Server;
+use App\Services\ProxyPortParser;
+use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class SaveProxyConfiguration
@@ -13,6 +15,14 @@ class SaveProxyConfiguration
 
     public function handle(Server $server, string $configuration): void
     {
+        try {
+            ProxyPortParser::fromConfiguration($configuration);
+        } catch (\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'configuration' => [$exception->getMessage()],
+            ]);
+        }
+
         $proxy_path = $server->proxyPath();
         $docker_compose_yml_base64 = base64_encode($configuration);
         $new_hash = str($docker_compose_yml_base64)->pipe('md5')->value;

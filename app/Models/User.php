@@ -11,6 +11,7 @@ use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
@@ -211,7 +212,7 @@ class User extends Authenticatable implements SendsEmail
      */
     public function deleteIfNotVerifiedAndForcePasswordReset()
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
+        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true && ! TeamInvitation::whereEmail($this->email)->exists()) {
             $this->delete();
         }
     }
@@ -234,7 +235,7 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -557,12 +558,26 @@ class User extends Authenticatable implements SendsEmail
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
 
+    public function oauthIdentities(): HasMany
+    {
+        return $this->hasMany(OauthIdentity::class);
+    }
+
+    public function hasSsoIdentity(): bool
+    {
+        return $this->oauthIdentities()->exists();
+    }
+
     /**
      * Check if the user has a password set.
-     * OAuth users are created without passwords.
      */
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function requiresPasswordConfirmation(): bool
+    {
+        return $this->hasPassword() && ! $this->hasSsoIdentity();
     }
 }

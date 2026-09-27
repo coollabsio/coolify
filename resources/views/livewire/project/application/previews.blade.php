@@ -7,6 +7,70 @@
             helper="Automatic pull request deployments and who can trigger them.">
             <x-slot:actions>
                 @can('update', $application)
+                    @if ($application->is_github_based())
+                        <x-modal-input title="Pull requests"
+                            subtitle="Load open pull requests from GitHub, then configure or deploy a preview."
+                            :wireIgnore="false" :isLarge="true">
+                            <x-slot:content>
+                                <x-forms.button wire:click="load_prs">
+                                    Load pull requests
+                                </x-forms.button>
+                            </x-slot:content>
+                            <x-slot:headerActions>
+                                @isset($rate_limit_remaining)
+                                    <span class="text-xs text-neutral-500 dark:text-fg-dim">
+                                        {{ $rate_limit_remaining }} requests remaining
+                                    </span>
+                                @endisset
+                                <x-forms.button wire:click="load_prs">
+                                    Refresh
+                                </x-forms.button>
+                            </x-slot:headerActions>
+
+                            <div class="flex min-h-48 items-center justify-center" wire:loading wire:target="load_prs">
+                                <x-loading text="Loading pull requests…" />
+                            </div>
+
+                            <div class="-m-4" wire:loading.remove wire:target="load_prs">
+                                @forelse ($pull_requests as $pull_request)
+                                    <div
+                                        class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center dark:border-white/[0.07]">
+                                        <div
+                                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 font-mono text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
+                                            #{{ data_get($pull_request, 'number') }}
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
+                                                {{ data_get($pull_request, 'title') }}
+                                            </h4>
+                                            <a target="_blank"
+                                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
+                                                href="{{ data_get($pull_request, 'html_url') }}">
+                                                Open on GitHub
+                                                <x-external-link />
+                                            </a>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-2">
+                                            <x-forms.button
+                                                wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                Configure
+                                            </x-forms.button>
+                                            @can('deploy', $application)
+                                                <x-forms.button
+                                                    wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                    Deploy preview
+                                                </x-forms.button>
+                                            @endcan
+                                        </div>
+                                    </div>
+                                @empty
+                                    <x-empty size="sm" title="No open pull requests"
+                                        description="No open pull requests were found for this repository."
+                                        icon-name="sources" />
+                                @endforelse
+                            </div>
+                        </x-modal-input>
+                    @endif
                     @if ($isPreviewDeploymentsEnabled)
                         <x-forms.button wire:click="togglePreviewDeployments" wire:target="togglePreviewDeployments">
                             Disable preview deployments
@@ -37,65 +101,6 @@
         <x-callout type="info" title="Preview deployment server">
             Preview deployments run on {{ $application->destination->server->name }}.
         </x-callout>
-    @endif
-
-    @if ($application->is_github_based())
-        <x-application.settings-section id="preview-pull-requests-section" title="Pull requests"
-            helper="Load open pull requests from GitHub, then configure or deploy a preview." flush>
-            <x-slot:actions>
-                @isset($rate_limit_remaining)
-                    <span class="text-xs text-neutral-500 dark:text-fg-dim">
-                        {{ $rate_limit_remaining }} requests remaining
-                    </span>
-                @endisset
-                @can('update', $application)
-                    <x-forms.button wire:click="load_prs">
-                        Load pull requests
-                    </x-forms.button>
-                @endcan
-            </x-slot:actions>
-
-            <div>
-                @forelse ($pull_requests as $pull_request)
-                    <div
-                        class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center dark:border-white/[0.07]">
-                        <div
-                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 font-mono text-xs font-semibold text-neutral-600 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
-                            #{{ data_get($pull_request, 'number') }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
-                                {{ data_get($pull_request, 'title') }}
-                            </h4>
-                            <a target="_blank"
-                                class="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
-                                href="{{ data_get($pull_request, 'html_url') }}">
-                                Open on GitHub
-                                <x-external-link />
-                            </a>
-                        </div>
-                        <div class="flex shrink-0 items-center gap-2">
-                            @can('update', $application)
-                                <x-forms.button
-                                    wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
-                                    Configure
-                                </x-forms.button>
-                            @endcan
-                            @can('deploy', $application)
-                                <x-forms.button
-                                    wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
-                                    Deploy preview
-                                </x-forms.button>
-                            @endcan
-                        </div>
-                    </div>
-                @empty
-                    <x-empty size="sm" title="No pull requests loaded"
-                        description="Load open pull requests from GitHub to configure a preview deployment."
-                        icon-name="sources" />
-                @endforelse
-            </div>
-        </x-application.settings-section>
     @endif
 
     @if ($application->build_pack === 'dockerimage')

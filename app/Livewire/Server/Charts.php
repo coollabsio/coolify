@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Charts extends Component
@@ -23,12 +24,41 @@ class Charts extends Component
 
     public bool $poll = true;
 
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $sentinelMetricsRefreshRateSeconds;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $sentinelMetricsHistoryDays;
+
+    #[Validate(['required', 'integer', 'min:10'])]
+    public int|string $sentinelPushIntervalSeconds;
+
     public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+            $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
+            $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
+            $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function saveMetricsSettings(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->validate();
+
+            $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
+            $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
+            $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
+            $this->server->settings->save();
+
+            $this->dispatch('success', 'Metrics settings updated. Restarting Sentinel.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -70,11 +100,9 @@ class Charts extends Component
         try {
             $cpuMetrics = $this->server->getCpuMetrics($this->interval);
             $memoryMetrics = $this->server->getMemoryMetrics($this->interval);
-            $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
-                'seriesData' => $cpuMetrics,
-            ]);
-            $this->dispatch("refreshChartData-{$this->chartId}-memory", [
-                'seriesData' => $memoryMetrics,
+            $this->dispatch("refreshChartData-{$this->chartId}-metrics", [
+                'cpuSeries' => $cpuMetrics,
+                'memorySeries' => $memoryMetrics,
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);

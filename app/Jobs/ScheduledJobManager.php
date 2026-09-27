@@ -9,6 +9,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Team;
+use App\Services\ScheduledJobDeliveryService;
 use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -101,6 +102,8 @@ class ScheduledJobManager implements ShouldQueue
         Log::channel('scheduled')->info('ScheduledJobManager started', [
             'execution_time' => $this->executionTime->toIso8601String(),
         ]);
+
+        app(ScheduledJobDeliveryService::class)->publishPending();
 
         // Process scheduled backups and tasks together so neither type starves the other.
         try {
@@ -231,7 +234,7 @@ class ScheduledJobManager implements ShouldQueue
                     continue;
                 }
 
-                if ($this->isDueCandidateBeforeExpensiveChecks($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
+                if ($this->isDueCandidateBeforeExpensiveChecks($backup->frequency, $server)) {
                     $dueBackups[] = [
                         'backup' => $backup,
                         'server' => $server,
@@ -266,7 +269,7 @@ class ScheduledJobManager implements ShouldQueue
                     continue;
                 }
 
-                if ($this->isDueCandidateBeforeExpensiveChecks($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                if ($this->isDueCandidateBeforeExpensiveChecks($task->frequency, $server)) {
                     $dueTasks[] = [
                         'task' => $task,
                         'server' => $server,
@@ -289,14 +292,21 @@ class ScheduledJobManager implements ShouldQueue
             $server = $precheckedServer ?? $backup->server();
             $skipReason = $this->getBackupSkipReason($backup, $server);
             if ($skipReason !== null) {
-                $this->skippedCount++;
-                $this->logBackupSkip($backup, $skipReason);
+                if ($server === null || $this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logBackupSkip($backup, $skipReason);
+                }
 
                 return;
             }
 
-            if ($this->shouldDispatch($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
-                DatabaseBackupJob::dispatch($backup);
+            if ($this->dispatchOccurrence(
+                $backup->frequency,
+                $server,
+                "scheduled-backup:{$backup->id}",
+                'database-backup',
+                $backup->id,
+            )) {
                 $this->dispatchedCount++;
                 Log::channel('scheduled')->info('Backup dispatched', [
                     'backup_id' => $backup->id,
@@ -320,25 +330,35 @@ class ScheduledJobManager implements ShouldQueue
             $server = $precheckedServer ?? $task->server();
             $criticalSkip = $this->getTaskCriticalSkipReason($task, $server);
             if ($criticalSkip !== null) {
-                $this->skippedCount++;
-                $this->logTaskSkip($task, $criticalSkip, $server);
+                if ($server === null || $this->recordSkippedOccurrence($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                    $this->skippedCount++;
+                    $this->logTaskSkip($task, $criticalSkip, $server);
+                }
 
-                return;
-            }
-
-            if (! $this->shouldDispatch($task->frequency, $server, "scheduled-task:{$task->id}")) {
                 return;
             }
 
             $runtimeSkip = $this->getTaskRuntimeSkipReason($task);
             if ($runtimeSkip !== null) {
-                $this->skippedCount++;
-                $this->logTaskSkip($task, $runtimeSkip, $server);
+                if ($this->recordSkippedOccurrence($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                    $this->skippedCount++;
+                    $this->logTaskSkip($task, $runtimeSkip, $server);
+                }
 
                 return;
             }
 
-            ScheduledTaskJob::dispatch($task);
+            if (! $this->dispatchOccurrence(
+                $task->frequency,
+                $server,
+                "scheduled-task:{$task->id}",
+                'scheduled-task',
+                $task->id,
+            )) {
+
+                return;
+            }
+
             $this->dispatchedCount++;
             Log::channel('scheduled')->info('Task dispatched', [
                 'task_id' => $task->id,
@@ -419,30 +439,43 @@ class ScheduledJobManager implements ShouldQueue
                 return;
             }
 
+            if (! $this->isDueCandidateBeforeExpensiveChecks($backup->frequency, $server)) {
+                return;
+            }
+
             if (! $server->isFunctional()) {
-                $this->skippedCount++;
-                $this->logSkip('volume_backup', 'server_not_functional', [
-                    'backup_id' => $backup->id,
-                    'team_id' => $backup->team_id,
-                    'server_id' => $server->id,
-                ]);
+                if ($this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('volume_backup', 'server_not_functional', [
+                        'backup_id' => $backup->id,
+                        'team_id' => $backup->team_id,
+                        'server_id' => $server->id,
+                    ]);
+                }
 
                 return;
             }
 
             if (isCloud() && $backup->team_id !== 0 && ! data_get($backup, 'team.subscription.stripe_invoice_paid', false)) {
-                $this->skippedCount++;
-                $this->logSkip('volume_backup', 'subscription_unpaid', [
-                    'backup_id' => $backup->id,
-                    'team_id' => $backup->team_id,
-                    'server_id' => $server->id,
-                ]);
+                if ($this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('volume_backup', 'subscription_unpaid', [
+                        'backup_id' => $backup->id,
+                        'team_id' => $backup->team_id,
+                        'server_id' => $server->id,
+                    ]);
+                }
 
                 return;
             }
 
-            if ($this->shouldDispatch($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
-                VolumeBackupJob::dispatch($backup);
+            if ($this->dispatchOccurrence(
+                $backup->frequency,
+                $server,
+                "scheduled-volume-backup:{$backup->id}",
+                'volume-backup',
+                $backup->id,
+            )) {
                 $this->dispatchedCount++;
                 Log::channel('scheduled')->info('Volume backup dispatched', [
                     'backup_id' => $backup->id,
@@ -536,27 +569,36 @@ class ScheduledJobManager implements ShouldQueue
     private function processDockerCleanup(Server $server): void
     {
         try {
+            $frequency = data_get($server->settings, 'docker_cleanup_frequency', '0 * * * *');
+            if (! $this->isDueCandidateBeforeExpensiveChecks($frequency, $server)) {
+                return;
+            }
+
             $skipReason = $this->getDockerCleanupSkipReason($server);
             if ($skipReason !== null) {
-                $this->skippedCount++;
-                $this->logSkip('docker_cleanup', $skipReason, [
-                    'server_id' => $server->id,
-                    'server_name' => $server->name,
-                    'team_id' => $server->team_id,
-                ]);
+                if ($this->recordSkippedOccurrence($frequency, $server, "docker-cleanup:{$server->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('docker_cleanup', $skipReason, [
+                        'server_id' => $server->id,
+                        'server_name' => $server->name,
+                        'team_id' => $server->team_id,
+                    ]);
+                }
 
                 return;
             }
 
-            $frequency = data_get($server->settings, 'docker_cleanup_frequency', '0 * * * *');
-
-            if ($this->shouldDispatch($frequency, $server, "docker-cleanup:{$server->id}")) {
-                DockerCleanupJob::dispatch(
-                    $server,
-                    false,
-                    $server->settings->delete_unused_volumes,
-                    $server->settings->delete_unused_networks
-                );
+            if ($this->dispatchOccurrence(
+                $frequency,
+                $server,
+                "docker-cleanup:{$server->id}",
+                'docker-cleanup',
+                $server->id,
+                [
+                    'delete_unused_volumes' => $server->settings->delete_unused_volumes,
+                    'delete_unused_networks' => $server->settings->delete_unused_networks,
+                ],
+            )) {
                 $this->dispatchedCount++;
                 Log::channel('scheduled')->info('Docker cleanup dispatched', [
                     'server_id' => $server->id,
@@ -618,40 +660,44 @@ class ScheduledJobManager implements ShouldQueue
         ], $context));
     }
 
-    private function shouldDispatch(string $frequency, Server $server, string $dedupKey): bool
-    {
-        return shouldRunCronNow(
-            $this->normalizeFrequency($frequency),
+    private function dispatchOccurrence(
+        string $frequency,
+        Server $server,
+        string $scheduleKey,
+        string $jobType,
+        int $resourceId,
+        array $payload = [],
+    ): bool {
+        return app(ScheduledJobDeliveryService::class)->recordAndPublish(
+            $scheduleKey,
+            $frequency,
             $this->serverTimezone($server),
-            $dedupKey,
+            $jobType,
+            $resourceId,
+            $payload,
             $this->executionTime,
         );
     }
 
-    private function isDueCandidateBeforeExpensiveChecks(string $frequency, Server $server, string $dedupKey): bool
+    private function recordSkippedOccurrence(string $frequency, Server $server, string $scheduleKey): bool
+    {
+        return app(ScheduledJobDeliveryService::class)->recordSkipped(
+            $scheduleKey,
+            $frequency,
+            $this->serverTimezone($server),
+            $this->executionTime,
+        );
+    }
+
+    private function isDueCandidateBeforeExpensiveChecks(string $frequency, Server $server): bool
     {
         $cron = new CronExpression($this->normalizeFrequency($frequency));
         $executionTime = ($this->executionTime ?? Carbon::now())->copy()->setTimezone($this->serverTimezone($server));
-        $lastDispatched = Cache::get($dedupKey);
         $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
 
-        if ($lastDispatched === null) {
-            $isDue = $cron->isDue($executionTime);
-
-            if (! $isDue) {
-                Cache::put($dedupKey, $previousDue->toIso8601String(), 2592000);
-            }
-
-            return $isDue;
-        }
-
-        $shouldFire = $previousDue->gt(Carbon::parse($lastDispatched));
-
-        if (! $shouldFire) {
-            Cache::put($dedupKey, $previousDue->toIso8601String(), 2592000);
-        }
-
-        return $shouldFire;
+        return $previousDue->gte(
+            $executionTime->copy()->subMinutes(ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES)
+        );
     }
 
     private function normalizeFrequency(string $frequency): string

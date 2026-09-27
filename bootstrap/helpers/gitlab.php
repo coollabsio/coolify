@@ -32,7 +32,7 @@ function refreshGitlabToken(GitlabApp $source): void
 
         $baseUrl = rtrim($source->html_url, '/');
 
-        $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
+        $response = Http::GitSource($baseUrl)->asForm()->post("{$baseUrl}/oauth/token", [
             'client_id' => $source->client_id,
             'client_secret' => $source->client_secret,
             'refresh_token' => $source->refresh_token,

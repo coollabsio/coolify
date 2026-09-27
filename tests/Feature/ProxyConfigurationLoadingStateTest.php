@@ -10,3 +10,21 @@ it('disables proxy configuration controls and covers the editor while saving', f
         ->toContain('Updating proxy configuration')
         ->toContain('aria-live="polite"');
 });
+
+it('loads only the compose file from the frontend and shows the shared loading indicator', function () {
+    $page = file_get_contents(resource_path('views/livewire/server/proxy/show.blade.php'));
+    $proxy = file_get_contents(resource_path('views/livewire/server/proxy.blade.php'));
+    $component = file_get_contents(app_path('Livewire/Server/Proxy.php'));
+
+    expect($page)
+        ->toContain('<livewire:server.proxy :server="$server" />')
+        ->not->toContain('<livewire:server.proxy :server="$server" lazy />');
+
+    expect($proxy)
+        ->toContain('x-init="$wire.loadProxyConfiguration()"')
+        ->toContain('wire:loading.flex wire:target="loadProxyConfiguration"')
+        ->toContain('<x-loading text="Loading proxy configuration…" />');
+
+    expect($component)
+        ->not->toContain('$this->loadProxyConfiguration();');
+});

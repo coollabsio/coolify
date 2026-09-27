@@ -6,6 +6,7 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -72,7 +73,8 @@ class Danger extends Component
             'standalone-mariadb',
             'standalone-keydb',
             'standalone-dragonfly',
-            'standalone-clickhouse' => $this->resource->name ?? 'Database',
+            'standalone-clickhouse',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
@@ -97,6 +99,12 @@ class Danger extends Component
             return 'Resource not found.';
         }
 
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
+        }
+
         if (! empty($selectedActions)) {
             $this->delete_volumes = in_array('delete_volumes', $selectedActions);
             $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
@@ -111,7 +119,33 @@ class Danger extends Component
                 $this->delete_volumes,
                 $this->delete_connected_networks,
                 $this->delete_configurations,
-                $this->docker_cleanup
+                $this->docker_cleanup,
+            )->afterResponse();
+
+            return redirectRoute($this, 'project.resource.index', [
+                'project_uuid' => $this->projectUuid,
+                'environment_uuid' => $this->environmentUuid,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function deleteFromCoolifyOnly(string $password): mixed
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
+        if (! $this->resource instanceof Service) {
+            return 'Service not found.';
+        }
+
+        try {
+            $this->authorize('delete', $this->resource);
+            DeleteResourceJob::dispatch(
+                resource: $this->resource,
+                deleteFromCoolifyOnly: true,
             )->afterResponse();
 
             return redirectRoute($this, 'project.resource.index', [

@@ -287,11 +287,14 @@
                                             ? ['value' => true, 'label' => 'Available build server (auto-select)']
                                             : ['value' => true, 'label' => 'No build servers connected', 'disabled' => true],
                                     ];
+                                    $buildServerFallbackPolicy = $application->environment->project->team->is_build_server_fallback_enabled
+                                        ? 'If no usable build server is available, Coolify builds on the deployment server.'
+                                        : 'If no usable build server is available, the deployment fails.';
                                 @endphp
                                 <div class="grid gap-4 pt-2 sm:grid-cols-2">
                                     <x-forms.listbox id="isBuildServerEnabled" label="Builder selection"
                                         onChange="instantSave" :options="$buildServerOptions"
-                                        helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         x-bind:disabled="!canUpdate" />
                                 </div>
                             @endif
@@ -398,7 +401,8 @@
                         @if (
                             $application->destination->server->isSwarm() ||
                                 $application->additional_servers->count() > 0 ||
-                                $application->settings->is_build_server_enabled)
+                                $application->settings->is_build_server_enabled ||
+                                ! $application->destination->server->canBuildApplications())
                             <x-forms.input id="dockerRegistryImageName" required label="Image"
                                 placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
                             <x-forms.input id="dockerRegistryImageTag"

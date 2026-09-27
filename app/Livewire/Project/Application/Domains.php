@@ -5,12 +5,14 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Concerns\InteractsWithDnsProviders;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +22,7 @@ class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+    use InteractsWithDnsProviders;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -127,6 +130,13 @@ class Domains extends Component
         'confirmDomainUsage',
     ];
 
+    public function getListeners(): array
+    {
+        return array_merge($this->listeners, [
+            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
+        ]);
+    }
+
     protected function rules(): array
     {
         return [
@@ -201,7 +211,7 @@ class Domains extends Component
 
         match ($status) {
             'ok' => $this->dispatch('success', "DNS is configured correctly for {$host}."),
-            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record."),
+            'failed' => $this->dispatch('error', "DNS is not configured for {$host}. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later."),
             default => $this->dispatch('info', "DNS check skipped for {$host}."),
         };
     }
@@ -765,8 +775,11 @@ class Domains extends Component
 
     /**
      * Persist current domain row DNS results and drop statuses for removed domains.
+     *
+     * @param  array<int, string>  $startingCheckKeys  Status keys whose check is being started by this call.
+     *                                                 They are allowed to replace a stored completed result.
      */
-    protected function persistDomainDnsStatuses(): void
+    protected function persistDomainDnsStatuses(array $startingCheckKeys = []): void
     {
         $statuses = [];
 
@@ -798,11 +811,15 @@ class Domains extends Component
             ];
         }
 
-        DB::transaction(function () use (&$statuses): void {
+        DB::transaction(function () use (&$statuses, $startingCheckKeys): void {
             $application = Application::query()->lockForUpdate()->findOrFail($this->application->id);
             $storedStatuses = $application->domain_dns_statuses ?? [];
 
             foreach ($statuses as $key => $status) {
+                if (in_array($key, $startingCheckKeys, true)) {
+                    continue;
+                }
+
                 $localCheckId = $status['check_id'] ?? null;
                 $storedCheckId = $storedStatuses[$key]['check_id'] ?? null;
 
@@ -1027,8 +1044,14 @@ class Domains extends Component
             $this->resetAddDomainForm();
             $this->dispatch('close-modal');
             $this->refreshDomains();
-            $urlsToCheck = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
-            $dnsChecks = collect($this->dnsEntriesForUrls($urlsToCheck, $serviceForCheck))
+            $addedUrls = array_values(array_unique(array_merge($newUrls, $pairedUrls)));
+            if ($this->configureDnsAfterDomainAdd($addedUrls)) {
+                $this->dispatch('success', 'Domain added.');
+
+                return;
+            }
+
+            $dnsChecks = collect($this->dnsEntriesForUrls($addedUrls, $serviceForCheck))
                 ->map(fn (string $url, string $statusKey) => [
                     'status_key' => $statusKey,
                     'url' => $url,
@@ -1038,7 +1061,7 @@ class Domains extends Component
             foreach ($dnsChecks as $dnsCheck) {
                 $this->markUrlsAsChecking([$dnsCheck['url']], $serviceForCheck, $dnsCheck['check_id']);
             }
-            $this->persistDomainDnsStatuses();
+            $this->persistDomainDnsStatuses($dnsChecks->pluck('status_key')->all());
 
             $failedDnsChecks = 0;
             foreach ($dnsChecks as $dnsCheck) {
@@ -1191,7 +1214,7 @@ class Domains extends Component
         foreach ($this->dnsEntriesForUrls($urls, $service) as $statusKey => $url) {
             $checkId = new_public_id();
             $this->markUrlsAsChecking([$url], $service, $checkId);
-            $this->persistDomainDnsStatuses();
+            $this->persistDomainDnsStatuses([$statusKey]);
 
             try {
                 CheckDomainDnsJob::dispatch(
@@ -1541,10 +1564,12 @@ class Domains extends Component
             }
 
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($this->application);
             if (! $this->saveDomainList($updated, $service, noindexDomains: $noindexDomains)) {
                 return;
             }
 
+            $this->releaseManagedDnsForEditedDomains($this->application, $previousDnsHostnames);
             $this->resetDefaultLabels();
 
             $this->forceSaveDomains = false;
@@ -1562,7 +1587,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomain(int $index): void
+    public function removeDomain(int $index, string $password = '', array $selectedActions = []): void
     {
         try {
             $this->authorize('update', $this->application);
@@ -1585,6 +1610,8 @@ class Domains extends Component
                 return;
             }
 
+            $this->releaseManagedDnsForUrl($url, $this->application, in_array('deleteManagedDns', $selectedActions, true));
+
             if ($this->editingIndex === $index) {
                 $this->cancelEdit();
             }
@@ -1597,7 +1624,7 @@ class Domains extends Component
         }
     }
 
-    public function removeDomainByKey(string $domainKey): void
+    public function removeDomainByKey(string $domainKey, string $password = '', array $selectedActions = []): void
     {
         $index = collect($this->domainRows)->search(
             fn (array $row): bool => ! ($row['is_suggested'] ?? false)
@@ -1608,7 +1635,7 @@ class Domains extends Component
             return;
         }
 
-        $this->removeDomain((int) $index);
+        $this->removeDomain((int) $index, $password, $selectedActions);
     }
 
     /**
@@ -1617,6 +1644,11 @@ class Domains extends Component
     private function domainRowKey(array $row): string
     {
         return hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
+    }
+
+    protected function dnsResourceForHostname(string $hostname): ?Model
+    {
+        return $this->application;
     }
 
     public function generateDomain(?string $serviceName = null): void

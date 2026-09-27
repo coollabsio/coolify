@@ -1,6 +1,6 @@
 <?php
 
-it('uses the themed warning color for resource action icons', function () {
+it('uses neutral play icons for resource start actions', function () {
     foreach ([
         'application',
         'database',
@@ -8,150 +8,116 @@ it('uses the themed warning color for resource action icons', function () {
     ] as $resource) {
         $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
 
-        expect(substr_count($heading, 'name="play-circle" class="size-3.5 text-warning"'))
+        // One neutral start icon in the mobile split action and one in the desktop split action.
+        expect(substr_count($heading, 'name="play-circle" class="size-3.5"'))
             ->toBeGreaterThanOrEqual(2);
+
+        expect($heading)
+            ->not->toContain('name="play-circle" class="size-3.5 text-warning"')
+            ->not->toContain('name="play-circle" class="size-3.5 text-orange-500');
     }
 });
 
-it('uses native mobile menus for databases and services', function () {
-    $applicationHeading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
-    $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-    $applicationMobileActions = mobileActionsMarkup($applicationHeading, 'application-mobile-actions', 'application-mobile-section');
-    $databaseMobileActions = mobileActionsMarkup($databaseHeading, 'database-mobile-actions', 'database-mobile-section');
-    $serviceMobileActions = mobileActionsMarkup($serviceHeading, 'service-mobile-actions', 'service-mobile-section');
+it('uses full-width split action menus on mobile resource headings', function () {
+    $headings = [
+        'application' => file_get_contents(resource_path('views/livewire/project/application/heading.blade.php')),
+        'database' => file_get_contents(resource_path('views/livewire/project/database/heading.blade.php')),
+        'service' => file_get_contents(resource_path('views/livewire/project/service/heading.blade.php')),
+    ];
 
-    expect(mobileActionsAreBeforeSelect($applicationHeading, 'application-mobile-actions', 'application-mobile-section'))->toBeTrue();
-    expect(mobileActionsAreBeforeSelect($databaseHeading, 'database-mobile-actions', 'database-mobile-section'))->toBeTrue();
-    expect(mobileActionsAreBeforeSelect($serviceHeading, 'service-mobile-actions', 'service-mobile-section'))->toBeTrue();
+    foreach ($headings as $resource => $heading) {
+        expect(mobileActionsAreBeforeDesktopActions($heading, "{$resource}-mobile-actions", "{$resource}-desktop-actions"))->toBeTrue();
 
-    expect($applicationHeading)
-        ->toContain('application-mobile-actions')
-        ->toContain("'route' => 'project.application.command'")
-        ->toContain("'navigate' => false")
-        ->toContain("value.startsWith('location|')")
-        ->toContain('window.location.href = url')
-        ->toContain('application-mobile-stop-trigger')
-        ->toContain('application-mobile-restart-trigger')
+        expect($heading)
+            ->toContain('<div class="w-full xl:hidden">')
+            ->toContain("<x-split-action id=\"{$resource}-mobile-actions\" class=\"mb-3 flex w-full\">")
+            ->not->toContain("{$resource}-mobile-section")
+            ->not->toContain('<select')
+            ->not->toContain('<optgroup')
+            ->not->toContain('@selected');
+
+        expect(mobileActionsMarkup($heading, "{$resource}-mobile-actions"))
+            ->toContain('<x-slot:main')
+            ->toContain('listbox-option justify-start! gap-2.5!')
+            ->toContain('role="menuitem"')
+            ->toContain('name="play-circle" class="size-3.5"')
+            ->toContain('name="restart" class="size-3.5')
+            ->toContain('name="stop-circle" class="size-3.5 text-error"');
+    }
+
+    expect(mobileActionsMarkup($headings['application'], 'application-mobile-actions'))
         ->toContain('wire:click="deploy"')
-        ->toContain('wire:click="force_deploy_without_cache"')
+        ->toContain('wire:click="deploy(true)"')
+        ->toContain('force_deploy_without_cache')
+        ->toContain('Deploy (without cache)')
+        ->toContain("document.getElementById('application-mobile-stop-trigger')?.click()")
+        ->toContain("document.getElementById('application-mobile-restart-trigger')?.click()");
+
+    expect($headings['application'])
+        ->toContain('<button id="application-mobile-stop-trigger" type="button">')
+        ->toContain('<button id="application-mobile-restart-trigger" type="button">')
         ->not->toContain('application-mobile-deploy-trigger')
         ->not->toContain('application-mobile-force-deploy-trigger')
-        ->not->toContain('Confirm Application Deployment?')
-        ->not->toContain('<optgroup label="Actions">');
+        ->not->toContain('Confirm Application Deployment?');
 
-    expect($applicationMobileActions)
-        ->toContain('mb-3')
-        ->toContain('Actions')
-        ->toContain('<x-forms.button isError class="shrink-0"')
-        ->not->toContain('button type="button" class="button shrink-0 text-error"')
-        ->toContain('M7 4v16l13 -8z')
-        ->toContain('M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747')
-        ->toContain('M6 5m0 1a1 1 0 0 1 1 -1h2');
+    expect(mobileActionsMarkup($headings['database'], 'database-mobile-actions'))
+        ->toContain('x-bind:disabled="busy"')
+        ->toContain("document.getElementById('database-restart-trigger')?.click()")
+        ->toContain("document.getElementById('database-stop-trigger')?.click()")
+        ->toContain("\$wire.dispatch('startEvent')");
 
-    expect($applicationHeading)
-        ->toContain('application-mobile-section-label')
-        ->toContain('Section');
-
-    expect($databaseHeading)
-        ->toContain('database-mobile-section')
-        ->toContain('database-mobile-actions')
-        ->toContain('<optgroup label="Database">')
-        ->toContain('<optgroup label="Configuration">')
-        ->toContain("'route' => 'project.database.command'")
-        ->toContain("'navigate' => false")
-        ->toContain("value.startsWith('location|')")
-        ->toContain('window.location.href = url')
-        ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
-        ->toContain("window.Livewire?.hook?.('morphed'")
-        ->toContain('x-model="selected"')
-        ->toContain('database-restart-trigger')
-        ->toContain('database-stop-trigger')
-        ->toContain("\$wire.dispatch('startEvent')")
+    expect($headings['database'])
+        ->toContain('<button id="database-restart-trigger" type="button">')
+        ->toContain('<button id="database-stop-trigger" type="button">')
         ->not->toContain('database-start-trigger')
-        ->not->toContain('Confirm Database Start?')
-        ->toContain('scrollbar hidden min-h-10')
-        ->not->toContain('<optgroup label="Links">')
-        ->not->toContain('<optgroup label="Actions">')
-        ->not->toContain('@selected');
+        ->not->toContain('Confirm Database Start?');
 
-    expect($databaseMobileActions)
-        ->toContain('mb-3')
-        ->toContain('Actions')
-        ->toContain('<x-forms.button isError class="shrink-0"')
-        ->not->toContain('button type="button" class="button shrink-0 text-error"')
-        ->toContain('M7 4v16l13 -8z')
-        ->toContain('M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747')
-        ->toContain('M6 5m0 1a1 1 0 0 1 1 -1h2');
-
-    expect($databaseHeading)
-        ->toContain('database-mobile-section-label')
-        ->toContain('Section');
-
-    expect($serviceHeading)
-        ->toContain('service-mobile-section')
-        ->toContain('service-mobile-actions')
-        ->toContain('<optgroup label="Service">')
-        ->toContain('<optgroup label="Configuration">')
-        ->toContain('<optgroup label="Resource">')
-        ->toContain('<optgroup label="Links">')
-        ->toContain("'route' => 'project.service.command'")
-        ->toContain("'navigate' => false")
-        ->toContain("value.startsWith('location|')")
-        ->toContain('window.location.href = url')
-        ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
-        ->toContain("window.Livewire?.hook?.('morphed'")
-        ->toContain('x-model="selected"')
-        ->toContain('service-restart-trigger')
-        ->toContain('service-stop-trigger')
+    expect(mobileActionsMarkup($headings['service'], 'service-mobile-actions'))
+        ->toContain('x-bind:disabled="deploying"')
+        ->toContain("document.getElementById('service-restart-trigger')?.click()")
+        ->toContain("document.getElementById('service-stop-trigger')?.click()")
         ->toContain("\$wire.dispatch('startEvent')")
         ->toContain("\$wire.dispatch('forceDeployEvent')")
-        ->toContain('service-pullAndRestart-trigger')
+        ->toContain("\$wire.dispatch('pullAndRestartEvent')");
+
+    expect($headings['service'])
+        ->toContain('<button id="service-restart-trigger" type="button">')
+        ->toContain('<button id="service-stop-trigger" type="button">')
         ->not->toContain('service-start-trigger')
         ->not->toContain('service-forceDeploy-trigger')
+        ->not->toContain('service-pullAndRestart-trigger')
         ->not->toContain('Confirm Service Deployment?')
-        ->not->toContain('Confirm Service Force Deployment?')
-        ->toContain('scrollbar hidden min-h-10')
-        ->toContain('mb-4 w-full md:mb-0 md:hidden')
-        ->toContain('hidden flex-wrap items-center gap-2 md:flex')
-        ->toContain('flex flex-nowrap')
-        ->toContain('overflow-x-auto')
-        ->not->toContain('<optgroup label="Actions">')
-        ->not->toContain('order-first flex flex-wrap items-center gap-2 sm:order-last')
-        ->not->toContain('@selected');
-
-    expect($serviceMobileActions)
-        ->toContain('mb-3')
-        ->toContain('Actions')
-        ->toContain('<x-forms.button isError class="shrink-0"')
-        ->not->toContain('button type="button" class="button shrink-0 text-error"')
-        ->toContain('M7 4v16l13 -8z')
-        ->toContain('M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747')
-        ->toContain('M6 5m0 1a1 1 0 0 1 1 -1h2');
-
-    expect($serviceHeading)
-        ->toContain('service-mobile-section-label')
-        ->toContain('Section');
+        ->not->toContain('Confirm Service Force Deployment?');
 });
 
-function mobileActionsMarkup(string $heading, string $actionsId, string $selectId): string
+function mobileActionsMarkup(string $heading, string $actionsId): string
 {
     $actionsPosition = strpos($heading, 'id="'.$actionsId.'"');
-    $selectPosition = strpos($heading, 'id="'.$selectId.'"');
 
-    if ($actionsPosition === false || $selectPosition === false || $actionsPosition > $selectPosition) {
+    if ($actionsPosition === false) {
         return '';
     }
 
-    return substr($heading, $actionsPosition, $selectPosition - $actionsPosition);
+    $endPosition = strpos($heading, '</x-split-action>', $actionsPosition);
+
+    if ($endPosition === false) {
+        return '';
+    }
+
+    return substr($heading, $actionsPosition, $endPosition - $actionsPosition);
 }
 
-function mobileActionsAreBeforeSelect(string $heading, string $actionsId, string $selectId): bool
+function mobileActionsAreBeforeDesktopActions(string $heading, string $mobileActionsId, string $desktopActionsId): bool
 {
-    $actionsPosition = strpos($heading, 'id="'.$actionsId.'"');
-    $selectPosition = strpos($heading, 'id="'.$selectId.'"');
+    $mobilePosition = strpos($heading, 'id="'.$mobileActionsId.'"');
+    $hudPosition = strpos($heading, "@teleport('#resource-action-hud-slot')");
+    $desktopPosition = strpos($heading, 'id="'.$desktopActionsId.'"');
 
-    return $actionsPosition !== false && $selectPosition !== false && $actionsPosition < $selectPosition;
+    return $mobilePosition !== false
+        && $hudPosition !== false
+        && $desktopPosition !== false
+        && $mobilePosition < $hudPosition
+        && $hudPosition < $desktopPosition;
 }
 
 it('places database backups immediately after configuration in navigation menus', function () {
@@ -167,81 +133,59 @@ it('places database backups immediately after configuration in navigation menus'
     }
 });
 
-it('keeps configuration sidebars hidden until desktop breakpoint', function () {
+it('shows configuration sidebars as a mobile link grid and a desktop rail instead of native selects', function () {
     expect(file_get_contents(resource_path('views/livewire/project/database/configuration.blade.php')))
-        ->toContain('sub-menu-wrapper hidden md:flex');
+        ->toContain('<x-database.configuration-sidebar :database="$database" :current-route="$currentRoute" />')
+        ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]')
+        ->not->toContain('sub-menu-wrapper');
 
-    expect(file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php')))
-        ->toContain('sub-menu-wrapper hidden md:flex');
+    foreach ([
+        'views/components/database/configuration-sidebar.blade.php',
+        'views/livewire/project/service/configuration.blade.php',
+        'views/livewire/project/service/index.blade.php',
+        'views/components/service-database/sidebar.blade.php',
+        'views/components/server/sidebar.blade.php',
+        'views/components/server/sidebar-proxy.blade.php',
+        'views/components/server/sidebar-sentinel.blade.php',
+        'views/components/server/sidebar-security.blade.php',
+    ] as $view) {
+        expect(file_get_contents(resource_path($view)))
+            ->toContain('<aside class="application-settings-navigation min-w-0 xl:self-start"')
+            ->toContain('class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3')
+            ->toContain('xl:grid-cols-1 xl:border-y-0 xl:py-0')
+            ->not->toContain('sub-menu-wrapper')
+            ->not->toContain('<select')
+            ->not->toContain('<optgroup');
+    }
 
-    expect(file_get_contents(resource_path('views/livewire/project/service/index.blade.php')))
-        ->toContain('sub-menu-wrapper hidden md:flex');
-
-    expect(file_get_contents(resource_path('views/components/service-database/sidebar.blade.php')))
-        ->toContain('sub-menu-wrapper hidden md:flex');
-
-    $serverSidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
-
-    expect($serverSidebar)
-        ->toContain('server-mobile-section-label')
-        ->toContain('server-mobile-section')
-        ->toContain('Section')
-        ->toContain('select w-full')
-        ->toContain('aria-label="Server menu"')
-        ->toContain('border-b-2 border-solid border-neutral-200 pb-4 md:hidden dark:border-coolgray-200')
-        ->toContain('<optgroup label="Server">')
-        ->toContain('<optgroup label="Configuration">')
+    expect(file_get_contents(resource_path('views/components/server/sidebar.blade.php')))
+        ->toContain('aria-label="Server configuration sections"')
         ->toContain("'route' => 'server.proxy'")
-        ->toContain("'navigate' => false")
-        ->toContain("value.startsWith('location|')")
-        ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
-        ->toContain('x-on:livewire:navigated.window="syncFromLocation()"')
-        ->toContain('sub-menu-wrapper hidden md:flex')
-        ->not->toContain('sub-menu-wrapper">');
+        ->toContain("'navigate' => false");
 
     $serverNavbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
 
     expect($serverNavbar)
-        ->toContain('server-mobile-actions')
-        ->toContain('Actions')
-        ->toContain('pb-0 md:pb-6')
-        ->toContain('navbar-main')
-        ->toContain('server-mobile-actions" class="mt-2 mb-3')
-        ->toContain('hidden min-h-10')
-        ->toContain('md:flex')
-        ->toContain('md:hidden')
-        ->toContain('flex flex-nowrap gap-2 overflow-x-auto')
-        ->toContain('server-mobile-restart-proxy-trigger')
-        ->toContain('server-mobile-stop-proxy-trigger')
-        ->toContain('class="button shrink-0"')
-        ->toContain('hidden gap-2 md:flex');
+        ->toContain('<div class="mb-3 w-full lg:hidden">')
+        ->toContain('<div class="w-full xl:hidden">')
+        ->toContain('<x-split-action id="server-mobile-actions" class="mb-3 flex w-full">')
+        ->toContain('<button id="server-mobile-restart-proxy-trigger" type="button">')
+        ->toContain('<button id="server-mobile-stop-proxy-trigger" type="button">')
+        ->not->toContain('navbar-main')
+        ->not->toContain('<select');
 
     $serverMobileActions = serverMobileActionsMarkup($serverNavbar);
 
+    expect($serverMobileActions)
+        ->toContain('Restart Proxy')
+        ->toContain('Stop Proxy')
+        ->toContain('Refresh Proxy Status')
+        ->not->toContain('Traefik');
+
     expect(strpos($serverMobileActions, 'Restart Proxy'))
         ->toBeLessThan(strpos($serverMobileActions, 'Stop Proxy'))
-        ->toBeLessThan(strpos($serverMobileActions, 'Traefik Dashboard'));
-
-    foreach ([
-        'views/components/server/sidebar-proxy.blade.php' => 'Proxy menu',
-        'views/components/server/sidebar-sentinel.blade.php' => 'Sentinel menu',
-        'views/components/server/sidebar-security.blade.php' => 'Security menu',
-    ] as $view => $label) {
-        $sidebar = file_get_contents(resource_path($view));
-
-        expect($sidebar)
-            ->toContain('server-mobile-section-label')
-            ->toContain('server-mobile-section')
-            ->toContain('Section')
-            ->toContain('select w-full')
-            ->toContain('aria-label="'.$label.'"')
-            ->toContain('border-b-2 border-solid border-neutral-200 pb-4 md:hidden dark:border-coolgray-200')
-            ->toContain('<optgroup label="Server">')
-            ->toContain('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url')
-            ->toContain('x-on:livewire:navigated.window="syncFromLocation()"')
-            ->toContain('sub-menu-wrapper hidden md:flex')
-            ->not->toContain('sub-menu-wrapper">');
-    }
+        ->and(strpos($serverMobileActions, 'Stop Proxy'))
+        ->toBeLessThan(strpos($serverMobileActions, 'Refresh Proxy Status'));
 
     foreach ([
         'views/livewire/server/show.blade.php',
@@ -265,9 +209,10 @@ it('keeps configuration sidebars hidden until desktop breakpoint', function () {
         'views/livewire/server/security/terminal-access.blade.php',
     ] as $view) {
         expect(file_get_contents(resource_path($view)))
-            ->toContain('gap-4 md:gap-8 md:flex-row')
-            ->toContain('md:flex-row')
-            ->not->toContain('sm:flex-row')
+            ->toContain('server-settings-workspace application-settings-workspace')
+            ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]')
+            ->toContain('<x-server.sidebar')
+            ->not->toContain('sub-menu-wrapper')
             ->not->toContain('class="flex flex-col h-full gap-8 md:flex-row');
     }
 });

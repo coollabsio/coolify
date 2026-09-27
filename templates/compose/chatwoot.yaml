@@ -84,7 +84,7 @@ services:
     volumes:
       - rails-data:/app/storage
     healthcheck:
-      test: ["CMD-SHELL", "bundle exec rails runner 'puts Sidekiq.redis(&:info)' > /dev/null 2>&1"]
+      test: ["CMD-SHELL", "bundle exec sidekiqmon processes | grep -q 'sidekiq'"]
       interval: 30s
       timeout: 10s
       retries: 3

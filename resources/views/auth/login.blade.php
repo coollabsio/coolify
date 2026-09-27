@@ -80,11 +80,15 @@
 
             @if ($enabled_oauth_providers->isNotEmpty())
                 <div class="auth-divider"><span>Or continue with</span></div>
-                <div class="grid gap-2 sm:grid-cols-2">
+                <div class="flex flex-col gap-2">
                     @foreach ($enabled_oauth_providers as $provider_setting)
                         <x-forms.button class="w-full justify-center" type="button"
                             onclick="document.location.href='/auth/{{ $provider_setting->provider }}/redirect'">
-                            {{ __("auth.login.$provider_setting->provider") }}
+                            @if ($provider_setting->provider !== 'oidc')
+                                <img class="size-5 shrink-0 dark:invert"
+                                    src="{{ asset('svgs/'.$provider_setting->provider.'.svg') }}" alt="" aria-hidden="true">
+                            @endif
+                            {{ $provider_setting->loginLabel() }}
                         </x-forms.button>
                     @endforeach
                 </div>

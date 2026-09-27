@@ -174,7 +174,9 @@ class Telegram extends Component
             $this->settings->telegram_notifications_server_patch_thread_id = $this->telegramNotificationsServerPatchThreadId;
             $this->settings->telegram_notifications_traefik_outdated_thread_id = $this->telegramNotificationsTraefikOutdatedThreadId;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
         } else {
             $this->telegramEnabled = $this->settings->telegram_enabled;
             if (auth()->user()->can('update', $this->settings)) {
@@ -263,6 +265,34 @@ class Telegram extends Component
         }
     }
 
+    public function toggleTelegramEnabled(): void
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->telegramEnabled) {
+                $this->telegramEnabled = false;
+            } else {
+                $this->validate([
+                    'telegramToken' => 'required',
+                    'telegramChatId' => 'required',
+                ], [
+                    'telegramToken.required' => 'Telegram Token is required.',
+                    'telegramChatId.required' => 'Telegram Chat ID is required.',
+                ]);
+                $this->telegramEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
     public function saveModel()
     {
         $this->authorize('update', $this->settings);
@@ -286,5 +316,12 @@ class Telegram extends Component
     public function render()
     {
         return view('livewire.notifications.telegram');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.telegram.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

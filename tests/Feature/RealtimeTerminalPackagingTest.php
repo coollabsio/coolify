@@ -143,7 +143,7 @@ it('shows connection progress in the terminal body instead of the header', funct
         ->not->toContain('wire:loading.flex wire:target="selected_container,connectToContainer"')
         ->not->toContain('wire:loading.flex wire:target="selected_uuid,connectToContainer"')
         ->and($terminalView)
-        ->toContain("x-on:terminal-starting.window=\"starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')\"")
+        ->toContain("x-on:terminal-starting.window=\"beginTerminalSessionStart(); setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')\"")
         ->toContain('data-auto-start="{{ $autoStart ? \'true\' : \'false\' }}"')
         ->toContain("starting ? 'connecting…'")
         ->and($terminalClient)
@@ -193,16 +193,19 @@ it('does not overlay the session expiry label on the application terminal', func
         ->not->toContain('terminal-session-expiry');
 });
 
-it('copies the realtime terminal utilities into the container image', function () {
-    $dockerfile = file_get_contents(base_path('docker/coolify-realtime/Dockerfile'));
+it('copies the terminal utilities into the Coolify container images', function (string $dockerfile) {
+    $dockerfile = file_get_contents(base_path($dockerfile));
 
-    expect($dockerfile)->toContain('COPY docker/coolify-realtime/terminal-utils.js /terminal/terminal-utils.js');
-});
+    expect($dockerfile)->toContain('COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js');
+})->with([
+    'production image' => 'docker/production/Dockerfile',
+    'development image' => 'docker/development/Dockerfile',
+]);
 
 it('mounts the realtime terminal utilities in local development compose files', function (string $composeFile) {
     $composeContents = file_get_contents(base_path($composeFile));
 
-    expect($composeContents)->toContain('./docker/coolify-realtime/terminal-utils.js:/terminal/terminal-utils.js');
+    expect($composeContents)->toContain('./docker/coolify-terminal/terminal-utils.js:/terminal/terminal-utils.js');
 })->with([
     'default dev compose' => 'docker-compose.dev.yml',
     'maxio dev compose' => 'docker-compose-maxio.dev.yml',
@@ -219,7 +222,7 @@ it('keeps terminal browser logging restricted to development or explicit diagnos
 });
 
 it('keeps realtime terminal server logging behind the explicit debug flag', function () {
-    $terminalServer = file_get_contents(base_path('docker/coolify-realtime/terminal-server.js'));
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
 
     expect($terminalServer)
         ->toContain('const debugOverride = String(process.env.TERMINAL_DEBUG')
@@ -229,7 +232,7 @@ it('keeps realtime terminal server logging behind the explicit debug flag', func
 });
 
 it('configures a server-initiated WebSocket heartbeat to survive proxy idle timeouts', function () {
-    $terminalServer = file_get_contents(base_path('docker/coolify-realtime/terminal-server.js'));
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
 
     expect($terminalServer)
         ->toContain('ws.isAlive = true;')
@@ -254,7 +257,7 @@ it('uses a fast probe timeout when the tab regains visibility', function () {
 });
 
 it('does not hard close terminal sessions after 30 minutes on the server', function () {
-    $terminalServer = file_get_contents(base_path('docker/coolify-realtime/terminal-server.js'));
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
 
     expect($terminalServer)
         ->not->toContain('IDLE_TIMEOUT_MS = 30 * 60 * 1000')
@@ -294,17 +297,19 @@ it('exits fullscreen when the terminal process exits', function () {
                     this.terminalActive = false;');
 });
 
-it('replays the last command on reconnect so the PTY respawns automatically', function () {
+it('does not replay single-use terminal tokens after reconnect', function () {
     $terminalClient = file_get_contents(base_path('resources/js/terminal.js'));
 
     expect($terminalClient)
-        ->toContain('lastSentCommand')
-        ->toContain('Replaying last command after reconnect.')
-        ->toContain('this.lastSentCommand = null;');
+        ->toContain('terminalToken')
+        ->toContain("this.\$wire.on('send-terminal-token', ([token]) =>")
+        ->toContain('tokens are single-use and must never be replayed')
+        ->not->toContain('lastSentCommand')
+        ->not->toContain('Replaying last command after reconnect.');
 });
 
 it('buffers messages received before the realtime server finishes auth so the replay is not lost', function () {
-    $terminalServer = file_get_contents(base_path('docker/coolify-realtime/terminal-server.js'));
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
 
     expect($terminalServer)
         ->toContain('authReady: false')
@@ -572,4 +577,59 @@ it('fits the terminal with FitAddon and keeps xterm within the host after resize
         ->toContain("this.term.element.style.maxHeight = '100%'")
         ->toContain('scrollback: 5000')
         ->not->toContain('Math.floor(height / charSize.height) - 1');
+});
+
+it('reports terminal authentication rejections with readable WebSocket close codes', function () {
+    $terminalServer = file_get_contents(base_path('docker/coolify-terminal/terminal-server.js'));
+    $terminalUtils = file_get_contents(base_path('docker/coolify-terminal/terminal-utils.js'));
+
+    expect($terminalUtils)
+        ->toContain('AUTH_REJECTED: 4401')
+        ->toContain('TOKEN_REJECTED: 4403')
+        ->and($terminalServer)
+        ->toContain("new WebSocketServer({ noServer: true, path: '/terminal/ws' })")
+        ->toContain("server.on('upgrade', createTerminalUpgradeHandler({ wss, authenticate: verifyClient }))")
+        ->toContain("rejectTerminalToken(userSession, 'Unauthorized: Invalid terminal token')")
+        ->toContain("rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected')")
+        ->toContain("typeof token !== 'string' || !/^[a-zA-Z0-9]{64}$/.test(token)")
+        ->toContain("response.status !== 200 || typeof response.data?.command !== 'string'")
+        ->not->toContain('verifyClient: verifyClient')
+        ->not->toContain('ws.close(401');
+});
+
+it('leaves the terminal connecting state when the connection is rejected, lost, or times out', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+
+    expect($terminalClient)
+        ->toContain("from './terminal-connection.js'")
+        ->toContain('connectionError: null')
+        ->toContain('const outcome = resolveTerminalCloseOutcome({')
+        ->toContain('this.authRejected = true;')
+        ->toContain('if (this.authRejected) {')
+        ->toContain('Ignoring terminal token after authentication was rejected.')
+        ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.timeout)')
+        ->toContain('failTerminalConnection(TERMINAL_CONNECTION_ERRORS.connectionFailed)')
+        ->toContain('...terminalSessionStartMethods,')
+        ->toContain('this.beginTerminalSessionStart();')
+        ->and(file_get_contents(resource_path('js/terminal-connection.js')))
+        ->toContain('export const terminalSessionStartMethods = {')
+        ->toContain('}, TERMINAL_SESSION_START_TIMEOUT_MS);')
+        ->and($terminalView)
+        ->toContain('data-terminal-connection-error')
+        ->toContain('x-text="connectionError"')
+        ->toContain('x-on:click="reloadTerminalPage()"')
+        ->toContain('x-show="!connectionError" class="terminal-loading-label');
+});
+
+it('ends the auto-start connecting state when no terminal token arrives', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalClient)
+        ->toMatch("/this\.starting = this\.\\\$el\.dataset\.autoStart === 'true';.*?if \(this\.starting\) \{\s*this\.armTerminalSessionStartTimeout\(\);\s*\}/s")
+        ->toContain("this.\$wire.on('terminal-session-failed', ({ message }) => {")
+        ->toContain('this.failTerminalSessionStart(message);')
+        ->toContain("this.\$wire.on('terminal-auto-start-cancelled', () => {")
+        ->toMatch('/destroy\(\) \{\s*this\.clearSessionStartTimeout\(\);/')
+        ->toMatch("/event\.data === 'pty-ready'\) \{\s*this\.completeTerminalSessionStart\(\);/");
 });

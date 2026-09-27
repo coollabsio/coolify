@@ -117,6 +117,21 @@ it('renders preview deployment enablement as a section action', function () {
     expect($this->application->fresh()->settings->is_preview_deployments_enabled)->toBeTrue();
 });
 
+it('renders GitHub pull requests in a modal opened from the preview settings', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
+    $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
+
+    expect($view)
+        ->toContain('<x-modal-input title="Pull requests"')
+        ->toContain(':isLarge="true"')
+        ->toContain('wire:click="load_prs"')
+        ->not->toContain('id="preview-pull-requests-section"')
+        ->and(strpos($view, '<x-modal-input title="Pull requests"'))
+        ->toBeLessThan(strpos($view, '<livewire:project.application.preview.form'));
+
+    expect($sidebar)->not->toContain("['id' => 'preview-pull-requests-section', 'label' => 'Pull requests']");
+});
+
 it('does not show git preview settings for non-git applications', function (string $buildPack, ?string $dockerfile) {
     $this->application->update(['build_pack' => $buildPack, 'dockerfile' => $dockerfile]);
 

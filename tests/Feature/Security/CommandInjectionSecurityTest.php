@@ -1025,6 +1025,16 @@ describe('service application lifecycle command escaping', function () {
             ->and($source)->toContain('escapeshellarg($container_id)');
     });
 
+    test('application deployment shell commands escape the generated container name', function () {
+        $source = file_get_contents(app_path('Jobs/ApplicationDeploymentJob.php'));
+
+        expect($source)->toContain('$escapedContainerName = escapeshellarg($this->container_name)')
+            ->and($source)->toContain("docker inspect --format='{{json .State.Health.Status}}' {\$escapedContainerName}")
+            ->and($source)->toContain("docker inspect --format='{{json .State.Health.Log}}' {\$escapedContainerName}")
+            ->and($source)->toContain('docker logs -n 100 {$escapedContainerName}')
+            ->and($source)->toContain('dockerStopCommand($timeout, escapeshellarg($containerName), $this->server)');
+    });
+
     test('service application logs endpoint passes raw container name to docker helpers', function () {
         $source = file_get_contents(app_path('Http/Controllers/Api/ServiceApplicationsController.php'));
 

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Enums\ProcessStatus;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -50,6 +51,12 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        // A database import that Coolify stopped after a restart must not run again when
+        // the queue retries this job. Its cleanup is already queued.
+        if (DatabaseImportCleanup::stopRequested($this->activity)) {
+            return;
+        }
+
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'ignore_errors' => $this->ignore_errors,
@@ -84,11 +91,14 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         ]);
 
         // Update activity status to reflect permanent failure
-        $this->activity->properties = $this->activity->properties->merge([
+        // A stopped database import already has the message that explains the stop; the process
+        // error ("Terminated") would hide it.
+        $stopRequested = DatabaseImportCleanup::stopRequested($this->activity);
+        $this->activity->properties = $this->activity->properties->merge(array_filter([
             'status' => ProcessStatus::ERROR->value,
-            'error' => $exception?->getMessage() ?? 'Job permanently failed',
+            'error' => $stopRequested ? null : ($exception?->getMessage() ?? 'Job permanently failed'),
             'failed_at' => now()->toIso8601String(),
-        ]);
+        ], fn ($value) => $value !== null));
         $this->activity->save();
 
         // Dispatch cleanup event on failure (same as on success)

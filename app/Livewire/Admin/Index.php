@@ -30,8 +30,8 @@ class Index extends Component
     public function back()
     {
         $this->authorizeAdminAccess();
-        if (session('impersonating')) {
-            session()->forget('impersonating');
+        if (session('impersonator_id') === 0) {
+            session()->forget(['impersonator_id', 'impersonating']);
             $user = User::find(0);
             $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
             Auth::login($user);
@@ -54,7 +54,7 @@ class Index extends Component
 
     public function getSubscribers()
     {
-        if (Auth::id() !== 0 && ! session('impersonating')) {
+        if (Auth::id() !== 0 && session('impersonator_id') !== 0) {
             return redirect()->route('dashboard');
         }
         $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
@@ -64,7 +64,7 @@ class Index extends Component
     public function switchUser(int $user_id)
     {
         $this->authorizeRootOnly();
-        session(['impersonating' => true]);
+        session(['impersonator_id' => Auth::id(), 'impersonating' => true]);
         $user = User::find($user_id);
         if (! $user) {
             abort(404);
@@ -78,7 +78,7 @@ class Index extends Component
 
     private function authorizeAdminAccess(): void
     {
-        if (! Auth::check() || (Auth::id() !== 0 && ! session('impersonating'))) {
+        if (! Auth::check() || (Auth::id() !== 0 && session('impersonator_id') !== 0)) {
             abort(403);
         }
     }

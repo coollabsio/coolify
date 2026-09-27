@@ -25,6 +25,13 @@ class BackupNow extends Component
             }
 
             DatabaseBackupJob::dispatch($this->backup);
+            $database = $this->backup->database;
+            auditLog('ui.database.backup_started', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $this->backup->uuid,
+            ]);
             $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

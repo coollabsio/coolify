@@ -104,7 +104,6 @@ class DeploymentNavbar extends Component
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
         ]);
-
         try {
             if ($this->application->settings->is_build_server_enabled) {
                 $server = Server::ownedByCurrentTeam()->find($build_server_id);

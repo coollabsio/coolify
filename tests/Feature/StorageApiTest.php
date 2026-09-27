@@ -16,6 +16,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -39,6 +42,16 @@ beforeEach(function () {
     $this->bearerToken = $token->getKey().'|'.$plainTextToken;
 
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $keyId = DB::table('private_keys')->insertGetId([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Storage Test Key',
+        'private_key' => Crypt::encryptString('test-key'),
+        'team_id' => $this->team->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $this->server->update(['private_key_id' => $keyId]);
+    Process::fake(fn () => Process::result(output: 'OK'));
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
@@ -89,6 +102,7 @@ function createTestServiceApplication($context): array
 {
     $service = Service::factory()->create([
         'environment_id' => $context->environment->id,
+        'server_id' => $context->server->id,
         'destination_id' => $context->destination->id,
         'destination_type' => $context->destination->getMorphClass(),
     ]);
@@ -170,6 +184,22 @@ describe('GET /api/v1/applications/{uuid}/storages', function () {
 });
 
 describe('POST /api/v1/applications/{uuid}/storages', function () {
+    test('rejects an application directory mount outside its managed root without side effects', function () {
+        $app = createTestApplication($this);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->postJson("/api/v1/applications/{$app->uuid}/storages", [
+            'type' => 'file',
+            'is_directory' => true,
+            'fs_path' => '/root/.ssh/authorized_keys',
+            'mount_path' => '/data',
+        ])->assertUnprocessable();
+
+        expect($app->fileStorages()->exists())->toBeFalse();
+        Bus::assertNotDispatched(ServerStorageSaveJob::class);
+    });
+
     test('creates a persistent storage', function () {
         $app = createTestApplication($this);
 
@@ -621,3 +651,127 @@ describe('DELETE /api/v1/databases/{uuid}/storages/{storage_uuid}', function () 
         expect(LocalPersistentVolume::find($vol->id))->toBeNull();
     });
 });
+
+test('rejects host paths when creating persistent storage through the API', function (string $resourceType) {
+    if ($resourceType === 'application') {
+        $resource = createTestApplication($this);
+        $url = "/api/v1/applications/{$resource->uuid}/storages";
+        $payload = [];
+    } elseif ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+        $payload = [];
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+        $payload = ['resource_uuid' => $resource->uuid];
+    }
+
+    $storageCountBefore = $resource->persistentStorages()->count();
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->bearerToken,
+        'Content-Type' => 'application/json',
+    ])->postJson($url, array_merge($payload, [
+        'type' => 'persistent',
+        'name' => 'blocked-bind-mount',
+        'mount_path' => '/data',
+        'host_path' => '/srv/data',
+    ]));
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('errors.host_path.0', 'This field is not allowed.');
+
+    expect($resource->persistentStorages()->count())->toBe($storageCountBefore);
+})->with(['application', 'database', 'service']);
+
+test('rejects directory mounts outside each resource configuration root', function (string $resourceType) {
+    if ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+        $payload = [];
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+        $payload = ['resource_uuid' => $resource->uuid];
+    }
+
+    $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->bearerToken,
+    ])->postJson($url, [...$payload, ...[
+        'type' => 'file',
+        'is_directory' => true,
+        'fs_path' => '/etc/shadow',
+        'mount_path' => '/data',
+    ]])->assertUnprocessable();
+
+    expect($resource->fileStorages()->exists())->toBeFalse();
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+})->with(['database', 'service']);
+
+test('rejects a directory mount through a remote symlink before creating storage', function (string $resourceType) {
+    if ($resourceType === 'application') {
+        $resource = createTestApplication($this);
+        $url = "/api/v1/applications/{$resource->uuid}/storages";
+        $payload = [];
+        $base = application_configuration_dir().'/'.$resource->uuid;
+    } elseif ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+        $payload = [];
+        $base = database_configuration_dir().'/'.$resource->uuid;
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+        $payload = ['resource_uuid' => $resource->uuid];
+        $base = service_configuration_dir().'/'.$service->uuid;
+    }
+
+    Process::fake(fn () => Process::result(output: 'NOK'));
+
+    $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken])
+        ->postJson($url, [...$payload, ...[
+            'type' => 'file',
+            'is_directory' => true,
+            'fs_path' => $base.'/linked/outside',
+            'mount_path' => '/data',
+        ]]);
+    $response->assertUnprocessable();
+
+    expect($resource->fileStorages()->exists())->toBeFalse();
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+})->with(['application', 'database', 'service']);
+
+test('rejects host paths when updating persistent storage through the API', function (string $resourceType) {
+    if ($resourceType === 'application') {
+        $resource = createTestApplication($this);
+        $url = "/api/v1/applications/{$resource->uuid}/storages";
+    } elseif ($resourceType === 'database') {
+        $resource = createTestDatabase($this);
+        $url = "/api/v1/databases/{$resource->uuid}/storages";
+    } else {
+        [$service, $resource] = createTestServiceApplication($this);
+        $url = "/api/v1/services/{$service->uuid}/storages";
+    }
+
+    $storage = LocalPersistentVolume::create([
+        'name' => $resource->uuid.'-data',
+        'mount_path' => '/data',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+
+    $response = $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->bearerToken,
+        'Content-Type' => 'application/json',
+    ])->patchJson($url, [
+        'uuid' => $storage->uuid,
+        'type' => 'persistent',
+        'host_path' => '/srv/data',
+    ]);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('errors.host_path.0', 'This field is not allowed.');
+
+    expect($storage->refresh()->host_path)->toBeNull();
+})->with(['application', 'database', 'service']);

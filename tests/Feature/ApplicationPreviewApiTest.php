@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -130,6 +132,61 @@ describe('DELETE /api/v1/applications/{uuid}/previews/{pull_request_id}', functi
             ->deleteJson("/api/v1/applications/{$this->application->uuid}/previews/7");
 
         $response->assertForbidden();
+    });
+});
+
+describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', function () {
+    test('returns runtime logs from the selected preview container', function () {
+        createPreview($this->application, 42);
+        $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+        $this->server->update(['private_key_id' => $privateKey->id]);
+        Process::fake(function ($process) {
+            if (str_contains($process->command, 'docker ps -a')) {
+                return Process::result(output: json_encode([
+                    'ID' => 'preview-container',
+                    'Names' => "{$this->application->uuid}-pr-42",
+                    'Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId=42",
+                ]));
+            }
+            if (str_contains($process->command, 'docker inspect')) {
+                return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
+            }
+            if (str_contains($process->command, 'docker logs')) {
+                return Process::result(output: 'preview runtime log');
+            }
+
+            return Process::result();
+        });
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42/logs")
+            ->assertOk()
+            ->assertJson(['logs' => 'preview runtime log']);
+    });
+
+    test('returns 404 when the preview does not exist', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42/logs")
+            ->assertNotFound()
+            ->assertJson(['message' => 'Preview not found.']);
+    });
+
+    test('rejects an invalid pull request id', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/not-a-number/logs")
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Invalid pull_request_id.']);
+    });
+
+    test('uses the pull request id to select the preview container', function () {
+        $controller = file_get_contents(app_path('Http/Controllers/Api/ApplicationsController.php'));
+        $openApi = json_decode(file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($controller)
+            ->toContain("\$request->route('pull_request_id')")
+            ->toContain('getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId)')
+            ->and($openApi['paths'])
+            ->toHaveKey('/applications/{uuid}/previews/{pull_request_id}/logs');
     });
 });
 

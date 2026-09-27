@@ -234,6 +234,56 @@ it('sends immediate notifications when outdated traefik is detected', function (
     expect($notification->servers->first()->outdatedInfo['type'])->toBe('patch_update');
 });
 
+it('does not notify about Traefik patch updates', function () {
+    $team = Team::factory()->create();
+    $team->webhookNotificationSettings()->update([
+        'webhook_enabled' => true,
+        'webhook_url' => 'https://example.com/webhook',
+    ]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $job = new CheckTraefikVersionForServerJob($server, ['v3.7' => '3.7.13']);
+    (new ReflectionMethod($job, 'storeOutdatedInfo'))->invoke($job, '3.7.7', '3.7.13', 'patch_update');
+
+    Notification::assertNothingSent();
+});
+
+it('notifies about Traefik minor updates', function () {
+    $team = Team::factory()->create();
+    $team->webhookNotificationSettings()->update([
+        'webhook_enabled' => true,
+        'webhook_url' => 'https://example.com/webhook',
+    ]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    $job = new CheckTraefikVersionForServerJob($server, ['v3.7' => '3.7.13']);
+    (new ReflectionMethod($job, 'storeOutdatedInfo'))->invoke($job, '3.6.20', '3.7.13', 'minor_upgrade', 'v3.7');
+
+    Notification::assertCount(1);
+});
+
+it('does not repeat a Traefik minor update notification when the target is unchanged', function () {
+    $team = Team::factory()->create();
+    $team->webhookNotificationSettings()->update([
+        'webhook_enabled' => true,
+        'webhook_url' => 'https://example.com/webhook',
+    ]);
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'traefik_outdated_info' => [
+            'current' => '3.6.20',
+            'latest' => '3.7.13',
+            'type' => 'minor_upgrade',
+            'upgrade_target' => 'v3.7',
+        ],
+    ]);
+
+    $job = new CheckTraefikVersionForServerJob($server, ['v3.7' => '3.7.13']);
+    (new ReflectionMethod($job, 'storeOutdatedInfo'))->invoke($job, '3.6.20', '3.7.13', 'minor_upgrade', 'v3.7');
+
+    Notification::assertNothingSent();
+});
+
 it('notification generates correct server proxy URLs', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create([

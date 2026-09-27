@@ -32,6 +32,7 @@ test('destination creation modal can mount with selected team server even when g
     $server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
 
@@ -47,6 +48,7 @@ test('server destinations page renders when selected server has no destinations'
     $server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
 

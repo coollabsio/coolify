@@ -1,3 +1,18 @@
+@php
+    // Copy affordance reads the live Livewire value. The bound property comes
+    // either from the `id`-derived modelBinding or from a passthrough
+    // `wire:model` attribute (used by read-only fields like DB URLs). Resolve to a
+    // single JS expression here — a directive inside the <x-copy-button> tag would
+    // break Blade's component-tag compiler.
+    $copyResolve = null;
+    if ($copyable) {
+        $copyModel = $modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model');
+        $copyResolve = $copyModel
+            ? "\$wire.get('".$copyModel."')"
+            : (string) \Illuminate\Support\Js::from($value);
+    }
+@endphp
+
 <div @class([
     'flex-1' => $isMultiline,
     'w-full' => !$isMultiline,
@@ -37,7 +52,7 @@
                 @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
-                @if ($autofocus) x-ref="autofocusInput" @endif>
+                @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
             @if ($allowToPeak)
                 <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
                     class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
@@ -48,9 +63,16 @@
                     <x-reicon name="eye-off2" x-cloak x-show="type === 'text'" class="size-[18px]" />
                 </button>
             @endif
+            @if ($copyable)
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
+                    class="absolute top-1/2 z-10 -translate-y-1/2 {{ $allowToPeak ? 'right-8' : 'right-1' }}" />
+            @endif
 
         </div>
     @else
+        @if ($copyable)
+            <div class="relative">
+        @endif
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
             @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
@@ -60,7 +82,12 @@
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}"
-            @if ($autofocus) x-ref="autofocusInput" @endif>
+            @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
+        @if ($copyable)
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
+                    class="absolute top-1/2 right-1 z-10 -translate-y-1/2" />
+            </div>
+        @endif
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

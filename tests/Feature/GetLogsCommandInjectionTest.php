@@ -74,6 +74,29 @@ describe('GetLogs locked properties', function () {
 });
 
 describe('GetLogs Livewire action validation', function () {
+    test('getLogs requests all logs when the line count is minus one', function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $server = Server::with('settings')->findOrFail($this->server->id);
+
+        Process::fake(['*' => Process::result(output: 'all logs')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $server,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->assertSee('All')
+            ->assertSeeHtml('title="Show all logs"')
+            ->call('showAllLogs')
+            ->assertSet('numberOfLines', -1);
+
+        Process::assertRan(fn ($process) => str_contains($process->command, 'docker logs -n all'));
+    });
+
     test('getLogs marks ANSI-colored output truncated based on raw bytes', function () {
         $this->server->settings->fill([
             'is_reachable' => true,
