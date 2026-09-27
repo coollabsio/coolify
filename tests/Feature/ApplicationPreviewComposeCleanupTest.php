@@ -47,6 +47,7 @@ networks:
 YAML;
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
     config(['constants.ssh.mux_enabled' => false]);
     Queue::fake();

@@ -60,9 +60,13 @@ it('uses a default caddy image that supports per-app traffic attribution', funct
         ->and($server->fresh()->caddySupportsLogAppend())->toBeTrue();
 });
 
-function caddyTrafficServer(object $test, bool $analyticsEnabled = true): Server
+function caddyTrafficServer(object $test, bool $analyticsEnabled = true, ?string $ip = null): Server
 {
-    $server = Server::factory()->create(['team_id' => $test->team->id, 'private_key_id' => $test->privateKey->id]);
+    $server = Server::factory()->create(array_filter([
+        'team_id' => $test->team->id,
+        'private_key_id' => $test->privateKey->id,
+        'ip' => $ip,
+    ]));
     $server->proxy->set('type', 'CADDY');
     $server->save();
     $server->settings->is_traffic_analytics_enabled = $analyticsEnabled;
@@ -80,40 +84,48 @@ it('mounts the Sentinel traffic log directory into Caddy in production', functio
         ->and($config['services']['caddy']['volumes'])->toContain('/data/coolify/proxy/caddy:/traffic');
 });
 
-it('mounts the Sentinel traffic log directory into Caddy in development', function () {
+it('mounts the Sentinel traffic log directory into Caddy in development', function (?string $ip, string $directory) {
     config()->set('app.env', 'local');
-    $server = caddyTrafficServer($this);
+    $server = caddyTrafficServer($this, ip: $ip);
 
     $volumes = Yaml::parse(generateDefaultProxyConfiguration($server))['services']['caddy']['volumes'];
     $trafficVolumes = array_values(array_filter($volumes, fn (string $volume): bool => str_ends_with($volume, ':/traffic')));
 
     // Caddy writes /traffic/access.log, Sentinel reads <trafficLogDirectory>/access.log.
     expect($trafficVolumes)->toBe([StartSentinel::trafficLogDirectory($server).':/traffic'])
-        ->and($trafficVolumes[0])->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy:/traffic');
-});
+        ->and($trafficVolumes[0])->toBe("{$directory}:/traffic");
+})->with([
+    // A dev KVM server has its own Docker daemon and its own /data/coolify, like production.
+    'dev KVM server' => ['10.221.1.10', '/data/coolify/proxy/caddy'],
+    // The testing-host server uses the host Docker daemon, so it mounts the dev data volume.
+    'dev testing-host server' => [Server::DEV_TESTING_HOST_IP, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy'],
+]);
 
-it('uses the configured dev data volume for Caddy, Traefik, and Sentinel', function () {
+it('uses the configured dev data volume for Caddy, Traefik, and Sentinel on the testing-host server', function () {
     config()->set('app.env', 'local');
     config()->set('constants.coolify.dev_data_volume', 'coolify-dev-feature_coolify_data');
-    $caddy = caddyTrafficServer($this);
+    $caddy = caddyTrafficServer($this, ip: Server::DEV_TESTING_HOST_IP);
 
     $caddyVolumes = Yaml::parse(generateDefaultProxyConfiguration($caddy))['services']['caddy']['volumes'];
 
-    $traefik = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
+    $traefik = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id, 'ip' => Server::DEV_TESTING_HOST_IP]);
     $traefik->proxy->set('type', 'TRAEFIK');
     $traefik->save();
     $traefikVolumes = Yaml::parse(generateDefaultProxyConfiguration($traefik->fresh()))['services']['traefik']['volumes'];
 
-    expect(StartSentinel::trafficLogDirectory($caddy))->toBe('/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy')
-        ->and($caddyVolumes)->toContain('/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy:/traffic')
+    expect(StartSentinel::trafficLogDirectory($caddy))->toBe('/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy/caddy')
+        ->and($caddyVolumes)->toContain('/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy/caddy:/traffic')
         ->and($traefikVolumes)->toContain('/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy/:/traefik');
 });
 
-it('falls back to the legacy dev data volume for an invalid volume name', function (?string $volume) {
+it('falls back to the legacy dev volumes for an invalid volume name', function (?string $volume) {
     config()->set('app.env', 'local');
     config()->set('constants.coolify.dev_data_volume', $volume);
+    config()->set('constants.coolify.dev_backups_volume', $volume);
+    $server = caddyTrafficServer($this, ip: Server::DEV_TESTING_HOST_IP);
 
-    expect(devCoolifyDataPath())->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data');
+    expect(devHostDockerPath($server, '/data/coolify'))->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data')
+        ->and(devHostDockerPath($server, '/data/coolify/backups/x'))->toBe('/var/lib/docker/volumes/coolify_dev_backups_data/_data/x');
 })->with([
     'empty' => [''],
     'null' => [null],

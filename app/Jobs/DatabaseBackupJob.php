@@ -801,6 +801,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         return instant_remote_process(['du -b '.escapeshellarg($this->backup_location).' | cut -f1'], $this->server, false, false, null, disableMultiplexing: true);
     }
 
+    /**
+     * Host path of the backup file for the upload container. It differs from backup_location only for the
+     * development testing-host server (see devHostDockerPath()).
+     */
+    private function backupMountSource(): string
+    {
+        return devHostDockerPath($this->server, $this->backup_location);
+    }
+
     private function upload_to_s3(): void
     {
         if (is_null($this->s3)) {
@@ -835,16 +844,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false, false, null, disableMultiplexing: true);
             }
 
-            if (isDev()) {
-                if ($this->database->name === 'coolify-db') {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
-                } else {
-                    $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
-                }
-            } else {
-                $backup_location_from = $this->backup_location;
-            }
-            $mount = escapeshellarg($backup_location_from.':'.$this->backup_location.':ro');
+            $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
             $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm -v {$mount} {$fullImageName}";
 
             // Escape S3 credentials to prevent command injection

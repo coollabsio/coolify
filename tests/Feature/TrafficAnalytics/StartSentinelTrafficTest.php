@@ -47,17 +47,21 @@ it('produces traffic + geoip env when enabled', function () {
     expect($env)->toHaveKey('TRAFFIC_ACCESS_LOG_PATH');
 });
 
-it('uses the dev proxy volume for traffic logs locally', function () {
+it('uses the dev proxy volume for traffic logs only on the testing-host server locally', function (string $ip, string $directory) {
     config()->set('app.env', 'local');
     $server = trafficProxyServer($this);
+    $server->update(['ip' => $ip]);
     $server->settings->is_traffic_analytics_enabled = true;
     $server->settings->save();
 
     expect(StartSentinel::trafficLogDirectory($server->fresh()))
-        ->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy');
+        ->toBe($directory);
     expect(StartSentinel::sentinelTrafficEnvironment($server->fresh())['TRAFFIC_ACCESS_LOG_PATH'])
-        ->toBe('/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/access.log');
-});
+        ->toBe("{$directory}/access.log");
+})->with([
+    'dev KVM server' => ['10.221.1.10', '/data/coolify/proxy'],
+    'dev testing-host server' => [Server::DEV_TESTING_HOST_IP, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy'],
+]);
 
 it('passes custom traffic settings as sentinel env', function () {
     $server = trafficProxyServer($this);
@@ -207,11 +211,13 @@ it('keeps the access log commands valid for non-root servers', function () {
     expect($syntax->isSuccessful())->toBeTrue($syntax->getErrorOutput());
 });
 
-it('mounts the configured dev data volume for traffic logs and Sentinel data', function () {
+it('mounts the configured dev data volume for traffic logs and Sentinel data on the testing-host server', function () {
     config()->set('app.env', 'local');
     config()->set('constants.coolify.dev_data_volume', 'coolify-dev-feature_coolify_data');
     $server = sentinelTrafficServer($this, 'CADDY', analyticsEnabled: true);
-    $directory = '/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy';
+    $server->update(['ip' => Server::DEV_TESTING_HOST_IP]);
+    $server = $server->fresh();
+    $directory = '/var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/proxy/caddy';
 
     $script = runStartSentinelAndCaptureScript($server);
 
