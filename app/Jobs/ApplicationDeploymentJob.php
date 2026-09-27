@@ -743,7 +743,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
-            $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
+            $composeFile = $this->parseComposeFileForDeployment();
             // Always add .env file to services
             $services = collect(data_get($composeFile, 'services', []));
             $services = $services->map(function ($service, $name) {
@@ -873,6 +873,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->start_docker_compose_services();
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    /**
+     * Parses the Compose file for this deployment and writes the volume warnings of the parser
+     * (for example an external volume that the resource does not use yet) to the deployment log.
+     *
+     * @return Collection<array-key, mixed>
+     */
+    private function parseComposeFileForDeployment(): Collection
+    {
+        $composeFile = collect($this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit));
+        foreach ($this->application->composeVolumeWarnings() as $warning) {
+            $this->application_deployment_queue->addLogEntry("Warning: {$warning}", 'stderr');
+        }
+
+        return $composeFile;
     }
 
     private function pull_docker_compose_images(): void

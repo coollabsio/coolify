@@ -343,7 +343,7 @@ test('the Compose deployment validates the repository file before any command us
     expect($loadPosition)->not->toBeFalse()
         ->and($body)->not->toContain('$this->application->loadComposeFile(')
         ->and($loadPosition)->toBeLessThan(strpos($body, '$this->application->oldRawParser()'))
-        ->and($loadPosition)->toBeLessThan(strpos($body, '$this->application->parse('))
+        ->and($loadPosition)->toBeLessThan(strpos($body, '$this->parseComposeFileForDeployment()'))
         ->and($loadPosition)->toBeLessThan(strpos($body, 'base64 -d'))
         ->and($body)->toContain('"stat -c \'%F\' ".escapeshellarg($realPathInGit)');
 });
