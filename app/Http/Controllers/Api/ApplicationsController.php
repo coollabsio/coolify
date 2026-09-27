@@ -1254,6 +1254,22 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
+        if ($request->filled('docker_compose_raw')) {
+            try {
+                if (! is_string($request->input('docker_compose_raw'))) {
+                    throw new \Exception('The docker_compose_raw field must be a string.');
+                }
+                validateDockerComposeForInjection($request->input('docker_compose_raw'));
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
+        }
+
         $return = $this->validateTagsParameter($request);
         if ($return instanceof JsonResponse) {
             return $return;

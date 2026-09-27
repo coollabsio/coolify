@@ -706,7 +706,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
                 // check if the file is a directory or a file inside the repository
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "stat -c '%F' {$realPathInGit}"), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+                    [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
                 );
                 if ($this->saved_outputs->has($saveName)) {
                     $fileStat = $this->trimmedSavedOutput($saveName);
@@ -731,7 +731,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->generate_build_env_variables();
 
-        $this->application->loadComposeFile(isInit: false);
+        $this->loadComposeFileForDeployment();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
@@ -1449,6 +1449,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}).");
 
         return $this->remote_secrets_cache = $secrets;
+    }
+
+    /**
+     * Reads the Compose file from the repository again (also for pull request previews). If the file is not
+     * safe to use, the deployment stops here with a visible log line, before a command uses the file.
+     */
+    private function loadComposeFileForDeployment(): void
+    {
+        try {
+            $this->application->loadComposeFile(isInit: false);
+        } catch (DeploymentException $e) {
+            // Deployment logs escape HTML themselves, so undo the escaping that error toasts need.
+            $message = 'Deployment stopped: '.lcfirst(html_entity_decode($e->getMessage(), ENT_QUOTES | ENT_HTML5));
+            $this->application_deployment_queue->addLogEntry($message, 'stderr');
+
+            throw new DeploymentException($message);
+        }
     }
 
     /**

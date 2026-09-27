@@ -201,7 +201,23 @@ function validateComposeNetworkNameField(string $name): void
         return;
     }
 
-    validateComposeNetworkName($name, 'network name field');
+    // Compose also resolves variables inside a longer name, for example ${COMPOSE_PROJECT_NAME}_default.
+    // Each variable must be $VAR, ${VAR}, ${VAR:-default} or ${VAR-default} with a safe default; the name
+    // is then checked with each variable replaced, so no shell syntax can remain.
+    $withoutVariables = preg_replace_callback(
+        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}|\$[A-Za-z_][A-Za-z0-9_]*/',
+        function (array $matches): string {
+            $default = $matches[2] ?? '';
+            if ($default !== '' && preg_match('/\A[A-Za-z0-9_.-]+\z/', $default) !== 1) {
+                throw new Exception('Invalid Docker Compose network name field. Variable defaults may contain only alphanumeric characters, dots, hyphens, and underscores.');
+            }
+
+            return 'x';
+        },
+        $name,
+    );
+
+    validateComposeNetworkName($withoutVariables ?? $name, 'network name field');
 }
 
 /**
