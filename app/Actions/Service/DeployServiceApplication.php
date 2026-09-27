@@ -34,6 +34,7 @@ class DeployServiceApplication
             'echo '.escapeshellarg("Saved configuration files to {$workdir}."),
             'touch '.escapeshellarg("{$workdir}/.env"),
             ...EnsureContentFilesOnServer::echoCommands($serviceApplication->fileStorages()->get(), $service->server),
+            ...StartService::composeVolumeWarningCommands($service),
         ]);
 
         if ($pullLatestImages) {

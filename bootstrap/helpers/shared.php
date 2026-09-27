@@ -2586,6 +2586,7 @@ function customApiValidator(Collection|array $item, array $rules, array $message
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
+    $resource->resetComposeVolumeWarnings();
     if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             // Extract inline comments from raw YAML before Symfony parser discards them
@@ -2807,7 +2808,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -2867,7 +2868,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
-                            if (composeExternalVolumeDeclaration($topLevelVolumes, $source->value()) !== null) {
+                            $legacyName = "{$savedService->service->uuid}_".Str::slug($source, '-');
+                            if (useComposeExternalVolumeAsWritten($resource, $savedService, $topLevelVolumes, $source->value(), $legacyName)) {
                                 // The external volume gets no row, so Coolify never removes it.
                                 return $volume;
                             }
@@ -3390,10 +3392,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
-        // External volumes are used as written, also by previews (no prefix and no preview suffix).
-        $externalTopLevelVolumes = $topLevelVolumes->filter(fn (mixed $volume): bool => isComposeExternalVolume($volume));
+        // Legacy Compose applications (parser versions 1 and 2) never stored their volumes, so Coolify
+        // cannot tell which external volume already holds data. They keep the old volume names.
+        $externalTopLevelVolumes = collect([]);
         if ($pull_request_id !== 0) {
-            $topLevelVolumes = collect($externalTopLevelVolumes->all());
+            $topLevelVolumes = collect([]);
         }
 
         if ($topLevelVolumes->count() > 0) {
@@ -3481,7 +3484,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
-                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, $name->value(), legacyApplicationComposeVolumeName($resource, $name->value(), $pull_request_id))) {
                                     // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
@@ -3550,7 +3553,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
-                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, (string) $source, legacyApplicationComposeVolumeName($resource, (string) $source, $pull_request_id))) {
                                     // An external volume is used as written.
                                     data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {
@@ -3610,7 +3613,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
-                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, $name->value()) !== null) {
+                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, $name->value(), legacyApplicationComposeVolumeName($resource, $name->value(), $pull_request_id))) {
                                     // An external volume is used as written.
                                 } else {
                                     if ($pull_request_id !== 0) {
@@ -3681,7 +3684,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
-                                } elseif (composeExternalVolumeDeclaration($externalTopLevelVolumes, (string) $source) !== null) {
+                                } elseif (useComposeExternalVolumeAsWritten($resource, $resource, $externalTopLevelVolumes, (string) $source, legacyApplicationComposeVolumeName($resource, (string) $source, $pull_request_id))) {
                                     // An external volume is used as written.
                                     data_set($volume, 'source', $source.':'.$target.($read_only ? ':ro' : ''));
                                 } else {

@@ -22,7 +22,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string}>
      */
     public array $forms = [];
 
@@ -207,6 +207,7 @@ class All extends Component
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
                     && ! $storage->isDeclaredInCompose(),
+                'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
             ];
         }
         $this->forms = $forms;

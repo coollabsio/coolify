@@ -62,6 +62,11 @@
                                 @if (blank($storage->host_path))
                                     <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
+                                @if ($form['replacedExternalVolume'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
+                                    </span>
+                                @endif
                             </div>
 
                             @if ($hasSourcePaths)
@@ -149,9 +154,12 @@
                                                 'label' => 'Also permanently delete the Docker volume and all its data.',
                                                 'default_warning' => 'The Docker volume and its data will not be deleted.',
                                             ]]"
-                                            :actions="[
+                                            :actions="array_values(array_filter([
                                                 'This removes only the stale volume entry from Coolify.',
-                                            ]" confirmationText="{{ $form['name'] }}"
+                                                $form['replacedExternalVolume']
+                                                    ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
+                                                    : null,
+                                            ]))" confirmationText="{{ $form['name'] }}"
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif

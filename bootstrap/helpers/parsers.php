@@ -350,6 +350,111 @@ function composeExternalVolumeDeclaration(iterable $topLevelVolumes, string $sou
 }
 
 /**
+ * Tells if a parser uses the volume source as written because it is an external volume.
+ *
+ * Before Coolify used external volumes as written, the parsers renamed them like all other
+ * volumes (the old name, for example "{uuid}_{volume}" or "{uuid}_{volume}-pr-{id}"), so the
+ * resource wrote its data into the renamed volume. When the owner still has the storage entry
+ * with the old name, the parser must keep the old name, or the resource loses its data. Then
+ * this function records a warning on the resource and returns false. When the user deletes that
+ * storage entry, the next parse uses the external volume.
+ *
+ * Returns false also for a source that is not external. Then the parser continues as usual.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes
+ * @param  string  $legacyName  the name that the parser gave the volume before it used external volumes as written
+ *
+ * @throws Exception If the external volume has a name that is not safe (see validateComposeExternalVolume())
+ */
+function useComposeExternalVolumeAsWritten(Application|Service $resource, Application|ServiceApplication|ServiceDatabase $owner, iterable $topLevelVolumes, string $source, string $legacyName): bool
+{
+    $declaration = composeExternalVolumeDeclaration($topLevelVolumes, $source);
+    if ($declaration === null) {
+        return false;
+    }
+    if ($legacyName === $source) {
+        return true;
+    }
+
+    $hasLegacyStorage = LocalPersistentVolume::query()
+        ->where('resource_type', get_class($owner))
+        ->where('resource_id', $owner->getKey())
+        ->where('name', $legacyName)
+        ->exists();
+    if (! $hasLegacyStorage) {
+        return true;
+    }
+
+    $resource->addComposeVolumeWarning(composeLegacyExternalVolumeWarning($source, $declaration, $legacyName));
+
+    return false;
+}
+
+/**
+ * The name that the legacy application parsers (compose_parsing_version 1 and 2) gave a volume
+ * before they used external volumes as written: parser version 1 kept the name and added only the
+ * preview suffix, parser version 2 added the "{uuid}-" prefix too.
+ */
+function legacyApplicationComposeVolumeName(Application $resource, string $source, int $pull_request_id): string
+{
+    $name = addPreviewDeploymentSuffix($source, $pull_request_id);
+
+    return $resource->compose_parsing_version === '2' ? "{$resource->uuid}-{$name}" : $name;
+}
+
+/**
+ * The warning for an external volume that the resource does not use yet (see useComposeExternalVolumeAsWritten()).
+ * The volume names are validated and contain no secrets.
+ *
+ * @param  array<string, mixed>  $declaration
+ */
+function composeLegacyExternalVolumeWarning(string $source, array $declaration, string $legacyName): string
+{
+    $dockerVolume = composeExternalVolumeDockerName($source, $declaration);
+    $external = $dockerVolume === $source ? 'external' : "external (Docker volume '{$dockerVolume}')";
+
+    return "Volume '{$source}' is declared as {$external}, but Coolify still uses '{$legacyName}' because this resource used it before. To use the external volume, copy your data into it and delete the storage entry '{$legacyName}', then redeploy.";
+}
+
+/**
+ * The Docker volume that an external Compose volume declaration refers to: `name:`, the old
+ * `external: {name: x}` syntax, or else the key.
+ *
+ * @param  array<string, mixed>  $declaration
+ */
+function composeExternalVolumeDockerName(string $key, array $declaration): string
+{
+    return (string) (data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $key);
+}
+
+/**
+ * The Docker volumes that a Compose file declares as external. Returns an empty list for a
+ * Compose file that is empty or not valid YAML.
+ *
+ * @return list<string>
+ */
+function composeExternalVolumeDockerNames(?string $compose): array
+{
+    if (blank($compose)) {
+        return [];
+    }
+    try {
+        $volumes = data_get(Yaml::parse($compose), 'volumes');
+    } catch (Throwable) {
+        return [];
+    }
+    if (! is_array($volumes)) {
+        return [];
+    }
+
+    return collect($volumes)
+        ->filter(fn (mixed $declaration): bool => isComposeExternalVolume($declaration))
+        ->map(fn (array $declaration, int|string $key): string => composeExternalVolumeDockerName((string) $key, $declaration))
+        ->values()
+        ->all();
+}
+
+/**
  * The key and the name of an external volume must be literal Docker volume names. Docker Compose
  * can resolve variables in `name:`, but then only the deployment `.env` sets which existing volume
  * the resource mounts, and Coolify cannot show or check that volume. Thus variables are rejected.
@@ -740,6 +845,7 @@ function removeComposeVolumeFieldsPreservingComments(string $source, array $clea
 
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
 {
+    $resource->resetComposeVolumeWarnings();
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
     // Store original compose for later use to update docker_compose_raw with content removed
@@ -1201,7 +1307,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    if (composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null) {
+                    $legacyName = "{$uuid}_".Str::slug($source, '-');
+                    if ($isPullRequest) {
+                        $legacyName = addPreviewDeploymentSuffix($legacyName, $pull_request_id);
+                    }
+                    if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), $legacyName)) {
                         // Previews share the external volume. It gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);
 
@@ -1913,6 +2023,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
 function serviceParser(Service $resource): Collection
 {
+    $resource->resetComposeVolumeWarnings();
     $uuid = data_get($resource, 'uuid');
     $compose = data_get($resource, 'docker_compose_raw');
     // Store original compose for later use to update docker_compose_raw with content removed
@@ -2556,7 +2667,7 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    if (composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null) {
+                    if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
                         // The external volume gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);
 

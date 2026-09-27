@@ -38,6 +38,7 @@ class StartService
         // but we guarantee it here in case of any edge cases or manual deployments
         $commands[] = "touch {$workdir}/.env";
         $commands = array_merge($commands, EnsureContentFilesOnServer::echoCommands($this->contentFileStorages($service), $service->server));
+        $commands = array_merge($commands, self::composeVolumeWarningCommands($service));
         if ($pullLatestImages) {
             $commands[] = "echo 'Pulling images.'";
             $commands[] = "docker compose --project-directory {$workdir} pull";
@@ -61,6 +62,20 @@ class StartService
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
         return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+    }
+
+    /**
+     * Shows the volume warnings of the last parse (for example an external volume that the
+     * service does not use yet) in the start log.
+     *
+     * @return list<string>
+     */
+    public static function composeVolumeWarningCommands(Service $service): array
+    {
+        return array_map(
+            fn (string $warning): string => 'echo '.escapeshellarg("Warning: {$warning}"),
+            $service->composeVolumeWarnings()
+        );
     }
 
     /**

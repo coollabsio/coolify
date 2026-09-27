@@ -13,6 +13,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
@@ -130,7 +131,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
