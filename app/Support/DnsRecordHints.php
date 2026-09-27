@@ -40,6 +40,34 @@ class DnsRecordHints
         return $records;
     }
 
+    public static function forCloudflareTunnel(array $hostnames, ?string $cname): array
+    {
+        $target = filled($cname) ? strtolower(rtrim($cname, '.')) : '<tunnel-id>.cfargotunnel.com';
+        $records = [];
+        $seen = [];
+
+        foreach ($hostnames as $hostname) {
+            $fqdn = self::normalizeHostname($hostname);
+            if ($fqdn === null) {
+                continue;
+            }
+            $key = strtolower('CNAME|'.$fqdn.'|'.$target);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $records[] = [
+                'type' => 'CNAME',
+                'name' => $fqdn,
+                'value' => $target,
+            ];
+        }
+
+        usort($records, fn (array $a, array $b): int => [$a['name'], $a['type'], $a['value']] <=> [$b['name'], $b['type'], $b['value']]);
+
+        return $records;
+    }
+
     /**
      * @return array<int, array{type: string, name: string, value: string}>
      */

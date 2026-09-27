@@ -70,6 +70,14 @@ class ServiceApplication extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function ($service) {
+            try {
+                if ($service->service?->server?->isCloudflareHttpTunnel()) {
+                    $service->is_force_https_enabled = false;
+                }
+            } catch (\Throwable) {
+            }
+        });
         static::deleting(function ($service) {
             $service->update(['fqdn' => null]);
             $service->persistentStorages()->delete();

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
+use App\Livewire\Concerns\UsesCloudflareHttpTunnelDomains;
 use App\Models\ApplicationPreview;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
@@ -15,6 +16,7 @@ use Livewire\Component;
 class PreviewDomains extends Component
 {
     use AuthorizesRequests;
+    use UsesCloudflareHttpTunnelDomains;
 
     public ApplicationPreview $preview;
 
@@ -39,6 +41,8 @@ class PreviewDomains extends Component
     public function mount(): void
     {
         $this->authorize('view', $this->preview->application);
+        $this->newDomainParts = $this->emptyDomainParts();
+        $this->editingDomainParts = $this->emptyDomainParts();
         $this->refreshDomains();
         if ($this->preview->application->build_pack === 'dockercompose') {
             $this->newDomainService = $this->composeServices()[0] ?? null;
@@ -90,7 +94,7 @@ class PreviewDomains extends Component
             return;
         }
         $domain = $this->domainRows[$index]['url'] ?? DomainPortOverrides::withoutPort($domain);
-        $this->newDomainParts = DomainUrlParts::empty();
+        $this->newDomainParts = $this->emptyDomainParts();
         $this->newDomainService = $this->preview->application->build_pack === 'dockercompose'
             ? ($this->composeServices()[0] ?? null)
             : null;
@@ -104,7 +108,7 @@ class PreviewDomains extends Component
                 $this->statusKey($domain, $this->domainRows[$index]['service']),
                 $domain,
                 $server,
-                $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+                $this->dnsCheckExpectedTarget(),
                 $checkId,
                 $this->preview->application->additional_servers->count() > 0,
             );
@@ -217,7 +221,7 @@ class PreviewDomains extends Component
                 $this->statusKey($domain, $this->domainRows[$index]['service']),
                 $domain,
                 $server,
-                $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+                $this->dnsCheckExpectedTarget(),
                 $checkId,
                 $this->preview->application->additional_servers->count() > 0,
             );
@@ -256,7 +260,7 @@ class PreviewDomains extends Component
     public function cancelEdit(): void
     {
         $this->editingIndex = null;
-        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->editingDomainParts = $this->emptyDomainParts();
         $this->resetErrorBag('editingDomainParts.host');
     }
 
@@ -353,7 +357,7 @@ class PreviewDomains extends Component
                 $statusKey,
                 $row['url'],
                 $server,
-                $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+                $this->dnsCheckExpectedTarget(),
                 $checkId,
                 $this->preview->application->additional_servers->count() > 0,
             );
@@ -414,7 +418,7 @@ class PreviewDomains extends Component
         return CheckDomainDns::run(
             [$key => $url],
             $server,
-            $server ? serverDnsTargetIp($server) ?? $server->ip : null,
+            $this->dnsCheckExpectedTarget(),
             $this->preview->application->additional_servers->count() > 0,
         )[$key];
     }

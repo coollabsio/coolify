@@ -101,7 +101,7 @@ class CloudflareDnsProvider
      * Creates the record with Coolify's ownership comment, or references an existing record that already has the wanted content.
      * Existing records that Coolify did not create are only referenced and never marked as owned.
      */
-    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null): ManagedDnsRecord
+    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, bool $proxied = false): ManagedDnsRecord
     {
         $hostname = strtolower(rtrim($hostname, '.'));
         $type = $this->recordType($content);
@@ -117,6 +117,14 @@ class CloudflareDnsProvider
 
             return $record;
         }
+        if ($type === 'CNAME') {
+            foreach (['A', 'AAAA'] as $otherType) {
+                $otherRecords = $this->findRecords($zone, $hostname, $otherType);
+                if ($otherRecords !== []) {
+                    throw new DnsRecordConflictException($otherRecords[0]['id'], $otherRecords[0]['content'], $content);
+                }
+            }
+        }
         if (count($remoteRecords) > 1) {
             throw new RuntimeException("Several DNS records already exist for {$hostname}. Update them in Cloudflare.");
         }
@@ -126,7 +134,7 @@ class CloudflareDnsProvider
 
         $uuid = new_public_id();
         $response = $this->client($zone->integrationToken)->post("https://api.cloudflare.com/client/v4/zones/{$zone->provider_zone_id}/dns_records", [
-            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => false,
+            'type' => $type, 'name' => $hostname, 'content' => $content, 'ttl' => 1, 'proxied' => $proxied,
             'comment' => ManagedDnsRecord::ownershipCommentFor($uuid),
         ]);
         if (! $response->successful() || ! is_string($response->json('result.id'))) {
@@ -283,7 +291,14 @@ class CloudflareDnsProvider
 
     private function recordType(string $content): string
     {
-        return filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? 'AAAA' : 'A';
+        if (filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return 'AAAA';
+        }
+        if (filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return 'A';
+        }
+
+        return 'CNAME';
     }
 
     private function auditDnsRecord(string $action, DnsProviderZone $zone, string $hostname, ?Model $resource): void

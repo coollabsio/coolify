@@ -58,8 +58,10 @@ class DomainUrlParts
     /**
      * @return array{scheme: string, host: string, port: string, path: string}
      */
-    public static function empty(): array
+    public static function empty(string $scheme = 'https'): array
     {
-        return ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+        $scheme = strtolower(trim($scheme)) === 'http' ? 'http' : 'https';
+
+        return ['scheme' => $scheme, 'host' => '', 'port' => '', 'path' => ''];
     }
 }

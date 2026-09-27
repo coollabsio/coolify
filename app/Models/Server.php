@@ -21,6 +21,7 @@ use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
+use App\Support\CloudflareHttpTunnel;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
@@ -954,6 +955,24 @@ $siteAddress {
     public function isLocalhost()
     {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
+    }
+
+    public function isCloudflareHttpTunnel(): bool
+    {
+        if ($this->relationLoaded('settings')) {
+            return (bool) $this->settings?->is_cloudflare_http_tunnel;
+        }
+
+        if (! $this->exists) {
+            return false;
+        }
+
+        return (bool) $this->settings?->is_cloudflare_http_tunnel;
+    }
+
+    public function cloudflareHttpTunnelCname(): ?string
+    {
+        return CloudflareHttpTunnel::fromServer($this);
     }
 
     /**

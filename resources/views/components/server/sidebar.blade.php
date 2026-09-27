@@ -56,7 +56,6 @@
             'active' => $activeMenu === 'cloudflare-tunnel',
             'icon' => 'globe',
             'group' => 'Networking',
-            'visible' => ! $server->isLocalhost(),
         ],
         [
             'label' => 'Proxy',
