@@ -24,13 +24,13 @@
             'active' => request()->routeIs('team.admin-view'),
             'icon' => 'admin',
         ] : null,
-        [
+        auth()->user()->can('delete', currentTeam()) ? [
             'label' => 'Danger Zone',
             'route' => 'team.danger-zone',
             'active' => request()->routeIs('team.danger-zone'),
             'icon' => 'shield-alert',
             'sectionStart' => true,
-        ],
+        ] : null,
     ])->filter();
 @endphp
 
