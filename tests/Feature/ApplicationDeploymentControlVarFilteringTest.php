@@ -1664,6 +1664,31 @@ it('keeps the old runtime env format for preview variables saved before exact es
     expect($runtimeEnvs)->toContain("LEGACY_PREVIEW=array:\\'self\\'");
 });
 
+it('resolves exact runtime env values without loading each variable resource', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    foreach (['FIRST_EXACT', 'SECOND_EXACT'] as $key) {
+        createApplicationEnvironmentVariable($application, [
+            'key' => $key,
+            'value' => "array:'self'",
+            'is_runtime' => true,
+            'is_buildtime' => false,
+        ]);
+    }
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server);
+
+    DB::enableQueryLog();
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+    $applicationLookups = collect(DB::getQueryLog())
+        ->filter(fn (array $query) => str($query['query'])->contains('from "applications"'));
+    DB::disableQueryLog();
+
+    expect($runtimeEnvs)->toContain('FIRST_EXACT='.escapeComposeEnvFileValue("array:'self'", allowInterpolation: true))
+        ->and($applicationLookups)->toBeEmpty();
+});
+
 it('keeps dollars literal in runtime JSON values', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
 

@@ -1755,7 +1755,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $resolvedValue = (string) $environmentVariable->get_real_environment_variables_with_server(
             $environmentVariable->value,
-            $environmentVariable->resourceable,
+            $this->application,
             $this->mainServer,
         );
 
