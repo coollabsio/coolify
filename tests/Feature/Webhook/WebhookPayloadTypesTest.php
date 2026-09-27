@@ -376,7 +376,7 @@ function webhookTypesFields(): array
             ['pull_request.title', 'string', null],
             ['pull_request.head.ref', 'branch', 'No branch'],
             ['pull_request.base.ref', 'branch', 'No branch'],
-            ['head.sha', 'sha', null],
+            ['pull_request.head.sha', 'sha', null],
             ['repository.full_name', 'required string', 'Invalid repository'],
         ],
         'gitea manual|pr|closed' => [
@@ -506,7 +506,8 @@ describe('Webhook payload value types', function () {
     })->with([
         'gitlab manual' => ['gitlab manual', webhookTypesSha()],
         'gitlab app' => ['gitlab app', webhookTypesSha()],
-        'gitea manual' => ['gitea manual', 'HEAD'],
+        // Gitea sends the head commit in pull_request.head.sha.
+        'gitea manual' => ['gitea manual', webhookTypesSha()],
         'bitbucket manual' => ['bitbucket manual', substr(webhookTypesSha(), 0, 12)],
     ]);
 

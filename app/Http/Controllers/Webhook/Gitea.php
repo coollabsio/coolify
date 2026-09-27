@@ -58,7 +58,8 @@ class Gitea extends Controller
                 $skip_deploy_pr = self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pull_request.title')]);
                 $branch = $this->webhookString(data_get($payload, 'pull_request.head.ref'));
                 $base_branch = $this->webhookString(data_get($payload, 'pull_request.base.ref'));
-                $commit = $this->webhookCommitSha($payload, 'head.sha');
+                // Gitea sends the head commit in pull_request.head.sha; newer versions also send it as after.
+                $commit = $this->webhookCommitSha($payload, 'pull_request.head.sha') ?? $this->webhookCommitSha($payload, 'after');
             }
             if (! $branch || ($x_gitea_event === 'pull_request' && ! $base_branch)) {
                 return response('Nothing to do. No branch found in the request.');
