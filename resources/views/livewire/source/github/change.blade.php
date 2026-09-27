@@ -266,13 +266,21 @@
 
                         <div class="flex min-h-[24rem] flex-col gap-4">
                             @if (!isCloud() || isDev())
+                                @if ($this->localhostUsesHttpTunnel())
+                                    <x-callout type="info" title="GitHub App needs a public HTTPS origin">
+                                        This Coolify instance is published through Cloudflare Tunnel. Set Settings →
+                                        Instance Domain to the tunneled hostname (for example
+                                        https://coolify.example.com). GitHub cannot redirect back to
+                                        http://192.168.x.x:8000. Put Cloudflare Access in front of the dashboard.
+                                    </x-callout>
+                                @endif
                                 <x-forms.listbox id="use_custom_webhook_endpoint" label="Webhook endpoint"
                                     :live="true" :options="[
                                         ['value' => false, 'label' => 'Use an instance endpoint'],
                                         ['value' => true, 'label' => 'Use a custom endpoint'],
                                     ]"
                                     x-model="useCustomWebhookEndpoint"
-                                    helper="Use a custom public URL when Coolify is behind a tunnel or reverse proxy." />
+                                    helper="GitHub App OAuth and webhooks must use a public HTTPS origin (the tunneled Instance Domain), never a LAN IP. Use a custom URL only when Coolify is behind another reverse proxy." />
                                 <div x-show="!useCustomWebhookEndpoint">
                                     <x-forms.listbox id="webhook_endpoint" label="Instance endpoint"
                                         :options="$endpointOptions" x-model="webhookEndpoint" />

@@ -5,6 +5,7 @@ namespace App\Livewire\Source\Github;
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
@@ -361,6 +362,11 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function localhostUsesHttpTunnel(): bool
+    {
+        return (bool) Server::find(0)?->isCloudflareHttpTunnel();
     }
 
     public function getGithubAppNameUpdatePath()

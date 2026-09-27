@@ -17,6 +17,10 @@ class CloudflareTunnelChangedNotification
     {
         $server_id = data_get($event, 'data.server_id');
         $ssh_domain = data_get($event, 'data.ssh_domain');
+        $containerName = data_get($event, 'data.container_name', 'coolify-cloudflared');
+        if (! in_array($containerName, ['coolify-cloudflared', 'coolify-http-cloudflared'], true)) {
+            $containerName = 'coolify-cloudflared';
+        }
 
         $this->server = Server::where('id', $server_id)->firstOrFail();
 
@@ -26,7 +30,7 @@ class CloudflareTunnelChangedNotification
 
         for ($i = 1; $i <= $attempts; $i++) {
             \Log::debug("Cloudflare health check attempt {$i}/{$attempts}", ['server_id' => $server_id]);
-            $result = instant_remote_process_with_timeout(['docker inspect coolify-cloudflared | jq -e ".[0].State.Health.Status == \"healthy\""'], $this->server, false, 10);
+            $result = instant_remote_process_with_timeout(['docker inspect '.$containerName.' | jq -e ".[0].State.Health.Status == \"healthy\""'], $this->server, false, 10);
 
             if (blank($result)) {
                 \Log::debug("Cloudflare Tunnels container not found on attempt {$i}", ['server_id' => $server_id]);
@@ -49,9 +53,19 @@ class CloudflareTunnelChangedNotification
 
             return;
         }
-        $this->server->settings->update([
-            'is_cloudflare_tunnel' => true,
-        ]);
+        $enableHttpOrigin = (bool) data_get($event, 'data.enable_http_origin');
+        $skipSsh = (bool) data_get($event, 'data.skip_ssh');
+        $settingsUpdate = [];
+        if (! $skipSsh) {
+            $settingsUpdate['is_cloudflare_tunnel'] = true;
+        }
+        if ($enableHttpOrigin) {
+            $settingsUpdate['is_cloudflare_http_tunnel'] = true;
+            $settingsUpdate['cloudflare_http_tunnel_last_seen_at'] = now();
+        }
+        if ($settingsUpdate !== []) {
+            $this->server->settings->update($settingsUpdate);
+        }
 
         // Only update IP if it's not already set to the ssh_domain or if it's empty
         if ($this->server->ip !== $ssh_domain && ! empty($ssh_domain)) {

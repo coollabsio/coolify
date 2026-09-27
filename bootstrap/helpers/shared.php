@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Shared\CheckDomainDns;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Jobs\ServerFilesFromServerJob;
@@ -32,6 +33,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\CloudflareHttpTunnel;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -1383,6 +1385,9 @@ function generateUrl(Server $server, string $random, bool $forceHttps = false): 
 {
     $wildcard = data_get($server, 'settings.wildcard_domain');
     if (is_null($wildcard) || $wildcard === '') {
+        if ($server->isCloudflareHttpTunnel()) {
+            return '';
+        }
         $wildcard = sslip($server);
     }
     $url = Url::fromString($wildcard);
@@ -1391,6 +1396,8 @@ function generateUrl(Server $server, string $random, bool $forceHttps = false): 
     $scheme = $url->getScheme();
     if ($forceHttps) {
         $scheme = 'https';
+    } elseif ($server->isCloudflareHttpTunnel()) {
+        $scheme = 'http';
     }
 
     return "$scheme://{$random}.$host$path";
@@ -1400,6 +1407,9 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false, 
 
     $wildcard = data_get($server, 'settings.wildcard_domain');
     if (is_null($wildcard) || $wildcard === '') {
+        if ($server->isCloudflareHttpTunnel()) {
+            return '';
+        }
         $wildcard = sslip($server);
     }
     $url = Url::fromString($wildcard);
@@ -1408,6 +1418,8 @@ function generateFqdn(Server $server, string $random, bool $forceHttps = false, 
     $scheme = $url->getScheme();
     if ($forceHttps) {
         $scheme = 'https';
+    } elseif ($server->isCloudflareHttpTunnel()) {
+        $scheme = 'http';
     }
 
     if ($parserVersion >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
@@ -2157,8 +2169,12 @@ function dnsGuidanceTargetAddress(?string $ipOrLabel): ?string
  * @param  ?string  $targetLabel  Display target (IP, or "IP (hostname)") used as fallback.
  * @param  ?string  $ipForRecordType  Preferred IP for type + display (defaults to $targetLabel).
  */
-function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordType = null): string
+function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordType = null, ?Server $server = null): string
 {
+    if ($server?->isCloudflareHttpTunnel()) {
+        return CloudflareHttpTunnel::mismatchGuidance($server->cloudflareHttpTunnelCname());
+    }
+
     $address = dnsGuidanceTargetAddress($ipForRecordType)
         ?? dnsGuidanceTargetAddress($targetLabel);
 
@@ -2182,6 +2198,15 @@ function validateDNSEntry(string $fqdn, Server $server)
     $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
     if (! $is_dns_validation_enabled) {
         return true;
+    }
+    if ($server->isCloudflareHttpTunnel()) {
+        $result = CheckDomainDns::run(
+            ['entry' => $fqdn],
+            $server,
+            serverDnsTargetIp($server),
+        );
+
+        return ($result['entry']['status'] ?? null) === 'ok';
     }
     $dns_servers = data_get($settings, 'custom_dns_servers');
     $dns_servers = str($dns_servers)->explode(',');
@@ -3144,6 +3169,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
+                $fqdns = CloudflareHttpTunnel::httpOriginDomains($fqdns, $resource->server ?? null);
                 $noindexDomains = $savedService instanceof ServiceApplication
                     ? $savedService->noindexDomains()
                     : collect([]);
@@ -3975,6 +4001,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $preview->save();
                             }
                         }
+                        $fqdns = CloudflareHttpTunnel::httpOriginDomains($fqdns, $server);
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
                         $composeRedirect = data_get($domains, "$serviceName.redirect");

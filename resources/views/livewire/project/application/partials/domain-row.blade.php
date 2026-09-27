@@ -158,6 +158,13 @@
                             title="Domain settings" aria-label="Settings for {{ $publicUrl }}">
                             <x-reicon name="settings" class="size-3.5" />
                         </button>
+                        @if ($this->usesCloudflareHttpTunnel())
+                            <button type="button" wire:click="publishHostnameThroughTunnel({{ \Illuminate\Support\Js::from($row['url']) }})"
+                                class="icon-button shrink-0" title="Publish this hostname"
+                                aria-label="Publish {{ $publicUrl }} through Cloudflare Tunnel">
+                                <x-reicon name="globe" class="size-3.5" />
+                            </button>
+                        @endif
                         <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?" buttonTitle="Remove"
                             isErrorButton canGate="update" :canResource="$application"
                             submitAction="removeDomainByKey({{ $domainKey }})" :actions="[

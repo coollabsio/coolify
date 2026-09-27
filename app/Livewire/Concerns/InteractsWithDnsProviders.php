@@ -43,14 +43,17 @@ trait InteractsWithDnsProviders
         $this->authorizeDnsProviderChange();
         $cloudflare = app(CloudflareDnsProvider::class);
         $zone = $this->findTeamZone($zoneId);
-        $content ??= $this->serverIp;
-        if ($zone === null || blank($content) || filter_var($content, FILTER_VALIDATE_IP) === false) {
-            $this->dispatch('error', 'No connected DNS provider or public server IP is available for this domain.');
+        $content ??= $this->dnsProviderRecordContent();
+        $isCname = $content !== null && filter_var($content, FILTER_VALIDATE_IP) === false;
+        if ($zone === null || blank($content) || (! $isCname && filter_var($content, FILTER_VALIDATE_IP) === false)) {
+            $this->dispatch('error', $this->usesCloudflareHttpTunnel()
+                ? 'Configure a Cloudflare Tunnel CNAME on the server before publishing this hostname.'
+                : 'No connected DNS provider or public server IP is available for this domain.');
 
             return;
         }
         try {
-            $record = $cloudflare->createRecord($zone, $hostname, $content, $this->dnsResourceForHostname($hostname));
+            $record = $cloudflare->createRecord($zone, $hostname, $content, $this->dnsResourceForHostname($hostname), $isCname);
             $this->referenceDnsRecordFromAllResources($record, $hostname);
             $this->markDnsManaged($hostname, $zone->integrationToken->name);
             $this->dispatch('success', "DNS record created for {$hostname}.");
@@ -62,6 +65,33 @@ trait InteractsWithDnsProviders
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
+    }
+
+    public function publishHostnameThroughTunnel(string $url): void
+    {
+        $this->authorizeDnsProviderChange();
+        if (! $this->usesCloudflareHttpTunnel()) {
+            $this->dispatch('error', 'Enable Cloudflare Tunnel HTTP origin on the server before publishing hostnames.');
+
+            return;
+        }
+
+        $hostname = parse_url($url, PHP_URL_HOST);
+        if (! is_string($hostname) || $hostname === '') {
+            $this->dispatch('error', 'This domain has no hostname to publish.');
+
+            return;
+        }
+
+        $zones = app(CloudflareDnsProvider::class)->findZones(currentTeam()->id, $hostname);
+        if ($zones->isEmpty()) {
+            $this->dispatch('error', 'No connected Cloudflare DNS zone can manage this hostname. Add a token with Zone DNS Edit, or create a proxied CNAME manually.');
+
+            return;
+        }
+
+        $this->createManagedDnsRecord($hostname, (int) $zones->first()->id);
+        $this->checkAllDns();
     }
 
     /** @param array<int, string> $urls */
@@ -86,7 +116,7 @@ trait InteractsWithDnsProviders
         if ($this->dnsProviderProposals === []) {
             return false;
         }
-        if (blank($this->serverIp) || filter_var($this->serverIp, FILTER_VALIDATE_IP) === false) {
+        if ($this->dnsProviderRecordContent() === null) {
             return false;
         }
         $this->markDnsPending($hostnames);
@@ -121,7 +151,7 @@ trait InteractsWithDnsProviders
                 $resource?->getMorphClass(),
                 $resource?->getKey(),
                 $proposal['hostname'],
-                $this->serverIp,
+                $this->dnsProviderRecordContent() ?? (string) $this->serverIp,
             );
             $this->dispatch('info', "Adding DNS record for {$proposal['hostname']}.");
         }
@@ -142,8 +172,9 @@ trait InteractsWithDnsProviders
         $key = $hostname.'|'.$zoneId;
         $conflict = $this->dnsProviderConflicts[$key] ?? null;
         $zone = $this->findTeamZone($zoneId);
-        $content = $this->serverIp;
-        if ($conflict === null || $zone === null || blank($content) || filter_var($content, FILTER_VALIDATE_IP) === false) {
+        $content = $this->dnsProviderRecordContent();
+        $isIp = filled($content) && filter_var($content, FILTER_VALIDATE_IP) !== false;
+        if ($conflict === null || $zone === null || blank($content) || (! $isIp && ! $this->usesCloudflareHttpTunnel())) {
             $this->dispatch('error', 'The DNS conflict is no longer available. Check the record again.');
 
             return;
@@ -175,7 +206,7 @@ trait InteractsWithDnsProviders
         $this->dnsProviderProposals = collect($hostnames)->flatMap(fn (string $hostname) => $provider->findZones(currentTeam()->id, $hostname)
             ->map(fn (DnsProviderZone $zone) => [
                 'hostname' => $hostname, 'zone_id' => $zone->id, 'zone' => $zone->name,
-                'credential' => $zone->integrationToken->name, 'target' => (string) $this->serverIp,
+                'credential' => $zone->integrationToken->name, 'target' => (string) ($this->dnsProviderRecordContent() ?? $this->serverIp),
                 'managed' => $managed->has($hostname),
             ])->all())->values()->all();
     }

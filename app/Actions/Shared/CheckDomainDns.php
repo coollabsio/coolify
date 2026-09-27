@@ -3,6 +3,7 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Support\CloudflareHttpTunnel;
 use Lorisleiva\Actions\Concerns\AsAction;
 use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
@@ -56,13 +57,25 @@ class CheckDomainDns
      */
     private function check(string $url, Server $server, ?string $expectedIp, array $dnsServers, int $deadline): array
     {
+        $tunnelMode = $server->isCloudflareHttpTunnel();
+        $cnameTarget = $tunnelMode ? $server->cloudflareHttpTunnelCname() : null;
+        $resultExpectedIp = $tunnelMode ? $cnameTarget : $expectedIp;
+
         try {
             $host = Url::fromString($url)->getHost();
         } catch (\Throwable) {
-            return $this->result('failed', 'Could not validate DNS for this domain.', $expectedIp);
+            return $this->result('failed', 'Could not validate DNS for this domain.', $resultExpectedIp);
         }
         if (str($host)->contains('sslip.io')) {
-            return $this->result('ok', 'DNS looks correct.', $expectedIp);
+            if ($tunnelMode) {
+                return $this->result('failed', CloudflareHttpTunnel::mismatchGuidance($cnameTarget), $resultExpectedIp);
+            }
+
+            return $this->result('ok', 'DNS looks correct.', $resultExpectedIp);
+        }
+
+        if ($tunnelMode && $this->tunnelDnsLooksCorrect($host, $dnsServers, $deadline, $cnameTarget)) {
+            return $this->result('ok', CloudflareHttpTunnel::successMessage($cnameTarget), $resultExpectedIp);
         }
 
         $type = dnsRecordTypeForIp($expectedIp) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
@@ -71,7 +84,7 @@ class CheckDomainDns
         foreach ($dnsServers as $dnsServer) {
             $remainingNanoseconds = $deadline - hrtime(true);
             if ($remainingNanoseconds < 1_000_000_000) {
-                return $this->result('failed', 'Could not validate DNS for this domain.', $expectedIp);
+                return $this->result('failed', 'Could not validate DNS for this domain.', $resultExpectedIp);
             }
 
             try {
@@ -92,8 +105,12 @@ class CheckDomainDns
                     }
 
                     $receivedAddressRecord = true;
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && $record->getData() === $expectedIp)) {
-                        return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
+                    $resolved = (string) $record->getData();
+                    if (isCloudflareIp($resolved)) {
+                        return $this->result('ok', $this->successMessage($server, $expectedIp, $tunnelMode, $cnameTarget), $resultExpectedIp);
+                    }
+                    if (! $tunnelMode && $expectedIp && $resolved === $expectedIp) {
+                        return $this->result('ok', $this->successMessage($server, $expectedIp), $resultExpectedIp);
                     }
                 }
             } catch (\Throwable) {
@@ -103,13 +120,58 @@ class CheckDomainDns
 
         if (! $receivedAddressRecord && hrtime(true) < $deadline) {
             foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
-                if (isCloudflareIp($resolvedIp) || ($expectedIp && $resolvedIp === $expectedIp)) {
-                    return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
+                if (isCloudflareIp($resolvedIp) || (! $tunnelMode && $expectedIp && $resolvedIp === $expectedIp)) {
+                    return $this->result('ok', $this->successMessage($server, $expectedIp, $tunnelMode, $cnameTarget), $resultExpectedIp);
                 }
             }
         }
 
-        return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $expectedIp);
+        if ($tunnelMode) {
+            return $this->result('failed', CloudflareHttpTunnel::mismatchGuidance($cnameTarget), $resultExpectedIp);
+        }
+
+        return $this->result('failed', dnsMismatchGuidanceMessage($expectedIp, $expectedIp), $resultExpectedIp);
+    }
+
+    /**
+     * @param  array<int, string>  $dnsServers
+     */
+    private function tunnelDnsLooksCorrect(string $host, array $dnsServers, int $deadline, ?string $expectedCname): bool
+    {
+        $cnameType = defined(DNSTypes::class.'::NAME_CNAME') ? DNSTypes::NAME_CNAME : 'CNAME';
+
+        foreach ($dnsServers as $dnsServer) {
+            $remainingNanoseconds = $deadline - hrtime(true);
+            if ($remainingNanoseconds < 1_000_000_000) {
+                return false;
+            }
+
+            try {
+                $query = app()->make(DNSQuery::class, [
+                    'server' => $dnsServer,
+                    'port' => 53,
+                    'timeout' => min(5, (int) floor($remainingNanoseconds / 1_000_000_000)),
+                ]);
+                $records = $query->query($host, $cnameType);
+                if ($records === false || $query->hasError()) {
+                    continue;
+                }
+
+                foreach ($records as $record) {
+                    $target = (string) $record->getData();
+                    if (CloudflareHttpTunnel::isCfargoTarget($target)) {
+                        return true;
+                    }
+                    if (filled($expectedCname) && strtolower(rtrim($target, '.')) === strtolower($expectedCname)) {
+                        return true;
+                    }
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -137,8 +199,12 @@ class CheckDomainDns
             ->all();
     }
 
-    private function successMessage(Server $server, ?string $expectedIp): string
+    private function successMessage(Server $server, ?string $expectedIp, bool $tunnelMode = false, ?string $cname = null): string
     {
+        if ($tunnelMode) {
+            return CloudflareHttpTunnel::successMessage($cname);
+        }
+
         if (
             filled($expectedIp)
             && filled($server->ip)

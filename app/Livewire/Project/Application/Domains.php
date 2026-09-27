@@ -6,6 +6,7 @@ use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Livewire\Concerns\InteractsWithDnsProviders;
+use App\Livewire\Concerns\UsesCloudflareHttpTunnelDomains;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
@@ -23,6 +24,7 @@ class Domains extends Component
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
     use InteractsWithDnsProviders;
+    use UsesCloudflareHttpTunnelDomains;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -261,6 +263,9 @@ class Domains extends Component
             $this->redirect = $this->application->redirect ?? 'both';
         }
         $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
+        if ($this->newDomain === '' && ! $this->newDomainPartsChanged) {
+            $this->newDomainParts = $this->emptyDomainParts();
+        }
 
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
@@ -546,7 +551,9 @@ class Domains extends Component
             'has_port_override' => $port['has_port_override'],
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
-            'expected_ip' => $this->serverIp,
+            'expected_ip' => $this->usesCloudflareHttpTunnel()
+                ? $this->cloudflareHttpTunnelCname()
+                : $this->serverIp,
             'checked_at' => null,
             'check_id' => null,
             'is_suggested' => false,
@@ -558,7 +565,8 @@ class Domains extends Component
         if (is_array($entry) && filled(data_get($entry, 'status'))) {
             $row['dns_status'] = (string) data_get($entry, 'status', 'pending');
             $row['dns_message'] = (string) data_get($entry, 'message', 'Not checked yet.');
-            $row['expected_ip'] = data_get($entry, 'expected_ip') ?: $this->serverIp;
+            $row['expected_ip'] = data_get($entry, 'expected_ip')
+                ?: ($this->usesCloudflareHttpTunnel() ? $this->cloudflareHttpTunnelCname() : $this->serverIp);
             $row['checked_at'] = data_get($entry, 'checked_at');
             $row['check_id'] = data_get($entry, 'check_id');
         }
@@ -747,7 +755,7 @@ class Domains extends Component
             $entries[(string) $index] = $this->domainRows[$index]['url'];
         }
 
-        $results = CheckDomainDns::run($entries, $server, $this->serverIp);
+        $results = CheckDomainDns::run($entries, $server, $this->dnsCheckExpectedTarget());
 
         foreach ($results as $index => $result) {
             $index = (int) $index;
@@ -805,7 +813,8 @@ class Domains extends Component
             $statuses[$key] = [
                 'status' => $status,
                 'message' => (string) ($row['dns_message'] ?? ''),
-                'expected_ip' => $row['expected_ip'] ?? $this->serverIp,
+                'expected_ip' => $row['expected_ip']
+                    ?? ($this->usesCloudflareHttpTunnel() ? $this->cloudflareHttpTunnelCname() : $this->serverIp),
                 'checked_at' => $row['checked_at'] ?? now()->toIso8601String(),
                 'check_id' => $row['check_id'] ?? null,
             ];
@@ -895,7 +904,7 @@ class Domains extends Component
     public function resetAddDomainForm(): void
     {
         $this->newDomain = '';
-        $this->newDomainParts = DomainUrlParts::empty();
+        $this->newDomainParts = $this->emptyDomainParts();
         $this->newDomainPartsChanged = false;
         $this->resetAddDomainDnsGate();
         $this->resetErrorBag('newDomain');
@@ -1071,7 +1080,7 @@ class Domains extends Component
                         $dnsCheck['status_key'],
                         $dnsCheck['url'],
                         $this->application->destination?->server,
-                        $this->serverIp,
+                        $this->dnsCheckExpectedTarget(),
                         $dnsCheck['check_id'],
                         $this->application->additional_servers->count() > 0,
                     );
@@ -1191,7 +1200,9 @@ class Domains extends Component
                 $this->domainRows[$index]['dns_status'] = 'skipped';
                 $this->domainRows[$index]['dns_message'] = $reason;
                 $this->domainRows[$index]['checked_at'] = now()->toIso8601String();
-                $this->domainRows[$index]['expected_ip'] = $this->serverIp;
+                $this->domainRows[$index]['expected_ip'] = $this->usesCloudflareHttpTunnel()
+                    ? $this->cloudflareHttpTunnelCname()
+                    : $this->serverIp;
 
                 continue;
             }
@@ -1222,7 +1233,7 @@ class Domains extends Component
                     $statusKey,
                     $url,
                     $this->application->destination?->server,
-                    $this->serverIp,
+                    $this->dnsCheckExpectedTarget(),
                     $checkId,
                     $this->application->additional_servers->count() > 0,
                 );
@@ -1262,7 +1273,7 @@ class Domains extends Component
             return null;
         }
 
-        $results = CheckDomainDns::run(array_combine($urls, $urls), $server, $this->serverIp);
+        $results = CheckDomainDns::run(array_combine($urls, $urls), $server, $this->dnsCheckExpectedTarget());
 
         foreach ($results as $result) {
             if ($result['status'] === 'failed') {
@@ -1394,7 +1405,7 @@ class Domains extends Component
         $this->showEditDomainModal = false;
         $this->editingIndex = null;
         $this->editingDomain = '';
-        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->editingDomainParts = $this->emptyDomainParts();
         $this->editingDomainPartsChanged = false;
         $this->editingService = null;
         $this->editingIndexing = 'index';
@@ -1667,6 +1678,12 @@ class Domains extends Component
                 return;
             }
 
+            if ($server->isCloudflareHttpTunnel() && blank(data_get($server, 'settings.wildcard_domain'))) {
+                $this->dispatch('error', 'sslip.io is not used with Cloudflare Tunnel. Set a wildcard domain on the server (for example http://example.com) or add a hostname manually.');
+
+                return;
+            }
+
             if ($this->isCompose) {
                 $serviceName = $serviceName ?: $this->newDomainService ?: ($this->composeServices[0] ?? null);
                 if (! $serviceName) {
@@ -1676,6 +1693,11 @@ class Domains extends Component
                 }
 
                 $domain = generateUrl(server: $server, random: new_public_id());
+                if (blank($domain)) {
+                    $this->dispatch('error', 'sslip.io is not used with Cloudflare Tunnel. Set a wildcard domain on the server or add a hostname manually.');
+
+                    return;
+                }
                 $current = $this->currentDomainList($serviceName);
                 $merged = $current->push($domain)->unique()->values();
 
@@ -1694,6 +1716,11 @@ class Domains extends Component
             }
 
             $fqdn = generateUrl(server: $server, random: $this->application->uuid);
+            if (blank($fqdn)) {
+                $this->dispatch('error', 'sslip.io is not used with Cloudflare Tunnel. Set a wildcard domain on the server or add a hostname manually.');
+
+                return;
+            }
             $merged = $this->currentDomainList()->push($fqdn)->unique()->values();
             if (! $this->saveDomainList($merged, null, checkConflicts: false)) {
                 return;
@@ -1879,6 +1906,7 @@ class Domains extends Component
         $dnsHint = dnsMismatchGuidanceMessage(
             $this->dnsTargetLabel() ?? $this->serverIp,
             $this->serverIp,
+            $this->cloudflareHttpTunnelServer(),
         );
 
         // Redirects need both hosts: canonical target + source the proxy redirects from.

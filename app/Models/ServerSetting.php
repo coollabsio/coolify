@@ -22,6 +22,10 @@ use OpenApi\Attributes as OA;
         'force_server_cleanup' => ['type' => 'boolean'],
         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
+        'is_cloudflare_http_tunnel' => ['type' => 'boolean'],
+        'cloudflare_http_tunnel_id' => ['type' => 'string', 'nullable' => true],
+        'cloudflare_http_tunnel_cname' => ['type' => 'string', 'nullable' => true],
+        'cloudflare_dashboard_hostname' => ['type' => 'string', 'nullable' => true],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
@@ -84,6 +88,17 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
+        'is_cloudflare_http_tunnel',
+        'cloudflare_http_tunnel_id',
+        'cloudflare_http_tunnel_cname',
+        'cloudflare_http_tunnel_account_id',
+        'cloudflare_http_tunnel_zone_id',
+        'cloudflare_http_tunnel_hostname',
+        'cloudflare_http_tunnel_token',
+        'cloudflare_http_tunnel_integration_token_id',
+        'cloudflare_dashboard_hostname',
+        'cloudflare_http_tunnel_last_seen_at',
+        'cloudflare_http_tunnel_use_existing_connector',
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
@@ -150,6 +165,10 @@ class ServerSetting extends Model
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'cloudflare_http_tunnel_token' => 'encrypted',
+        'is_cloudflare_http_tunnel' => 'boolean',
+        'cloudflare_http_tunnel_use_existing_connector' => 'boolean',
+        'cloudflare_http_tunnel_last_seen_at' => 'datetime',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
@@ -184,6 +203,7 @@ class ServerSetting extends Model
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
         'geoip_maxmind_license_key',
+        'cloudflare_http_tunnel_token',
     ];
 
     protected static function booted()
@@ -375,6 +395,11 @@ class ServerSetting extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function cloudflareHttpTunnelIntegrationToken()
+    {
+        return $this->belongsTo(IntegrationToken::class, 'cloudflare_http_tunnel_integration_token_id');
     }
 
     public function dockerCleanupFrequency(): Attribute

@@ -10,12 +10,19 @@
             <x-unsaved-bar action="submit"
                 targets="fqdn,instance_name,public_ipv4,public_ipv6,dev_helper_version" />
             <x-application.settings-section title="General">
+                @if ($server?->isCloudflareHttpTunnel())
+                    <x-callout type="info" title="GitHub App needs this public URL" class="mb-4">
+                        Localhost is published through Cloudflare Tunnel. Set Instance Domain to the tunneled HTTPS
+                        hostname (for example https://coolify.example.com). GitHub App OAuth and webhooks cannot use
+                        http://192.168.x.x:8000. Put Cloudflare Access in front of the dashboard.
+                    </x-callout>
+                @endif
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div @class([
                         'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
                     ])>
                         <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
-                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS."
+                            helper="Enter the full public URL of the instance (for example, https://coolify.example.com).<br><br><span class='text-coollabs dark:text-warning'>GitHub App:</span> OAuth and webhook callbacks must use this HTTPS origin, never an RFC1918 LAN IP such as http://192.168.x.x:8000.<br><br><span class='text-coollabs dark:text-warning'>Cloudflare Tunnel:</span> Use a tunneled hostname and put Cloudflare Access in front of the dashboard. Include <b>https://</b>."
                             placeholder="https://coolify.yourdomain.com" />
                     </div>
 

@@ -1,5 +1,7 @@
 # External TLS HTTP Redirect Design
 
+> Superseded for Cloudflare Tunnel HTTP origin: see `docs/knowledge-base/cloudflare/tunnels.md`. Tunnel mode stores Coolify domains as `http://` and disables Redirect HTTP to HTTPS so Cloudflare-terminated TLS does not loop. Direct-mode resources still use `https://` by default.
+
 ## Problem
 
 The Cloudflare Tunnel all-resource setup sends public HTTPS requests to Coolify's proxy through `http://localhost:80`. When a resource domain is stored as `https://` and Coolify redirects HTTP traffic to HTTPS, the tunneled request repeatedly returns to the HTTP entrypoint and causes `TOO_MANY_REDIRECTS`.

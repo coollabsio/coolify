@@ -192,6 +192,13 @@
                                 @click="openEditDomain(@js($index), @js($row['url']), @js($editingParts), @js((int) $row['service_application_id']), @js($serviceLabel), @js($isNoindexed ? 'noindex' : 'index'), @js($rowDirection))">
                                 <x-reicon name="settings" class="size-3.5" />
                             </button>
+                            @if ($this->usesCloudflareHttpTunnel())
+                                <button type="button" wire:click="publishHostnameThroughTunnel({{ \Illuminate\Support\Js::from($row['url']) }})"
+                                    class="icon-button shrink-0" title="Publish this hostname"
+                                    aria-label="Publish {{ $publicUrl }} through Cloudflare Tunnel">
+                                    <x-reicon name="globe" class="size-3.5" />
+                                </button>
+                            @endif
                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                 buttonTitle="Remove" isErrorButton
                                 canGate="update" :canResource="$service"

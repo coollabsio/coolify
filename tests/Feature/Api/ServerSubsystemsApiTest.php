@@ -312,6 +312,50 @@ describe('Cloudflare Tunnel API', function () {
             ->and((string) $this->server->fresh()->ip)->toBe($originalIp);
     });
 
+    test('GET and PATCH expose HTTP origin separately from SSH tunnel', function () {
+        $this->server->settings->update([
+            'is_cloudflare_http_tunnel' => true,
+            'cloudflare_http_tunnel_id' => 'abcd1234',
+            'cloudflare_http_tunnel_cname' => 'abcd1234.cfargotunnel.com',
+            'cloudflare_http_tunnel_token' => 'eyJhbGciOi.secret-token',
+        ]);
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->getJson("/api/v1/servers/{$this->server->uuid}/cloudflare-tunnel")
+            ->assertOk()
+            ->assertJsonPath('is_cloudflare_tunnel', false)
+            ->assertJsonPath('is_cloudflare_http_tunnel', true)
+            ->assertJsonPath('cloudflare_http_tunnel_cname', 'abcd1234.cfargotunnel.com')
+            ->assertJsonMissingPath('cloudflare_http_tunnel_token');
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/cloudflare-tunnel", [
+                'is_cloudflare_http_tunnel' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_cloudflare_http_tunnel', false)
+            ->assertJsonPath('is_cloudflare_tunnel', false);
+
+        expect((bool) $this->server->settings->fresh()->is_cloudflare_tunnel)->toBeFalse()
+            ->and((bool) $this->server->settings->fresh()->is_cloudflare_http_tunnel)->toBeFalse();
+    });
+
+    test('POST enable still only sets the SSH cloudflare tunnel flag', function () {
+        $this->server->settings->update([
+            'is_cloudflare_tunnel' => false,
+            'is_cloudflare_http_tunnel' => false,
+        ]);
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->postJson("/api/v1/servers/{$this->server->uuid}/cloudflare-tunnel/enable")
+            ->assertOk()
+            ->assertJsonPath('is_cloudflare_tunnel', true)
+            ->assertJsonPath('is_cloudflare_http_tunnel', false);
+
+        expect((bool) $this->server->settings->fresh()->is_cloudflare_tunnel)->toBeTrue()
+            ->and((bool) $this->server->settings->fresh()->is_cloudflare_http_tunnel)->toBeFalse();
+    });
+
     test('other-team cloudflare tunnel endpoints return 404', function () {
         $this->withHeaders(serverSubsystemsHeaders())
             ->getJson("/api/v1/servers/{$this->otherServer->uuid}/cloudflare-tunnel")

@@ -38,7 +38,13 @@ class ConfigureDnsRecordJob implements ShouldQueue
             ->firstOrFail();
 
         try {
-            $provider->createRecord($zone, $this->hostname, $this->content, $this->resource());
+            $provider->createRecord(
+                $zone,
+                $this->hostname,
+                $this->content,
+                $this->resource(),
+                filter_var($this->content, FILTER_VALIDATE_IP) === false,
+            );
 
             DnsRecordConfigurationFinished::dispatch(
                 $this->teamId,

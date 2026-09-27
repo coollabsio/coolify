@@ -380,6 +380,7 @@ class Application extends BaseModel
         static::created(function ($application) {
             ApplicationSetting::create([
                 'application_id' => $application->id,
+                'is_force_https_enabled' => ! $application->destination?->server?->isCloudflareHttpTunnel(),
             ]);
             $application->compose_parsing_version = self::$parserVersion;
             $application->save();
