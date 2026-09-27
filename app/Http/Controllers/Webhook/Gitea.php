@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
@@ -45,20 +46,21 @@ class Gitea extends Controller
             if ($x_gitea_event === 'push') {
                 $branch = $this->webhookPushBranch(data_get($payload, 'ref'));
                 $full_name = data_get($payload, 'repository.full_name');
+                $commit = $this->webhookCommitSha($payload, 'after');
                 $changed_files = $this->webhookPushChangedFiles($payload);
                 $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_gitea_event === 'pull_request') {
-                $action = data_get($payload, 'action');
+                $action = $this->webhookPayloadString($payload, 'action');
                 $full_name = data_get($payload, 'repository.full_name');
-                $pull_request_id = data_get($payload, 'number');
-                $pull_request_html_url = data_get($payload, 'pull_request.html_url');
-                $pull_request_title = data_get($payload, 'pull_request.title');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
+                $pull_request_id = $this->webhookPullRequestId($payload, 'number');
+                $pull_request_html_url = $this->webhookPayloadUrl($payload, 'pull_request.html_url');
+                $skip_deploy_pr = self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pull_request.title')]);
                 $branch = $this->webhookString(data_get($payload, 'pull_request.head.ref'));
                 $base_branch = $this->webhookString(data_get($payload, 'pull_request.base.ref'));
+                $commit = $this->webhookCommitSha($payload, 'head.sha');
             }
-            if (! $branch) {
+            if (! $branch || ($x_gitea_event === 'pull_request' && ! $base_branch)) {
                 return response('Nothing to do. No branch found in the request.');
             }
             // A deleted branch has no commit to deploy. No secret is checked here.
@@ -143,7 +145,7 @@ class Gitea extends Controller
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
-                                commit: data_get($payload, 'after', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 is_webhook: true,
                             );
                             if ($result['status'] === 'queue_full') {
@@ -161,7 +163,7 @@ class Gitea extends Controller
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
                                     'deployment_uuid' => $deployment_uuid,
-                                    'commit' => data_get($payload, 'after'),
+                                    'commit' => $commit,
                                     'repository' => $full_name ?? null,
                                 ]);
                                 $return_payloads->push([
@@ -222,7 +224,7 @@ class Gitea extends Controller
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                         'docker_compose_domains' => $application->docker_compose_domains,
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
@@ -231,7 +233,7 @@ class Gitea extends Controller
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url,
+                                        'pull_request_html_url' => $pull_request_html_url ?? '',
                                     ]);
                                     $pr_app->generate_preview_fqdn();
                                 }
@@ -241,7 +243,7 @@ class Gitea extends Controller
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
-                                commit: data_get($payload, 'head.sha', 'HEAD'),
+                                commit: $commit ?? 'HEAD',
                                 is_webhook: true,
                                 git_type: 'gitea'
                             );
@@ -292,6 +294,8 @@ class Gitea extends Controller
             }
 
             return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
+        } catch (InvalidWebhookPayloadException $e) {
+            return response($e->getMessage());
         } catch (Exception $e) {
             return handleError($e);
         }

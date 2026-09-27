@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
@@ -39,7 +40,7 @@ class Bitbucket extends Controller
                 // A deleted branch has no "new" state, so no branch is found.
                 $branch = $this->webhookString(data_get($payload, 'push.changes.0.new.name'));
                 $full_name = data_get($payload, 'repository.full_name');
-                $commit = $this->webhookString(data_get($payload, 'push.changes.0.new.target.hash'));
+                $commit = $this->webhookCommitSha($payload, 'push.changes.0.new.target.hash');
                 // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
                 // are evaluated only on the visible 5.
                 $changes = data_get($payload, 'push.changes');
@@ -61,11 +62,10 @@ class Bitbucket extends Controller
                 $branch = $this->webhookString(data_get($payload, 'pullrequest.destination.branch.name'));
                 $base_branch = $this->webhookString(data_get($payload, 'pullrequest.source.branch.name'));
                 $full_name = data_get($payload, 'repository.full_name');
-                $pull_request_id = data_get($payload, 'pullrequest.id');
-                $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
-                $pull_request_title = data_get($payload, 'pullrequest.title');
-                $skip_deploy_pr = self::shouldSkipDeployAny([$pull_request_title]);
-                $commit = data_get($payload, 'pullrequest.source.commit.hash');
+                $pull_request_id = $this->webhookPullRequestId($payload, 'pullrequest.id');
+                $pull_request_html_url = $this->webhookPayloadUrl($payload, 'pullrequest.links.html.href');
+                $skip_deploy_pr = self::shouldSkipDeployAny([$this->webhookPayloadString($payload, 'pullrequest.title')]);
+                $commit = $this->webhookCommitSha($payload, 'pullrequest.source.commit.hash');
 
                 if (! $branch) {
                     return response([
@@ -222,7 +222,7 @@ class Bitbucket extends Controller
                                     'git_type' => 'bitbucket',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
+                                    'pull_request_html_url' => $pull_request_html_url ?? '',
                                     'docker_compose_domains' => $application->docker_compose_domains,
                                 ]);
                                 $pr_app->generate_preview_fqdn_compose();
@@ -231,7 +231,7 @@ class Bitbucket extends Controller
                                     'git_type' => 'bitbucket',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url,
+                                    'pull_request_html_url' => $pull_request_html_url ?? '',
                                 ]);
                                 $pr_app->generate_preview_fqdn();
                             }
@@ -291,6 +291,11 @@ class Bitbucket extends Controller
             }
 
             return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
+        } catch (InvalidWebhookPayloadException $e) {
+            return response([
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+            ]);
         } catch (Exception $e) {
             return handleError($e);
         }

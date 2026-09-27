@@ -38,7 +38,7 @@ test('manual webhook routes are not rate limited per request', function (string 
  * An invalid delivery uses a new random wrong secret unless $wrongSecret is set,
  * so each invalid delivery is a new guess (a new token or a new signature).
  */
-function sendManualWebhookPush(TestCase $test, string $provider, Application $application, bool $validSignature = true, string $ip = '203.0.113.10', string $repository = 'test-org/test-repo', string $branch = 'main', ?string $wrongSecret = null, string $commit = 'abc123'): TestResponse
+function sendManualWebhookPush(TestCase $test, string $provider, Application $application, bool $validSignature = true, string $ip = '203.0.113.10', string $repository = 'test-org/test-repo', string $branch = 'main', ?string $wrongSecret = null, string $commit = 'abc1234'): TestResponse
 {
     $secret = $validSignature ? $application->{"manual_webhook_secret_{$provider}"} : ($wrongSecret ?? 'wrong-secret-'.Str::random(24));
     $server = ['REMOTE_ADDR' => $ip, 'CONTENT_TYPE' => 'application/json'];
@@ -212,13 +212,13 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
 
         // Each delivery has a different payload. Identical redeliveries count once.
         for ($i = 0; $i < 30; $i++) {
-            $response = sendManualWebhookPush($this, 'github', $application, repository: 'unknown-org/unknown-repo', commit: "commit-{$i}");
+            $response = sendManualWebhookPush($this, 'github', $application, repository: 'unknown-org/unknown-repo', commit: sprintf('abc%04d', $i));
 
             $response->assertOk();
             expect($response->getContent())->toContain('Invalid signature');
         }
 
-        sendManualWebhookPush($this, 'github', $application, repository: 'unknown-org/unknown-repo', commit: 'commit-30')->assertStatus(429);
+        sendManualWebhookPush($this, 'github', $application, repository: 'unknown-org/unknown-repo', commit: 'abc0030')->assertStatus(429);
     });
 
     test('valid deliveries do not count when another matching application has a different secret', function () {
@@ -327,7 +327,7 @@ describe('GitHub Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -347,7 +347,7 @@ describe('GitHub Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -368,7 +368,7 @@ describe('GitHub Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -403,7 +403,7 @@ describe('GitHub App Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['id' => 987654321],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -430,7 +430,7 @@ describe('GitLab Manual Webhook HMAC', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['path_with_namespace' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => 'attacker-supplied-token',
@@ -447,7 +447,7 @@ describe('GitLab Manual Webhook HMAC', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['path_with_namespace' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => 'wrong-token',
@@ -465,7 +465,7 @@ describe('GitLab Manual Webhook HMAC', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['path_with_namespace' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => $secret,
@@ -486,7 +486,7 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         ]);
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -505,7 +505,7 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         $secret = $app->manual_webhook_secret_bitbucket;
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -523,7 +523,7 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         $app = createApplicationWithWebhook();
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -542,7 +542,7 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         $secret = $app->manual_webhook_secret_bitbucket;
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -571,7 +571,7 @@ describe('Gitea Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -591,7 +591,7 @@ describe('Gitea Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -612,7 +612,7 @@ describe('Gitea Manual Webhook HMAC', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -638,7 +638,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => ''],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -661,7 +661,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -684,7 +684,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -727,7 +727,7 @@ describe('Manual Webhook Repository Matching', function () {
                 'object_kind' => 'push',
                 'ref' => 'refs/heads/main',
                 'project' => ['path_with_namespace' => ''],
-                'after' => 'abc123',
+                'after' => 'abc1234',
                 'commits' => [],
             ],
             ['HTTP_X-Gitlab-Token' => 'wrong-token'],
@@ -736,7 +736,7 @@ describe('Manual Webhook Repository Matching', function () {
             'bitbucket',
             '/webhooks/source/bitbucket/events/manual',
             [
-                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
                 'repository' => ['full_name' => ''],
             ],
             ['HTTP_X-Event-Key' => 'repo:push', 'HTTP_X-Hub-Signature' => 'sha256=forgedhashvalue'],
@@ -747,7 +747,7 @@ describe('Manual Webhook Repository Matching', function () {
             [
                 'ref' => 'refs/heads/main',
                 'repository' => ['full_name' => ''],
-                'after' => 'abc123',
+                'after' => 'abc1234',
                 'commits' => [],
             ],
             ['HTTP_X-Gitea-Event' => 'push', 'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue'],
@@ -778,7 +778,7 @@ describe('Manual Webhook Repository Matching', function () {
                 'object_kind' => 'push',
                 'ref' => 'refs/heads/main',
                 'project' => ['path_with_namespace' => 'test-org/test'],
-                'after' => 'abc123',
+                'after' => 'abc1234',
                 'commits' => [],
             ],
             ['HTTP_X-Gitlab-Token' => 'wrong-token'],
@@ -787,7 +787,7 @@ describe('Manual Webhook Repository Matching', function () {
             'bitbucket',
             '/webhooks/source/bitbucket/events/manual',
             [
-                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+                'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
                 'repository' => ['full_name' => 'test-org/test'],
             ],
             ['HTTP_X-Event-Key' => 'repo:push', 'HTTP_X-Hub-Signature' => 'sha256=forgedhashvalue'],
@@ -798,7 +798,7 @@ describe('Manual Webhook Repository Matching', function () {
             [
                 'ref' => 'refs/heads/main',
                 'repository' => ['full_name' => 'test-org/test'],
-                'after' => 'abc123',
+                'after' => 'abc1234',
                 'commits' => [],
             ],
             ['HTTP_X-Gitea-Event' => 'push', 'HTTP_X-Hub-Signature-256' => 'sha256=forgedhashvalue'],
@@ -814,7 +814,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -837,7 +837,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -860,7 +860,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -885,7 +885,7 @@ describe('Manual Webhook Repository Matching', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/master',
             'project' => ['path_with_namespace' => 'services/xyz'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => $secret,
@@ -906,7 +906,7 @@ describe('Manual Webhook Repository Matching', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/master',
             'project' => ['path_with_namespace' => 'services/xyz'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => $secret,
@@ -925,7 +925,7 @@ describe('Manual Webhook Repository Matching', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -995,7 +995,7 @@ function sendSignedManualWebhook(TestCase $test, string $provider, Application $
  *
  * @return array<string, mixed>
  */
-function manualWebhookPushPayloadWithoutCommits(string $provider, string $after = 'abc123'): array
+function manualWebhookPushPayloadWithoutCommits(string $provider, string $after = 'abc1234'): array
 {
     if ($provider === 'gitlab') {
         return [
@@ -1070,7 +1070,7 @@ describe('Manual Webhook Push Payloads Without Commits', function () {
     test('a github push marked as deleted does not queue a deployment', function () {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
-        $payload = manualWebhookPushPayloadWithoutCommits('github', after: 'abc123') + ['deleted' => true, 'commits' => []];
+        $payload = manualWebhookPushPayloadWithoutCommits('github', after: 'abc1234') + ['deleted' => true, 'commits' => []];
 
         $response = sendSignedManualWebhook($this, 'github', $application, $payload);
 
@@ -1112,7 +1112,7 @@ describe('Manual Webhook Malformed Payloads', function () {
         'bitbucket branch deletion' => ['bitbucket', ['push' => ['changes' => [['new' => null, 'old' => ['name' => 'main']]]], 'repository' => ['full_name' => 'test-org/test-repo']], 'No branch'],
         'bitbucket with an array branch' => ['bitbucket', ['push' => ['changes' => [['new' => ['name' => ['main']]]]], 'repository' => ['full_name' => 'test-org/test-repo']], 'No branch'],
         'bitbucket without repository' => ['bitbucket', ['push' => ['changes' => [['new' => ['name' => 'main']]]]], 'Invalid repository'],
-        'bitbucket with malformed commits' => ['bitbucket', ['push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']], 'commits' => [['message' => ['x']], 'text']]]], 'repository' => ['full_name' => 'test-org/test-repo']], 'Deployment queued'],
+        'bitbucket with malformed commits' => ['bitbucket', ['push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']], 'commits' => [['message' => ['x']], 'text']]]], 'repository' => ['full_name' => 'test-org/test-repo']], 'Deployment queued'],
     ]);
 
     test('gitea deliveries for unsupported events get a clean response', function () {
@@ -1158,7 +1158,7 @@ describe('App Webhook Push Payloads Without Commits', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['id' => 987654321],
-            'after' => 'abc123',
+            'after' => 'abc1234',
         ]);
 
         $response = $this->call('POST', '/webhooks/source/github/events', [], [], [], [
@@ -1196,7 +1196,7 @@ describe('App Webhook Push Payloads Without Commits', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['id' => 4242],
-            'after' => 'abc123',
+            'after' => 'abc1234',
         ];
         if ($variant === 'null') {
             $payload['commits'] = null;
@@ -1333,9 +1333,9 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
         $application = createApplicationWithWebhook();
 
         for ($i = 0; $i < 30; $i++) {
-            sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'old-hook-secret', commit: "commit-{$i}")->assertOk();
+            sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'old-hook-secret', commit: sprintf('abc%04d', $i))->assertOk();
         }
 
-        sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'old-hook-secret', commit: 'commit-30')->assertStatus(429);
+        sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'old-hook-secret', commit: 'abc0030')->assertStatus(429);
     })->with(['github', 'bitbucket', 'gitea']);
 });

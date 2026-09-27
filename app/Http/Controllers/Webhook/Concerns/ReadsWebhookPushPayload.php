@@ -2,19 +2,37 @@
 
 namespace App\Http\Controllers\Webhook\Concerns;
 
+use App\Exceptions\InvalidWebhookPayloadException;
 use App\Models\Application;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
- * Reads push webhook payloads defensively.
+ * Reads webhook payloads defensively.
  *
  * Git hosts omit the commit list (or send null) for some pushes, for example
  * branch creation, branch deletion and some system hooks. Such payloads must
  * not crash the handler and must not skip a deployment because of watch paths.
+ *
+ * The typed readers (webhookPayloadString(), webhookPayloadId(),
+ * webhookCommitSha(), webhookPayloadUrl()) throw an
+ * InvalidWebhookPayloadException for a value with a wrong type or format. The
+ * handlers catch it and send a clean "Nothing to do." response, so a malformed
+ * but correctly signed payload never causes a 500 or a deployment.
  */
 trait ReadsWebhookPushPayload
 {
+    /**
+     * Largest value of an integer database column (pull_request_id,
+     * repository_project_id).
+     */
+    protected const WEBHOOK_MAX_DATABASE_INTEGER = 2147483647;
+
+    /**
+     * Length of the application_previews.pull_request_html_url column.
+     */
+    protected const WEBHOOK_MAX_URL_LENGTH = 255;
+
     /**
      * Branch name from a ref such as "refs/heads/main", or null when the ref is
      * missing or not a string.
@@ -36,6 +54,128 @@ trait ReadsWebhookPushPayload
     protected function webhookString(mixed $value): ?string
     {
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * A string field of the payload. A missing, null or empty value gives null.
+     *
+     * @throws InvalidWebhookPayloadException When the value is not a string, or is missing and required.
+     */
+    protected function webhookPayloadString(mixed $payload, string $key, bool $required = false): ?string
+    {
+        $value = data_get($payload, $key);
+        if ($value === null || $value === '') {
+            if ($required) {
+                throw InvalidWebhookPayloadException::forField($key);
+            }
+
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw InvalidWebhookPayloadException::forField($key);
+        }
+
+        return $value;
+    }
+
+    /**
+     * A positive integer id of the payload, sent as an integer or as a string
+     * of digits. A missing or null value gives null.
+     *
+     * @throws InvalidWebhookPayloadException When the value is not a positive integer up to $max, or is missing and required.
+     */
+    protected function webhookPayloadId(mixed $payload, string $key, bool $required = false, int $max = PHP_INT_MAX): ?int
+    {
+        $value = data_get($payload, $key);
+        if ($value === null) {
+            if ($required) {
+                throw InvalidWebhookPayloadException::forField($key);
+            }
+
+            return null;
+        }
+
+        if (is_string($value) && preg_match('/\A[1-9][0-9]{0,18}\z/', $value) === 1) {
+            $value = filter_var($value, FILTER_VALIDATE_INT);
+        }
+
+        if (! is_int($value) || $value < 1 || $value > $max) {
+            throw InvalidWebhookPayloadException::forField($key);
+        }
+
+        return $value;
+    }
+
+    /**
+     * An id that Coolify stores in or compares with an integer database
+     * column, for example a pull request id or a repository project id.
+     *
+     * @throws InvalidWebhookPayloadException
+     */
+    protected function webhookPayloadDatabaseId(mixed $payload, string $key, bool $required = false): ?int
+    {
+        return $this->webhookPayloadId($payload, $key, $required, self::WEBHOOK_MAX_DATABASE_INTEGER);
+    }
+
+    /**
+     * A pull request or merge request id. The id is required.
+     *
+     * @throws InvalidWebhookPayloadException
+     */
+    protected function webhookPullRequestId(mixed $payload, string $key): int
+    {
+        return $this->webhookPayloadDatabaseId($payload, $key, required: true);
+    }
+
+    /**
+     * A commit SHA of the payload: 7 to 64 hexadecimal characters. A missing,
+     * null or empty value gives null.
+     *
+     * @throws InvalidWebhookPayloadException When the value is not a commit SHA.
+     */
+    protected function webhookCommitSha(mixed $payload, string $key): ?string
+    {
+        $value = data_get($payload, $key);
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_string($value) || preg_match('/\A[0-9a-fA-F]{7,64}\z/', $value) !== 1) {
+            throw InvalidWebhookPayloadException::forField($key);
+        }
+
+        return $value;
+    }
+
+    /**
+     * An absolute http or https URL of the payload, for example a pull request
+     * link that Coolify stores and shows in the UI. A missing, null or empty
+     * value gives null.
+     *
+     * @throws InvalidWebhookPayloadException When the value is not a valid URL, or is missing and required.
+     */
+    protected function webhookPayloadUrl(mixed $payload, string $key, bool $required = false): ?string
+    {
+        $value = $this->webhookPayloadString($payload, $key, $required);
+        if ($value === null) {
+            return null;
+        }
+
+        $scheme = parse_url($value, PHP_URL_SCHEME);
+        $host = parse_url($value, PHP_URL_HOST);
+        if (
+            strlen($value) > self::WEBHOOK_MAX_URL_LENGTH
+            || preg_match('/[\s\x00-\x1F\x7F]/', $value) === 1
+            || ! is_string($scheme)
+            || ! in_array(strtolower($scheme), ['http', 'https'], true)
+            || ! is_string($host)
+            || $host === ''
+        ) {
+            throw InvalidWebhookPayloadException::forField($key);
+        }
+
+        return $value;
     }
 
     /**
