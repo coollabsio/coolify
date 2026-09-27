@@ -649,6 +649,27 @@ it('explains invalid Nixpacks plan variable keys in deployment logs', function (
         ->toContain('https://nixpacks.com/docs/configuration/file');
 });
 
+it('marks an invalid variable name failure as already explained in the deployment log', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK;SECURITY;ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    try {
+        invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
+});
+
 it('truncates long Nixpacks plan variable keys in deployment logs', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',

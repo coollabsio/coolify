@@ -1464,7 +1464,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $message = 'Deployment stopped: '.lcfirst(html_entity_decode($e->getMessage(), ENT_QUOTES | ENT_HTML5));
             $this->application_deployment_queue->addLogEntry($message, 'stderr');
 
-            throw new DeploymentException($message);
+            throw DeploymentException::alreadyLogged($message, previous: $e);
         }
     }
 
@@ -1485,10 +1485,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
         if ($missing !== []) {
-            $message = 'Missing secret keys: '.implode(', ', $missing)." (referenced by {$envKey}).";
+            $message = 'Missing secret keys: '.implode(', ', $missing)." (referenced by {$envKey}). Check the secret manager source of this application.";
             $this->application_deployment_queue->addLogEntry($message, 'stderr');
 
-            throw new DeploymentException($message.' Check the secret manager source of this application.');
+            throw DeploymentException::alreadyLogged($message);
         }
 
         return RemoteSecretReferences::substitute($value, $secrets);
@@ -2087,7 +2087,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\InvalidArgumentException $exception) {
             $this->logInvalidBuildtimeEnvironmentVariableKey($key, $origin);
 
-            throw new DeploymentException(
+            // The log already explains the problem and how to fix it.
+            throw DeploymentException::alreadyLogged(
                 "Invalid environment variable name from {$origin}: ".ValidationPatterns::displayShellEnvironmentVariableKey($key).'. Names must start with a letter or underscore and contain only letters, numbers, underscores, and dots.',
                 previous: $exception,
             );
@@ -5555,7 +5556,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $errorClass = get_class($exception);
 
         $this->application_deployment_queue->addLogEntry('========================================', 'stderr');
-        $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
+        if ($exception instanceof DeploymentException && $exception->isMessageAlreadyLogged()) {
+            $this->application_deployment_queue->addLogEntry('Deployment failed.', 'stderr');
+        } else {
+            $this->application_deployment_queue->addLogEntry("Deployment failed: {$errorMessage}", 'stderr');
+        }
         $this->application_deployment_queue->addLogEntry("Error type: {$errorClass}", 'stderr', hidden: true);
         $this->application_deployment_queue->addLogEntry("Error code: {$errorCode}", 'stderr', hidden: true);
 

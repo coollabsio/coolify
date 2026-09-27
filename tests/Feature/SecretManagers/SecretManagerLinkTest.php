@@ -378,6 +378,38 @@ test('a missing secret key fails the deployment and names the variable', functio
         ->toThrow(DeploymentException::class, 'Missing secret keys: GONE_KEY (referenced by DB_PASSWORD).');
 });
 
+test('a missing secret key is a visible log line once and marks the failure as already logged', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'OTHER' => 'value',
+        ]),
+    ]);
+
+    createSecretManagerLink('doppler');
+
+    $env = $this->application->environment_variables()->create([
+        'key' => 'DB_PASSWORD',
+        'value' => '{{vault.GONE_KEY}}',
+    ]);
+    $job = makeDeploymentJobForSecrets();
+
+    try {
+        resolveEnvOnJob($job, $env);
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
+
+    $queue = (new ReflectionProperty($job, 'application_deployment_queue'))->getValue($job);
+    $visible = collect(json_decode($queue->refresh()->logs, true))
+        ->reject(fn (array $entry): bool => (bool) ($entry['hidden'] ?? false))
+        ->pluck('output');
+
+    expect($visible->filter(fn (string $line): bool => str_contains($line, 'Missing secret keys: GONE_KEY (referenced by DB_PASSWORD).')))
+        ->toHaveCount(1)
+        ->and($visible->implode("\n"))->toContain('Check the secret manager source of this application.');
+});
+
 test('a reference without a configured source fails the deployment', function () {
     Http::fake();
 

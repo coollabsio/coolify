@@ -287,6 +287,42 @@ test('a deployment stops with a visible log line when the repository Compose fil
     Process::assertNotRan(fn ($process) => str_contains(is_array($process->command) ? implode(' ', $process->command) : $process->command, 'base64 -d'));
 })->with(['production' => 0, 'pull request preview' => 42]);
 
+test('the deployment log shows the unsafe Compose file explanation once and a short failure line', function () {
+    fakeRepositoryCompose(composeInjectionPayloads()['service name command substitution'][0]);
+    $logEntries = [];
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class);
+    $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout', bool $hidden = false) use (&$logEntries) {
+        $logEntries[] = [$message, $type, $hidden];
+    });
+    $job = Mockery::mock(ApplicationDeploymentJob::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $job->shouldReceive('failDeployment')->once();
+    foreach ([
+        'application' => $this->application,
+        'application_deployment_queue' => $queue,
+        'pull_request_id' => 0,
+        'deployment_uuid' => 'deployment-uuid',
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    try {
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'loadComposeFileForDeployment'))->invoke($job);
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        $job->failed($exception);
+    }
+
+    $visible = collect($logEntries)->filter(fn (array $entry): bool => $entry[2] === false)->pluck(0);
+    $explanation = 'the Docker Compose file at /docker-compose.yml (branch: main) is not safe to use';
+    expect($visible->filter(fn (string $line): bool => str_contains($line, $explanation)))->toHaveCount(1)
+        ->and($visible)->toContain('Deployment failed.')
+        ->and($visible->implode("\n"))->not->toContain('Deployment failed: ');
+
+    $hidden = collect($logEntries)->filter(fn (array $entry): bool => $entry[2] === true)->pluck(0)->implode("\n");
+    expect($hidden)->toContain('Error type: '.DeploymentException::class)
+        ->toContain('Location: ');
+});
+
 test('a deployment loads a safe repository Compose file', function () {
     $compose = "services:\n  web:\n    image: nginx:1.27\n";
     fakeRepositoryCompose($compose);
