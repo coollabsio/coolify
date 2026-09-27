@@ -1,19 +1,13 @@
 @props(['section', 'routeParameters'])
 
 @php
+    $activeKey = $section === 'deployment' ? 'deployments' : $section;
     $menuItems = collect([
         [
             'key' => 'general',
             'label' => 'General',
             'route' => 'project.cluster-application.show',
             'icon' => 'settings',
-            'group' => 'Settings',
-        ],
-        [
-            'key' => 'configuration',
-            'label' => 'Configuration',
-            'route' => 'project.cluster-application.configuration',
-            'icon' => 'code',
             'group' => 'Settings',
         ],
         [
@@ -24,23 +18,23 @@
             'group' => 'Settings',
         ],
         [
+            'key' => 'deployments',
+            'label' => 'Deployment Logs',
+            'route' => 'project.cluster-application.deployments',
+            'icon' => 'time-back',
+            'group' => 'Observe & troubleshoot',
+        ],
+        [
             'key' => 'resource-limits',
             'label' => 'Resource Limits',
             'route' => 'project.cluster-application.resource-limits',
             'icon' => 'cpu',
-            'group' => 'Settings',
-        ],
-        [
-            'key' => 'deployments',
-            'label' => 'Deployments',
-            'route' => 'project.cluster-application.deployments',
-            'icon' => 'time-back',
             'group' => 'Operations',
         ],
     ]);
     $groupedMenuItems = $menuItems->groupBy('group');
     $activeGroup = (string) $groupedMenuItems->search(
-        fn ($items) => $items->contains(fn (array $item): bool => $item['key'] === $section)
+        fn ($items) => $items->contains(fn (array $item): bool => $item['key'] === $activeKey)
     );
 @endphp
 
@@ -67,9 +61,9 @@
                     <a wire:key="cluster-application-link-{{ $menuItem['key'] }}"
                         @class([
                             'menu-item',
-                            'menu-item-active' => $menuItem['key'] === $section,
+                            'menu-item-active' => $menuItem['key'] === $activeKey,
                         ])
-                        @if ($menuItem['key'] === $section) aria-current="page" @endif
+                        @if ($menuItem['key'] === $activeKey) aria-current="page" @endif
                         {{ wireNavigate() }}
                         href="{{ route($menuItem['route'], $routeParameters) }}">
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />

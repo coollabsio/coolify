@@ -54,9 +54,11 @@
             <dt class="text-neutral-500 dark:text-fg-dim">Last deployment</dt>
             <dd class="mt-1">
                 @if ($latestDeployment)
-                    <span title="{{ $latestDeployment->created_at }}">
+                    <a class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
+                        title="{{ $latestDeployment->created_at }}" {{ wireNavigate() }}
+                        href="{{ route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $latestDeployment->uuid]) }}">
                         {{ $latestDeployment->created_at->diffForHumans() }}
-                    </span>
+                    </a>
                 @else
                     <span class="text-neutral-500 dark:text-fg-dim">Never</span>
                 @endif
@@ -64,3 +66,16 @@
         </div>
     </dl>
 </x-application.settings-section>
+
+<form wire:submit="saveConfiguration" class="flex flex-col gap-6">
+    @can('update', $workload)
+        <x-unsaved-bar action="saveConfiguration" targets="startCommand" />
+    @endcan
+
+    <x-application.settings-section id="cluster-application-runtime" title="Runtime"
+        helper="Changes create a new revision. Redeploy the application to apply them.">
+        <x-forms.input id="startCommand" label="Start command" placeholder="nginx -g &quot;daemon off;&quot;"
+            canGate="update" :canResource="$workload"
+            helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />
+    </x-application.settings-section>
+</form>

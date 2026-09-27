@@ -293,10 +293,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
         Route::prefix('cluster-application/{workload_uuid}')->group(function () {
             Route::get('/', ClusterApplicationShow::class)->name('project.cluster-application.show');
-            Route::get('/configuration', ClusterApplicationShow::class)->name('project.cluster-application.configuration');
             Route::get('/environment-variables', ClusterApplicationShow::class)->name('project.cluster-application.environment-variables');
             Route::get('/resource-limits', ClusterApplicationShow::class)->name('project.cluster-application.resource-limits');
             Route::get('/deployments', ClusterApplicationShow::class)->name('project.cluster-application.deployments');
+            Route::get('/deployments/{deployment_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.deployment.show');
         });
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');

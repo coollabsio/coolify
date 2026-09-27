@@ -2,20 +2,24 @@
     @php
         $sectionTitles = [
             'general' => 'General',
-            'configuration' => 'Configuration',
             'environment-variables' => 'Environment Variables',
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
+            'deployment' => 'Deployment',
         ];
-        $pollsStatus = in_array($section, ['general', 'deployments'], true);
+        $pollInterval = match (true) {
+            $section === 'deployment' && $selectedDeployment['isActive'] => '2000ms',
+            in_array($section, ['general', 'deployments', 'deployment'], true) => '10000ms',
+            default => null,
+        };
     @endphp
 
     <x-slot:title>
         {{ str($workload->name)->limit(10) }} > {{ $sectionTitles[$section] }} | Coolify
     </x-slot>
 
-    <nav class="w-full max-w-none pb-4 md:pb-6 lg:pb-0"
-        @if ($pollsStatus) wire:poll.10000ms="refresh" @endif>
+    <nav wire:key="cluster-application-header-{{ $pollInterval ?? 'static' }}" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0"
+        @if ($pollInterval) wire:poll.{{ $pollInterval }}="refresh" @endif>
         <div class="mb-3 flex min-w-0 flex-col items-start gap-2 xl:hidden">
             <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
                 {{ $workload->name }}

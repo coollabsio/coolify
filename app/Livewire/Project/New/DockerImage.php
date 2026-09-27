@@ -211,10 +211,11 @@ class DockerImage extends Component
             );
             DeployNodeWorkloadJob::dispatch($deployment['operation']->id);
 
-            return redirectRoute($this, 'project.cluster-application.show', [
+            return redirectRoute($this, 'project.cluster-application.deployment.show', [
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
                 'workload_uuid' => $deployment['workload']->uuid,
+                'deployment_uuid' => $deployment['operation']->uuid,
             ]);
         }
 
