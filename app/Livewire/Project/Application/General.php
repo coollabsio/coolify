@@ -347,7 +347,7 @@ class General extends Component
         }
 
         try {
-            validateDockerComposeForInjection($this->dockerComposeRaw);
+            validateDockerComposeForInjection($this->dockerComposeRaw, composeResourceDirectory($this->application));
         } catch (Exception $e) {
             throw new Exception(e($e->getMessage()), 0, $e);
         }

@@ -283,22 +283,26 @@ class LocalFileVolume extends BaseModel
         }
         $path = data_get_str($this, 'fs_path');
         $content = data_get($this, 'content');
-        $pathForParentDirectory = str($this->fs_path);
+        $writesContent = $this->writesContentOnServer();
+        if ($path->startsWith('.')) {
+            $path = $path->after('.');
+            $path = $workdir.$path;
+        }
+
+        if ($writesContent) {
+            $path = str($this->confinedContentPath($path->value(), $server));
+        } elseif (! $this->isAdminControlledComposeMount()) {
+            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
+            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
+        }
+
+        $pathForParentDirectory = $writesContent ? $path : str($this->fs_path);
         if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
             $parent_dir = $pathForParentDirectory->beforeLast('/');
             if ($parent_dir != '') {
                 $escapedParentDir = escapeshellarg($parent_dir);
                 $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
             }
-        }
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
-
-        if (! $this->isAdminControlledComposeMount()) {
-            $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
-            $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
         }
 
         // Validate and escape resolved path (may differ from fs_path if relative)
@@ -374,6 +378,81 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
+     * Coolify writes file content (from Compose `content:`, the UI or the API) to the server.
+     */
+    public function writesContentOnServer(): bool
+    {
+        return ! $this->is_directory && (string) $this->content !== '';
+    }
+
+    /**
+     * Coolify writes file content only inside the resource directory, also for Compose bind mounts
+     * that an administrator can point anywhere. The path must be below the directory (not the
+     * directory itself), and it must stay inside it after the server resolves symlinks.
+     *
+     * @throws \RuntimeException If the path is not inside the resource directory
+     */
+    public function confinedContentPath(string $path, Server $server): string
+    {
+        $error = new \RuntimeException(
+            "Coolify writes file content only inside the resource directory. The path {$path} is outside of it. Use a relative source such as ./config/app.conf."
+        );
+
+        foreach ($this->contentBaseDirectories() as $baseDirectory) {
+            try {
+                $confinedPath = confinePathToBase($baseDirectory, $path, 'storage path');
+            } catch (\Exception) {
+                continue;
+            }
+            if ($confinedPath === normalizeUnixPath($baseDirectory)) {
+                continue;
+            }
+
+            try {
+                self::assertRemotePathIsConfined($baseDirectory, $confinedPath, $server);
+            } catch (\RuntimeException) {
+                throw $error;
+            }
+
+            return $confinedPath;
+        }
+
+        throw $error;
+    }
+
+    /**
+     * The resource workdir, and the directory where the Compose parser resolves `./` sources. They
+     * differ only for services that use parser version 3.
+     *
+     * @return list<string>
+     */
+    public function contentBaseDirectories(): array
+    {
+        return array_values(array_unique([$this->ownerResource()->workdir(), $this->composeSourceDirectory()]));
+    }
+
+    protected function composeSourceDirectory(): string
+    {
+        $owner = $this->ownerResource();
+
+        return $owner instanceof Application || $owner instanceof Service
+            ? composeResourceDirectory($owner)
+            : $owner->workdir();
+    }
+
+    /**
+     * The Application, Service or standalone database that owns the storage directory.
+     */
+    protected function ownerResource(): mixed
+    {
+        $resource = $this->resource;
+
+        return $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase
+            ? $resource->service
+            : $resource;
+    }
+
+    /**
      * Raw Compose bind mounts keep administrator-selected host path semantics.
      */
     protected function isAdminControlledComposeMount(): bool
@@ -402,7 +481,7 @@ class LocalFileVolume extends BaseModel
                         continue;
                     }
 
-                    $resolvedSource = replaceLocalSource(str((string) $source), str($this->resource->workdir()));
+                    $resolvedSource = replaceLocalSource(str((string) $source), str($this->composeSourceDirectory()));
                     if (normalizeUnixPath($resolvedSource->value()) === normalizeUnixPath($this->fs_path)) {
                         return true;
                     }

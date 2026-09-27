@@ -230,14 +230,16 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
-                // Does not exists (no dir or file), not flagged as directory, is init, has content
+                // Does not exists (no dir or file), not flagged as directory, is init, has content.
+                // Content is written only inside the resource directory, as a literal path.
+                $escapedContentLocation = escapeshellarg($fileVolume->confinedContentPath((string) $fileLocation, $server));
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
-                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
+                    'mkdir -p -- "$(dirname -- '.$escapedContentLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedContentLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init

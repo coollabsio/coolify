@@ -22,10 +22,11 @@ use Symfony\Component\Yaml\Yaml;
  * This should be called BEFORE saving to database to prevent malicious data from being stored.
  *
  * @param  string  $composeYaml  The raw Docker Compose YAML content
+ * @param  string|null  $resourceDirectory  The resource directory, if the resource exists (see validateComposeContentVolumeSource())
  *
  * @throws Exception If the compose file contains command injection attempts
  */
-function validateDockerComposeForInjection(string $composeYaml): void
+function validateDockerComposeForInjection(string $composeYaml, ?string $resourceDirectory = null): void
 {
     try {
         $parsed = Yaml::parse($composeYaml);
@@ -78,6 +79,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             }
                         }
                     }
+                    validateComposeContentVolumeSource($volume, $resourceDirectory);
                 }
             }
         }
@@ -102,6 +104,71 @@ function validateDockerComposeForInjection(string $composeYaml): void
                 validateComposeNetworkNameField($networkConfig['name']);
             }
         }
+    }
+}
+
+/**
+ * The directory that the Compose parsers resolve `./` bind sources in. Services that use parser
+ * version 3 resolve them in the applications directory.
+ */
+function composeResourceDirectory(Application|Service $resource): string
+{
+    if ($resource instanceof Service && (int) $resource->compose_parsing_version === 3) {
+        return application_configuration_dir().'/'.$resource->uuid;
+    }
+
+    return $resource->workdir();
+}
+
+/**
+ * Coolify writes the `content:` of a Compose bind volume to the host, so that file must be inside
+ * the resource directory. The source must be a `./` path that stays inside the resource directory,
+ * or an absolute path inside $resourceDirectory. Sources with `~`, `..` or variables are rejected,
+ * because their host path is not known before the write. Bind volumes without `content:` are not
+ * changed: an administrator can mount any host path.
+ *
+ * @param  array<string, mixed>  $volume  A long-syntax Compose volume
+ *
+ * @throws Exception If Coolify would write the content outside the resource directory
+ */
+function validateComposeContentVolumeSource(array $volume, ?string $resourceDirectory = null): void
+{
+    if (! array_key_exists('content', $volume) || ($volume['type'] ?? null) !== 'bind') {
+        return;
+    }
+
+    $source = $volume['source'] ?? null;
+    $displaySource = is_scalar($source) && (string) $source !== '' ? (string) $source : '(empty)';
+    $error = new Exception(
+        "Volume source {$displaySource} with content must be inside the resource directory. Use a relative path such as ./config/app.conf."
+    );
+
+    if (! is_string($source) || str_contains($source, '$') || str_contains($source, '\\')) {
+        throw $error;
+    }
+    if (in_array('..', explode('/', $source), true)) {
+        throw $error;
+    }
+
+    if (str_starts_with($source, './')) {
+        $baseDirectory = $resourceDirectory ?? '/coolify-resource-directory';
+        $path = $baseDirectory.'/'.substr($source, 2);
+    } elseif (str_starts_with($source, '/') && $resourceDirectory !== null) {
+        $baseDirectory = $resourceDirectory;
+        $path = $source;
+    } else {
+        throw $error;
+    }
+
+    try {
+        $baseDirectory = normalizeUnixPath($baseDirectory);
+        $path = normalizeUnixPath($path);
+    } catch (Exception) {
+        throw $error;
+    }
+
+    if (! str_starts_with($path, $baseDirectory.'/')) {
+        throw $error;
     }
 }
 
@@ -982,6 +1049,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
                     }
+                    validateComposeContentVolumeSource($volume, composeResourceDirectory($resource));
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
@@ -1026,7 +1094,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
                             : true;
                         if ($isPullRequest && $isPreviewSuffixEnabled) {
-                            $source = addPreviewDeploymentSuffix($source, $pull_request_id);
+                            $source = str(addPreviewDeploymentSuffix($source, $pull_request_id));
                         }
                         LocalFileVolume::updateOrCreate(
                             [
@@ -2341,6 +2409,7 @@ function serviceParser(Service $resource): Collection
                     if ($source !== null && ! empty($source->value())) {
                         validateComposeArrayVolumeSource($source->value());
                     }
+                    validateComposeContentVolumeSource($volume, composeResourceDirectory($resource));
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
