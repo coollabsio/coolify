@@ -3,7 +3,7 @@
 
     <header class="mb-5">
         <a href="{{ route('node-cluster.index') }}" {{ wireNavigate() }} class="mb-2 inline-flex items-center gap-1 text-[12px] text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
-            <x-reicon name="arrow-left" class="size-3.5" /> Clusters
+            <x-reicon name="arrow-right" class="size-3.5 rotate-180" /> Clusters
         </a>
         <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Add Node</h1>
         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Connect a server. Coolify installs and configures the required components.</p>
@@ -49,9 +49,18 @@
         <form wire:submit="install" class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
             <div class="mb-4 flex items-start gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><x-reicon name="check-circle" class="size-4" /></span><div><h2 class="text-[15px]! font-semibold!">Server connected</h2><p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Review the cluster. Coolify will install missing components.</p></div></div>
             @if ($clusters->isNotEmpty())
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <label class="flex cursor-pointer gap-2 rounded-lg border p-3 text-[12px] dark:border-white/[0.08]"><input type="radio" wire:model.live="clusterMode" value="existing"><span><strong class="block">Existing cluster</strong><span class="text-neutral-500">Add this Node to a cluster.</span></span></label>
-                    <label class="flex cursor-pointer gap-2 rounded-lg border p-3 text-[12px] dark:border-white/[0.08]"><input type="radio" wire:model.live="clusterMode" value="new"><span><strong class="block">New cluster</strong><span class="text-neutral-500">Create a private cluster.</span></span></label>
+                <div class="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Cluster">
+                    @foreach (['existing' => ['Existing cluster', 'Add this Node to a cluster.'], 'new' => ['New cluster', 'Create a private cluster.']] as $modeValue => [$modeTitle, $modeDescription])
+                        <label wire:key="cluster-mode-{{ $modeValue }}"
+                            class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-neutral-200 bg-white p-3 text-[12px] transition-colors hover:bg-neutral-50 has-[:checked]:border-coollabs/40 has-[:checked]:bg-coollabs/[0.06] dark:border-white/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.05] dark:has-[:checked]:border-warning/40 dark:has-[:checked]:bg-warning/[0.07]">
+                            <input type="radio" wire:model.live="clusterMode" value="{{ $modeValue }}"
+                                class="mt-0.5 size-4 shrink-0 border-neutral-300 text-coollabs focus:ring-coollabs dark:border-white/20 dark:bg-transparent dark:text-warning dark:focus:ring-warning">
+                            <span class="min-w-0">
+                                <strong class="block text-[13px] font-semibold text-black dark:text-fg">{{ $modeTitle }}</strong>
+                                <span class="text-neutral-500 dark:text-fg-dim">{{ $modeDescription }}</span>
+                            </span>
+                        </label>
+                    @endforeach
                 </div>
             @endif
             <div class="mt-4">

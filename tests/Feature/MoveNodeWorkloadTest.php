@@ -63,7 +63,7 @@ it('publishes a ready target before it removes and withdraws the source workload
     Http::fake(function (Request $request) use ($target, $workload, $revision, &$events) {
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
             $events[] = 'deploy-target';
-            expect($request['ports'][0]['host_ip'])->toBe($target->wireguard_ip);
+            expect($request['ports'])->toBe([]);
 
             return Http::response([
                 'command_id' => $request['command_id'],
@@ -153,7 +153,7 @@ it('queues a safe move from the Node page', function () {
     session(['currentTeam' => $team]);
     Queue::fake();
 
-    Livewire::test(Show::class, ['node_uuid' => $source->uuid])
+    Livewire::test(Show::class, ['node_uuid' => $source->uuid, 'section' => 'workloads'])
         ->assertSee('Move to Node')
         ->assertSee('Target Node')
         ->set('moveTargets.'.$workload->uuid, $target->uuid)

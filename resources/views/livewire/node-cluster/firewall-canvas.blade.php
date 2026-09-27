@@ -8,10 +8,7 @@
     class="relative overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-black/20"
 >
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
-        <div>
-            <p class="text-sm font-medium">Traffic map</p>
-            <p class="text-xs text-neutral-500 dark:text-fg-dim">Drag a yellow handle to an application, then add an allowed protocol and port.</p>
-        </div>
+        <p class="text-xs text-neutral-500 dark:text-fg-dim">Drag a yellow handle to an application, then add an allowed protocol and port.</p>
         <div class="flex items-center gap-1">
             <button type="button" class="button" aria-label="Zoom out" x-on:click="zoomBy(-0.1)">−</button>
             <span class="min-w-12 text-center text-xs text-neutral-500" x-text="`${Math.round(zoom * 100)}%`"></span>

@@ -68,7 +68,8 @@ class DeployNodeWorkloadJob implements ShouldQueue
                 TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The deployment result is unknown.');
             }
         } catch (RequestException $exception) {
-            $message = 'Flux rejected the deployment with HTTP '.$exception->response->status().'.';
+            $reason = trim(mb_substr($exception->response->body(), 0, 2000));
+            $message = 'Flux rejected the deployment with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}");
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: $message);
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));

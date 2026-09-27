@@ -38,11 +38,20 @@ it('shows and runs node Sentinel controls in development', function () {
     RepairFluxTrust::partialMock()->shouldReceive('handle')->once()->andReturn('');
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSet('section', 'general')
         ->assertSee($this->node->user.'@'.$this->node->ip.':'.$this->node->port)
         ->assertDontSee('{{ $node->ip }}', escape: false)
-        ->assertSee('Install or update')
-        ->assertSee('Flux control channel')
-        ->assertSee('Validate Podman')
+        ->assertDontSee('Update Sentinel');
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
+        ->assertSee('Connection')
+        ->assertSee('Update Sentinel')
+        ->assertSee('Troubleshooting')
+        ->assertSee('Validate node')
+        ->assertSee('Repair trust')
+        ->assertSee('Renew certificate')
+        ->assertDontSee('Refresh state')
+        ->assertDontSee('Install or update')
         ->call('installSentinel')
         ->assertDispatched('success', 'Host Sentinel installed and started.')
         ->call('testFluxConnection')
@@ -52,7 +61,7 @@ it('shows and runs node Sentinel controls in development', function () {
 });
 
 it('refreshes the node Flux connection state from cache', function () {
-    $component = Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+    $component = Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
         ->assertSee('Disconnected');
 
     Cache::put($this->node->cacheKey(), [
@@ -63,7 +72,8 @@ it('refreshes the node Flux connection state from cache', function () {
     ]);
 
     $component->call('refreshFluxConnection')
-        ->assertSee('connected')
+        ->assertSee('Connected')
+        ->assertDontSee('Disconnected')
         ->assertSee('TLS')
         ->assertSee('https://flux.example.com:7443')
         ->assertDispatched('info', 'Flux connection state refreshed.');
@@ -113,11 +123,48 @@ it('blocks node pages outside development or for another team', function () {
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])->assertNotFound();
 });
 
-it('wraps node actions on narrow screens and has no button icons', function () {
-    $view = file_get_contents(resource_path('views/livewire/node/show.blade.php'));
+it('wraps Sentinel actions on narrow screens and keeps them text-only', function () {
+    $view = file_get_contents(resource_path('views/livewire/node/partials/sentinel.blade.php'));
 
     expect($view)->toContain('flex flex-wrap items-center gap-2')
-        ->not->toContain('<x-reicon');
+        ->and(substr_count($view, '<x-reicon'))->toBe(substr_count($view, '<x-reicon name="refresh"'));
+});
+
+it('hides raw revision and discovery state from the Node overview', function () {
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSee('Overview')
+        ->assertSee('Not assigned')
+        ->assertSee('Resource usage')
+        ->assertDontSee('Revision')
+        ->assertDontSee('Discovery')
+        ->assertDontSee('Coolify endpoint');
+});
+
+it('shows validation output only while the Node is not ready', function () {
+    $this->node->update(['is_usable' => false, 'validation_logs' => 'Podman is not installed.']);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertSee('Node is not ready')
+        ->assertSee('Podman is not installed.');
+
+    $this->node->update(['is_usable' => true]);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+        ->assertDontSee('Podman is not installed.');
+});
+
+it('hides Sentinel management controls from team members', function () {
+    $member = User::factory()->create();
+    $member->teams()->attach($this->node->team_id, ['role' => 'member']);
+    $this->actingAs($member);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
+        ->assertSee('Connection')
+        ->assertDontSee('Update Sentinel')
+        ->assertDontSee('Repair trust')
+        ->assertDontSee('Renew certificate')
+        ->call('installSentinel')
+        ->assertNotDispatched('success');
 });
 
 it('shows and refreshes the read-only Node container inventory', function () {
@@ -136,7 +183,7 @@ it('shows and refreshes the read-only Node container inventory', function () {
         ->with(Mockery::type(Node::class))
         ->andReturn(1);
 
-    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'containers'])
         ->assertSee('Containers')
         ->assertSee('manual-nginx')
         ->assertSee('nginx:latest')

@@ -24,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Features\SupportRedirects\Redirector;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -215,7 +216,7 @@ it('shows the cluster application in its project and environment', function () {
         ->assertSee($this->cluster->name)
         ->assertSee($this->node->name)
         ->assertSee('General')
-        ->assertSee('Deployment Logs')
+        ->assertSee('Deployments')
         ->assertSee('Internal mesh')
         ->assertSee('External')
         ->assertSee('Not available yet')
@@ -250,7 +251,7 @@ it('lets an administrator create a new revision with resource settings', functio
         'environment_uuid' => $this->environment->uuid,
         'workload_uuid' => $deployment['workload']->uuid,
     ])
-        ->assertSee('Resource limits')
+        ->assertSee('Resource Limits')
         ->set('cpuLimit', '2.5')
         ->set('cpuReservation', '1.25')
         ->set('memoryLimitMb', '1024')
@@ -381,6 +382,24 @@ it('allows a specific Node to be selected from New resource', function () {
     ]));
 });
 
+it('accepts Livewire redirects for both cluster and Node selection', function () {
+    $component = new Select;
+    $component->parameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+    ];
+
+    $originalRedirector = app('redirect');
+    app()->instance('redirect', app(Redirector::class)->component($component));
+
+    try {
+        expect($component->setCluster($this->cluster->uuid))->toBeInstanceOf(Redirector::class);
+        expect($component->setNode($this->node->uuid))->toBeInstanceOf(Redirector::class);
+    } finally {
+        app()->instance('redirect', $originalRedirector);
+    }
+});
+
 it('always shows cluster selection on the Docker image form after a server shortcut', function () {
     Queue::fake();
     $server = Server::factory()->create(['team_id' => $this->team->id]);
@@ -480,7 +499,7 @@ it('creates a new revision when resource settings return to an earlier value', f
         ->and($revisions[3]->configuration_hash)->toBe($revisions[1]->configuration_hash);
 });
 
-it('lets an administrator save ports, a start command, and encrypted environment variables', function () {
+it('lets an administrator save a start command and encrypted environment variables', function () {
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
@@ -491,13 +510,11 @@ it('lets an administrator save ports, a start command, and encrypted environment
         'workload_uuid' => $deployment['workload']->uuid,
     ])
         ->assertSee('Configuration')
-        ->set('portMappings', '8080:80, 5353:53/udp')
         ->set('startCommand', 'nginx -g "daemon off;"')
         ->set('environmentVariables', "# comment\nAPP_ENV=production\nSECRET=\"s3cret value\"\n")
         ->call('saveConfiguration')
         ->assertHasNoErrors()
         ->assertDispatched('success')
-        ->assertSet('portMappings', '8080:80, 5353:53/udp')
         ->assertSet('startCommand', 'nginx -g "daemon off;"')
         ->assertSet('environmentVariables', "APP_ENV=production\nSECRET=s3cret value");
 
@@ -507,14 +524,34 @@ it('lets an administrator save ports, a start command, and encrypted environment
         ->and($latest->configuration)->toBe([
             'restart_policy' => 'unless-stopped',
             'command' => ['nginx', '-g', 'daemon off;'],
-            'ports' => [
-                ['host_port' => 8080, 'container_port' => 80, 'protocol' => 'tcp'],
-                ['host_port' => 5353, 'container_port' => 53, 'protocol' => 'udp'],
-            ],
         ])
         ->and($latest->environment)->toBe(['APP_ENV' => 'production', 'SECRET' => 's3cret value'])
         ->and($rawEnvironment)->not->toContain('s3cret')
         ->and($latest->toArray())->not->toHaveKey('environment');
+});
+
+it('drops host ports from an older revision when the configuration is saved', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $deployment['workload']->createRevision('docker.io/library/nginx:latest', [
+        'restart_policy' => 'unless-stopped',
+        'ports' => [['host_port' => 8080, 'container_port' => 80, 'protocol' => 'tcp']],
+    ]);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->set('startCommand', 'nginx')
+        ->call('saveConfiguration')
+        ->assertHasNoErrors();
+
+    expect($deployment['workload']->revisions()->latest('id')->firstOrFail()->configuration)->toBe([
+        'restart_policy' => 'unless-stopped',
+        'command' => ['nginx'],
+    ]);
 });
 
 it('keeps the current revision when the configuration does not change', function () {
@@ -533,7 +570,7 @@ it('keeps the current revision when the configuration does not change', function
     expect($deployment['workload']->revisions()->count())->toBe(1);
 });
 
-it('rejects invalid ports and environment variables', function (string $field, string $value) {
+it('rejects invalid environment variables', function (string $field, string $value) {
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
@@ -549,10 +586,6 @@ it('rejects invalid ports and environment variables', function (string $field, s
 
     expect($deployment['workload']->revisions()->count())->toBe(1);
 })->with([
-    'container port only' => ['portMappings', '80'],
-    'port out of range' => ['portMappings', '70000:80'],
-    'duplicate host port' => ['portMappings', '8080:80, 8080:81'],
-    'unknown protocol' => ['portMappings', '8080:80/icmp'],
     'missing equals sign' => ['environmentVariables', 'APP_ENV'],
     'invalid key' => ['environmentVariables', '1BAD=value'],
 ]);
@@ -561,7 +594,7 @@ it('hides environment variables from members and forbids configuration changes',
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
-    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], [], ['SECRET' => 'member-must-not-see']);
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['SECRET' => 'member-must-not-see']);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
     $this->actingAs($member);
@@ -574,7 +607,7 @@ it('hides environment variables from members and forbids configuration changes',
     ])
         ->assertSet('environmentVariables', '')
         ->assertDontSee('member-must-not-see')
-        ->set('portMappings', '8080:80')
+        ->set('startCommand', 'nginx')
         ->call('saveConfiguration')
         ->assertForbidden();
 
@@ -601,3 +634,123 @@ it('asks Sentinel for a newer image when an administrator redeploys', function (
     expect($operation->id)->not->toBe($deployment['operation']->id)
         ->and(data_get($operation->request, 'pull_policy'))->toBe('newer');
 });
+
+it('renders every cluster application section as its own page', function (string $routeName, string $section, array $expectedText) {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], ['nginx', '-g', 'daemon off;'], ['APP_ENV' => 'production']);
+    $deployment['operation']->update([
+        'status' => NodeOperationStatus::FAILED,
+        'error' => 'Image pull failed: manifest unknown',
+    ]);
+    $routeParameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ];
+
+    $response = $this->get(route($routeName, $routeParameters))
+        ->assertOk()
+        ->assertSee($deployment['workload']->name)
+        ->assertSee(['Settings', 'Operations'])
+        ->assertDontSee('href="#', false)
+        ->assertSee('menu-item menu-item-active', false);
+
+    foreach ([
+        'project.cluster-application.show',
+        'project.cluster-application.configuration',
+        'project.cluster-application.environment-variables',
+        'project.cluster-application.resource-limits',
+        'project.cluster-application.deployments',
+    ] as $sidebarRoute) {
+        $response->assertSee('href="'.route($sidebarRoute, $routeParameters).'"', false);
+    }
+    foreach ($expectedText as $text) {
+        $response->assertSee($text, false);
+    }
+
+    expect($response->getContent())->toMatch(
+        '/aria-current="page"[^>]*href="'.preg_quote(route($routeName, $routeParameters), '/').'"/'
+    )->and(substr_count($response->getContent(), 'aria-current="page"'))->toBe(1)
+        ->and(ClusterApplicationShow::SECTIONS)->toContain($section);
+})->with([
+    'general' => ['project.cluster-application.show', 'general', ['Overview', 'Internal hostname', 'Copy internal hostname']],
+    'configuration' => ['project.cluster-application.configuration', 'configuration', ['Start command']],
+    'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'APP_ENV=production', 'Values are stored encrypted.']],
+    'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
+    'deployments' => ['project.cluster-application.deployments', 'deployments', ['Deployment history', 'Deployment', 'Failed', 'Image pull failed: manifest unknown']],
+]);
+
+it('only renders the form that belongs to the current section', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $routeParameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ];
+
+    $this->get(route('project.cluster-application.configuration', $routeParameters))
+        ->assertOk()
+        ->assertSee('Start command')
+        ->assertDontSee('Port mappings')
+        ->assertDontSee('CPU limit (cores)')
+        ->assertDontSee('Deployment history');
+
+    $this->get(route('project.cluster-application.show', $routeParameters))
+        ->assertOk()
+        ->assertSee('wire:poll.10000ms="refresh"', false)
+        ->assertDontSee('Published ports')
+        ->assertDontSee('Start command');
+
+    $this->get(route('project.cluster-application.resource-limits', $routeParameters))
+        ->assertOk()
+        ->assertDontSee('wire:poll.10000ms="refresh"', false);
+});
+
+it('hides environment variable values from members on the environment variables page', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['SECRET' => 'member-must-not-see']);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $this->get(route('project.cluster-application.environment-variables', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee('Environment variables are hidden')
+        ->assertDontSee('member-must-not-see')
+        ->assertDontSee('cluster-application-desktop-actions', false);
+});
+
+it('does not expose any cluster application section to another team', function (string $routeName) {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $outsider = User::factory()->create();
+    $outsiderTeam = $outsider->teams()->firstOrFail();
+    $outsiderTeam->update(['show_boarding' => false]);
+    Cache::flush();
+    $this->actingAs($outsider);
+    session(['currentTeam' => $outsiderTeam]);
+
+    $this->get(route($routeName, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ]))->assertNotFound();
+})->with([
+    'project.cluster-application.show',
+    'project.cluster-application.configuration',
+    'project.cluster-application.environment-variables',
+    'project.cluster-application.resource-limits',
+    'project.cluster-application.deployments',
+]);

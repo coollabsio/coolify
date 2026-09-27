@@ -139,6 +139,9 @@ it('uses the grouped server-style side submenu on node pages', function () {
         ->toContain('aria-label="Node configuration sections"')
         ->toContain("'group' => 'Settings'")
         ->toContain("'group' => 'Operations'")
+        ->toContain("'group' => 'Workloads'")
+        ->toContain("'group' => 'Networking'")
+        ->toContain('settingsSidebarAccordion')
         ->toContain("route(\$menuItem['route']")
         ->toContain("\$activeMenu === 'terminal'")
         ->toContain("'navigate' => false")
@@ -149,7 +152,7 @@ it('uses the grouped server-style side submenu on node pages', function () {
         ->toContain('lg:hidden')
         ->and($overview)
         ->toContain('node-settings-workspace application-settings-workspace')
-        ->toContain('<x-node.sidebar :node="$node" activeMenu="general" />')
+        ->toContain('<x-node.sidebar :node="$node" :activeMenu="$section" />')
         ->and($terminal)
         ->toContain('<x-node.sidebar :node="$resource" activeMenu="terminal" />');
 });

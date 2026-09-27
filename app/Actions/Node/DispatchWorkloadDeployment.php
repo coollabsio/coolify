@@ -32,15 +32,6 @@ class DispatchWorkloadDeployment
         ]);
         $environment = $configuration['environment'] ?? [];
         $resources = $configuration['resources'] ?? [];
-        $ports = collect($configuration['ports'] ?? [])
-            ->map(function (array $port) use ($operation): array {
-                if (filled($operation->node->wireguard_ip)) {
-                    $port['host_ip'] = $operation->node->wireguard_ip;
-                }
-
-                return $port;
-            })
-            ->all();
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
             $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
@@ -57,7 +48,7 @@ class DispatchWorkloadDeployment
                 'image' => $operation->revision->image,
                 'command' => $configuration['command'] ?? [],
                 'environment' => $environment === [] ? (object) [] : $environment,
-                'ports' => $ports,
+                'ports' => [],
                 'labels' => BuildContainerLabels::run($operation->workload, $operation->revision, 'main'),
                 'restart_policy' => $configuration['restart_policy'] ?? 'unless-stopped',
                 'pull_policy' => data_get($operation->request, 'pull_policy', 'missing'),
@@ -97,11 +88,6 @@ class DispatchWorkloadDeployment
             'command.*' => ['string', 'max:4096'],
             'environment' => ['sometimes', 'array', 'max:256'],
             'environment.*' => ['string', 'max:4096'],
-            'ports' => ['sometimes', 'array', 'max:128'],
-            'ports.*.host_ip' => ['nullable', 'ip'],
-            'ports.*.host_port' => ['nullable', 'integer', 'between:1,65535'],
-            'ports.*.container_port' => ['required', 'integer', 'between:1,65535'],
-            'ports.*.protocol' => ['required', 'in:tcp,udp,sctp'],
             'restart_policy' => ['sometimes', 'in:no,always,on-failure,unless-stopped'],
             'resources' => ['sometimes', 'array:cpu_limit,cpu_reservation,memory_limit_bytes,memory_reservation_bytes'],
             'resources.cpu_limit' => ['nullable', 'numeric', 'between:0.01,1024'],

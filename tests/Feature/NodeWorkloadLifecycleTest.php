@@ -6,13 +6,16 @@ use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Node\Show;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeContainer;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadRevision;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -183,6 +186,16 @@ it('fails when the requested lifecycle state is not reached', function () {
         ->and($operation->error)->toBe('The requested workload state was not reached.');
 });
 
+it('records the reason when Flux rejects a lifecycle command', function () {
+    $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::START);
+    Http::fake(['*/v1/commands/workload.lifecycle' => Http::response('Error: unable to start container: bind: address already in use', 502)]);
+
+    (new ManageNodeWorkloadJob($operation->id))->handle();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
+        ->and($operation->error)->toBe('Flux rejected the workload lifecycle command with HTTP 502: Error: unable to start container: bind: address already in use');
+});
+
 it('recovers from observed lifecycle state without replaying the command', function () {
     $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::STOP);
     $operation->update(['status' => NodeOperationStatus::UNCERTAIN, 'error' => 'Unknown result.']);
@@ -224,7 +237,7 @@ it('queues an authorized lifecycle action from the Node page', function () {
         'management_state' => NodeContainerManagementState::MANAGED,
     ]);
 
-    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
         ->assertSee('Stop')
         ->assertSee('Restart')
         ->assertSee('Remove')
@@ -262,7 +275,7 @@ it('updates a permanent workload dns name from the Node page', function () {
         'endpoint_count' => count($request['endpoints']),
     ]));
 
-    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
         ->assertSet('dnsNames.'.$this->workload->uuid, 'example-app')
         ->assertSee('Internal DNS name')
         ->set('dnsNames.'.$this->workload->uuid, 'stable-api')
@@ -330,6 +343,53 @@ it('does not let members or cross-team identifiers change workload dns names', f
         ->call('saveWorkloadDnsName', $foreignWorkload->uuid);
 
     expect($foreignWorkload->refresh()->internal_dns_name)->toBe('foreign-app');
+});
+
+it('links workloads to their application page and labels recent activity', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $user->teams()->attach($this->team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $this->workload->update([
+        'project_id' => $project->id,
+        'environment_id' => $environment->id,
+        'internal_dns_name' => 'example-app',
+    ]);
+    $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::RESTART);
+    $operation->update(['status' => NodeOperationStatus::UNCERTAIN]);
+    NodeOperation::factory()->create(['node_id' => $this->node->id, 'command_type' => 'network.firewall.inspect.v1']);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
+        ->assertSee(route('project.cluster-application.show', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'workload_uuid' => $this->workload->uuid,
+        ]), false)
+        ->assertSee('docker.io/library/alpine:latest')
+        ->assertSee('example-app.default.coolify.internal')
+        ->assertSee('Restart Example App')
+        ->assertSee('Recover')
+        ->assertDontSee('workload.lifecycle.v1')
+        ->assertDontSee('Network firewall inspect');
+});
+
+it('hides workload mutations from team members', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
+        ->assertSee('Example App')
+        ->assertDontSee('Redeploy')
+        ->assertDontSee('Internal DNS name')
+        ->assertDontSeeHtml('deployRevision(');
 });
 
 it('queues lifecycle recovery from the Node page', function () {

@@ -3,12 +3,27 @@
 namespace App\Models;
 
 use App\Enums\NodeOperationStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NodeOperation extends BaseModel
 {
     use HasFactory;
+
+    /**
+     * Commands that Coolify runs periodically in the background. They are
+     * hidden from activity lists unless they fail.
+     */
+    public const BACKGROUND_COMMAND_TYPES = [
+        'container.list.v1',
+        'discovery.corrosion.endpoints.reconcile.v1',
+        'discovery.corrosion.inspect.v1',
+        'network.firewall.inspect.v1',
+        'network.wireguard.inspect.v1',
+        'system.info.v1',
+        'system.ping.v1',
+    ];
 
     protected $guarded = [];
 
@@ -43,5 +58,12 @@ class NodeOperation extends BaseModel
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by_id');
+    }
+
+    public function scopeUserFacing(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNotIn('command_type', self::BACKGROUND_COMMAND_TYPES)
+            ->orWhereIn('status', [NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT, NodeOperationStatus::UNCERTAIN]));
     }
 }

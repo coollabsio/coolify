@@ -1,8 +1,25 @@
 <div>
-    <x-slot:title>{{ $workload->name }} | Coolify</x-slot>
-    <nav wire:poll.10000ms="refresh" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
+    @php
+        $sectionTitles = [
+            'general' => 'General',
+            'configuration' => 'Configuration',
+            'environment-variables' => 'Environment Variables',
+            'resource-limits' => 'Resource Limits',
+            'deployments' => 'Deployments',
+        ];
+        $pollsStatus = in_array($section, ['general', 'deployments'], true);
+    @endphp
+
+    <x-slot:title>
+        {{ str($workload->name)->limit(10) }} > {{ $sectionTitles[$section] }} | Coolify
+    </x-slot>
+
+    <nav class="w-full max-w-none pb-4 md:pb-6 lg:pb-0"
+        @if ($pollsStatus) wire:poll.10000ms="refresh" @endif>
         <div class="mb-3 flex min-w-0 flex-col items-start gap-2 xl:hidden">
-            <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $workload->name }}</h1>
+            <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
+                {{ $workload->name }}
+            </h1>
             <div class="flex items-center gap-2">
                 <x-status-summary :status="strtolower($status)" />
                 <x-cluster-applications.links :workload="$workload" compact />
@@ -27,71 +44,10 @@
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-            <aside class="application-settings-navigation min-w-0 xl:self-start">
-                <nav aria-label="Cluster application sections"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                    <div class="nav-section hidden xl:block">Settings</div>
-                    <a href="#general" class="menu-item menu-item-active"><x-reicon name="settings" class="menu-item-icon" /><span class="menu-item-label">General</span></a>
-                    <a href="#configuration" class="menu-item"><x-reicon name="code" class="menu-item-icon" /><span class="menu-item-label">Configuration</span></a>
-                    <a href="#resources" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Resources</span></a>
-                    <a href="#deployments" class="menu-item"><x-reicon name="time-back" class="menu-item-icon" /><span class="menu-item-label">Deployment Logs</span></a>
-                    <a href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}" class="menu-item"><x-reicon name="servers" class="menu-item-icon" /><span class="menu-item-label">Node</span></a>
-                </nav>
-            </aside>
+            <x-cluster-applications.sidebar :section="$section" :route-parameters="$routeParameters" />
 
-            <div class="flex min-w-0 flex-col gap-6">
-        <x-application.settings-section id="general" title="Application details">
-            <div class="grid gap-4 text-sm sm:grid-cols-2">
-                <div><span class="text-neutral-500 dark:text-fg-dim">Image</span><p class="break-all font-mono text-xs">{{ $workload->revisions->first()?->image }}</p></div>
-                <div><span class="text-neutral-500 dark:text-fg-dim">Cluster</span><p>{{ $node->cluster?->name ?? 'None' }}</p></div>
-                <div><span class="text-neutral-500 dark:text-fg-dim">Node</span><p><a class="hover:underline" href="{{ route('node.show', ['node_uuid' => $node->uuid]) }}">{{ $node->name }}</a></p></div>
-                <div><span class="text-neutral-500 dark:text-fg-dim">Internal DNS</span><p class="font-mono text-xs">{{ $workload->internal_dns_name ? $workload->internal_dns_name.'.default.coolify.internal' : 'Pending' }}</p></div>
-            </div>
-        </x-application.settings-section>
-
-        <x-application.settings-section id="configuration" title="Configuration" helper="Changes create a new revision. Redeploy the application to apply them.">
-            <form wire:submit="saveConfiguration" class="flex flex-col gap-4">
-                <x-forms.input id="portMappings" label="Port mappings" placeholder="8080:80, 5353:53/udp"
-                    helper="Comma-separated host:container pairs. Add /udp or /sctp for other protocols. Ports bind to the Node WireGuard IP, so they are reachable only inside the cluster." />
-                <x-forms.input id="startCommand" label="Start command" placeholder="nginx -g &quot;daemon off;&quot;"
-                    helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />
-                @can('update', $workload)
-                    <x-forms.textarea id="environmentVariables" label="Environment variables" rows="8" placeholder="KEY=value"
-                        helper="One KEY=VALUE pair per line. Lines that start with # are ignored. Values are stored encrypted." />
-                    <div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save configuration</x-forms.button></div>
-                @endcan
-            </form>
-        </x-application.settings-section>
-
-        <x-application.settings-section id="resources" title="Resource limits" helper="Set optional runtime limits and scheduling reservations. Empty values mean unlimited.">
-            <form wire:submit="saveResources" class="flex flex-col gap-4">
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-forms.input wire:model="cpuLimit" type="number" min="0.01" max="1024" step="0.01" label="CPU limit (cores)" helper="Maximum CPU capacity that Podman can use." />
-                    <x-forms.input wire:model="cpuReservation" type="number" min="0.01" max="1024" step="0.01" label="CPU reservation (cores)" helper="Capacity reserved for placement. Podman uses it as relative CPU weight." />
-                    <x-forms.input wire:model="memoryLimitMb" type="number" min="4" max="1048576" label="Memory limit (MiB)" helper="Maximum memory available to the container." />
-                    <x-forms.input wire:model="memoryReservationMb" type="number" min="4" max="1048576" label="Memory reservation (MiB)" helper="Capacity reserved for placement and soft runtime memory pressure." />
-                </div>
-                @can('update', $workload)<div class="flex flex-wrap gap-2"><x-forms.button type="submit">Save resources</x-forms.button></div>@endcan
-            </form>
-        </x-application.settings-section>
-
-        <x-application.settings-section id="deployments" title="Deployment logs">
-            <div class="flex flex-col gap-3">
-                @forelse ($workload->operations as $operation)
-                    <div wire:key="cluster-app-operation-{{ $operation->uuid }}" class="rounded-xl border border-neutral-200 px-4 py-3 text-sm dark:border-white/[0.08]">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <span>{{ str($operation->command_type)->replace('.v1', '')->replace('.', ' ')->title() }}</span>
-                            <x-status-badge :status="str($operation->status->value)->title()" :type="$operation->status->value === 'succeeded' ? 'success' : ($operation->status->value === 'failed' ? 'error' : 'warning')" />
-                        </div>
-                        @if ($operation->error)
-                            <p class="mt-2 text-xs text-red-500">{{ $operation->error }}</p>
-                        @endif
-                    </div>
-                @empty
-                    <x-empty size="sm" title="No deployments yet" description="Deploy this application to create its first operation." icon-name="layers" />
-                @endforelse
-            </div>
-        </x-application.settings-section>
+            <div class="application-settings-form flex min-w-0 flex-col gap-6">
+                @include('livewire.project.cluster-application.partials.'.$section)
             </div>
         </div>
     </section>

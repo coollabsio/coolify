@@ -7,20 +7,29 @@ use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Actions\Node\UpdateNodeWorkloadResources;
+use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Models\Environment;
 use App\Models\Node;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
 {
     use AuthorizesRequests;
+
+    /** @var list<string> */
+    public const SECTIONS = ['general', 'configuration', 'environment-variables', 'resource-limits', 'deployments'];
+
+    #[Locked]
+    public string $section = 'general';
 
     public Project $project;
 
@@ -42,8 +51,6 @@ class Show extends Component
 
     public string $memoryReservationMb = '';
 
-    public string $portMappings = '';
-
     public string $startCommand = '';
 
     public string $environmentVariables = '';
@@ -56,6 +63,7 @@ class Show extends Component
             ->where('project_id', $this->project->id)->where('environment_id', $this->environment->id)
             ->where('uuid', $workload_uuid)->firstOrFail();
         $this->authorize('view', $this->workload);
+        $this->section = $this->resolveSection(request()->route()?->getName());
         $this->loadData();
         $this->loadResourceSettings();
         $this->loadConfiguration();
@@ -115,18 +123,16 @@ class Show extends Component
     {
         $this->authorize('update', $this->workload);
         $this->validate([
-            'portMappings' => ['nullable', 'string', 'max:4096'],
             'startCommand' => ['nullable', 'string', 'max:16384'],
             'environmentVariables' => ['nullable', 'string', 'max:262144'],
         ]);
-        $ports = $this->parsePortMappings();
         $command = $this->parseStartCommand();
         $environment = $this->parseEnvironmentVariables();
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
 
-        UpdateNodeWorkloadConfiguration::run($this->workload, $command, $ports, $environment);
+        UpdateNodeWorkloadConfiguration::run($this->workload, $command, $environment);
         $this->loadData();
         $this->loadConfiguration();
         $this->dispatch('success', 'Configuration saved. Redeploy the application to apply it.');
@@ -152,7 +158,63 @@ class Show extends Component
 
     public function render(): View
     {
-        return view('livewire.project.cluster-application.show');
+        return view('livewire.project.cluster-application.show', [
+            'image' => $this->workload->revisions->first()?->image,
+            'internalHostname' => $this->workload->internal_dns_name
+                ? $this->workload->internal_dns_name.'.default.coolify.internal'
+                : null,
+            'deployments' => $this->section === 'deployments' ? $this->deploymentHistory() : [],
+            'routeParameters' => [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'workload_uuid' => $this->workload->uuid,
+            ],
+        ]);
+    }
+
+    /** @return list<array{uuid: string, label: string, status: string, statusType: string, created_at: mixed, duration: ?string, error: ?string}> */
+    private function deploymentHistory(): array
+    {
+        return $this->workload->operations
+            ->map(fn (NodeOperation $operation): array => [
+                'uuid' => $operation->uuid,
+                'label' => match ($operation->command_type) {
+                    'workload.deploy.v1' => 'Deployment',
+                    'workload.lifecycle.v1' => str(data_get($operation->request, 'action', 'lifecycle'))->title()->toString(),
+                    'workload.resources.v1' => 'Resource update',
+                    'workload.move.v1' => 'Move to another Node',
+                    default => str($operation->command_type)->replace('.v1', '')->replace('.', ' ')->title()->toString(),
+                },
+                'status' => match ($operation->status) {
+                    NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED => 'Queued',
+                    NodeOperationStatus::RUNNING, NodeOperationStatus::VERIFYING => 'In progress',
+                    NodeOperationStatus::SUCCEEDED => 'Success',
+                    NodeOperationStatus::FAILED => 'Failed',
+                    NodeOperationStatus::TIMED_OUT => 'Timed out',
+                    NodeOperationStatus::UNCERTAIN => 'Uncertain',
+                    NodeOperationStatus::CANCELLED => 'Cancelled',
+                },
+                'statusType' => match ($operation->status) {
+                    NodeOperationStatus::SUCCEEDED => 'success',
+                    NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT => 'error',
+                    NodeOperationStatus::CANCELLED => 'neutral',
+                    default => 'warning',
+                },
+                'created_at' => $operation->created_at,
+                'duration' => $operation->started_at && $operation->completed_at
+                    ? calculateDuration($operation->started_at, $operation->completed_at)
+                    : null,
+                'error' => $operation->error,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function resolveSection(?string $routeName): string
+    {
+        $section = str($routeName ?? '')->after('project.cluster-application.')->toString();
+
+        return in_array($section, self::SECTIONS, true) ? $section : 'general';
     }
 
     private function loadData(): void
@@ -172,9 +234,6 @@ class Show extends Component
     {
         $revision = $this->workload->revisions->first();
         $configuration = $revision?->configuration ?? [];
-        $this->portMappings = collect($configuration['ports'] ?? [])
-            ->map(fn (array $port): string => ($port['host_port'] ?? '').':'.$port['container_port'].($port['protocol'] === 'tcp' ? '' : '/'.$port['protocol']))
-            ->implode(', ');
         $this->startCommand = collect($configuration['command'] ?? [])
             ->map(fn (string $argument): string => preg_match('/[\s"]/', $argument) === 1 ? '"'.str_replace('"', '""', $argument).'"' : $argument)
             ->implode(' ');
@@ -184,35 +243,6 @@ class Show extends Component
                 ->map(fn (string $value, string $key): string => "{$key}={$value}")
                 ->implode("\n");
         }
-    }
-
-    /** @return list<array{host_port: int, container_port: int, protocol: string}> */
-    private function parsePortMappings(): array
-    {
-        $ports = [];
-        foreach (preg_split('/[\s,]+/', trim($this->portMappings), -1, PREG_SPLIT_NO_EMPTY) as $mapping) {
-            if (preg_match('/^(\d{1,5}):(\d{1,5})(?:\/(tcp|udp|sctp))?$/', $mapping, $matches) !== 1
-                || (int) $matches[1] < 1 || (int) $matches[1] > 65535
-                || (int) $matches[2] < 1 || (int) $matches[2] > 65535) {
-                $this->addError('portMappings', "Invalid port mapping \"{$mapping}\". Use host:container or host:container/udp.");
-
-                return [];
-            }
-            $protocol = $matches[3] ?? 'tcp';
-            if (collect($ports)->contains(fn (array $port): bool => $port['host_port'] === (int) $matches[1] && $port['protocol'] === $protocol)) {
-                $this->addError('portMappings', "Host port {$matches[1]}/{$protocol} is used more than once.");
-
-                return [];
-            }
-            $ports[] = ['host_port' => (int) $matches[1], 'container_port' => (int) $matches[2], 'protocol' => $protocol];
-        }
-        if (count($ports) > 128) {
-            $this->addError('portMappings', 'Use at most 128 port mappings.');
-
-            return [];
-        }
-
-        return $ports;
     }
 
     /** @return list<string> */

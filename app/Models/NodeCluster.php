@@ -62,4 +62,44 @@ class NodeCluster extends BaseModel
     {
         return $this->network_status === 'active' || $this->last_reconciled_at !== null;
     }
+
+    public function networkStatusLabel(): string
+    {
+        return match ($this->network_status) {
+            'active', 'applied' => 'Active',
+            'reconciling' => 'Syncing',
+            'error', 'failed' => 'Failed',
+            default => 'Pending',
+        };
+    }
+
+    /** @return 'success'|'warning'|'error'|'neutral' */
+    public function networkStatusBadgeType(): string
+    {
+        return match ($this->network_status) {
+            'active', 'applied' => 'success',
+            'reconciling' => 'warning',
+            'error', 'failed' => 'error',
+            default => 'neutral',
+        };
+    }
+
+    public function isNodeNetworkInSync(Node $node): bool
+    {
+        return $node->network_applied_revision !== null
+            && (int) $node->network_applied_revision === $this->desired_revision
+            && $node->corrosion_status === 'converged';
+    }
+
+    public function hasNodesNeedingAttention(): bool
+    {
+        return $this->nodes()
+            ->where(fn ($query) => $query
+                ->where('is_usable', false)
+                ->orWhereNull('network_applied_revision')
+                ->orWhere('network_applied_revision', '!=', $this->desired_revision)
+                ->orWhereNull('corrosion_status')
+                ->orWhere('corrosion_status', '!=', 'converged'))
+            ->exists();
+    }
 }

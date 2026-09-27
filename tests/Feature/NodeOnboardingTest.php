@@ -38,7 +38,7 @@ it('shows the node onboarding route and call to action', function () {
     $this->get(route('node.onboarding'))->assertOk()->assertSee('Connect your server');
 
     Livewire::test(Index::class)
-        ->assertSee('Add Node')
+        ->assertSee('Add node')
         ->assertSee(route('node.onboarding'), escape: false);
 });
 

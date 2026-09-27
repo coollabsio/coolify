@@ -31,7 +31,7 @@ it('shows team nodes in the clusters view and links to the node page', function 
     Livewire::test(NodeClusterIndex::class)
         ->assertSee('Nodes')
         ->assertSee('QEMU worker node')
-        ->assertSee('Worker')
+        ->assertSee('Unassigned')
         ->assertSee(route('node.show', ['node_uuid' => $node->uuid]), escape: false);
 });
 

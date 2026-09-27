@@ -69,7 +69,8 @@ class ManageNodeWorkloadJob implements ShouldQueue
                 TransitionOperation::run($operation, NodeOperationStatus::UNCERTAIN, error: 'The workload lifecycle result is unknown.');
             }
         } catch (RequestException $exception) {
-            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'Flux rejected the workload lifecycle command with HTTP '.$exception->response->status().'.');
+            $reason = trim(mb_substr($exception->response->body(), 0, 2000));
+            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'Flux rejected the workload lifecycle command with HTTP '.$exception->response->status().($reason === '' ? '.' : ": {$reason}"));
         } catch (Throwable $exception) {
             TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
         }

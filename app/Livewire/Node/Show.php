@@ -28,13 +28,20 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
 {
     use AuthorizesRequests;
 
+    /** @var list<string> */
+    private const SECTIONS = ['general', 'workloads', 'containers', 'sentinel'];
+
     public Node $node;
+
+    #[Locked]
+    public string $section = 'general';
 
     /** @var array<string, mixed>|null */
     public ?array $fluxConnection = null;
@@ -48,7 +55,7 @@ class Show extends Component
     /** @var array<string, string> */
     public array $moveTargets = [];
 
-    public function mount(string $node_uuid): void
+    public function mount(string $node_uuid, ?string $section = null): void
     {
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->node = Node::query()
@@ -56,8 +63,8 @@ class Show extends Component
             ->where('team_id', currentTeam()->id)
             ->firstOrFail();
         $this->authorize('view', $this->node);
-        $this->loadFluxConnection();
-        $this->loadNodeData();
+        $this->section = $this->resolveSection($section);
+        $this->loadSectionData();
     }
 
     public function installSentinel(): void
@@ -74,12 +81,14 @@ class Show extends Component
     {
         $this->runAction(fn () => ValidateNode::run($this->node), 'Node validation completed.');
         $this->node->refresh();
+        $this->loadSectionData();
     }
 
     public function refreshInformation(): void
     {
         $this->runAction(fn () => FetchFluxNodeInformation::run($this->node), 'Node details refreshed through Flux.');
         $this->node->refresh();
+        $this->loadSectionData();
     }
 
     public function refreshContainers(): void
@@ -211,6 +220,7 @@ class Show extends Component
             }
 
             $this->loadNodeData();
+            $this->dispatch('close-modal');
             $this->dispatch('success', 'Internal DNS name updated.');
         } catch (ValidationException $exception) {
             throw $exception;
@@ -240,6 +250,7 @@ class Show extends Component
                 ->firstOrFail();
             $operation = CreateMoveOperation::run($this->node, $target, $revision, auth()->user());
             MoveNodeWorkloadJob::dispatch($operation->id);
+            $this->dispatch('close-modal');
             $this->dispatch('success', 'Workload move queued. The source stays active until the target is ready.');
             $this->loadNodeData();
         } catch (ValidationException $exception) {
@@ -286,6 +297,31 @@ class Show extends Component
         return view('livewire.node.show');
     }
 
+    private function resolveSection(?string $section): string
+    {
+        $section ??= match (request()->route()?->getName()) {
+            'node.workloads' => 'workloads',
+            'node.containers' => 'containers',
+            'node.sentinel' => 'sentinel',
+            default => 'general',
+        };
+
+        return in_array($section, self::SECTIONS, true) ? $section : 'general';
+    }
+
+    /**
+     * Load only the data that the current section renders.
+     */
+    private function loadSectionData(): void
+    {
+        match ($this->section) {
+            'workloads' => $this->loadNodeData(),
+            'containers' => $this->node->load('containers'),
+            'sentinel' => $this->loadFluxConnection(),
+            default => $this->node->load('cluster'),
+        };
+    }
+
     private function loadFluxConnection(): void
     {
         $this->fluxConnection = Cache::get($this->node->cacheKey());
@@ -293,11 +329,22 @@ class Show extends Component
 
     private function loadNodeData(): void
     {
+        if ($this->section === 'containers') {
+            $this->node->load('containers');
+
+            return;
+        }
+        if ($this->section !== 'workloads') {
+            return;
+        }
+
         $this->node->load([
             'cluster.nodes',
-            'containers',
-            'workloads' => fn ($query) => $query->with(['revisions' => fn ($revisions) => $revisions->latest('id')->limit(1)]),
-            'operations' => fn ($query) => $query->with('workload')->latest('id')->limit(20),
+            'workloads' => fn ($query) => $query->with([
+                'environment.project',
+                'revisions' => fn ($revisions) => $revisions->latest('id')->limit(1),
+            ]),
+            'operations' => fn ($query) => $query->with('workload')->whereNotNull('node_workload_id')->latest('id')->limit(10),
         ]);
         $this->workloadStates = $this->node->workloads
             ->mapWithKeys(function ($workload): array {

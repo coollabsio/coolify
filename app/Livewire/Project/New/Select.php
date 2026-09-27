@@ -7,7 +7,6 @@ use App\Models\NodeCluster;
 use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -442,7 +441,7 @@ class Select extends Component
         return $this->whatToDoNext();
     }
 
-    public function setCluster(string $clusterUuid): RedirectResponse
+    public function setCluster(string $clusterUuid)
     {
         $cluster = NodeCluster::query()
             ->where('team_id', currentTeam()->id)
@@ -461,7 +460,7 @@ class Select extends Component
         ]);
     }
 
-    public function setNode(string $nodeUuid): RedirectResponse
+    public function setNode(string $nodeUuid)
     {
         $node = Node::query()
             ->where('team_id', currentTeam()->id)

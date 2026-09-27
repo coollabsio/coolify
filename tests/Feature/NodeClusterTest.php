@@ -6,6 +6,7 @@ use App\Actions\Node\EnsureNodeWorkloadAddress;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\RepairNodeClusterNetwork;
 use App\Actions\Node\UpdateNodeCluster;
+use App\Enums\NodeOperationStatus;
 use App\Jobs\ReconcileNodeClusterNetworkJob;
 use App\Livewire\NodeCluster\Index;
 use App\Livewire\NodeCluster\Show;
@@ -14,6 +15,7 @@ use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeIngressRule;
+use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -249,7 +252,7 @@ it('prevents members from mutating clusters', function () {
         ->assertForbidden();
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->call('deleteCluster')
+        ->call('deleteCluster', 'password')
         ->assertForbidden();
 });
 
@@ -307,7 +310,7 @@ it('deletes a cluster after cleaning unused assigned nodes', function () {
     AssignNodeToCluster::run($cluster, $node);
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->call('deleteCluster')
+        ->call('deleteCluster', 'password')
         ->assertRedirect(route('node-cluster.index'));
 
     expect($cluster->fresh())->toBeNull()
@@ -326,7 +329,7 @@ it('creates edits assigns removes and deletes through Livewire', function () {
         ->set('nodeUuid', $node->uuid)
         ->call('assignNode')->assertDispatched('success')
         ->call('removeNode', $node->uuid)->assertDispatched('success')
-        ->call('deleteCluster');
+        ->call('deleteCluster', 'password');
 
     expect(NodeCluster::query()->whereKey($cluster->id)->exists())->toBeFalse();
 });
@@ -344,9 +347,10 @@ it('does not expose foreign nodes to assignment actions', function () {
 it('shows the system-managed core cluster firewall rules', function () {
     $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Core rules mesh');
 
-    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->assertSee('Core cluster traffic')
-        ->assertSee('System managed')
+    $this->get(route('node-cluster.firewall', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('System rules')
+        ->assertSee('Managed by Coolify')
         ->assertSee('WireGuard')
         ->assertSee('UDP / 51820')
         ->assertSee('Corrosion gossip')
@@ -355,7 +359,8 @@ it('shows the system-managed core cluster firewall rules', function () {
         ->assertSee('TCP / 8080')
         ->assertSee('Workload DNS')
         ->assertSee('TCP + UDP / 53')
-        ->assertSee('Established connections');
+        ->assertSee('Established connections')
+        ->assertDontSee('Core cluster traffic');
 });
 
 it('adds and removes scoped workload firewall rules', function () {
@@ -447,9 +452,12 @@ it('adds a firewall rule from a Node to a workload', function () {
     $destination = NodeWorkload::factory()->create(['team_id' => $team->id]);
     EnsureNodeWorkloadAddress::run($node, $destination);
 
-    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+    $this->get(route('node-cluster.firewall', $cluster->uuid))
+        ->assertSuccessful()
         ->assertSee($node->name)
-        ->assertSee('Nodes allow only required cluster traffic by default.')
+        ->assertSee('Nodes allow only required cluster traffic by default.');
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->set('firewallSourceUuid', 'node:'.$node->uuid)
         ->set('firewallDestinationUuid', $destination->uuid)
         ->set('firewallProtocol', 'icmp')
@@ -535,7 +543,7 @@ it('queues cluster network reconciliation once', function () {
     AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id]));
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->assertSee('Reconcile network')
+        ->assertSee('Sync network')
         ->call('reconcileNetwork')
         ->assertDispatched('success');
 
@@ -571,8 +579,11 @@ it('runs the scoped SSH network repair from the cluster page', function () {
         ->shouldReceive('handle')
         ->once();
 
+    $this->get(route('node-cluster.advanced', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Repair network over SSH');
+
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
-        ->assertSee('Repair over SSH')
         ->call('repairNetwork')
         ->assertDispatched('success');
 });
@@ -604,4 +615,216 @@ it('uses the Clusters label and layers icon in the sidebar', function () {
         ->toContain('<x-reicon name="layers" class="menu-item-icon" />')
         ->toContain('>Clusters</span>')
         ->not->toContain('title="Node clusters"');
+});
+
+it('renders one page per cluster menu item with the grouped sidebar', function (string $routeName, array $expectedText) {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Sectioned cluster');
+
+    $response = $this->get(route($routeName, $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSeeLivewire(Show::class)
+        ->assertSee('Sectioned cluster')
+        ->assertSee('Settings')
+        ->assertSee('Network')
+        ->assertSee('Danger zone')
+        ->assertSee(route('node-cluster.show', $cluster->uuid), escape: false)
+        ->assertSee(route('node-cluster.nodes', $cluster->uuid), escape: false)
+        ->assertSee(route('node-cluster.firewall', $cluster->uuid), escape: false)
+        ->assertSee(route('node-cluster.advanced', $cluster->uuid), escape: false)
+        ->assertSee(route('node-cluster.delete', $cluster->uuid), escape: false)
+        ->assertDontSee('Revision ')
+        ->assertDontSee('Desired revision');
+
+    foreach ($expectedText as $text) {
+        $response->assertSee($text);
+    }
+})->with([
+    'general' => ['node-cluster.show', ['Overview', 'Nodes ready', 'Private network', 'Last synced', 'Sync network', 'Pending']],
+    'nodes' => ['node-cluster.nodes', ['No nodes in this cluster', 'Connect new node']],
+    'firewall' => ['node-cluster.firewall', ['Traffic map', 'Application rules', 'Ingress rules', 'System rules']],
+    'advanced' => ['node-cluster.advanced', ['Private network', 'WireGuard interface', 'Deployment limits', 'Troubleshooting', 'Recent operations']],
+    'danger' => ['node-cluster.delete', ['Delete cluster', 'This action cannot be undone']],
+]);
+
+it('derives the active section from the route', function (string $routeName, string $title) {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Route sections');
+
+    $this->get(route($routeName, $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Route sections > '.$title.' | Cluster | Coolify', false);
+})->with([
+    ['node-cluster.show', 'General'],
+    ['node-cluster.nodes', 'Nodes'],
+    ['node-cluster.firewall', 'Firewall'],
+    ['node-cluster.advanced', 'Advanced'],
+    ['node-cluster.delete', 'Danger'],
+]);
+
+it('does not let the client change the locked section', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Locked section');
+
+    expect(fn () => Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])->set('section', 'danger'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+});
+
+it('denies cross-team access to every cluster page', function (string $routeName) {
+    $foreign = NodeCluster::factory()->create();
+
+    $this->get(route($routeName, $foreign->uuid))->assertNotFound();
+})->with(['node-cluster.show', 'node-cluster.nodes', 'node-cluster.firewall', 'node-cluster.advanced', 'node-cluster.delete']);
+
+it('lists cluster nodes with network state and offers unassigned nodes', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Node list');
+    $member = Node::factory()->create(['team_id' => $team->id, 'name' => 'Member node', 'is_usable' => true]);
+    AssignNodeToCluster::run($cluster, $member);
+    Node::factory()->create(['team_id' => $team->id, 'name' => 'Spare node']);
+
+    $this->get(route('node-cluster.nodes', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Member node')
+        ->assertSee($member->fresh()->wireguard_ip)
+        ->assertSee('Ready')
+        ->assertSee('Pending')
+        ->assertSee('Add node')
+        ->assertSee('Spare node')
+        ->assertSee('Remove')
+        ->assertSee('node-cluster-nodes-warning', escape: false)
+        ->assertDontSee('Discovery');
+});
+
+it('shows a node network as in sync only when the revision is applied and discovery converged', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Sync state');
+    $node = Node::factory()->create(['team_id' => $team->id, 'is_usable' => true]);
+    AssignNodeToCluster::run($cluster, $node);
+    $cluster->refresh();
+
+    $node->update(['network_applied_revision' => $cluster->desired_revision, 'corrosion_status' => 'syncing']);
+    expect($cluster->isNodeNetworkInSync($node->fresh()))->toBeFalse()
+        ->and($cluster->hasNodesNeedingAttention())->toBeTrue();
+
+    $node->update(['corrosion_status' => 'converged']);
+    expect($cluster->isNodeNetworkInSync($node->fresh()))->toBeTrue()
+        ->and($cluster->hasNodesNeedingAttention())->toBeFalse();
+
+    $this->get(route('node-cluster.nodes', $cluster->uuid))
+        ->assertSee('In sync')
+        ->assertDontSee('node-cluster-nodes-warning', escape: false);
+});
+
+it('maps the cluster network status to a typed badge', function (?string $status, string $label, string $type) {
+    $cluster = NodeCluster::factory()->make(['network_status' => $status]);
+
+    expect($cluster->networkStatusLabel())->toBe($label)
+        ->and($cluster->networkStatusBadgeType())->toBe($type);
+})->with([
+    ['active', 'Active', 'success'],
+    ['applied', 'Active', 'success'],
+    ['reconciling', 'Syncing', 'warning'],
+    ['error', 'Failed', 'error'],
+    ['failed', 'Failed', 'error'],
+    ['pending', 'Pending', 'neutral'],
+    [null, 'Pending', 'neutral'],
+]);
+
+it('hides mutating controls and the danger page link from members', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Read only cluster');
+    AssignNodeToCluster::run($cluster, Node::factory()->create(['team_id' => $team->id, 'name' => 'Visible node']));
+    Node::factory()->create(['team_id' => $team->id, 'name' => 'Unassigned spare']);
+    $team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    auth()->user()->unsetRelation('teams');
+
+    $this->get(route('node-cluster.show', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertDontSee('Sync network')
+        ->assertDontSee(route('node-cluster.delete', $cluster->uuid), escape: false);
+
+    $this->get(route('node-cluster.nodes', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Visible node')
+        ->assertDontSee('Unassigned spare')
+        ->assertDontSee('wire:click="removeNode', escape: false);
+
+    $this->get(route('node-cluster.advanced', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertDontSee('Repair network over SSH');
+
+    $this->get(route('node-cluster.delete', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertDontSee('Confirm Cluster Deletion?');
+});
+
+it('requires the account password before deleting a cluster', function () {
+    $cluster = CreateNodeCluster::run($this->user->teams()->firstOrFail(), $this->user, 'Password protected');
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('deleteCluster', 'wrong-password')
+        ->assertHasErrors('password')
+        ->assertNoRedirect();
+
+    expect($cluster->fresh())->not->toBeNull();
+});
+
+it('keeps the delete error toast when a cluster still has applications', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Busy cluster');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    EnsureNodeWorkloadAddress::run($node->fresh(), NodeWorkload::factory()->create(['team_id' => $team->id]));
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->call('deleteCluster', 'password')
+        ->assertDispatched('error')
+        ->assertNoRedirect();
+
+    expect($cluster->fresh())->not->toBeNull();
+});
+
+it('shows recent operations with readable labels on the advanced page', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Operations cluster');
+    $node = Node::factory()->create(['team_id' => $team->id, 'name' => 'Ops node']);
+    AssignNodeToCluster::run($cluster, $node);
+    NodeOperation::factory()->create(['node_id' => $node->id, 'command_type' => 'network.cluster.apply.v1']);
+
+    $this->get(route('node-cluster.advanced', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Network Cluster Apply')
+        ->assertSee('Ops node')
+        ->assertDontSee('network.cluster.apply.v1');
+});
+
+it('hides successful background checks from recent operations', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Background cluster');
+    $node = Node::factory()->create(['team_id' => $team->id, 'name' => 'Background node']);
+    AssignNodeToCluster::run($cluster, $node);
+    NodeOperation::factory()->create(['node_id' => $node->id, 'command_type' => 'network.firewall.inspect.v1', 'status' => NodeOperationStatus::SUCCEEDED]);
+    NodeOperation::factory()->create(['node_id' => $node->id, 'command_type' => 'discovery.corrosion.inspect.v1', 'status' => NodeOperationStatus::FAILED]);
+    NodeOperation::factory()->create(['node_id' => $node->id, 'command_type' => 'network.wireguard.reconcile.v1', 'status' => NodeOperationStatus::SUCCEEDED]);
+
+    $this->get(route('node-cluster.advanced', $cluster->uuid))
+        ->assertSuccessful()
+        ->assertDontSee('Network Firewall Inspect')
+        ->assertSee('Discovery Corrosion Inspect')
+        ->assertSee('Network Wireguard Reconcile');
+});
+
+it('lists clusters before nodes on the index without development badges', function () {
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Index cluster');
+    $assigned = Node::factory()->create(['team_id' => $team->id, 'name' => 'Assigned node', 'ip' => '203.0.113.10']);
+    AssignNodeToCluster::run($cluster, $assigned);
+    Node::factory()->create(['team_id' => $team->id, 'name' => 'Loose node']);
+
+    Livewire::test(Index::class)
+        ->assertSeeInOrder(['Index cluster', 'Nodes', 'Assigned node'])
+        ->assertSee('203.0.113.10')
+        ->assertSee('Unassigned')
+        ->assertSee('New cluster')
+        ->assertSee('Add node')
+        ->assertSee('Pending')
+        ->assertDontSeeHtml('>Dev<');
 });

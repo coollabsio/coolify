@@ -104,8 +104,12 @@ it('rejects offline, unusable, stale, and incomplete Nodes', function (array $no
 ]);
 
 it('lets cluster administrators customize deployment pressure limits', function () {
+    $this->get(route('node-cluster.advanced', $this->cluster->uuid))
+        ->assertSuccessful()
+        ->assertSee('Deployment limits')
+        ->assertSee('CPU limit (%)');
+
     Livewire::test(Show::class, ['cluster_uuid' => $this->cluster->uuid])
-        ->assertSee('Deployment pressure')
         ->set('cpuPressureThreshold', 92)
         ->set('memoryPressureThreshold', 88)
         ->set('diskPressureThreshold', 85)

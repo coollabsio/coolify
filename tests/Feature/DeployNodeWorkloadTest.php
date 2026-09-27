@@ -131,6 +131,20 @@ it('rejects an unknown pull policy before it creates an operation', function () 
         ->toThrow(InvalidArgumentException::class, 'The image pull policy is invalid.');
 });
 
+it('does not publish host ports from an older revision', function () {
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    Http::assertSent(fn ($request): bool => $request['ports'] === []);
+});
+
 it('encodes an empty environment as a json object', function () {
     $configuration = ['restart_policy' => 'unless-stopped'];
     $this->revision->update([
@@ -275,13 +289,13 @@ it('keeps recovery uncertain when Flux remains unavailable', function () {
         ->and($this->operation->error)->toBe('The deployment result is unknown.');
 });
 
-it('marks an explicit Sentinel failure as failed', function () {
-    Http::fake(['*/v1/commands/workload.deploy' => Http::response('Sentinel command failed', 502)]);
+it('marks an explicit Sentinel failure as failed with the reported reason', function () {
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response('listen tcp4 10.240.0.2:8080: bind: address already in use', 502)]);
 
     (new DeployNodeWorkloadJob($this->operation->id))->handle();
 
     expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
-        ->and($this->operation->error)->toContain('502');
+        ->and($this->operation->error)->toBe('Flux rejected the deployment with HTTP 502: listen tcp4 10.240.0.2:8080: bind: address already in use');
 });
 
 it('marks an unknown transport outcome as uncertain', function () {
@@ -319,10 +333,11 @@ it('queues an assigned revision from the Node page without storing environment v
     session(['currentTeam' => $team]);
     Queue::fake();
 
-    Livewire::test(Show::class, ['node_uuid' => $node->uuid])
+    Livewire::test(Show::class, ['node_uuid' => $node->uuid, 'section' => 'workloads'])
         ->assertSee('Workloads')
         ->assertSee('Unknown')
         ->assertSee('Deploy')
+        ->assertSee('Recent activity')
         ->call('deployRevision', $revision->uuid)
         ->assertDispatched('success');
 

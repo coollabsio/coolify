@@ -291,7 +291,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
-        Route::get('/cluster-application/{workload_uuid}', ClusterApplicationShow::class)->name('project.cluster-application.show');
+        Route::prefix('cluster-application/{workload_uuid}')->group(function () {
+            Route::get('/', ClusterApplicationShow::class)->name('project.cluster-application.show');
+            Route::get('/configuration', ClusterApplicationShow::class)->name('project.cluster-application.configuration');
+            Route::get('/environment-variables', ClusterApplicationShow::class)->name('project.cluster-application.environment-variables');
+            Route::get('/resource-limits', ClusterApplicationShow::class)->name('project.cluster-application.resource-limits');
+            Route::get('/deployments', ClusterApplicationShow::class)->name('project.cluster-application.deployments');
+        });
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
@@ -386,9 +392,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/node-clusters', NodeClusterIndex::class)->name('node-cluster.index');
     Route::get('/node-clusters/new-node', NodeOnboarding::class)->name('node.onboarding');
-    Route::get('/node-clusters/{cluster_uuid}', NodeClusterShow::class)->name('node-cluster.show');
+    Route::prefix('node-clusters/{cluster_uuid}')->group(function () {
+        Route::get('/', NodeClusterShow::class)->name('node-cluster.show');
+        Route::get('/nodes', NodeClusterShow::class)->name('node-cluster.nodes');
+        Route::get('/firewall', NodeClusterShow::class)->name('node-cluster.firewall');
+        Route::get('/advanced', NodeClusterShow::class)->name('node-cluster.advanced');
+        Route::get('/danger', NodeClusterShow::class)->name('node-cluster.delete');
+    });
     Route::prefix('node/{node_uuid}')->group(function () {
         Route::get('/', NodeShow::class)->name('node.show');
+        Route::get('/workloads', NodeShow::class)->name('node.workloads');
+        Route::get('/containers', NodeShow::class)->name('node.containers');
+        Route::get('/sentinel', NodeShow::class)->name('node.sentinel');
         Route::get('/internal-dns', NodeInternalDns::class)->name('node.internal-dns');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('node.command')->middleware('can.access.terminal');
     });

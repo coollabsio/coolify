@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\TerminalSessionService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -48,6 +49,59 @@ it('shows an authorized terminal menu on the node view', function () {
         ->assertSee('General')
         ->assertSee('Terminal')
         ->assertSee(route('node.command', $this->node->uuid), false);
+});
+
+it('renders each Node section route with the grouped sidebar', function (string $routeName, string $activeLabel, string $sectionText) {
+    $response = $this->get(route($routeName, $this->node->uuid))
+        ->assertSuccessful()
+        ->assertSee($sectionText)
+        ->assertSee('menu-item-active', false);
+
+    foreach (['node.show', 'node.workloads', 'node.containers', 'node.internal-dns', 'node.sentinel'] as $linkedRoute) {
+        $response->assertSee(route($linkedRoute, $this->node->uuid), false);
+    }
+    foreach (['Settings', 'Workloads', 'Networking', 'Operations', $activeLabel] as $label) {
+        $response->assertSee($label);
+    }
+})->with([
+    'general' => ['node.show', 'General', 'Resource usage'],
+    'workloads' => ['node.workloads', 'Workloads', 'Recent activity'],
+    'containers' => ['node.containers', 'Containers', 'No containers found'],
+    'sentinel' => ['node.sentinel', 'Sentinel', 'Troubleshooting'],
+]);
+
+it('derives the Node section from the route name', function () {
+    $this->get(route('node.workloads', $this->node->uuid))
+        ->assertSuccessful()
+        ->assertSee('No workloads on this Node')
+        ->assertDontSee('Resource usage');
+
+    $this->get(route('node.sentinel', $this->node->uuid))
+        ->assertSuccessful()
+        ->assertSee('Update Sentinel')
+        ->assertDontSee('No workloads on this Node');
+});
+
+it('keeps every Node section route team scoped', function (string $routeName) {
+    $foreignTeam = User::factory()->create()->teams()->firstOrFail();
+    $foreignNode = Node::factory()->create([
+        'team_id' => $foreignTeam->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+
+    $this->get(route($routeName, $foreignNode->uuid))->assertNotFound();
+})->with(['node.show', 'node.workloads', 'node.containers', 'node.sentinel']);
+
+it('shows the Sentinel warning in the sidebar while Sentinel is disconnected', function () {
+    $this->get(route('node.show', $this->node->uuid))
+        ->assertSuccessful()
+        ->assertSee('Sentinel needs attention');
+
+    Cache::put($this->node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String()]);
+
+    $this->get(route('node.show', $this->node->uuid))
+        ->assertSuccessful()
+        ->assertDontSee('Sentinel needs attention');
 });
 
 it('keeps the mobile Node readiness badge compact', function () {

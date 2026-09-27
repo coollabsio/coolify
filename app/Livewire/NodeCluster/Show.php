@@ -21,13 +21,25 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
 {
     use AuthorizesRequests;
 
+    private const SECTIONS_BY_ROUTE = [
+        'node-cluster.show' => 'general',
+        'node-cluster.nodes' => 'nodes',
+        'node-cluster.firewall' => 'firewall',
+        'node-cluster.advanced' => 'advanced',
+        'node-cluster.delete' => 'danger',
+    ];
+
     public NodeCluster $cluster;
+
+    #[Locked]
+    public string $section = 'general';
 
     public string $name = '';
 
@@ -68,6 +80,7 @@ class Show extends Component
         abort_unless(isDev() && config('constants.sentinel.host_enabled', false), 404);
         $this->cluster = NodeCluster::query()->where('team_id', currentTeam()->id)->where('uuid', $cluster_uuid)->firstOrFail();
         $this->authorize('view', $this->cluster);
+        $this->section = self::SECTIONS_BY_ROUTE[request()->route()?->getName()] ?? 'general';
         $this->fillFromCluster();
     }
 
@@ -105,6 +118,7 @@ class Show extends Component
         AssignNodeToCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
         $this->reset('nodeUuid');
+        $this->dispatch('close-modal');
         $this->dispatch('success', 'Node assigned to the cluster.');
     }
 
@@ -137,17 +151,22 @@ class Show extends Component
         $this->dispatch('success', 'Node removed from the cluster.');
     }
 
-    public function deleteCluster(): void
+    public function deleteCluster(mixed $password = null): bool|string
     {
         $this->authorize('delete', $this->cluster);
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
         try {
             DeleteNodeCluster::run($this->cluster, auth()->user());
         } catch (DomainException $exception) {
             $this->dispatch('error', $exception->getMessage());
 
-            return;
+            return true;
         }
         $this->redirectRoute('node-cluster.index', navigate: true);
+
+        return true;
     }
 
     public function addFirewallRule(): void
@@ -173,7 +192,10 @@ class Show extends Component
             $validated['firewallProtocol'],
             $validated['firewallPort'],
         );
-        $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
+        if ($this->getErrorBag()->isEmpty()) {
+            $this->reset('firewallSourceUuid', 'firewallDestinationUuid');
+            $this->dispatch('close-modal');
+        }
     }
 
     /** @return array{uuid: string, sourceType: string, sourceUuid: string, destinationUuid: string, protocol: string, port: int}|null */
@@ -289,6 +311,7 @@ class Show extends Component
             $this->queueNetworkReconciliation();
         }
         $this->reset('ingressDestinationUuid');
+        $this->dispatch('close-modal');
         $this->dispatch('success', $created ? 'Ingress rule added and reconciliation queued.' : 'The ingress rule already exists.');
     }
 
@@ -337,8 +360,42 @@ class Show extends Component
 
     public function render(): View
     {
-        $nodes = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->orderBy('name')->get();
-        $availableNodes = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->orderBy('name')->get();
+        return view('livewire.node-cluster.show', [
+            'nodesNeedAttention' => $this->cluster->hasNodesNeedingAttention(),
+            ...match ($this->section) {
+                'general' => $this->generalData(),
+                'nodes' => $this->nodesData(),
+                'firewall' => $this->firewallData(),
+                'advanced' => $this->advancedData(),
+                default => [],
+            },
+        ]);
+    }
+
+    /** @return array{nodesCount: int, readyNodesCount: int} */
+    private function generalData(): array
+    {
+        return [
+            'nodesCount' => $this->cluster->nodes()->count(),
+            'readyNodesCount' => $this->cluster->nodes()->where('is_usable', true)->count(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function nodesData(): array
+    {
+        return [
+            'nodes' => $this->clusterNodes()->get(),
+            'availableNodes' => auth()->user()->can('update', $this->cluster)
+                ? Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->orderBy('name')->get()
+                : collect(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function firewallData(): array
+    {
+        $nodes = $this->clusterNodes()->get();
         $workloads = $this->meshWorkloads()->orderBy('name')->get();
         $firewallRules = NodeFirewallRule::query()
             ->with(['sourceWorkload', 'sourceNode', 'destinationWorkload'])
@@ -350,19 +407,13 @@ class Show extends Component
             ->where('node_cluster_id', $this->cluster->id)
             ->orderBy('id')
             ->get();
-        $operations = NodeOperation::query()
-            ->with('node')
-            ->whereHas('node', fn ($query) => $query->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id))
-            ->latest('id')
-            ->limit(30)
-            ->get();
         $firewallCanvasNodes = $nodes->map(fn (Node $node): array => [
             'id' => 'node:'.$node->uuid,
             'type' => 'node',
             'uuid' => $node->uuid,
             'name' => $node->name,
-            'subtitle' => 'Cluster Node',
-            'status' => $node->is_usable ? 'Ready' : 'Unavailable',
+            'subtitle' => $node->wireguard_ip ?? 'Node',
+            'status' => $node->is_usable ? 'Ready' : 'Not ready',
         ])->concat($workloads->map(fn (NodeWorkload $workload): array => [
             'id' => 'workload:'.$workload->uuid,
             'type' => 'workload',
@@ -382,16 +433,26 @@ class Show extends Component
             'port' => $rule->port,
         ])->values();
 
-        return view('livewire.node-cluster.show', compact(
-            'nodes',
-            'availableNodes',
-            'workloads',
-            'firewallRules',
-            'ingressRules',
-            'operations',
-            'firewallCanvasNodes',
-            'firewallCanvasRules',
-        ));
+        return compact('nodes', 'workloads', 'firewallRules', 'ingressRules', 'firewallCanvasNodes', 'firewallCanvasRules');
+    }
+
+    /** @return array<string, mixed> */
+    private function advancedData(): array
+    {
+        return [
+            'operations' => NodeOperation::query()
+                ->with('node')
+                ->whereHas('node', fn ($query) => $query->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id))
+                ->userFacing()
+                ->latest('id')
+                ->limit(10)
+                ->get(),
+        ];
+    }
+
+    private function clusterNodes(): Builder
+    {
+        return Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->orderBy('name');
     }
 
     private function meshWorkloads(): Builder
