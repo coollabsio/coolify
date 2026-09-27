@@ -3025,6 +3025,11 @@ input[type="search"]::-webkit-search-results-decoration {
     display: none;
 }
 
+/* External Compose volumes (read-only): Volume | Docker volume | Mount path | Service */
+.external-volumes-table-grid {
+    grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1.2fr) minmax(8rem, 1fr) minmax(6rem, 0.8fr);
+}
+
 /*
  * Same tokens as .application-settings-form label (13px / medium / subtle).
  * Do not use text-sm (14px) — settings labels override Tailwind to 13px.
@@ -3056,13 +3061,15 @@ input[type="search"]::-webkit-search-results-decoration {
 @media (max-width: 768px) {
     .data-table-header.volumes-table-grid,
     .data-table-header.volumes-table-grid-with-pr,
-    .data-table-header.volumes-table-grid-readonly {
+    .data-table-header.volumes-table-grid-readonly,
+    .data-table-header.external-volumes-table-grid {
         display: none;
     }
 
     .data-table-row.volumes-table-grid,
     .data-table-row.volumes-table-grid-with-pr,
-    .data-table-row.volumes-table-grid-readonly {
+    .data-table-row.volumes-table-grid-readonly,
+    .data-table-row.external-volumes-table-grid {
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -3081,7 +3088,8 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .data-table-row.volumes-table-grid > *,
     .data-table-row.volumes-table-grid-with-pr > *,
-    .data-table-row.volumes-table-grid-readonly > * {
+    .data-table-row.volumes-table-grid-readonly > *,
+    .data-table-row.external-volumes-table-grid > * {
         width: 100%;
         min-width: 0;
     }

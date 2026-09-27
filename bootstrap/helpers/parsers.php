@@ -403,6 +403,36 @@ function legacyApplicationComposeVolumeName(Application $resource, string $sourc
 }
 
 /**
+ * Records a warning when a legacy Compose application (parser version 1 or 2) does not use an
+ * external volume as written. These parsers keep the old volume name (see
+ * legacyApplicationComposeVolumeName()), so the resource keeps its data. The parser version 1 keeps
+ * the name of a production volume, so it uses the external volume and gets no warning.
+ *
+ * The volume names are not validated here, so that the legacy parsers keep their old behavior. The
+ * warning shows the Docker volume name only when it is a literal, valid Docker volume name.
+ *
+ * @param  iterable<array-key, mixed>  $topLevelVolumes  the top-level volumes as declared in the Compose file
+ */
+function warnLegacyApplicationComposeExternalVolume(Application $resource, iterable $topLevelVolumes, string $source, int $pull_request_id): void
+{
+    $declaration = collect($topLevelVolumes)->get($source);
+    if (! isComposeExternalVolume($declaration)) {
+        return;
+    }
+    $keptName = legacyApplicationComposeVolumeName($resource, $source, $pull_request_id);
+    if ($keptName === $source) {
+        return;
+    }
+
+    $dockerVolume = data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $source;
+    $external = ! is_string($dockerVolume) || $dockerVolume === $source || preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $dockerVolume) !== 1
+        ? 'external'
+        : "external (Docker volume '{$dockerVolume}')";
+
+    $resource->addComposeVolumeWarning("Volume '{$source}' is declared as {$external}, but this application uses an old Compose parser, so Coolify uses '{$keptName}'. To use the external volume, copy your data into it, then clone this application or create it again.");
+}
+
+/**
  * The warning for an external volume that the resource does not use yet (see useComposeExternalVolumeAsWritten()).
  * The volume names are validated and contain no secrets.
  *
@@ -452,6 +482,70 @@ function composeExternalVolumeDockerNames(?string $compose): array
         ->map(fn (array $declaration, int|string $key): string => composeExternalVolumeDockerName((string) $key, $declaration))
         ->values()
         ->all();
+}
+
+/**
+ * The external volumes that the services of a Compose file mount, one entry for each volume and
+ * service. Returns an empty list for a Compose file that is empty or not valid YAML.
+ *
+ * @return list<array{key: string, dockerName: string, service: string, mountPaths: list<string>}>
+ */
+function composeExternalVolumeMounts(?string $compose): array
+{
+    if (blank($compose)) {
+        return [];
+    }
+    try {
+        $yaml = Yaml::parse($compose);
+    } catch (Throwable) {
+        return [];
+    }
+    $topLevelVolumes = data_get($yaml, 'volumes');
+    $services = data_get($yaml, 'services');
+    if (! is_array($topLevelVolumes) || ! is_array($services)) {
+        return [];
+    }
+
+    $mounts = [];
+    foreach ($services as $serviceName => $service) {
+        $serviceVolumes = data_get($service, 'volumes');
+        if (! is_array($serviceVolumes)) {
+            continue;
+        }
+        foreach ($serviceVolumes as $volume) {
+            $parsed = match (true) {
+                is_string($volume) => parseDockerVolumeString($volume),
+                is_array($volume) => $volume,
+                default => [],
+            };
+            // parseDockerVolumeString() returns Stringable values.
+            $source = data_get($parsed, 'source');
+            $target = data_get($parsed, 'target');
+            if (! (is_scalar($source) || $source instanceof Stringable) || ! (is_scalar($target) || $target instanceof Stringable)) {
+                continue;
+            }
+            $source = (string) $source;
+            $target = (string) $target;
+            $declaration = $topLevelVolumes[$source] ?? null;
+            if (! isComposeExternalVolume($declaration)) {
+                continue;
+            }
+
+            $dockerName = data_get($declaration, 'name') ?? data_get($declaration, 'external.name') ?? $source;
+            $mountKey = $source."\0".$serviceName;
+            $mounts[$mountKey] ??= [
+                'key' => $source,
+                'dockerName' => is_scalar($dockerName) ? (string) $dockerName : $source,
+                'service' => (string) $serviceName,
+                'mountPaths' => [],
+            ];
+            if (! in_array($target, $mounts[$mountKey]['mountPaths'], true)) {
+                $mounts[$mountKey]['mountPaths'][] = $target;
+            }
+        }
+    }
+
+    return array_values($mounts);
 }
 
 /**
