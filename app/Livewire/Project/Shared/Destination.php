@@ -157,7 +157,9 @@ class Destination extends Component
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
 
-            $this->resource->additional_networks()->attach($network->id, ['server_id' => $server->id]);
+            $this->resource->additional_networks()->syncWithoutDetaching([
+                $network->id => ['server_id' => $server->id],
+            ]);
             $this->dispatch('refresh');
         } catch (\Throwable $e) {
             return handleError($e, $this);

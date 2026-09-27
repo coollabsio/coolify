@@ -1,4 +1,5 @@
 @php
+    $hasSourcePaths = $resource->persistentStorages->contains(fn ($storage) => filled($storage->host_path));
     $gridClass = match (true) {
         $supportsPreviewSuffix => 'volumes-table-grid-with-pr',
         $showActionsColumn => 'volumes-table-grid',
@@ -16,9 +17,11 @@
 
     @if ($resource->persistentStorages->isNotEmpty())
         <div class="data-table w-full">
-            <div class="data-table-header {{ $gridClass }}">
-                <span>Volume Name</span>
-                <span class="volumes-col-source">Source Path</span>
+            <div class="data-table-header {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
+                <span>Storage Name</span>
+                @if ($hasSourcePaths)
+                    <span>Source Path</span>
+                @endif
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
                     <div class="volumes-col-pr flex items-center gap-1.5">
@@ -44,26 +47,38 @@
                     $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
-                    $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
                 @endphp
 
                 @if ($inputsReadonly)
                     <div class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }} text-[13px] text-neutral-700 dark:text-fg-dim">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }} text-[13px] text-neutral-700 dark:text-fg-dim">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <span
                                         class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
+                                @if (blank($storage->host_path))
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
+                                @endif
+                                @if ($form['replacedExternalVolume'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
+                                    </span>
+                                @endif
                             </div>
 
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate text-[13px]"
-                                    title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
-                            </div>
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -108,7 +123,7 @@
 
                             @if ($showBackupAction)
                                 <div
-                                    class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                    class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
@@ -139,9 +154,12 @@
                                                 'label' => 'Also permanently delete the Docker volume and all its data.',
                                                 'default_warning' => 'The Docker volume and its data will not be deleted.',
                                             ]]"
-                                            :actions="[
+                                            :actions="array_values(array_filter([
                                                 'This removes only the stale volume entry from Coolify.',
-                                            ]" confirmationText="{{ $form['name'] }}"
+                                                $form['replacedExternalVolume']
+                                                    ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
+                                                    : null,
+                                            ]))" confirmationText="{{ $form['name'] }}"
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif
@@ -151,37 +169,33 @@
                     </div>
                 @else
                     <form wire:submit="submit({{ $id }})" class="env-table-item" wire:key="storage-row-{{ $id }}">
-                        <div class="data-table-row {{ $gridClass }}">
+                        <div class="data-table-row {{ $gridClass }} {{ $hasSourcePaths ? 'has-source' : '' }}">
                             <div class="volumes-cell-name min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
+                                <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <div class="min-w-0 flex-1">
-                                        <x-forms.input id="forms.{{ $id }}.name" required />
+                                        <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="volumes-col-source min-w-0">
-                                <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                @if (filled($form['hostPath']))
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="min-w-0 flex-1">
-                                            <x-forms.input id="forms.{{ $id }}.hostPath" />
-                                        </div>
-                                        <x-modal-confirmation title="Remove Source Path?" isErrorButton
-                                            canGate="update" :canResource="$resource"
-                                            buttonTitle="Remove" submitAction="clearHostPath({{ $id }})"
-                                            :actions="[
-                                                'Are you sure you want to remove the source path?',
-                                                'The next deployment will use a named Docker volume instead.',
-                                                'Data from the existing host directory will not be copied to the named volume.',
-                                                'Use a Directory Mount when you need to mount a host directory.',
-                                            ]" />
-                                    </div>
-                                @else
-                                    <span class="data-table-cell-dash">-</span>
+                                @if ($storage->standaloneSqlite)
+                                    <a href="{{ $storage->standaloneSqlite->link() }}"
+                                        class="block text-xs text-neutral-500 underline underline-offset-2 hover:text-black dark:text-fg-dim dark:hover:text-fg">SQLite
+                                        database {{ $storage->standaloneSqlite->name }}</a>
+                                @elseif (blank($storage->host_path))
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">Volume mount</span>
                                 @endif
                             </div>
+
+                            @if ($hasSourcePaths)
+                                <div class="volumes-cell-source min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Source Path</span>
+                                    @if (filled($storage->host_path))
+                                        <x-forms.input aria-label="Source Path" :value="$storage->host_path" readonly />
+                                    @else
+                                        <span class="data-table-cell-dash">-</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
@@ -227,12 +241,12 @@
                             </div>
 
                             <div
-                                class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
+                                class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
                                 <x-forms.button type="submit" class="!px-2.5 !text-xs">
                                     Update
                                 </x-forms.button>
 
-                                @if ($showBackupAction)
+                                @if ($showBackupAction && ! $form['isShared'])
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
                                             <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
@@ -263,6 +277,7 @@
                                     </x-modal-input>
                                 @endif
 
+                                @unless ($form['isShared'])
                                 <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton
                                     buttonTitle="Delete" submitAction="delete({{ $id }})" :actions="[
                                         'The selected persistent storage/volume will be permanently deleted.',
@@ -270,6 +285,7 @@
                                     ]" confirmationText="{{ $form['name'] }}"
                                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                                     shortConfirmationLabel="Storage Name" />
+                                @endunless
                             </div>
                         </div>
                     </form>

@@ -8,7 +8,9 @@ $dimensionLabels = [
     'browser' => 'Browsers',
     'os' => 'Operating systems',
 ];
-$analyticsServerUuid = $application->destination?->server?->uuid;
+// Shared by the application and service analytics tabs. A resource with several Sentinel
+// keys (compose services, previews) is merged, so latency and uniques become approximate.
+$approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-amber-700 uppercase dark:bg-amber-500/10 dark:text-amber-400">~ approximate</span>';
 ?>
 <div class="flex flex-col gap-6">
     @if (! $enabled)
@@ -76,7 +78,12 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                     </div>
                 </div>
                 <div class="flex flex-col bg-[var(--coollabs-base)] px-4 py-3">
-                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Unique visitors</span>
+                    <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
+                        Unique visitors
+                        @if ($uniquesApproximate)
+                            {!! $approxBadge('Summed across services; visitors of more than one service may be double-counted.') !!}
+                        @endif
+                    </span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [
@@ -115,7 +122,12 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                     </div>
                 </div>
                 <div class="col-span-2 flex flex-col bg-[var(--coollabs-base)] px-4 py-3 sm:col-span-1">
-                    <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">p95 latency</span>
+                    <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
+                        p95 latency
+                        @if ($latencyApproximate)
+                            {!! $approxBadge('Highest p95 latency across services; not a true merged percentile.') !!}
+                        @endif
+                    </span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
                     <div class="mt-auto pt-3">
                         @include('livewire.traffic._sparkline', [

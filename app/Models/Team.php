@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -30,6 +32,7 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string', 'description' => 'The date and time the team was last updated.'],
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
+        'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -50,15 +53,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
         'show_boarding',
         'custom_server_limit',
         'is_mcp_server_enabled',
+        'is_build_server_fallback_enabled',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
+        'is_build_server_fallback_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'is_build_server_fallback_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -123,9 +129,27 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
             return true;
         }
         $serverLimit = Team::serverLimit($team);
-        $servers = $team->servers->count();
+        $servers = $team->servers()->count();
 
         return $servers >= $serverLimit;
+    }
+
+    public static function createServerWithinLimit(int $teamId, array $attributes): Server
+    {
+        return DB::transaction(function () use ($teamId, $attributes): Server {
+            self::ensureServerCapacity($teamId);
+
+            return Server::create($attributes);
+        });
+    }
+
+    /** Call within a transaction so the team lock lasts through the server insert. */
+    public static function ensureServerCapacity(int $teamId): void
+    {
+        $team = self::query()->lockForUpdate()->findOrFail($teamId);
+        if (self::serverLimitReached($team)) {
+            throw ValidationException::withMessages(['server' => 'Server limit reached for your subscription.']);
+        }
     }
 
     public function subscriptionPastOverDue()
@@ -316,6 +340,18 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
     public function servers()
     {
         return $this->hasMany(Server::class);
+    }
+
+    public function usesSwarm(): bool
+    {
+        return $this->servers()
+            ->where(function ($query) {
+                $query->whereHas('settings', function ($settings) {
+                    $settings->where('is_swarm_manager', true)
+                        ->orWhere('is_swarm_worker', true);
+                })->orWhereHas('swarmDockers');
+            })
+            ->exists();
     }
 
     public function privateKeys()

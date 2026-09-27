@@ -61,3 +61,16 @@ test('onboarding uses the reusable advanced settings component', function () {
         ->and($onboarding)
         ->toContain('<x-forms.collapsible title="Advanced Connection Settings"');
 });
+
+test('deployments-only servers require a registry image because builds run elsewhere', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+    $requiredImageCondition = str($view)
+        ->after("@if (\$application->build_pack === 'dockerimage')")
+        ->after('@else')
+        ->before('<x-forms.input id="dockerRegistryImageName" required label="Image"')
+        ->toString();
+
+    expect($requiredImageCondition)
+        ->toContain('$application->settings->is_build_server_enabled')
+        ->toContain('! $application->destination->server->canBuildApplications()');
+});

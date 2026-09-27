@@ -8,6 +8,7 @@ use App\Models\DockerCleanupExecution;
 use App\Models\Server;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
+use App\Services\ScheduledJobDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -38,13 +39,20 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public Server $server,
         public bool $manualCleanup = false,
         public bool $deleteUnusedVolumes = false,
-        public bool $deleteUnusedNetworks = false
+        public bool $deleteUnusedNetworks = false,
+        public ?string $occurrenceUuid = null,
     ) {
         $this->onQueue('high');
     }
 
     public function handle(): void
     {
+        if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
+            return;
+        }
+
+        $failed = false;
+
         try {
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
@@ -138,6 +146,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 event(new DockerCleanupDone($this->execution_log));
             }
         } catch (\Throwable $e) {
+            $failed = true;
             if ($this->execution_log) {
                 $this->execution_log->update([
                     'status' => 'failed',
@@ -148,6 +157,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
             throw $e;
         } finally {
+            if (! $failed && $this->occurrenceUuid) {
+                app(ScheduledJobDeliveryService::class)->complete($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+            }
+
             if ($this->execution_log) {
                 $this->execution_log->update([
                     'finished_at' => Carbon::now()->toImmutable(),
@@ -158,6 +171,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function failed(?\Throwable $exception): void
     {
+        if ($this->occurrenceUuid) {
+            app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
         $execution = DockerCleanupExecution::query()
             ->where('server_id', $this->server->id)
             ->where('status', 'running')

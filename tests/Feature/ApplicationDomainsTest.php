@@ -607,6 +607,27 @@ it('does not overwrite a completed preview dns result with stale checking state'
         ]);
 });
 
+it('links the labels warning to the container labels section', function () {
+    $this->application->settings()->update(['is_container_label_readonly_enabled' => false]);
+
+    $labelsUrl = route('project.application.configuration', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]).'#container-labels-section';
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Domains managed via labels')
+        ->assertSee('href="'.$labelsUrl.'"', false)
+        ->assertSee('Go to Container labels');
+});
+
+it('does not show the labels warning when Coolify manages labels', function () {
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Domains managed via labels')
+        ->assertDontSee('#container-labels-section', false);
+});
+
 it('lists existing domains as individual rows', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com,https://another.example.com,https://www.another.example.com',
@@ -1021,17 +1042,16 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'resource_id' => $this->application->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'app.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->application);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -1039,6 +1059,7 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
             'type' => 'A',
             'name' => 'app.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 
@@ -3536,4 +3557,121 @@ it('prevents members from cancelling protected application redirect conflict sta
         ->set('showDomainConflictModal', true)
         ->set('showDomainConflictModal', false)
         ->assertForbidden();
+});
+
+it('restarts a dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $url = 'https://dns-recheck.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect($this->application->fresh()->domain_dns_statuses[$url]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('does not overwrite a completed dns result with stale checking state', function () {
+    $url = 'https://dns-stale.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'stale-check',
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $this->application->update([
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'check_id' => 'completed-check',
+            ],
+        ],
+    ]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDomainDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($this->application->fresh()->domain_dns_statuses[$url])
+        ->toMatchArray([
+            'status' => 'ok',
+            'message' => 'DNS looks correct.',
+            'check_id' => 'completed-check',
+        ]);
+});
+
+it('replaces a completed dns result when the domain is checked again', function () {
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = true;
+    $settings->save();
+
+    $url = 'https://this-domain-should-not-resolve-for-coolify-tests.invalid';
+    $checkedAt = now()->subDays(12)->toIso8601String();
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => $checkedAt,
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('checkDomainDns', 0)
+        ->call('pollDnsChecks')
+        ->assertSet('domainRows.0.dns_status', 'failed');
+
+    expect($this->application->fresh()->domain_dns_statuses[$url])
+        ->status->toBe('failed')
+        ->checked_at->not->toBe($checkedAt);
+});
+
+it('restarts a preview dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $url = 'https://preview-recheck.example.com';
+    $statusKey = hash('sha256', $url.'|');
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 54,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/54',
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+            ],
+        ],
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect($preview->fresh()->domain_dns_statuses[$statusKey]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
 });

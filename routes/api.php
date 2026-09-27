@@ -72,6 +72,7 @@ Route::group([
     Route::get('/teams', [TeamController::class, 'teams'])->middleware(['api.ability:read']);
     // Token's team
     Route::get('/team', [TeamController::class, 'current_team'])->middleware(['api.ability:read']);
+    Route::patch('/team', [TeamController::class, 'update_current_team'])->middleware(['api.ability:write']);
     Route::get('/team/members', [TeamController::class, 'current_team_members'])->middleware(['api.ability:read']);
     // Deprecated aliases — same handlers as /team and /team/members (remove in a later release)
     Route::get('/teams/current', [TeamController::class, 'current_team'])->middleware(['api.ability:read']);
@@ -252,6 +253,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/previews/{pull_request_id}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);
@@ -309,6 +311,7 @@ Route::group([
     Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
     Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
+    Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.upload');

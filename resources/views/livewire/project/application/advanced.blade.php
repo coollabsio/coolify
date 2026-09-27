@@ -164,7 +164,7 @@
                     canGate="update" :canResource="$application" />
                 <x-forms.input type="number" min="0" id="maxRestartCount" label="Max restart count"
                     wire:change="saveMaxRestartCount"
-                    helper="Maximum number of crash restarts before Coolify automatically stops the application and sends a notification. Saved automatically. Set to 0 to disable the limit."
+                    helper="Maximum number of restarts before Coolify automatically stops the application and sends a notification. Saved automatically. Set to 0 to disable the limit."
                     canGate="update" :canResource="$application" />
             </div>
         </x-application.settings-section>

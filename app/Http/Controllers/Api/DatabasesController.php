@@ -21,7 +21,9 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +74,7 @@ class DatabasesController extends Controller
         ],
         responses: [
             new OA\Response(response: 202, description: 'Import queued'),
-            new OA\Response(response: 409, description: 'Import already active'),
+            new OA\Response(response: 409, description: 'Another start, restart or import of this database is already in progress.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -482,6 +484,7 @@ class DatabasesController extends Controller
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
+                        'sqlite_databases' => ['type' => 'string', 'description' => 'Comma-separated SQLite database file names'],
                         'health_check_enabled' => ['type' => 'boolean', 'description' => 'Enable the database healthcheck probe.', 'default' => true],
                         'health_check_interval' => ['type' => 'integer', 'description' => 'Healthcheck interval in seconds.', 'minimum' => 1, 'default' => 15],
                         'health_check_timeout' => ['type' => 'integer', 'description' => 'Healthcheck timeout in seconds.', 'minimum' => 1, 'default' => 5],
@@ -516,7 +519,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -751,6 +754,12 @@ class DatabasesController extends Controller
                     }
                     $request->offsetSet('mysql_conf', $mysqlConf);
                 }
+                break;
+            case 'standalone-sqlite':
+                $allowedFields = ['name', 'description', 'image', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'sqlite_databases'];
+                $validator = customApiValidator($request->all(), [
+                    'sqlite_databases' => ['string', 'max:255', 'regex:'.StandaloneSqlite::DATABASES_PATTERN],
+                ]);
                 break;
         }
         $allowedFields = array_merge($allowedFields, ['health_check_enabled', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period']);
@@ -1008,6 +1017,8 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $backupData['databases_to_backup'] = $database->clickhouse_db;
+            } elseif ($database->type() === 'standalone-sqlite') {
+                $backupData['databases_to_backup'] = $database->sqlite_databases;
             }
         }
 
@@ -1844,9 +1855,74 @@ class DatabasesController extends Controller
         return $this->create_database($request, NewDatabaseTypes::MONGODB);
     }
 
+    #[OA\Post(
+        summary: 'Create (SQLite)',
+        description: 'Create a new SQLite database.',
+        path: '/databases/sqlite',
+        operationId: 'create-database-sqlite',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+
+        requestBody: new OA\RequestBody(
+            description: 'Database data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    properties: [
+                        'server_uuid' => ['type' => 'string', 'description' => 'UUID of the server'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'UUID of the project'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'],
+                        'destination_uuid' => ['type' => 'string', 'description' => 'UUID of the destination if the server has multiple destinations'],
+                        'sqlite_databases' => ['type' => 'string', 'description' => 'Comma-separated SQLite database file names'],
+                        'name' => ['type' => 'string', 'description' => 'Name of the database'],
+                        'description' => ['type' => 'string', 'description' => 'Description of the database'],
+                        'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
+                        'limits_memory' => ['type' => 'string', 'description' => 'Memory limit of the database'],
+                        'limits_memory_swap' => ['type' => 'string', 'description' => 'Memory swap limit of the database'],
+                        'limits_memory_swappiness' => ['type' => 'integer', 'description' => 'Memory swappiness of the database'],
+                        'limits_memory_reservation' => ['type' => 'string', 'description' => 'Memory reservation of the database'],
+                        'limits_cpus' => ['type' => 'string', 'description' => 'CPU limit of the database'],
+                        'limits_cpuset' => ['type' => 'string', 'description' => 'CPU set of the database'],
+                        'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares of the database'],
+                        'instant_deploy' => ['type' => 'boolean', 'description' => 'Instant deploy the database'],
+                        'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the database.'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function create_database_sqlite(Request $request)
+    {
+        return $this->create_database($request, NewDatabaseTypes::SQLITE);
+    }
+
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'tags'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'public_port_timeout', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqlite_databases', 'tags'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1855,6 +1931,10 @@ class DatabasesController extends Controller
 
         // Use a generic authorization for database creation - using PostgreSQL as representative model
         $this->authorize('create', StandalonePostgresql::class);
+
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
@@ -2484,6 +2564,47 @@ class DatabasesController extends Controller
             ]);
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
+        } elseif ($type === NewDatabaseTypes::SQLITE) {
+            $allowedFields = ['name', 'description', 'image', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'sqlite_databases', 'tags'];
+            $validator = customApiValidator($request->all(), [
+                'sqlite_databases' => ['string', 'max:255', 'regex:'.StandaloneSqlite::DATABASES_PATTERN],
+            ]);
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            removeUnnecessaryFieldsFromRequest($request);
+            $database = create_standalone_sqlite($environment->id, $destination, $request->only($allowedFields));
+            if ($instantDeploy) {
+                StartDatabase::dispatch($database);
+            }
+            if ($tagNames !== []) {
+                $this->attachTagsToResource($database, $tagNames, $teamId);
+            }
+
+            auditLog('api.database.created', [
+                'team_id' => $teamId,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'database_type' => $type->value,
+                'server_uuid' => $serverUuid,
+                'is_public' => (bool) $database->is_public,
+                'instant_deploy' => (bool) $instantDeploy,
+            ]);
+
+            return response()->json(serializeApiResponse([
+                'uuid' => $database->uuid,
+            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid database type requested.'], 400);
@@ -2667,6 +2788,12 @@ class DatabasesController extends Controller
         }
 
         $this->authorize('delete', $database);
+
+        if ($database instanceof StandaloneSqlite && $database->hasConnectedApplications()) {
+            return response()->json([
+                'message' => 'This database volume is mounted by '.$database->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.',
+            ], 422);
+        }
 
         $database->delete();
 
@@ -3234,6 +3361,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_deploy(Request $request)
@@ -3256,7 +3387,11 @@ class DatabasesController extends Controller
         if (str($database->status)->contains('running')) {
             return response()->json(['message' => 'Database is already running.'], 400);
         }
-        StartDatabase::dispatch($database);
+        $reservation = StartDatabase::reserveOperation($database);
+        if ($reservation === null) {
+            return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
+        }
+        StartDatabase::dispatchReserved(StartDatabase::class, $database, $reservation);
 
         auditLog('api.database.started', [
             'team_id' => $teamId,
@@ -3420,6 +3555,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Another start, restart or import of this database is already in progress.',
+            ),
         ]
     )]
     public function action_restart(Request $request)
@@ -3439,7 +3578,11 @@ class DatabasesController extends Controller
 
         $this->authorize('manage', $database);
 
-        RestartDatabase::dispatch($database);
+        $reservation = StartDatabase::reserveOperation($database);
+        if ($reservation === null) {
+            return response()->json(['message' => ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE], 409);
+        }
+        StartDatabase::dispatchReserved(RestartDatabase::class, $database, $reservation);
 
         auditLog('api.database.restarted', [
             'team_id' => $teamId,
@@ -3469,6 +3612,10 @@ class DatabasesController extends Controller
                 'value',
                 'real_value',
             ]);
+        }
+
+        if ($env->is_shown_once ?? false) {
+            $env->makeHidden(['value', 'real_value']);
         }
 
         return serializeApiResponse($env);
@@ -3576,7 +3723,7 @@ class DatabasesController extends Controller
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -3717,7 +3864,7 @@ class DatabasesController extends Controller
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -3848,7 +3995,7 @@ class DatabasesController extends Controller
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -4143,7 +4290,6 @@ class DatabasesController extends Controller
                             'type' => ['type' => 'string', 'enum' => ['persistent', 'file'], 'description' => 'The type of storage.'],
                             'name' => ['type' => 'string', 'description' => 'Volume name (persistent only, required for persistent).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path.'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, optional).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'File content (file only, optional).'],
                             'is_directory' => ['type' => 'boolean', 'description' => 'Whether this is a directory mount (file only, default false).'],
                             'fs_path' => ['type' => 'string', 'description' => 'Host directory path (required when is_directory is true).'],
@@ -4188,14 +4334,13 @@ class DatabasesController extends Controller
             'type' => 'required|string|in:persistent,file',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'required|string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
             'is_directory' => 'boolean',
             'is_host_file' => 'boolean',
             'fs_path' => 'string',
         ]);
 
-        $allAllowedFields = ['type', 'name', 'mount_path', 'host_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
+        $allAllowedFields = ['type', 'name', 'mount_path', 'content', 'is_directory', 'is_host_file', 'fs_path'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4231,7 +4376,6 @@ class DatabasesController extends Controller
             $storage = LocalPersistentVolume::create([
                 'name' => $database->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
-                'host_path' => $request->host_path,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
             ]);
@@ -4267,11 +4411,16 @@ class DatabasesController extends Controller
                 ], 422);
             }
 
-            $fsPath = str($request->fs_path)->trim()->start('/')->value();
-            $mountPath = str($request->mount_path)->trim()->start('/')->value();
-
-            validateShellSafePath($fsPath, 'storage source path');
-            validateShellSafePath($mountPath, 'storage destination path');
+            try {
+                $fsPath = confinePathToBase(database_configuration_dir().'/'.$database->uuid, $request->fs_path, 'storage source path');
+                $mountPath = validateFileMountPath($request->mount_path, 'storage destination path');
+                LocalFileVolume::assertRemotePathIsConfined($database->workdir(), $fsPath, $database->destination->server);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['fs_path' => $e->getMessage()],
+                ], 422);
+            }
 
             $storage = LocalFileVolume::create([
                 'fs_path' => $fsPath,
@@ -4383,7 +4532,6 @@ class DatabasesController extends Controller
                             'is_preview_suffix_enabled' => ['type' => 'boolean', 'description' => 'Whether to add -pr-N suffix for preview deployments.'],
                             'name' => ['type' => 'string', 'description' => 'The volume name (persistent only, not allowed for read-only storages).'],
                             'mount_path' => ['type' => 'string', 'description' => 'The container mount path (not allowed for read-only storages).'],
-                            'host_path' => ['type' => 'string', 'nullable' => true, 'description' => 'The host path (persistent only, not allowed for read-only storages).'],
                             'content' => ['type' => 'string', 'nullable' => true, 'description' => 'The file content (file only, not allowed for read-only storages).'],
                         ],
                         additionalProperties: false,
@@ -4442,11 +4590,10 @@ class DatabasesController extends Controller
             'is_preview_suffix_enabled' => 'boolean',
             'name' => ['string', 'regex:'.ValidationPatterns::VOLUME_NAME_PATTERN],
             'mount_path' => 'string',
-            'host_path' => ['string', 'nullable', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             'content' => 'string|nullable',
         ]);
 
-        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'host_path', 'content'];
+        $allAllowedFields = ['uuid', 'id', 'type', 'is_preview_suffix_enabled', 'name', 'mount_path', 'content'];
         $extraFields = array_diff(array_keys($request->all()), $allAllowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
@@ -4488,7 +4635,7 @@ class DatabasesController extends Controller
         }
 
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
-        $editableOnlyFields = ['name', 'mount_path', 'host_path', 'content'];
+        $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
 
         if ($isReadOnly && ! empty($requestedEditableFields)) {
@@ -4526,9 +4673,6 @@ class DatabasesController extends Controller
                 }
                 if ($request->has('mount_path')) {
                     $storage->mount_path = $request->mount_path;
-                }
-                if ($request->has('host_path')) {
-                    $storage->host_path = $request->host_path;
                 }
             } else {
                 if ($request->has('mount_path')) {
@@ -4617,6 +4761,12 @@ class DatabasesController extends Controller
         if ($storage->shouldBeReadOnlyInUI()) {
             return response()->json([
                 'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
+            ], 422);
+        }
+
+        if ($storage->isSharedWithAnotherResource()) {
+            return response()->json([
+                'message' => 'This volume is mounted by an application. Unlink it on the SQLite database page first.',
             ], 422);
         }
 
@@ -4899,6 +5049,7 @@ class DatabasesController extends Controller
                 str_starts_with($originalName, 'mongodb-data-') => 'mongodb-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'keydb-data-') => 'keydb-data-'.$newDatabase->uuid,
                 str_starts_with($originalName, 'dragonfly-data-') => 'dragonfly-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'sqlite-data-') => 'sqlite-data-'.$newDatabase->uuid,
                 str_starts_with($volume->name, $database->uuid) => str($volume->name)->replace($database->uuid, $newDatabase->uuid)->toString(),
                 default => $newDatabase->uuid.'-'.$volume->name,
             };

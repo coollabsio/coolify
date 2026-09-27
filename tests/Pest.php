@@ -27,6 +27,7 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
 */
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
+require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -79,8 +80,7 @@ beforeEach(function () {
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
 
-    // Browser Livewire actions often dispatch events; the Soketi host is not
-    // resolvable from host-side Pest runs (docker DNS name coolify-realtime).
+    // Browser Livewire actions often dispatch events; disable broadcasting for host-side runs.
     config(['broadcasting.default' => 'null']);
 });
 

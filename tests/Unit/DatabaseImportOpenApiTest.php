@@ -80,3 +80,17 @@ test('constrains additional properties on each database import source branch', f
             ->toMatchArray(['type' => 'boolean', 'default' => false]);
     }
 });
+
+test('documents the 409 response of database start, restart, and import endpoints', function () {
+    $document = json_decode((string) file_get_contents(__DIR__.'/../../openapi.json'), true, flags: JSON_THROW_ON_ERROR);
+    $inProgress = 'Another start, restart or import of this database is already in progress.';
+
+    foreach ([
+        ['/databases/{uuid}/start', 'post'],
+        ['/databases/{uuid}/restart', 'post'],
+        ['/databases/{uuid}/imports', 'post'],
+        ['/services/{uuid}/databases/{database_uuid}/imports', 'post'],
+    ] as [$path, $method]) {
+        expect($document['paths'][$path][$method]['responses']['409']['description'] ?? null)->toBe($inProgress);
+    }
+});

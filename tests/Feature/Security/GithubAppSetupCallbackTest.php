@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,11 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::macro('GitSource', fn (string $url) => Http::withOptions(SafeExternalUrl::httpClientOptions(
+        $url,
+        resolver: fn (string $host): array => ['93.184.216.34'],
+    )));
+
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
 
     $this->team = Team::factory()->create();

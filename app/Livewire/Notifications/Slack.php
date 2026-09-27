@@ -110,7 +110,9 @@ class Slack extends Component
             $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
             $this->settings->traefik_outdated_slack_notifications = $this->traefikOutdatedSlackNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->slackEnabled = $this->settings->slack_enabled;
@@ -227,5 +229,12 @@ class Slack extends Component
     public function render()
     {
         return view('livewire.notifications.slack');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.slack.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

@@ -4,10 +4,12 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Service\DeleteService;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -84,7 +86,7 @@ class Index extends Component
 
     public bool $isStripprefixEnabled = false;
 
-    public mixed $maxRestartCount = 10;
+    public mixed $maxRestartCount = 0;
 
     protected $listeners = ['generateDockerCompose', 'refreshScheduledBackups' => '$refresh', 'refreshFileStorages'];
 
@@ -254,6 +256,7 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            app(DeleteService::class)->removeSubresourceContainer($this->serviceDatabase);
             $this->serviceDatabase->delete();
             $this->dispatch('success', 'Database deleted.');
 
@@ -432,7 +435,7 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
-            $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 10;
+            $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
     }
 
@@ -501,6 +504,7 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
+            app(DeleteService::class)->removeSubresourceContainer($this->serviceApplication);
             $this->serviceApplication->delete();
             $this->dispatch('success', 'Application deleted.');
 
@@ -568,6 +572,7 @@ class Index extends Component
     {
         try {
             $persistedApplication = $this->serviceApplication->fresh();
+            $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
             $previousEditableUrls = $persistedApplication->url;
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
@@ -623,6 +628,7 @@ class Index extends Component
             $this->validate();
             $this->serviceApplication->save();
             $this->serviceApplication->refresh();
+            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, currentTeam()->id);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {

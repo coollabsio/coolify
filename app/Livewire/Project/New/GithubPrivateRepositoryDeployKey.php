@@ -125,13 +125,18 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function setPrivateKey($private_key_id)
     {
-        $this->private_key_id = $private_key_id;
+        $this->authorize('create', Application::class);
+
+        $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($private_key_id);
+        $this->private_key_id = $privateKey->id;
         $this->current_step = 'repository';
     }
 
     public function submit()
     {
         $this->authorize('create', Application::class);
+
+        $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
         $this->validate();
         try {
@@ -160,7 +165,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'environment_id' => $environment->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
-                    'private_key_id' => $this->private_key_id,
+                    'private_key_id' => $privateKey->id,
                 ];
             } else {
                 $application_init = [
@@ -173,7 +178,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'environment_id' => $environment->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
-                    'private_key_id' => $this->private_key_id,
+                    'private_key_id' => $privateKey->id,
                     'source_id' => $this->git_source->id,
                     'source_type' => $this->git_source->getMorphClass(),
                 ];

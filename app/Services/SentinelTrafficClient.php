@@ -17,6 +17,21 @@ class SentinelTrafficClient
     /** Record separator (0x1E) framing the batched curl responses in warm(). */
     private const RECORD_SEPARATOR = "\x1e";
 
+    /**
+     * Seconds to remember that this server's Sentinel has no `/api/resource/...` routes. Longer
+     * than the data cache: every probe on an older Sentinel costs one or two wasted execs.
+     */
+    public const RESOURCE_SCOPE_ABSENCE_TTL = 300;
+
+    /** Path segment of the per-key routes: `/api/app/{key}/traffic/...`. */
+    private const SCOPE_APP = 'app';
+
+    /**
+     * Path segment of the resource routes: `/api/resource/{uuid}/traffic/...`. Sentinel merges
+     * `{uuid}` and every `{uuid}-*` key exactly (HLL union for uniques, merged t-digests).
+     */
+    private const SCOPE_RESOURCE = 'resource';
+
     /** @var array<int, string> */
     private const ALLOWED_DIMENSIONS = [
         'status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot', 'agent', 'ip', 'useragent',
@@ -28,9 +43,15 @@ class SentinelTrafficClient
     // (e.g. "2024-01-14T10:00:00Z"), confirmed against sentinel/API.md.
     public function overview(?string $appKey, string $from, string $to): TrafficOverviewData
     {
-        $json = json_decode($this->raw($this->overviewUrl($appKey, $from, $to)), true) ?? [];
+        return $this->fetchOverview($this->overviewUrl($appKey, $from, $to));
+    }
 
-        return TrafficOverviewData::fromSentinel($json);
+    /**
+     * Exact overview of one resource: every key of the resource merged by Sentinel.
+     */
+    public function resourceOverview(string $resourceUuid, string $from, string $to): TrafficOverviewData
+    {
+        return $this->fetchOverview($this->overviewUrl($resourceUuid, $from, $to, self::SCOPE_RESOURCE));
     }
 
     /**
@@ -50,29 +71,27 @@ class SentinelTrafficClient
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
     }
 
-    /**
-     * Slim shared fetch for a single application's overview over a UI range, so the
-     * General-page widget and the full analytics tab don't duplicate window + client calls.
-     */
-    public function appOverview(string $appKey, string $range = '24h'): TrafficOverviewData
-    {
-        [$from, $to] = self::rangeWindow($range);
-
-        return $this->overview($appKey, $from, $to);
-    }
-
     public function paths(?string $appKey, string $from, string $to, int $limit = 50): Collection
     {
-        $rows = json_decode($this->raw($this->pathsUrl($appKey, $from, $to, $limit)), true) ?? [];
+        return $this->fetchPaths($this->pathsUrl($appKey, $from, $to, $limit));
+    }
 
-        return collect($rows)->map(fn ($r) => TrafficPathData::fromSentinel($r));
+    /**
+     * Top paths of one resource. Each row keeps the real Sentinel key in its `app` field.
+     */
+    public function resourcePaths(string $resourceUuid, string $from, string $to, int $limit = 50): Collection
+    {
+        return $this->fetchPaths($this->pathsUrl($resourceUuid, $from, $to, $limit, self::SCOPE_RESOURCE));
     }
 
     public function breakdown(?string $appKey, string $dimension, string $from, string $to, int $limit = 50): Collection
     {
-        $rows = json_decode($this->raw($this->breakdownUrl($appKey, $dimension, $from, $to, $limit)), true) ?? [];
+        return $this->fetchBreakdown($this->breakdownUrl($appKey, $dimension, $from, $to, $limit));
+    }
 
-        return collect($rows)->map(fn ($r) => TrafficBreakdownData::fromSentinel($r));
+    public function resourceBreakdown(string $resourceUuid, string $dimension, string $from, string $to, int $limit = 50): Collection
+    {
+        return $this->fetchBreakdown($this->breakdownUrl($resourceUuid, $dimension, $from, $to, $limit, self::SCOPE_RESOURCE));
     }
 
     /**
@@ -88,18 +107,220 @@ class SentinelTrafficClient
      */
     public function series(?string $appKey, string $range = '24h'): Collection
     {
-        $rows = json_decode($this->raw($this->seriesUrl($appKey, $range)), true);
+        return $this->fetchSeries($this->seriesUrl($appKey, $range));
+    }
 
-        if (! is_array($rows) || $rows === []) {
-            return collect();
+    /**
+     * @return Collection<int, TrafficSeriesBucketData>
+     */
+    public function resourceSeries(string $resourceUuid, string $range = '24h'): Collection
+    {
+        return $this->fetchSeries($this->seriesUrl($resourceUuid, $range, self::SCOPE_RESOURCE));
+    }
+
+    /**
+     * False while this server's Sentinel is known to lack the resource routes; callers then
+     * use the per-key path (resourceKeys() and a merge in TrafficAnalyticsAggregator).
+     */
+    public function supportsResourceScope(): bool
+    {
+        return Cache::get($this->resourceScopeAbsenceKey()) !== true;
+    }
+
+    /**
+     * Exact overview of one resource, or null when Sentinel has no resource routes. A failed
+     * probe is remembered (see RESOURCE_SCOPE_ABSENCE_TTL), so later calls return null at once.
+     */
+    public function tryResourceOverview(string $resourceUuid, string $from, string $to): ?TrafficOverviewData
+    {
+        $url = $this->overviewUrl($resourceUuid, $from, $to, self::SCOPE_RESOURCE);
+        if (! $this->supportsResourceScope()) {
+            return null;
         }
 
-        return collect($rows)->map(fn ($r) => TrafficSeriesBucketData::fromSentinel($r));
+        $overview = $this->genuineOverview($url);
+        if ($overview === null) {
+            $this->markResourceScopeAbsent();
+
+            return null;
+        }
+
+        return TrafficOverviewData::fromSentinel($overview);
+    }
+
+    /**
+     * Warm every resource endpoint in one exec with the resource dashboard bundle. When the
+     * bundle is unavailable, batch the individual resource endpoints instead. Returns false
+     * (and remembers it) when Sentinel has no resource routes; the caller then uses the
+     * per-key path with prefetchResource().
+     *
+     * @param  array<int, string>  $dimensions
+     */
+    public function prefetchResourceScope(string $resourceUuid, string $from, string $to, array $dimensions, string $range, int $pathLimit = 50, int $breakdownLimit = 50): bool
+    {
+        $this->assertSafeKey($resourceUuid);
+        if (! $this->supportsResourceScope()) {
+            return false;
+        }
+
+        $bundle = $this->fetchBundle($this->dashboardUrl($resourceUuid, $from, $to, $range, $pathLimit, $breakdownLimit, 0, self::SCOPE_RESOURCE));
+        if ($bundle !== null) {
+            $this->seedFromDashboard($resourceUuid, $from, $to, $range, $dimensions, $pathLimit, $breakdownLimit, $bundle, self::SCOPE_RESOURCE);
+
+            return true;
+        }
+
+        $overviewUrl = $this->overviewUrl($resourceUuid, $from, $to, self::SCOPE_RESOURCE);
+        $this->warm([
+            ...$this->endpointUrls($resourceUuid, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit, self::SCOPE_RESOURCE),
+            $this->attributionUrl(),
+        ]);
+
+        // After a real batch, an uncached overview means the route is absent: no second probe.
+        $supported = (! $this->usesBatchableTransport() || Cache::has($this->cacheKey($overviewUrl)))
+            && $this->genuineOverview($overviewUrl) !== null;
+
+        if (! $supported) {
+            $this->markResourceScopeAbsent();
+        }
+
+        return $supported;
     }
 
     public function apps(): array
     {
         return json_decode($this->raw($this->appsUrl()), true) ?? [];
+    }
+
+    /**
+     * True when Sentinel key $key belongs to the resource with $resourceUuid. A resource
+     * (Application or Service) owns the bare `{uuid}` key and every `{uuid}-…` key: compose
+     * services (`{uuid}-{service}`), previews (`{uuid}-{pr}`), and preview compose services.
+     */
+    public static function keyBelongsTo(string $key, string $resourceUuid): bool
+    {
+        return $resourceUuid !== '' && ($key === $resourceUuid || str_starts_with($key, $resourceUuid.'-'));
+    }
+
+    /**
+     * Uuids that could own $key, most specific first: the key itself, then every prefix
+     * that ends before a `-`. Lets a caller match a key against a uuid map in O(key length).
+     *
+     * @return array<int, string>
+     */
+    public static function candidateOwnerUuids(string $key): array
+    {
+        $candidates = [$key];
+        $position = strlen($key);
+        while (($position = strrpos(substr($key, 0, $position), '-')) !== false) {
+            if ($position > 0) {
+                $candidates[] = substr($key, 0, $position);
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * Every Sentinel key recorded on this server that belongs to the resource. Falls back to
+     * the bare uuid when none is recorded (or the key list is unavailable), so per-key queries
+     * still run and return an empty result instead of failing.
+     *
+     * @return array<int, string>
+     */
+    public function resourceKeys(string $resourceUuid): array
+    {
+        $this->assertSafeKey($resourceUuid);
+
+        try {
+            $recorded = $this->apps();
+        } catch (\Throwable) {
+            $recorded = [];
+        }
+
+        $keys = array_values(array_unique(array_filter(
+            $recorded,
+            fn ($key) => is_string($key)
+                && $this->isSafeKey($key)
+                && self::keyBelongsTo($key, $resourceUuid)
+        )));
+        sort($keys);
+
+        return $keys === [] ? [$resourceUuid] : $keys;
+    }
+
+    /**
+     * Resolve the resource's keys and warm every endpoint for each key, in as few SSH
+     * round-trips as possible: the key list and the bare-uuid dashboard bundle (the common
+     * single-key case) share one exec, and extra keys share one more.
+     *
+     * @param  array<int, string>  $dimensions
+     * @return array<int, string>
+     */
+    public function prefetchResource(string $resourceUuid, string $from, string $to, array $dimensions, string $range, int $pathLimit = 50, int $breakdownLimit = 50): array
+    {
+        $this->assertSafeKey($resourceUuid);
+
+        $urls = [$this->appsUrl()];
+        if (Cache::get($this->dashboardAbsenceKey()) !== true) {
+            $urls[] = $this->dashboardUrl($resourceUuid, $from, $to, $range, $pathLimit, $breakdownLimit, 0);
+        }
+        $this->warm($urls);
+
+        $keys = $this->resourceKeys($resourceUuid);
+        $this->prefetchKeys($keys, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit);
+
+        return $keys;
+    }
+
+    /**
+     * Warm every endpoint for several app keys. One key uses prefetchServerWide(); several
+     * keys batch their dashboard bundles (or, on an older Sentinel, their individual
+     * endpoints) into one exec instead of one SSH round-trip per key.
+     *
+     * @param  array<int, string>  $appKeys
+     * @param  array<int, string>  $dimensions
+     */
+    public function prefetchKeys(array $appKeys, string $from, string $to, array $dimensions, string $range, int $pathLimit = 50, int $breakdownLimit = 50): void
+    {
+        $appKeys = array_values(array_unique($appKeys));
+        if ($appKeys === []) {
+            return;
+        }
+
+        if (count($appKeys) === 1 || ! $this->usesBatchableTransport()) {
+            foreach ($appKeys as $appKey) {
+                $this->prefetchServerWide($appKey, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit);
+            }
+
+            return;
+        }
+
+        if (Cache::get($this->dashboardAbsenceKey()) !== true) {
+            $dashboardUrls = array_map(
+                fn (string $appKey) => $this->dashboardUrl($appKey, $from, $to, $range, $pathLimit, $breakdownLimit, 0),
+                $appKeys
+            );
+            $this->warm($dashboardUrls);
+
+            if (Cache::has($this->cacheKey($dashboardUrls[0]))) {
+                // Each call now reads its bundle from cache and seeds the per-endpoint cache.
+                foreach ($appKeys as $appKey) {
+                    $this->prefetchServerWide($appKey, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit);
+                }
+
+                return;
+            }
+
+            // Older Sentinel without the dashboard route: remember it like fetchDashboard() does.
+            Cache::put($this->dashboardAbsenceKey(), true, 60);
+        }
+
+        $urls = [$this->attributionUrl()];
+        foreach ($appKeys as $appKey) {
+            array_push($urls, ...$this->endpointUrls($appKey, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit));
+        }
+        $this->warm($urls);
     }
 
     public function attribution(): ?string
@@ -139,14 +360,9 @@ class SentinelTrafficClient
 
         // Fallback for older Sentinel without /traffic/dashboard: batch the individual endpoints.
         $urls = [
-            $this->overviewUrl($appKey, $from, $to),
-            $this->pathsUrl($appKey, $from, $to, $pathLimit),
-            $this->seriesUrl($appKey, $range),
+            ...$this->endpointUrls($appKey, $from, $to, $dimensions, $range, $pathLimit, $breakdownLimit),
             $this->attributionUrl(),
         ];
-        foreach ($dimensions as $dimension) {
-            $urls[] = $this->breakdownUrl($appKey, $dimension, $from, $to, $breakdownLimit);
-        }
         // The per-application leaderboard only exists on the unfiltered view.
         if ($appKey === null) {
             $urls[] = $this->appsUrl();
@@ -178,26 +394,95 @@ class SentinelTrafficClient
         // so without a marker every refresh would re-probe over SSH before falling back to the
         // batch. Remember the absence for the same 60s window as the data cache: at most one
         // wasted probe per minute, and a Sentinel upgrade is picked up on the next window.
-        $absenceKey = 'traffic:dashboard-absent:'.$this->server->uuid;
+        $absenceKey = $this->dashboardAbsenceKey();
         if (Cache::get($absenceKey) === true) {
             return null;
         }
 
+        $bundle = $this->fetchBundle($this->dashboardUrl($appKey, $from, $to, $range, $pathLimit, $breakdownLimit, $appsLimit));
+        if ($bundle === null) {
+            Cache::put($absenceKey, true, 60);
+        }
+
+        return $bundle;
+    }
+
+    /**
+     * Fetch one dashboard bundle, or null when the route is absent or the response is not a
+     * real bundle (no `overview` member).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fetchBundle(string $url): ?array
+    {
         try {
-            $decoded = json_decode($this->raw($this->dashboardUrl($appKey, $from, $to, $range, $pathLimit, $breakdownLimit, $appsLimit)), true);
+            $decoded = json_decode($this->raw($url), true);
         } catch (\Throwable) {
-            Cache::put($absenceKey, true, 60);
-
             return null;
         }
 
-        if (! is_array($decoded) || ! array_key_exists('overview', $decoded)) {
-            Cache::put($absenceKey, true, 60);
+        return is_array($decoded) && array_key_exists('overview', $decoded) ? $decoded : null;
+    }
 
+    /**
+     * The decoded overview at $url, or null when the route is absent or the body is not a
+     * real overview. Sentinel always sends `requests`, also for an empty range, so a stub
+     * (`{}`) does not count as support.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function genuineOverview(string $url): ?array
+    {
+        try {
+            $decoded = json_decode($this->raw($url), true);
+        } catch (\Throwable) {
             return null;
         }
 
-        return $decoded;
+        return is_array($decoded) && array_key_exists('requests', $decoded) ? $decoded : null;
+    }
+
+    private function markResourceScopeAbsent(): void
+    {
+        Cache::put($this->resourceScopeAbsenceKey(), true, self::RESOURCE_SCOPE_ABSENCE_TTL);
+    }
+
+    private function resourceScopeAbsenceKey(): string
+    {
+        return 'traffic:resource-scope-absent:'.$this->server->uuid;
+    }
+
+    private function fetchOverview(string $url): TrafficOverviewData
+    {
+        return TrafficOverviewData::fromSentinel(json_decode($this->raw($url), true) ?? []);
+    }
+
+    private function fetchPaths(string $url): Collection
+    {
+        $rows = json_decode($this->raw($url), true) ?? [];
+
+        return collect($rows)->map(fn ($r) => TrafficPathData::fromSentinel($r));
+    }
+
+    private function fetchBreakdown(string $url): Collection
+    {
+        $rows = json_decode($this->raw($url), true) ?? [];
+
+        return collect($rows)->map(fn ($r) => TrafficBreakdownData::fromSentinel($r));
+    }
+
+    /**
+     * @return Collection<int, TrafficSeriesBucketData>
+     */
+    private function fetchSeries(string $url): Collection
+    {
+        $rows = json_decode($this->raw($url), true);
+
+        if (! is_array($rows) || $rows === []) {
+            return collect();
+        }
+
+        return collect($rows)->map(fn ($r) => TrafficSeriesBucketData::fromSentinel($r));
     }
 
     /**
@@ -208,18 +493,18 @@ class SentinelTrafficClient
      * @param  array<int, string>  $dimensions
      * @param  array<string, mixed>  $bundle
      */
-    private function seedFromDashboard(?string $appKey, string $from, string $to, string $range, array $dimensions, int $pathLimit, int $breakdownLimit, array $bundle): void
+    private function seedFromDashboard(?string $appKey, string $from, string $to, string $range, array $dimensions, int $pathLimit, int $breakdownLimit, array $bundle, string $scope = self::SCOPE_APP): void
     {
         $put = fn (string $url, $member) => Cache::put($this->cacheKey($url), json_encode($member), 60);
 
-        $put($this->overviewUrl($appKey, $from, $to), $bundle['overview'] ?? []);
-        $put($this->pathsUrl($appKey, $from, $to, $pathLimit), $bundle['paths'] ?? []);
-        $put($this->seriesUrl($appKey, $range), $bundle['series'] ?? []);
+        $put($this->overviewUrl($appKey, $from, $to, $scope), $bundle['overview'] ?? []);
+        $put($this->pathsUrl($appKey, $from, $to, $pathLimit, $scope), $bundle['paths'] ?? []);
+        $put($this->seriesUrl($appKey, $range, $scope), $bundle['series'] ?? []);
         $put($this->attributionUrl(), ['attribution' => $bundle['attribution'] ?? null]);
 
         $breakdowns = $bundle['breakdowns'] ?? [];
         foreach ($dimensions as $dimension) {
-            $put($this->breakdownUrl($appKey, $dimension, $from, $to, $breakdownLimit), $breakdowns[$dimension] ?? []);
+            $put($this->breakdownUrl($appKey, $dimension, $from, $to, $breakdownLimit, $scope), $breakdowns[$dimension] ?? []);
         }
 
         foreach ($bundle['apps'] ?? [] as $app) {
@@ -242,37 +527,63 @@ class SentinelTrafficClient
         $this->warm($urls);
     }
 
-    private function overviewUrl(?string $appKey, string $from, string $to): string
+    private function dashboardAbsenceKey(): string
     {
-        $path = $this->appScopedPath($appKey, 'overview');
+        return 'traffic:dashboard-absent:'.$this->server->uuid;
+    }
+
+    /**
+     * The individual endpoint urls (overview, paths, series, breakdowns) for one key or the
+     * whole server, used by the batched fallback on Sentinel builds without the dashboard.
+     *
+     * @param  array<int, string>  $dimensions
+     * @return array<int, string>
+     */
+    private function endpointUrls(?string $appKey, string $from, string $to, array $dimensions, string $range, int $pathLimit, int $breakdownLimit, string $scope = self::SCOPE_APP): array
+    {
+        $urls = [
+            $this->overviewUrl($appKey, $from, $to, $scope),
+            $this->pathsUrl($appKey, $from, $to, $pathLimit, $scope),
+            $this->seriesUrl($appKey, $range, $scope),
+        ];
+        foreach ($dimensions as $dimension) {
+            $urls[] = $this->breakdownUrl($appKey, $dimension, $from, $to, $breakdownLimit, $scope);
+        }
+
+        return $urls;
+    }
+
+    private function overviewUrl(?string $appKey, string $from, string $to, string $scope = self::SCOPE_APP): string
+    {
+        $path = $this->appScopedPath($appKey, 'overview', $scope);
 
         return $this->url($path, ['from' => $from, 'to' => $to]);
     }
 
-    private function pathsUrl(?string $appKey, string $from, string $to, int $limit): string
+    private function pathsUrl(?string $appKey, string $from, string $to, int $limit, string $scope = self::SCOPE_APP): string
     {
-        $path = $this->appScopedPath($appKey, 'paths');
+        $path = $this->appScopedPath($appKey, 'paths', $scope);
 
         return $this->url($path, ['from' => $from, 'to' => $to, 'limit' => (int) $limit]);
     }
 
-    private function breakdownUrl(?string $appKey, string $dimension, string $from, string $to, int $limit): string
+    private function breakdownUrl(?string $appKey, string $dimension, string $from, string $to, int $limit, string $scope = self::SCOPE_APP): string
     {
         $this->assertSafeDimension($dimension);
-        $path = $this->appScopedPath($appKey, "breakdown/{$dimension}");
+        $path = $this->appScopedPath($appKey, "breakdown/{$dimension}", $scope);
 
         return $this->url($path, ['from' => $from, 'to' => $to, 'limit' => (int) $limit]);
     }
 
-    private function seriesUrl(?string $appKey, string $range): string
+    private function seriesUrl(?string $appKey, string $range, string $scope = self::SCOPE_APP): string
     {
         $range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
-        $path = $this->appScopedPath($appKey, 'series');
+        $path = $this->appScopedPath($appKey, 'series', $scope);
 
         return $this->url($path, ['range' => $range]);
     }
 
-    private function dashboardUrl(?string $appKey, string $from, string $to, string $range, int $pathLimit, int $breakdownLimit, int $appsLimit): string
+    private function dashboardUrl(?string $appKey, string $from, string $to, string $range, int $pathLimit, int $breakdownLimit, int $appsLimit, string $scope = self::SCOPE_APP): string
     {
         $range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
         $query = [
@@ -288,9 +599,8 @@ class SentinelTrafficClient
 
             return $this->url('/traffic/dashboard', $query);
         }
-        $this->assertSafeKey($appKey);
 
-        return $this->url("/app/{$appKey}/traffic/dashboard", $query);
+        return $this->url($this->appScopedPath($appKey, 'dashboard', $scope), $query);
     }
 
     private function appsUrl(): string
@@ -304,16 +614,17 @@ class SentinelTrafficClient
     }
 
     /**
-     * Build a traffic path, optionally scoped to a single (validated) app key.
+     * Build a traffic path, optionally scoped to a single (validated) app key, or with
+     * SCOPE_RESOURCE to a resource uuid and all of its `{uuid}-*` keys.
      */
-    private function appScopedPath(?string $appKey, string $suffix): string
+    private function appScopedPath(?string $appKey, string $suffix, string $scope = self::SCOPE_APP): string
     {
         if ($appKey === null) {
             return "/traffic/{$suffix}";
         }
         $this->assertSafeKey($appKey);
 
-        return "/app/{$appKey}/traffic/{$suffix}";
+        return "/{$scope}/{$appKey}/traffic/{$suffix}";
     }
 
     /**
@@ -324,9 +635,14 @@ class SentinelTrafficClient
      */
     private function assertSafeKey(string $value): void
     {
-        if ($value === '' || ! preg_match('/\A[A-Za-z0-9._:-]+\z/', $value)) {
+        if (! $this->isSafeKey($value)) {
             throw new \InvalidArgumentException('Invalid traffic analytics app key.');
         }
+    }
+
+    private function isSafeKey(string $value): bool
+    {
+        return $value !== '' && preg_match('/\A[A-Za-z0-9._:-]+\z/', $value) === 1;
     }
 
     private function assertSafeDimension(string $dimension): void

@@ -25,7 +25,8 @@ function remote_process(
     ?Model $model = null,
     bool $ignore_errors = false,
     $callEventOnFinish = null,
-    $callEventData = null
+    $callEventData = null,
+    array $properties = [],
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -46,6 +47,7 @@ function remote_process(
     SshMultiplexingHelper::ensureMultiplexedConnection($server);
 
     $properties = [
+        ...$properties,
         'server_uuid' => $server->uuid,
         'command' => $command_string,
         'type' => $type,

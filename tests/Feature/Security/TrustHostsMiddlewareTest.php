@@ -229,24 +229,26 @@ it('caches negative results when no FQDN is configured', function () {
     expect($hosts2)->not->toBeEmpty();
 });
 
-it('skips host validation for terminal auth routes', function () {
-    // These routes should be accessible with any Host header (for internal container communication)
+it('allows terminal auth requests from the local terminal server', function () {
     $response = $this->postJson('/terminal/auth', [], [
-        'Host' => 'coolify:8080',  // Internal Docker host
+        'Host' => '127.0.0.1:8080',
     ]);
 
-    // Should not get 400 Bad Host (might get 401 Unauthorized instead)
     expect($response->status())->not->toBe(400);
 });
 
-it('skips host validation for terminal auth ips route', function () {
-    // These routes should be accessible with any Host header (for internal container communication)
+it('enforces host validation for terminal auth routes', function () {
+    InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['fqdn' => 'https://coolify.example.com']
+    );
+    Cache::forget('instance_settings_fqdn_host');
+
     $response = $this->postJson('/terminal/auth/ips', [], [
-        'Host' => 'soketi:6002',  // Another internal Docker host
+        'Host' => 'evil.com',
     ]);
 
-    // Should not get 400 Bad Host (might get 401 Unauthorized instead)
-    expect($response->status())->not->toBe(400);
+    expect($response->status())->toBe(400);
 });
 
 it('still enforces host validation for non-terminal routes', function () {

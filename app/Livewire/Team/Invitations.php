@@ -25,12 +25,11 @@ class Invitations extends Component
             $invitationEmail = $invitation->email;
             $invitationUuid = $invitation->uuid;
             DB::transaction(function () use ($invitation): void {
+                $invitation->delete();
                 $user = User::whereEmail($invitation->email)->first();
                 if (filled($user)) {
                     $user->deleteIfNotVerifiedAndForcePasswordReset();
                 }
-
-                $invitation->delete();
             });
             auditLog('ui.team_invitation.revoked', [
                 'team_id' => currentTeam()->id,

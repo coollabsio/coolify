@@ -189,17 +189,16 @@ it('deletes the managed dns record when removing a service domain by key with de
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->apiApp->getMorphClass(),
-        'resource_id' => $this->apiApp->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'api.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->apiApp);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -207,6 +206,7 @@ it('deletes the managed dns record when removing a service domain by key with de
             'type' => 'A',
             'name' => 'api.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 
@@ -1318,4 +1318,32 @@ it('lays out the domain settings dropdowns in responsive columns', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
     expect($view)->toContain('mt-4 grid grid-cols-1 gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2')
         ->toContain('flex flex-wrap items-center justify-between gap-2');
+});
+
+it('restarts a service dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $domain = 'https://api.example.com';
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
+    $index = collect($component->get('domainRows'))->search(fn (array $row): bool => $row['url'] === $domain);
+
+    expect($index)->not->toBeFalse();
+
+    $component->call('checkDomainDns', $index)
+        ->assertSet("domainRows.{$index}.dns_status", 'checking');
+
+    expect($this->apiApp->fresh()->domain_dns_statuses[$domain]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
 });

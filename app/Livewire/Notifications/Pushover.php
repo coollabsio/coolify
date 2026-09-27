@@ -113,7 +113,9 @@ class Pushover extends Component
             $this->settings->server_patch_pushover_notifications = $this->serverPatchPushoverNotifications;
             $this->settings->traefik_outdated_pushover_notifications = $this->traefikOutdatedPushoverNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->pushoverEnabled = $this->settings->pushover_enabled;
@@ -238,5 +240,12 @@ class Pushover extends Component
     public function render()
     {
         return view('livewire.notifications.pushover');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.pushover.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

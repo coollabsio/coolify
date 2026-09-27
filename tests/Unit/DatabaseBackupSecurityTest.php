@@ -1,5 +1,8 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
+use App\Support\ValidationPatterns;
+
 /**
  * Database Backup Security Tests
  *
@@ -221,4 +224,43 @@ test('escapeshellarg on mongodb URI prevents shell breakout', function () {
     expect($command)->toContain("evil.com #'");
     // No unescaped double quotes that could break the command
     expect(substr_count($command, "'"))->toBeGreaterThanOrEqual(2);
+});
+
+test('backup shell commands do not interpolate raw container names or backup paths', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    preg_match_all('/^.*(?:docker exec|mkdir -p |du -b |docker run -d).*$/m', $source, $matches);
+
+    expect($matches[0])->not->toBeEmpty();
+    foreach ($matches[0] as $command) {
+        $quotedArgumentsRemoved = preg_replace('/escapeshellarg\(\$this->(?:container_name|backup_dir|backup_location)\)/', '', $command);
+        expect($quotedArgumentsRemoved)->not->toMatch('/\$this->(?:container_name|backup_dir|backup_location)\b/');
+    }
+});
+
+test('backup job accepts supported service container names only', function () {
+    expect(ValidationPatterns::isValidContainerName('db-name_service.1-uuid'))->toBeTrue()
+        ->and(ValidationPatterns::isValidContainerName('db name-uuid'))->toBeFalse()
+        ->and(ValidationPatterns::isValidContainerName("db\nname-uuid"))->toBeFalse()
+        ->and(ValidationPatterns::isValidContainerName("db-uuid\n"))->toBeFalse();
+
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    expect($source)->toContain('ValidationPatterns::isValidContainerName($this->container_name)');
+});
+
+test('service restart commands do not interpolate raw container names', function () {
+    foreach (['ServiceDatabase.php', 'ServiceApplication.php'] as $model) {
+        $source = file_get_contents(__DIR__.'/../../app/Models/'.$model);
+        expect($source)->not->toContain('docker restart {$container_id}');
+    }
+});
+
+test('backup filenames remove shell and path separators from database names', function () {
+    $job = (new ReflectionClass(DatabaseBackupJob::class))->newInstanceWithoutConstructor();
+    $filenamePart = (new ReflectionClass($job))->getMethod('backupFilenamePart');
+
+    expect($filenamePart->invoke($job, 'safe_db-1'))->toBe('safe_db-1')
+        ->and($filenamePart->invoke($job, '../db name'))->toBe('..-db-name');
+
+    $source = file_get_contents(__DIR__.'/../../app/Jobs/DatabaseBackupJob.php');
+    expect(substr_count($source, '$this->backupFilenamePart('))->toBe(4);
 });

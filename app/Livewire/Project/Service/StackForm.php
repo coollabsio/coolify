@@ -149,8 +149,9 @@ class StackForm extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->syncData(true);
-            $this->service->save();
+            $this->service->refresh()->update([
+                'connect_to_docker_network' => $this->connectToDockerNetwork,
+            ]);
             $this->dispatch('success', 'Service settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -165,7 +166,7 @@ class StackForm extends Component
             $this->syncData(true);
 
             // Validate for command injection BEFORE any database operations
-            validateDockerComposeForInjection($this->service->docker_compose_raw);
+            validateDockerComposeForInjection($this->service->docker_compose_raw, composeResourceDirectory($this->service));
 
             // Use transaction to ensure atomicity - if parse fails, save is rolled back
             DB::transaction(function () {

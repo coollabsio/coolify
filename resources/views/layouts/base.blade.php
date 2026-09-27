@@ -284,13 +284,12 @@
             window.Pusher = Pusher;
             const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
             window.Echo = new EchoConstructor({
-                broadcaster: 'pusher',
-                cluster: "{{ config('constants.pusher.host') }}" || window.location.hostname,
+                broadcaster: 'reverb',
                 key: "{{ config('constants.pusher.app_key') }}" || 'coolify',
                 wsHost: "{{ config('constants.pusher.host') }}" || window.location.hostname,
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
-                forceTLS: false,
+                forceTLS: window.location.protocol === 'https:',
                 encrypted: true,
                 enableStats: false,
                 enableLogging: true,

@@ -22,6 +22,7 @@ class AuditEvent extends Model
         'event',
         'source',
         'action',
+        'level',
         'actor_type',
         'actor_id',
         'actor_name',
@@ -83,10 +84,10 @@ class AuditEvent extends Model
     /**
      * @param  array<string, mixed>  $context
      */
-    public static function record(string $event, array $context = []): void
+    public static function record(string $event, array $context = [], string $level = 'info'): void
     {
         try {
-            $attributes = self::attributesFor($event, $context);
+            $attributes = self::attributesFor($event, $context, $level);
 
             DB::afterCommit(function () use ($attributes): void {
                 defer(function () use ($attributes): void {
@@ -112,7 +113,7 @@ class AuditEvent extends Model
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private static function attributesFor(string $event, array $context): array
+    private static function attributesFor(string $event, array $context, string $level): array
     {
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
             ?? data_get($context, 'team_id')
@@ -139,10 +140,11 @@ class AuditEvent extends Model
             'event' => $event,
             'source' => $source,
             'action' => $action,
+            'level' => self::normalizeLevel($level),
             'actor_type' => $actorType,
-            'actor_id' => $user?->id,
-            'actor_name' => $user?->name,
-            'actor_email' => $user?->email,
+            'actor_id' => data_get($context, 'actor_id', $user?->id),
+            'actor_name' => data_get($context, 'actor_name', $user?->name),
+            'actor_email' => data_get($context, 'actor_email', $user?->email),
             'actor_token_id' => $token?->id,
             'actor_token_name' => $token?->name,
             'resource_type' => $resourceType,
@@ -154,6 +156,16 @@ class AuditEvent extends Model
             'ip_address' => app()->bound('request') ? request()->ip() : null,
             'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
         ];
+    }
+
+    public static function normalizeLevel(string $level): string
+    {
+        return in_array($level, ['info', 'warning', 'error'], true) ? $level : 'info';
+    }
+
+    public static function redactContext(array $context): array
+    {
+        return self::redact($context);
     }
 
     /**
@@ -194,7 +206,7 @@ class AuditEvent extends Model
 
     private static function redact(mixed $value, ?string $key = null): mixed
     {
-        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie/i', $key)) {
+        if ($key !== null && self::isSensitiveKey($key)) {
             return '[REDACTED]';
         }
 
@@ -207,5 +219,14 @@ class AuditEvent extends Model
                 $itemKey => self::redact($item, (string) $itemKey),
             ])
             ->all();
+    }
+
+    private static function isSensitiveKey(string $key): bool
+    {
+        if (preg_match('/_(id|uuid|name)$/i', $key)) {
+            return false;
+        }
+
+        return (bool) preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie|license_key/i', $key);
     }
 }

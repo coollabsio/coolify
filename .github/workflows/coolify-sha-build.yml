@@ -107,3 +107,8 @@ jobs:
             "${IMAGE}:sha-${SHA}-amd64" \
             "${IMAGE}:sha-${SHA}-aarch64" \
             --tag "${IMAGE}:sha-${SHA}"
+
+      - uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}

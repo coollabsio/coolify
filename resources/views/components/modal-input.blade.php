@@ -62,16 +62,9 @@
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                     <header class="flex-wrap! sm:flex-nowrap!">
                         <div class="min-w-0 flex-1 py-0.5">
+                            <h3 class="truncate">{{ $title }}</h3>
                             @if ($subtitle)
-                                <h3>
-                                    <x-helper :helper="$subtitle" :label="'More information about '.$title">
-                                        <x-slot:trigger>
-                                            <span class="underline underline-offset-4">{{ $title }}</span>
-                                        </x-slot:trigger>
-                                    </x-helper>
-                                </h3>
-                            @else
-                                <h3 class="truncate">{{ $title }}</h3>
+                                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
                             @endif
                         </div>
                         @isset($headerActions)

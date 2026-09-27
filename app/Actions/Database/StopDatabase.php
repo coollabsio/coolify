@@ -13,13 +13,14 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true): string
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true): string
     {
         try {
             $server = $database->destination->server;

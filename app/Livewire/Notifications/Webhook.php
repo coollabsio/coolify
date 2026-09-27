@@ -105,7 +105,9 @@ class Webhook extends Component
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
@@ -219,5 +221,12 @@ class Webhook extends Component
     public function render()
     {
         return view('livewire.notifications.webhook');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.webhook.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

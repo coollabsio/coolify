@@ -25,6 +25,7 @@ class ServiceApplicationsController extends Controller
             'resourceable',
             'resourceable_id',
             'resourceable_type',
+            'service',
         ]);
 
         $serialized = serializeApiResponse($serviceApplication);

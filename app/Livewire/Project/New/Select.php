@@ -255,6 +255,13 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'sqlite',
+                'name' => 'SQLite',
+                'description' => 'A lightweight relational database stored in a single file.',
+                'logo' => asset('svgs/resources/sqlite.svg'),
+                'experimental' => true,
+            ],
 
         ];
 
@@ -274,7 +281,7 @@ class Select extends Component
             $this->servers = $this->allServers;
         } else {
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }
@@ -369,10 +376,11 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'sqlite':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {
-                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
                 } else {
                     $this->servers = $this->allServers;
                 }
@@ -382,7 +390,7 @@ class Select extends Component
             $this->isDatabase = true;
             $this->includeSwarm = false;
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }

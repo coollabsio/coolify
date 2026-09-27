@@ -21,6 +21,17 @@ it('extracts a bare host from referer URLs and bare hosts, dropping www', functi
     expect(refererHost(null))->toBeNull();
 });
 
+it('groups referer breakdown rows by normalized host', function () {
+    expect(groupRefererBreakdownRows([
+        ['value' => 'https://www.example.com/first', 'requests' => 7, 'bytesOut' => 700],
+        ['value' => 'http://example.com/second', 'requests' => 3, 'bytesOut' => 300],
+        ['value' => 'https://other.example/path', 'requests' => 5, 'bytesOut' => 500],
+    ]))->toBe([
+        ['value' => 'example.com', 'requests' => 10, 'bytesOut' => 1000],
+        ['value' => 'other.example', 'requests' => 5, 'bytesOut' => 500],
+    ]);
+});
+
 it('builds a duckduckgo favicon url for a host', function () {
     expect(refererFaviconUrl('example.com'))->toBe('https://icons.duckduckgo.com/ip3/example.com.ico');
 });

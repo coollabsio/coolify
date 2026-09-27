@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AuditEvent;
+use Illuminate\Support\Facades\Log;
 
 if (! function_exists('auditLog')) {
     /**
@@ -12,10 +13,31 @@ if (! function_exists('auditLog')) {
      */
     function auditLog(string $event, array $context = [], string $level = 'info'): void
     {
+        $level = AuditEvent::normalizeLevel($level);
+
         try {
-            AuditEvent::record($event, $context);
+            $request = app()->bound('request') ? request() : null;
+            $user = auth()->user();
+            $token = $user?->currentAccessToken();
+            $payload = AuditEvent::redactContext(array_merge([
+                'event' => $event,
+                'ip' => $request?->ip(),
+                'ua' => substr((string) $request?->userAgent(), 0, 200),
+                'user_id' => $user?->id,
+                'user_email' => $user?->email,
+                'team_id' => $token ? data_get($token, 'team_id') : null,
+                'token_id' => $token?->id,
+                'token_name' => $token?->name,
+                'method' => $request?->method(),
+                'path' => $request?->path(),
+            ], $context));
+
+            Log::channel('audit')->{$level}($event, $payload);
         } catch (Throwable) {
+            // The database sink remains available when the optional channel fails.
         }
+
+        AuditEvent::record($event, $context, $level);
     }
 }
 
