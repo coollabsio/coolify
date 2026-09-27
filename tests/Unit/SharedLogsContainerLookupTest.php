@@ -29,5 +29,19 @@ it('filters service and database containers by the correct coolify labels', func
         ->toContain('function getCurrentServiceContainerStatus')
         ->toContain('label=coolify.serviceId=')
         ->toContain('function getCurrentDatabaseContainerStatus')
-        ->toContain('label=coolify.databaseId=');
+        ->toContain('label=coolify.databaseId=')
+        ->toContain('label=coolify.database.subType=');
+});
+
+it('filters database containers by subType in api and logs to prevent cross-database collision', function () {
+    $databasesController = file_get_contents(__DIR__.'/../../app/Http/Controllers/Api/DatabasesController.php');
+    $logsFile = file_get_contents(__DIR__.'/../../app/Livewire/Project/Shared/Logs.php');
+
+    expect($databasesController)
+        ->toContain('getCurrentDatabaseContainerStatus($database->destination->server, $database->id, $database->type())')
+        ->toContain('$database->uuid');
+
+    expect($logsFile)
+        ->toContain('getCurrentDatabaseContainerStatus(')
+        ->toContain('$this->resource->type()');
 });

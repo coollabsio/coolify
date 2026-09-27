@@ -97,7 +97,8 @@ class Logs extends Component
                 ),
                 default => getCurrentDatabaseContainerStatus(
                     $server,
-                    $this->resource->id
+                    $this->resource->id,
+                    method_exists($this->resource, 'type') ? $this->resource->type() : null
                 ),
             };
 
