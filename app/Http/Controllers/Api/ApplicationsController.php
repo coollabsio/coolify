@@ -3790,7 +3790,6 @@ class ApplicationsController extends Controller
                 if ($request->has('comment') && $env->comment != $request->comment) {
                     $env->comment = $request->comment;
                 }
-                $env->uses_legacy_escaping = false;
                 $env->save();
 
                 auditLog('api.application.env_updated', [
@@ -3832,7 +3831,6 @@ class ApplicationsController extends Controller
                 if ($request->has('comment') && $env->comment != $request->comment) {
                     $env->comment = $request->comment;
                 }
-                $env->uses_legacy_escaping = false;
                 $env->save();
 
                 auditLog('api.application.env_updated', [
@@ -4017,7 +4015,6 @@ class ApplicationsController extends Controller
                     if ($item->has('comment') && $env->comment != $item->get('comment')) {
                         $env->comment = $item->get('comment');
                     }
-                    $env->uses_legacy_escaping = false;
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -4056,7 +4053,6 @@ class ApplicationsController extends Controller
                     if ($item->has('comment') && $env->comment != $item->get('comment')) {
                         $env->comment = $item->get('comment');
                     }
-                    $env->uses_legacy_escaping = false;
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([

@@ -3813,7 +3813,6 @@ class DatabasesController extends Controller
         if ($request->has('comment')) {
             $env->comment = $request->comment;
         }
-        $env->uses_legacy_escaping = false;
         $env->save();
 
         auditLog('api.database.env_updated', [
@@ -3947,10 +3946,10 @@ class DatabasesController extends Controller
                 ], 422);
             }
             $key = str($item['key'])->trim()->replace(' ', '_')->value;
-            $env = $database->environment_variables()->firstOrNew(['key' => $key]);
-            $env->fill($item);
-            $env->uses_legacy_escaping = false;
-            $env->save();
+            $env = $database->environment_variables()->updateOrCreate(
+                ['key' => $key],
+                $item
+            );
 
             $updatedEnvs->push($this->removeSensitiveEnvData($env));
         }

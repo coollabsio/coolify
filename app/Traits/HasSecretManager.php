@@ -2,8 +2,13 @@
 
 namespace App\Traits;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\SecretManagerLink;
+use App\Models\Service;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneRedis;
 use App\Support\RemoteSecretReferences;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use RuntimeException;
@@ -87,6 +92,42 @@ trait HasSecretManager
         return $environmentVariable->is_literal || $environmentVariable->is_multiline
             ? "'{$value}'"
             : escapeEnvVariables($value);
+    }
+
+    /**
+     * Whether the container gets a different value than the saved value, because this variable
+     * uses the old escaping. Secret manager values are not fetched here, so they never show it.
+     */
+    public function legacyEscapingChangesValue(EnvironmentVariable $environmentVariable): bool
+    {
+        if ($this->useExactEscaping($environmentVariable)) {
+            return false;
+        }
+
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        if (blank($value) || RemoteSecretReferences::containsReference($value)) {
+            return false;
+        }
+
+        $isRedisPassword = $environmentVariable->key === 'REDIS_PASSWORD'
+            && ($this instanceof StandaloneRedis || $this instanceof StandaloneKeydb || $this instanceof StandaloneDragonfly);
+
+        if ($isRedisPassword && str_contains($value, '$')) {
+            return true;
+        }
+
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return str_contains($value, '$') || (! $this instanceof Application && str_contains($value, "\n"));
+        }
+
+        if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
+            // Service and application .env files strip the old single quotes; database environment lists keep them.
+            return ($this instanceof Service || $this instanceof Application) ? str_contains($value, "'") : true;
+        }
+
+        return escapeEnvVariables($value) !== $value
+            || (($this instanceof Service || $this instanceof Application) && str_contains($value, ' #'));
     }
 
     /**

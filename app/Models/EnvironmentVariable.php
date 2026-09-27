@@ -131,22 +131,7 @@ class EnvironmentVariable extends BaseModel
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
             $environmentVariable->updateIsShared();
-
-            if ($environmentVariable->getOriginal('uses_legacy_escaping') && $environmentVariable->changesEscapedValue()) {
-                $environmentVariable->uses_legacy_escaping = false;
-            }
         });
-    }
-
-    /**
-     * A new value or format means the user saved the variable again, so it can use exact escaping.
-     * The flags are compared as booleans because not all database drivers return booleans.
-     */
-    private function changesEscapedValue(): bool
-    {
-        return $this->isDirty('value')
-            || (bool) $this->getOriginal('is_literal') !== (bool) $this->is_literal
-            || (bool) $this->getOriginal('is_multiline') !== (bool) $this->is_multiline;
     }
 
     public function service()

@@ -65,12 +65,12 @@ test('the migration marks existing variables as legacy and new variables as exac
         ->and($this->service->environment_variables()->create(['key' => 'NEW', 'value' => "a'b"])->fresh()->uses_legacy_escaping)->toBeFalse();
 });
 
-test('changing the value or format of a legacy variable switches it to exact escaping', function (array $change) {
+test('changing the value or format of a legacy variable keeps legacy escaping', function (array $change) {
     $variable = legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"]);
 
     $variable->update($change);
 
-    expect($variable->fresh()->uses_legacy_escaping)->toBeFalse();
+    expect($variable->fresh()->uses_legacy_escaping)->toBeTrue();
 })->with([
     'value' => [['value' => "a'c"]],
     'literal' => [['is_literal' => true]],
@@ -147,17 +147,34 @@ test('keydb column passwords keep the old start command', function () {
         ->toBe("keydb-server --requirepass 'p4\$\$word' --appendonly yes");
 });
 
-test('the update button switches a legacy variable to exact escaping', function () {
+test('saving in the editor without a value change keeps legacy escaping', function () {
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
     $variable = legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"]);
 
     Livewire::test(Show::class, ['env' => $variable, 'type' => 'service'])
         ->call('loadValues')
+        ->set('comment', 'only the comment changes')
         ->call('submit')
         ->assertHasNoErrors();
 
-    expect($variable->fresh()->uses_legacy_escaping)->toBeFalse();
+    expect($variable->fresh())
+        ->comment->toBe('only the comment changes')
+        ->uses_legacy_escaping->toBeTrue();
+});
+
+test('changing the value in the editor keeps legacy escaping', function () {
+    $this->actingAs($this->user);
+    session(['currentTeam' => $this->team]);
+    $variable = legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"]);
+
+    Livewire::test(Show::class, ['env' => $variable, 'type' => 'service'])
+        ->call('loadValues')
+        ->set('value', "a'c")
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($variable->fresh()->uses_legacy_escaping)->toBeTrue();
 });
 
 test('instant saves keep legacy escaping', function () {
@@ -172,54 +189,87 @@ test('instant saves keep legacy escaping', function () {
     expect($variable->fresh()->uses_legacy_escaping)->toBeTrue();
 });
 
-test('the editor does not tell users about legacy escaping', function () {
-    $this->actingAs($this->user);
-    session(['currentTeam' => $this->team]);
-    $variable = legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"]);
+test('a variable that is deleted and added again gets exact escaping', function () {
+    legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"])->delete();
 
-    Livewire::test(Show::class, ['env' => $variable, 'type' => 'service'])
-        ->call('loadValues')
-        ->assertDontSee('escaping');
+    $variable = $this->service->environment_variables()->create(['key' => 'CSP', 'value' => "a'b"]);
+
+    expect($variable->fresh()->uses_legacy_escaping)->toBeFalse()
+        ->and($this->service->composeEnvironmentFileLine($variable->fresh()))->toBe('CSP="a\'b"');
 });
 
-test('api updates switch service and database variables to exact escaping', function () {
+test('the editor shows the legacy escaping hint only when the container value differs from the saved value', function (bool $legacy, string $value, bool $expected) {
+    $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
-    $token = $this->user->createToken('test-token', ['*'])->plainTextToken;
-    $serviceVariable = legacyVariable($this->service, ['key' => 'CSP', 'value' => "a'b"]);
-    $bulkVariable = legacyVariable($this->service, ['key' => 'BULK', 'value' => "a'b"]);
+    $variable = $legacy
+        ? legacyVariable($this->service, ['key' => 'CSP', 'value' => $value])
+        : $this->service->environment_variables()->create(['key' => 'CSP', 'value' => $value]);
+
+    $component = Livewire::test(Show::class, ['env' => $variable->fresh(), 'type' => 'service'])
+        ->call('loadValues')
+        ->assertSet('legacyEscapingChangesValue', $expected);
+
+    $expected
+        ? $component->assertSee('delete this variable and add it again')
+        : $component->assertDontSee('delete this variable and add it again');
+})->with([
+    'legacy with a quote' => [true, "a'b", true],
+    'legacy plain value' => [true, 'plain-value', false],
+    'exact with a quote' => [false, "a'b", false],
+]);
+
+/**
+ * Automation often sends the same values on every run, so only a real change may switch the escaping.
+ *
+ * @return array{0: array<string, string>, 1: list<EnvironmentVariable>}
+ */
+function apiLegacyEscapingFixture(object $test): array
+{
+    session(['currentTeam' => $test->team]);
+    $headers = ['Authorization' => 'Bearer '.$test->user->createToken('test-token', ['*'])->plainTextToken];
     $database = StandalonePostgresql::forceCreate([
         'uuid' => 'postgres-api-legacy-test',
         'name' => 'Postgres api legacy test',
         'image' => 'postgres:16-alpine',
         'postgres_password' => 'password',
-        ...$this->resourceAttributes,
+        ...$test->resourceAttributes,
     ]);
-    $databaseVariable = legacyVariable($database, ['key' => 'CSP', 'value' => "a'b"]);
-    $headers = ['Authorization' => "Bearer {$token}"];
+    $application = Application::factory()->create($test->resourceAttributes);
 
-    $this->withHeaders($headers)->patchJson("/api/v1/services/{$this->service->uuid}/envs", ['key' => 'CSP', 'value' => "a'b"])->assertStatus(201);
-    $this->withHeaders($headers)->patchJson("/api/v1/services/{$this->service->uuid}/envs/bulk", ['data' => [['key' => 'BULK', 'value' => "a'b"]]])->assertStatus(201);
-    $this->withHeaders($headers)->patchJson("/api/v1/databases/{$database->uuid}/envs", ['key' => 'CSP', 'value' => "a'b"])->assertStatus(201);
+    $test->routes = [
+        'service' => ["/api/v1/services/{$test->service->uuid}/envs", legacyVariable($test->service, ['key' => 'CSP', 'value' => "a'b"])],
+        'service bulk' => ["/api/v1/services/{$test->service->uuid}/envs/bulk", legacyVariable($test->service, ['key' => 'BULK', 'value' => "a'b"])],
+        'database' => ["/api/v1/databases/{$database->uuid}/envs", legacyVariable($database, ['key' => 'CSP', 'value' => "a'b"])],
+        'database bulk' => ["/api/v1/databases/{$database->uuid}/envs/bulk", legacyVariable($database, ['key' => 'BULK', 'value' => "a'b"])],
+        'application' => ["/api/v1/applications/{$application->uuid}/envs", legacyVariable($application, ['key' => 'CSP', 'value' => "a'b"])],
+        'application bulk' => ["/api/v1/applications/{$application->uuid}/envs/bulk", legacyVariable($application, ['key' => 'BULK', 'value' => "a'b"])],
+    ];
 
-    expect($serviceVariable->fresh()->uses_legacy_escaping)->toBeFalse()
-        ->and($bulkVariable->fresh()->uses_legacy_escaping)->toBeFalse()
-        ->and($databaseVariable->fresh()->uses_legacy_escaping)->toBeFalse();
-});
+    return $headers;
+}
 
-test('api updates switch application variables to exact escaping', function () {
-    session(['currentTeam' => $this->team]);
-    $token = $this->user->createToken('test-token', ['*'])->plainTextToken;
-    $application = Application::factory()->create($this->resourceAttributes);
-    $singleVariable = legacyVariable($application, ['key' => 'CSP', 'value' => "a'b"]);
-    $bulkVariable = legacyVariable($application, ['key' => 'BULK', 'value' => "a'b"]);
-    $headers = ['Authorization' => "Bearer {$token}"];
+function patchLegacyEscapingVariable(object $test, array $headers, string $route, string $value): EnvironmentVariable
+{
+    [$url, $variable] = $test->routes[$route];
+    $payload = ['key' => $variable->key, 'value' => $value];
+    $test->withHeaders($headers)
+        ->patchJson($url, str_ends_with($url, '/bulk') ? ['data' => [$payload]] : $payload)
+        ->assertStatus(201);
 
-    $this->withHeaders($headers)->patchJson("/api/v1/applications/{$application->uuid}/envs", ['key' => 'CSP', 'value' => "a'b"])->assertStatus(201);
-    $this->withHeaders($headers)->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", ['data' => [['key' => 'BULK', 'value' => "a'b"]]])->assertStatus(201);
+    return $variable->fresh();
+}
 
-    expect($singleVariable->fresh()->uses_legacy_escaping)->toBeFalse()
-        ->and($bulkVariable->fresh()->uses_legacy_escaping)->toBeFalse();
-});
+test('api updates with the same value keep legacy escaping', function (string $route) {
+    $headers = apiLegacyEscapingFixture($this);
+
+    expect(patchLegacyEscapingVariable($this, $headers, $route, "a'b")->uses_legacy_escaping)->toBeTrue();
+})->with(['service', 'service bulk', 'database', 'database bulk', 'application', 'application bulk']);
+
+test('api updates with a new value keep legacy escaping', function (string $route) {
+    $headers = apiLegacyEscapingFixture($this);
+
+    expect(patchLegacyEscapingVariable($this, $headers, $route, "a'c")->uses_legacy_escaping)->toBeTrue();
+})->with(['service', 'service bulk', 'database', 'database bulk', 'application', 'application bulk']);
 
 test('the resolved value shows what the container gets for exact and legacy variables', function (array $attributes, string $exact, string $legacy) {
     $exactVariable = $this->service->environment_variables()->create(['key' => 'EXACT', ...$attributes]);
@@ -289,3 +339,24 @@ test('the editor shows the resolved value by escaping', function () {
         ->call('loadValues')
         ->assertSet('real_value', "array:\\'self\\'");
 });
+
+test('the legacy escaping hint follows how each resource type used the old escaping', function (string $type, array $attributes, bool $expected) {
+    $resource = match ($type) {
+        'application' => Application::factory()->create($this->resourceAttributes),
+        'database' => StandalonePostgresql::forceCreate([
+            'uuid' => 'postgres-hint-test',
+            'name' => 'Postgres hint test',
+            'image' => 'postgres:16-alpine',
+            'postgres_password' => 'password',
+            ...$this->resourceAttributes,
+        ]),
+    };
+    $variable = legacyVariable($resource, ['key' => 'HINT', ...$attributes]);
+
+    expect($resource->legacyEscapingChangesValue($variable))->toBe($expected);
+})->with([
+    'application plain with a quote' => ['application', ['value' => "a'b"], true],
+    'application literal without a quote' => ['application', ['value' => 'x$y', 'is_literal' => true], false],
+    'database literal adds quotes' => ['database', ['value' => 'x', 'is_literal' => true], true],
+    'database plain value' => ['database', ['value' => 'plain'], false],
+]);
