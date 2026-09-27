@@ -4,15 +4,10 @@
 # tags: whatsapp,api,gateway,messaging,automation,webhooks,open,source
 # logo: svgs/openwa.png
 # port: 2785
-#
-# Minimal stack: SQLite + local storage. No docker-proxy — Coolify manages the stack via compose.
-# Assign a domain to openwa (port 2785). Requires at least 2 GB RAM for whatsapp-web.js sessions.
 
 services:
   openwa:
     image: ghcr.io/rmyndharis/openwa:0.23.1
-    restart: unless-stopped
-    stop_grace_period: 45s
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -66,6 +61,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-
-volumes:
-  openwa-data:
