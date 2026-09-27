@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Enums\StaticImageTypes;
@@ -869,7 +870,39 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        // Start compose file
+        $this->start_docker_compose_services();
+
+        $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    private function pull_docker_compose_images(): void
+    {
+        $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
+
+        if ($this->use_build_server) {
+            $this->write_deployment_configurations();
+            $this->server = $this->mainServer;
+            $workdir = $this->application->workdir();
+            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
+        } else {
+            $workdir = $this->workdir;
+            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+        }
+
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+        ]);
+    }
+
+    /**
+     * Starts the Compose containers. Content files are written first, because `docker compose up`
+     * creates a missing bind source as an empty directory.
+     */
+    private function start_docker_compose_services(): void
+    {
+        $this->write_missing_content_files();
+
         $server_workdir = $this->application->workdir();
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
@@ -948,28 +981,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
-
-        $this->application_deployment_queue->addLogEntry('New container started.');
     }
 
-    private function pull_docker_compose_images(): void
+    /**
+     * The queued ServerStorageSaveJob writes new content files, but it can run after the containers
+     * start. Preserve-repository deployments write all file storages in write_deployment_configurations().
+     * Coolify writes file storages only on the main server of the application.
+     */
+    private function write_missing_content_files(): void
     {
-        $this->application_deployment_queue->addLogEntry('Pulling image-based services before stopping the current deployment.');
-
-        if ($this->use_build_server) {
-            $this->write_deployment_configurations();
-            $this->server = $this->mainServer;
-            $workdir = $this->application->workdir();
-            $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable";
-        } else {
-            $workdir = $this->workdir;
-            $command = executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable");
+        if ($this->preserveRepository) {
+            return;
+        }
+        if ((int) data_get($this->application, 'destination.server_id') !== (int) $this->mainServer->id) {
+            return;
         }
 
-        $this->execute_remote_command([
-            $command,
-            'hidden' => true,
-        ]);
+        EnsureContentFilesOnServer::run(
+            $this->application->fileStorages()->get(),
+            $this->mainServer,
+            function (string $message, string $type): void {
+                $this->application_deployment_queue->addLogEntry($message, $type);
+            },
+        );
     }
 
     private function deploy_dockerfile_buildpack()

@@ -26,6 +26,7 @@ function service_logo_urls(mixed $logo): array
 }
 
 use App\Models\Application;
+use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -223,6 +224,13 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->save();
                 if ($fileVolume->is_based_on_git) {
                     $fileVolume->loadStorageOnServer();
+                }
+            } elseif ($isDir === 'OK' && ! $fileVolume->is_directory && filled($content)) {
+                // A configured file must not lose its content because a directory is at its path.
+                // Docker leaves an empty directory when it starts before the file exists: replace it.
+                // A directory with files stays; the start or deployment shows a warning for it.
+                if (LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
+                    $fileVolume->saveStorageOnServer();
                 }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
