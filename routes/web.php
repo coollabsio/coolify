@@ -123,6 +123,13 @@ Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->mi
 Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
 
+// Connect3 fork: Traefik rewrites /robots.txt on every staging hostname to this route (c3_global.yaml).
+Route::get(C3_ROBOTS_PATH, fn () => response(C3_ROBOTS_BODY, 200, [
+    'Content-Type' => 'text/plain; charset=UTF-8',
+    'Cache-Control' => 'public, max-age=3600',
+    'X-Robots-Tag' => C3_NOINDEX_VALUE,
+]))->name('c3.robots');
+
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 

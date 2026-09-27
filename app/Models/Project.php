@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use App\Traits\C3\HasConnect3Site;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,12 +18,16 @@ use OpenApi\Attributes as OA;
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
         'description' => ['type' => 'string'],
+        'client_slug' => ['type' => 'string', 'nullable' => true, 'description' => 'Connect3: drives <slug>.<staging-apex>.'],
+        'site_state' => ['type' => 'string', 'enum' => ['staged', 'live']],
+        'live_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
     ]
 )]
 class Project extends BaseModel
 {
     use Auditable, HasFactory;
     use ClearsGlobalSearchCache;
+    use HasConnect3Site; // Connect3 fork
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -30,7 +35,28 @@ class Project extends BaseModel
         'description',
         'team_id',
         'uuid',
+        // Connect3 fork
+        'client_slug',
+        'site_state',
+        'live_domains',
+        'staging_auth_user',
+        'staging_auth_pass',
+        'ai_gateway_key_id',
     ];
+
+    // Connect3 fork
+    protected $hidden = [
+        'staging_auth_pass',
+    ];
+
+    // Connect3 fork
+    protected function casts(): array
+    {
+        return [
+            'live_domains' => 'array',
+            'staging_auth_pass' => 'encrypted',
+        ];
+    }
 
     /**
      * Get query builder for projects owned by current team.

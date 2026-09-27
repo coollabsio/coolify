@@ -70,6 +70,9 @@
             @endif
         </form>
 
+    {{-- Connect3 fork --}}
+    <livewire:settings.c3 />
+
     <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
         confirmAction="confirmDomainUsage">
         <x-slot:consequences>

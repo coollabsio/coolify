@@ -103,6 +103,9 @@
             </section>
         </form>
 
+        {{-- Connect3 fork --}}
+        <livewire:project.c3-settings :project="$project" />
+
         <section
             class="overflow-hidden rounded-[10px] border border-red-300 bg-red-50/80 dark:border-red-500/25 dark:bg-red-500/[0.06]">
             <div class="flex items-start justify-between gap-4 px-5 py-4">

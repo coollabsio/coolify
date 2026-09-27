@@ -233,7 +233,7 @@ class ProjectController extends Controller
     )]
     public function create_project(Request $request)
     {
-        $allowedFields = ['name', 'description'];
+        $allowedFields = ['name', 'description', 'client_slug']; // client_slug: Connect3 fork
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -248,6 +248,7 @@ class ProjectController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'client_slug' => ['nullable', 'string', 'max:63', 'regex:/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', 'not_regex:/--/', 'unique:projects,client_slug'], // Connect3 fork
         ], ValidationPatterns::combinedMessages());
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -269,6 +270,7 @@ class ProjectController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
+            'client_slug' => $request->client_slug, // Connect3 fork
         ]);
 
         return response()->json([

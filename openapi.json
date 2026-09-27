@@ -5481,6 +5481,250 @@
                 ]
             }
         },
+        "\/projects\/{uuid}\/c3": {
+            "get": {
+                "tags": [
+                    "Connect3"
+                ],
+                "summary": "Connect3 site status",
+                "description": "Slug, state, staging URL and credentials (credentials only with read:sensitive or root).",
+                "operationId": "c3-get-project-site",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Site status"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Connect3"
+                ],
+                "summary": "Update Connect3 fields",
+                "description": "Set or change client_slug and ai_gateway_key_id.",
+                "operationId": "c3-update-project-site",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "client_slug": {
+                                        "type": "string",
+                                        "description": "DNS label, lowercase, no \"--\"."
+                                    },
+                                    "ai_gateway_key_id": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "Validation failed"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/c3\/promote": {
+            "post": {
+                "tags": [
+                    "Connect3"
+                ],
+                "summary": "Promote to live",
+                "description": "Runs the DNS pre-flight, then routes the given client domains to the project. Blocked (422) when DNS does not point at this server.",
+                "operationId": "c3-promote-project-site",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "domains": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        ],
+                                        "description": "Client domain(s), comma separated string or array."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Promoted"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "Pre-flight blocked; nothing changed"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/c3\/demote": {
+            "post": {
+                "tags": [
+                    "Connect3"
+                ],
+                "summary": "Demote to staged",
+                "description": "Removes the live routers. Staging URL and credentials are unchanged.",
+                "operationId": "c3-demote-project-site",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "reason": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Demoted"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/c3\/regenerate-credentials": {
+            "post": {
+                "tags": [
+                    "Connect3"
+                ],
+                "summary": "Regenerate staging credentials",
+                "description": "Rotates the staging basic-auth password. Effective immediately, no redeploy.",
+                "operationId": "c3-regenerate-staging-credentials",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Regenerated"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/cloud-init-scripts": {
             "get": {
                 "tags": [
@@ -23493,6 +23737,24 @@
                     },
                     "description": {
                         "type": "string"
+                    },
+                    "client_slug": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Connect3: drives <slug>.<staging-apex>."
+                    },
+                    "site_state": {
+                        "type": "string",
+                        "enum": [
+                            "staged",
+                            "live"
+                        ]
+                    },
+                    "live_domains": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 },
                 "type": "object"
@@ -24196,6 +24458,10 @@
         {
             "name": "Applications",
             "description": "Applications"
+        },
+        {
+            "name": "Connect3",
+            "description": "Connect3"
         },
         {
             "name": "Cloud-init Scripts",

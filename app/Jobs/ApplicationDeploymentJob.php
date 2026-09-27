@@ -3630,6 +3630,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             });
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
+        // Connect3 fork guardrail: staging hostnames never leave here without auth + noindex (see bootstrap/helpers/c3.php).
+        $labels = c3_enforceStagingLabels($labels, c3_stagingApex(), c3_stagingCertResolver())->toArray();
 
         // Check for custom HEALTHCHECK
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {

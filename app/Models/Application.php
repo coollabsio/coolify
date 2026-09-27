@@ -11,6 +11,7 @@ use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\Auditable;
+use App\Traits\C3\HasStagingFqdn;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -130,6 +131,8 @@ class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
+
+    use HasStagingFqdn; // Connect3 fork
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 

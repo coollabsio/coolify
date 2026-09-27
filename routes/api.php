@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\ApplicationSecretManagerController;
 use App\Http\Controllers\Api\AuditEventsController;
+use App\Http\Controllers\Api\C3Controller;
 use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
@@ -110,6 +111,12 @@ Route::group([
     Route::post('/projects/{uuid}/environments/{environment_name_or_uuid}/envs', [SharedEnvironmentVariablesController::class, 'environment_create_env'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'environment_update_env'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'environment_delete_env'])->middleware(['api.ability:write']);
+    // Connect3 fork: must be registered before the environment catch-all below.
+    Route::get('/projects/{uuid}/c3', [C3Controller::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/projects/{uuid}/c3', [C3Controller::class, 'update'])->middleware(['api.ability:write']);
+    Route::post('/projects/{uuid}/c3/promote', [C3Controller::class, 'promote'])->middleware(['api.ability:write']);
+    Route::post('/projects/{uuid}/c3/demote', [C3Controller::class, 'demote'])->middleware(['api.ability:write']);
+    Route::post('/projects/{uuid}/c3/regenerate-credentials', [C3Controller::class, 'regenerateCredentials'])->middleware(['api.ability:write']);
     Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
     Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}', [ProjectController::class, 'update_environment'])->middleware(['api.ability:write']);

@@ -658,6 +658,9 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             $config['services']['traefik']['command'][] = '--providers.docker.exposedbydefault=false';
         }
 
+        // Connect3 fork: DNS-01 wildcard resolver for the staging apex.
+        $config = c3_applyProxyExtras($config, $server->isLocalhost() && c3_enabled() && c3_hasCloudflareToken());
+
         // Append custom commands (e.g., trustedIPs for Cloudflare)
         if (! empty($custom_commands)) {
             foreach ($custom_commands as $custom_command) {

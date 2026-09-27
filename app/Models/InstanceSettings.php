@@ -59,6 +59,9 @@ class InstanceSettings extends Model
         'avatar_s3_storage_id',
         'image_cdn_url',
         'is_dashboard_force_https_enabled',
+        // Connect3 fork
+        'c3_staging_apex',
+        'c3_cloudflare_dns_token',
     ];
 
     protected $hidden = [
@@ -71,6 +74,7 @@ class InstanceSettings extends Model
         'resend_api_key',
         'domain_connect_private_key',
         'sentinel_token',
+        'c3_cloudflare_dns_token', // Connect3 fork
     ];
 
     protected $casts = [
@@ -100,6 +104,7 @@ class InstanceSettings extends Model
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',
+        'c3_cloudflare_dns_token' => 'encrypted', // Connect3 fork
     ];
 
     protected static function booted(): void
