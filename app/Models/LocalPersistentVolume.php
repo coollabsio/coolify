@@ -184,6 +184,7 @@ class LocalPersistentVolume extends BaseModel
 
             $compose = Yaml::parse($composeContent);
             $services = data_get($compose, 'services', []);
+            $topLevelVolumes = data_get($compose, 'volumes', []);
 
             if ($this->isServiceResource()) {
                 $services = array_intersect_key($services, [$resource->name => true]);
@@ -194,6 +195,11 @@ class LocalPersistentVolume extends BaseModel
                     $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
+                    // Volume names may contain dots, so the top-level definition is looked up directly.
+                    if ($source && isExternalVolume($topLevelVolumes[(string) $source] ?? null)) {
+                        continue;
+                    }
+
                     $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
                     $generatedName = $source ? $resourceUuid.'_'.Str::slug($source, '-') : null;
 
