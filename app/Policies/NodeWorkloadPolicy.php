@@ -31,4 +31,12 @@ class NodeWorkloadPolicy
     {
         return $user->isAdminOfTeam($nodeWorkload->team_id);
     }
+
+    /**
+     * Determine whether the user can manage environment variables.
+     */
+    public function manageEnvironment(User $user, NodeWorkload $nodeWorkload): bool
+    {
+        return $user->isAdminOfTeam($nodeWorkload->team_id);
+    }
 }

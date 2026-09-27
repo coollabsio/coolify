@@ -1099,5 +1099,6 @@ class All extends Component
         if ($this->view === 'dev') {
             $this->getDevView();
         }
+        $this->dispatch('configurationChanged');
     }
 }

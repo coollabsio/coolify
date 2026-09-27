@@ -13,14 +13,15 @@ class UpdateNodeWorkloadConfiguration
 
     /**
      * @param  list<string>  $command
-     * @param  array<string, string>  $environment
+     * @param  array<string, string>|null  $environment  Null keeps the current revision environment.
      */
-    public function handle(NodeWorkload $workload, array $command, array $environment): NodeWorkloadRevision
+    public function handle(NodeWorkload $workload, array $command, ?array $environment = null): NodeWorkloadRevision
     {
         return DB::transaction(function () use ($workload, $command, $environment): NodeWorkloadRevision {
             $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
             $current = $workload->revisions()->latest('id')->lockForUpdate()->firstOrFail();
             $configuration = $current->configuration ?? [];
+            $environment ??= $current->environment ?? [];
             unset($configuration['command'], $configuration['ports']);
             if ($command !== []) {
                 $configuration['command'] = $command;

@@ -5,12 +5,14 @@ namespace App\Livewire\Project\ClusterApplication;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\DetermineWorkloadState;
+use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
+use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Environment;
 use App\Models\Node;
 use App\Models\NodeOperation;
@@ -65,8 +67,6 @@ class Show extends Component
 
     public string $startCommand = '';
 
-    public string $environmentVariables = '';
-
     public function mount(string $project_uuid, string $environment_uuid, string $workload_uuid, ?string $deployment_uuid = null): void
     {
         $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
@@ -86,9 +86,15 @@ class Show extends Component
 
     public function deploy(): void
     {
-        $this->authorize('update', $this->workload);
-        $revision = $this->workload->revisions()->latest('id')->firstOrFail();
-        $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
+        try {
+            $this->authorize('update', $this->workload);
+            $revision = PrepareNodeWorkloadRevision::run($this->workload);
+            $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
+        } catch (\Throwable $exception) {
+            handleError($exception, $this);
+
+            return;
+        }
         $operation = $deployment['operation'];
         if ($deployment['created']) {
             DeployNodeWorkloadJob::dispatch($operation->id);
@@ -111,6 +117,7 @@ class Show extends Component
     {
         $this->authorize('view', $this->workload);
         $this->loadData();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
     }
 
     public function saveResources(): void
@@ -140,25 +147,23 @@ class Show extends Component
         ]);
         $this->loadData();
         $this->loadResourceSettings();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Resource settings saved. Redeploy the application to apply them.');
     }
 
     public function saveConfiguration(): void
     {
         $this->authorize('update', $this->workload);
-        $this->validate([
-            'startCommand' => ['nullable', 'string', 'max:16384'],
-            'environmentVariables' => ['nullable', 'string', 'max:262144'],
-        ]);
+        $this->validate(['startCommand' => ['nullable', 'string', 'max:16384']]);
         $command = $this->parseStartCommand();
-        $environment = $this->parseEnvironmentVariables();
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
 
-        UpdateNodeWorkloadConfiguration::run($this->workload, $command, $environment);
+        UpdateNodeWorkloadConfiguration::run($this->workload, $command);
         $this->loadData();
         $this->loadConfiguration();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Configuration saved. Redeploy the application to apply it.');
     }
 
@@ -412,12 +417,6 @@ class Show extends Component
         $this->startCommand = collect($configuration['command'] ?? [])
             ->map(fn (string $argument): string => preg_match('/[\s"]/', $argument) === 1 ? '"'.str_replace('"', '""', $argument).'"' : $argument)
             ->implode(' ');
-        $this->environmentVariables = '';
-        if (auth()->user()?->can('update', $this->workload)) {
-            $this->environmentVariables = collect($revision?->environment ?? [])
-                ->map(fn (string $value, string $key): string => "{$key}={$value}")
-                ->implode("\n");
-        }
     }
 
     /** @return list<string> */
@@ -434,40 +433,6 @@ class Show extends Component
         }
 
         return $command;
-    }
-
-    /** @return array<string, string> */
-    private function parseEnvironmentVariables(): array
-    {
-        $environment = [];
-        foreach (preg_split('/\r\n|\r|\n/', $this->environmentVariables) as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
-                continue;
-            }
-            if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s', $line, $matches) !== 1) {
-                $this->addError('environmentVariables', 'Each line must use KEY=VALUE. Keys can contain letters, numbers, and underscores.');
-
-                return [];
-            }
-            $value = $matches[2];
-            if (strlen($value) >= 2 && in_array($value[0], ['"', "'"], true) && str_ends_with($value, $value[0])) {
-                $value = substr($value, 1, -1);
-            }
-            if (mb_strlen($value) > 4096) {
-                $this->addError('environmentVariables', "The value of {$matches[1]} is longer than 4096 characters.");
-
-                return [];
-            }
-            $environment[$matches[1]] = $value;
-        }
-        if (count($environment) > 256) {
-            $this->addError('environmentVariables', 'Use at most 256 environment variables.');
-
-            return [];
-        }
-
-        return $environment;
     }
 
     private function loadResourceSettings(): void

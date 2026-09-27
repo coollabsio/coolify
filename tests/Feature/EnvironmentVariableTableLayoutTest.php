@@ -156,7 +156,7 @@ test('environment variable editor places delete left and update actions right', 
     expect($view)
         ->toContain('class="flex flex-wrap items-center justify-between gap-2 border-t')
         ->toMatch('/data-environment-variable-delete-action[\s\S]+buttonTitle="Delete"[\s\S]+data-environment-variable-update-actions[\s\S]+Lock[\s\S]+Update variable/')
-        ->toContain('@environment-variable-updated.window="if ($event.detail.envId === @js($env->id)) modalOpen = false"')
+        ->toContain('@environment-variable-updated.window="if ($event.detail.envId === {{ (int) $env->id }}) modalOpen = false"')
         ->toContain('<fieldset disabled wire:dirty.attr.remove="disabled">')
         ->toContain('type="submit" isHighlighted wire:target="submit"')
         ->toContain('wire:dirty.attr.remove="disabled"')

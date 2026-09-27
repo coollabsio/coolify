@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\CreateClusterDockerImageWorkload;
+use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\UpdateNodeWorkloadConfiguration;
 use App\Enums\NodeContainerManagementState;
 use App\Enums\NodeOperationStatus;
@@ -9,6 +10,8 @@ use App\Jobs\ManageNodeWorkloadJob;
 use App\Livewire\Project\ClusterApplication\Show as ClusterApplicationShow;
 use App\Livewire\Project\New\DockerImage;
 use App\Livewire\Project\New\Select;
+use App\Livewire\Project\Shared\EnvironmentVariable\All as EnvironmentVariableAll;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show as EnvironmentVariableShow;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Node;
@@ -19,6 +22,7 @@ use App\Models\NodeWorkload;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -502,35 +506,155 @@ it('creates a new revision when resource settings return to an earlier value', f
         ->and($revisions[3]->configuration_hash)->toBe($revisions[1]->configuration_hash);
 });
 
-it('lets an administrator save a start command and encrypted environment variables', function () {
+it('saves a start command and keeps the environment of the current revision', function () {
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['APP_ENV' => 'production']);
 
     Livewire::test(ClusterApplicationShow::class, [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'workload_uuid' => $deployment['workload']->uuid,
     ])
-        ->assertSee('Configuration')
         ->set('startCommand', 'nginx -g "daemon off;"')
-        ->set('environmentVariables', "# comment\nAPP_ENV=production\nSECRET=\"s3cret value\"\n")
         ->call('saveConfiguration')
         ->assertHasNoErrors()
         ->assertDispatched('success')
-        ->assertSet('startCommand', 'nginx -g "daemon off;"')
-        ->assertSet('environmentVariables', "APP_ENV=production\nSECRET=s3cret value");
+        ->assertDispatched('configurationChanged')
+        ->assertSet('startCommand', 'nginx -g "daemon off;"');
 
     $latest = $deployment['workload']->revisions()->latest('id')->firstOrFail();
-    $rawEnvironment = DB::table('node_workload_revisions')->where('id', $latest->id)->value('environment');
-    expect($deployment['workload']->revisions()->count())->toBe(2)
+    expect($deployment['workload']->revisions()->count())->toBe(3)
         ->and($latest->configuration)->toBe([
             'restart_policy' => 'unless-stopped',
             'command' => ['nginx', '-g', 'daemon off;'],
         ])
-        ->and($latest->environment)->toBe(['APP_ENV' => 'production', 'SECRET' => 's3cret value'])
+        ->and($latest->environment)->toBe(['APP_ENV' => 'production']);
+});
+
+it('records resolved runtime environment variables in a new encrypted revision on deploy', function () {
+    Queue::fake();
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
+    $workload = $deployment['workload'];
+    SharedEnvironmentVariable::query()->create([
+        'key' => 'DB_HOST',
+        'value' => 'db.internal',
+        'type' => 'project',
+        'team_id' => $this->team->id,
+        'project_id' => $this->project->id,
+    ]);
+    $workload->environment_variables()->createMany([
+        ['key' => 'SECRET', 'value' => 's3cret value'],
+        ['key' => 'APP_ENV', 'value' => 'production'],
+        ['key' => 'DATABASE_HOST', 'value' => '{{project.DB_HOST}}'],
+        ['key' => 'BUILD_ONLY', 'value' => 'not-at-runtime', 'is_runtime' => false],
+    ]);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $workload->uuid,
+    ])->call('deploy');
+
+    $latest = $workload->revisions()->latest('id')->firstOrFail();
+    $rawEnvironment = DB::table('node_workload_revisions')->where('id', $latest->id)->value('environment');
+    expect($workload->revisions()->count())->toBe(2)
+        ->and($latest->environment)->toBe([
+            'APP_ENV' => 'production',
+            'DATABASE_HOST' => 'db.internal',
+            'SECRET' => 's3cret value',
+        ])
         ->and($rawEnvironment)->not->toContain('s3cret')
-        ->and($latest->toArray())->not->toHaveKey('environment');
+        ->and($latest->toArray())->not->toHaveKey('environment')
+        ->and($workload->operations()->latest('id')->firstOrFail()->node_workload_revision_id)->toBe($latest->id);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $workload->uuid,
+    ])->call('deploy');
+    expect($workload->revisions()->count())->toBe(2);
+});
+
+it('does not deploy environment variable names that Podman cannot use', function () {
+    Queue::fake();
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
+    $deployment['workload']->environment_variables()->create(['key' => 'app.name', 'value' => 'demo']);
+
+    Livewire::test(ClusterApplicationShow::class, [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ])
+        ->call('deploy')
+        ->assertDispatched('error')
+        ->assertNoRedirect();
+
+    expect($deployment['workload']->operations()->count())->toBe(1)
+        ->and($deployment['workload']->revisions()->count())->toBe(1);
+    Queue::assertNotPushed(DeployNodeWorkloadJob::class);
+});
+
+it('warns about pending changes until the latest configuration is deployed', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $workload = $deployment['workload'];
+    expect($workload->isConfigurationChanged())->toBeFalse();
+
+    $deployment['operation']->update(['status' => NodeOperationStatus::SUCCEEDED]);
+    expect($workload->fresh()->isConfigurationChanged())->toBeFalse();
+
+    $workload->environment_variables()->create(['key' => 'APP_ENV', 'value' => 'production']);
+    expect($workload->fresh()->isConfigurationChanged())->toBeTrue();
+
+    $routeParameters = [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $workload->uuid,
+    ];
+    $this->get(route('project.cluster-application.show', $routeParameters))
+        ->assertOk()
+        ->assertSee('Changes pending')
+        ->assertSee('The latest configuration has not been applied');
+
+    $revision = PrepareNodeWorkloadRevision::run($workload);
+    NodeOperation::factory()->create([
+        'node_id' => $this->node->id,
+        'node_workload_id' => $workload->id,
+        'node_workload_revision_id' => $revision->id,
+        'command_type' => 'workload.deploy.v1',
+        'status' => NodeOperationStatus::SUCCEEDED,
+    ]);
+    expect($workload->fresh()->isConfigurationChanged())->toBeFalse();
+    $this->get(route('project.cluster-application.show', $routeParameters))
+        ->assertOk()
+        ->assertDontSee('Changes pending');
+
+    UpdateNodeWorkloadConfiguration::run($workload, ['nginx']);
+    expect($workload->fresh()->isConfigurationChanged())->toBeTrue();
+});
+
+it('copies environment variables from the latest revision when migrating', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['APP_ENV' => 'production', 'SECRET' => 'value']);
+
+    $migration = require database_path('migrations/2026_09_27_183939_move_node_workload_environment_to_environment_variables.php');
+    $migration->up();
+    $migration->up();
+
+    expect($deployment['workload']->environment_variables()->orderBy('order')->pluck('value', 'key')->all())
+        ->toBe(['APP_ENV' => 'production', 'SECRET' => 'value'])
+        ->and($deployment['workload']->fresh()->runtimeEnvironment())->toBe(['APP_ENV' => 'production', 'SECRET' => 'value']);
 });
 
 it('drops host ports from an older revision when the configuration is saved', function () {
@@ -573,31 +697,10 @@ it('keeps the current revision when the configuration does not change', function
     expect($deployment['workload']->revisions()->count())->toBe(1);
 });
 
-it('rejects invalid environment variables', function (string $field, string $value) {
+it('forbids members from changing the configuration or managing environment variables', function () {
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
-
-    Livewire::test(ClusterApplicationShow::class, [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'workload_uuid' => $deployment['workload']->uuid,
-    ])
-        ->set($field, $value)
-        ->call('saveConfiguration')
-        ->assertHasErrors([$field]);
-
-    expect($deployment['workload']->revisions()->count())->toBe(1);
-})->with([
-    'missing equals sign' => ['environmentVariables', 'APP_ENV'],
-    'invalid key' => ['environmentVariables', '1BAD=value'],
-]);
-
-it('hides environment variables from members and forbids configuration changes', function () {
-    $deployment = CreateClusterDockerImageWorkload::run(
-        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
-    );
-    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['SECRET' => 'member-must-not-see']);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
     $this->actingAs($member);
@@ -608,13 +711,13 @@ it('hides environment variables from members and forbids configuration changes',
         'environment_uuid' => $this->environment->uuid,
         'workload_uuid' => $deployment['workload']->uuid,
     ])
-        ->assertSet('environmentVariables', '')
-        ->assertDontSee('member-must-not-see')
         ->set('startCommand', 'nginx')
         ->call('saveConfiguration')
         ->assertForbidden();
 
-    expect($deployment['workload']->revisions()->count())->toBe(2);
+    expect($member->can('manageEnvironment', $deployment['workload']))->toBeFalse()
+        ->and($this->user->can('manageEnvironment', $deployment['workload']))->toBeTrue()
+        ->and($deployment['workload']->revisions()->count())->toBe(1);
 });
 
 it('asks Sentinel for a newer image when an administrator redeploys', function () {
@@ -728,7 +831,7 @@ it('renders every cluster application section as its own page', function (string
         ->and(ClusterApplicationShow::SECTIONS)->toContain($section);
 })->with([
     'general' => ['project.cluster-application.show', 'general', ['Overview', 'Internal hostname', 'Copy internal hostname', 'Runtime', 'Start command']],
-    'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'APP_ENV=production', 'Values are stored encrypted.']],
+    'environment variables' => ['project.cluster-application.environment-variables', 'environment-variables', ['Environment variables', 'Developer view']],
     'resource limits' => ['project.cluster-application.resource-limits', 'resource-limits', ['CPU limit (cores)', 'Memory reservation (MiB)']],
     'deployments' => ['project.cluster-application.deployments', 'deployments', ['Deployment history', 'Status', 'Revision', 'Duration', 'Node', 'Failed', 'Manual']],
 ]);
@@ -881,11 +984,44 @@ it('does not open logs for operations that are not deployments of this applicati
         ->assertNotFound();
 });
 
+it('uses the shared environment variable editor on the environment variables page', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $deployment['workload']->environment_variables()->create(['key' => 'APP_ENV', 'value' => 'visible-to-admins']);
+
+    $this->get(route('project.cluster-application.environment-variables', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'workload_uuid' => $deployment['workload']->uuid,
+    ]))
+        ->assertOk()
+        ->assertSeeLivewire(EnvironmentVariableAll::class)
+        ->assertSee('Developer view');
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $deployment['workload']])
+        ->call('loadEnvironmentVariables')
+        ->assertSee('APP_ENV')
+        ->call('switch')
+        ->assertSet('variables', 'APP_ENV=visible-to-admins');
+});
+
+it('closes the edit dialog of the updated environment variable row', function () {
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    );
+    $variable = $deployment['workload']->environment_variables()->create(['key' => 'APP_ENV', 'value' => 'production']);
+
+    Livewire::test(EnvironmentVariableShow::class, ['env' => $variable, 'type' => 'cluster-application'])
+        ->assertSeeHtml('$event.detail.envId === '.$variable->id.')')
+        ->assertDontSeeHtml('@js(');
+});
+
 it('hides environment variable values from members on the environment variables page', function () {
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
     );
-    UpdateNodeWorkloadConfiguration::run($deployment['workload'], [], ['SECRET' => 'member-must-not-see']);
+    $deployment['workload']->environment_variables()->create(['key' => 'SECRET', 'value' => 'member-must-not-see']);
     $member = User::factory()->create();
     $member->teams()->attach($this->team, ['role' => 'member']);
     $this->actingAs($member);
@@ -897,9 +1033,14 @@ it('hides environment variable values from members on the environment variables 
         'workload_uuid' => $deployment['workload']->uuid,
     ]))
         ->assertOk()
-        ->assertSee('Environment variables are hidden')
         ->assertDontSee('member-must-not-see')
+        ->assertDontSee('Developer view')
         ->assertDontSee('cluster-application-desktop-actions', false);
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $deployment['workload']])
+        ->call('loadEnvironmentVariables')
+        ->assertSee('SECRET')
+        ->assertDontSee('member-must-not-see');
 });
 
 it('does not expose any cluster application section to another team', function (string $routeName) {

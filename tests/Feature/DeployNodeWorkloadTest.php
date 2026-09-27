@@ -329,6 +329,7 @@ it('queues an assigned revision from the Node page without storing environment v
         'node_workload_id' => $workload->id,
         'environment' => ['SECRET' => 'do-not-store'],
     ]);
+    $workload->environment_variables()->create(['key' => 'SECRET', 'value' => 'do-not-store']);
     $this->actingAs($user);
     session(['currentTeam' => $team]);
     Queue::fake();
@@ -351,6 +352,30 @@ it('queues an assigned revision from the Node page without storing environment v
         DeployNodeWorkloadJob::class,
         fn ($job) => $job->operationId === $operation->id,
     );
+});
+
+it('deploys the current environment variables from the node page', function () {
+    config()->set('app.env', 'local');
+    config()->set('constants.sentinel.host_enabled', true);
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $cluster = NodeCluster::factory()->create(['team_id' => $team->id]);
+    $node = Node::factory()->create(deploymentReadyNodeAttributes($team->id, $this->key->id, $cluster->id));
+    $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
+    $node->workloads()->attach($workload);
+    $revision = NodeWorkloadRevision::factory()->create(['node_workload_id' => $workload->id, 'environment' => []]);
+    $workload->environment_variables()->create(['key' => 'APP_ENV', 'value' => 'production']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+    Queue::fake();
+
+    Livewire::test(Show::class, ['node_uuid' => $node->uuid, 'section' => 'workloads'])
+        ->call('deployRevision', $revision->uuid)
+        ->assertDispatched('success');
+
+    $deployed = $node->operations()->firstOrFail()->revision;
+    expect($deployed->id)->not->toBe($revision->id)
+        ->and($deployed->environment)->toBe(['APP_ENV' => 'production']);
 });
 
 it('queues an uncertain deployment again with the same operation identity', function () {

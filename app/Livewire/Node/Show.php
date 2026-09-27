@@ -8,6 +8,7 @@ use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
+use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\ValidateNode;
@@ -115,6 +116,9 @@ class Show extends Component
                     ->where('team_id', $this->node->team_id)
                     ->whereHas('nodes', fn ($nodes) => $nodes->whereKey($this->node->id)))
                 ->firstOrFail();
+            if ($revision->workload->revisions()->latest('id')->value('id') === $revision->id) {
+                $revision = PrepareNodeWorkloadRevision::run($revision->workload);
+            }
             $deployment = CreateDeploymentOperation::run($this->node, $revision, auth()->user(), 'newer');
             $operation = $deployment['operation'];
             if ($deployment['created']) {

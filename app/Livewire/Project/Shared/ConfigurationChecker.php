@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
+use App\Models\NodeWorkload;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -25,7 +26,7 @@ class ConfigurationChecker extends Component
 
     public array $missingRequiredEnvironmentVariableNames = [];
 
-    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
+    public Application|NodeWorkload|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
     public function getListeners(): array
     {

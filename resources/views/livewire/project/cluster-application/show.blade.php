@@ -14,6 +14,9 @@
         };
     @endphp
 
+    <livewire:project.shared.configuration-checker :resource="$workload"
+        wire:key="cluster-application-configuration-checker-{{ $workload->uuid }}" />
+
     <x-slot:title>
         {{ str($workload->name)->limit(10) }} > {{ $sectionTitles[$section] }} | Coolify
     </x-slot>
