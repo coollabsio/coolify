@@ -1,0 +1,44 @@
+# documentation: https://github.com/fxerkan/my_network_scanner#readme
+# slogan: See every device on your home network - including the Zigbee, Z-Wave, Matter and Bluetooth LE ones an IP scan cannot find.
+# category: monitoring
+# tags: network, scanner, monitoring, homelab, home-assistant, iot, mdns, matter, zigbee, zwave, discovery
+# logo: svgs/mynes.svg
+# port: 5883
+
+# Host networking is required: raw ARP frames and mDNS/SSDP multicast do not cross a bridge
+# network, so the proxy cannot route by container name and the UI is served on host port 5883.
+# Every environment variable below is optional and can also be set in the app's own settings.
+services:
+  mynes:
+    image: fxerkan/my_network_scanner:1.8.2
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - MYNES_PORT=5883
+      - MYNES_PASSWORD=${SERVICE_PASSWORD_MYNES}
+      # Login gate: set MYNES_AUTH_ENABLED=true with a username+password to require sign-in.
+      - MYNES_AUTH_ENABLED=${MYNES_AUTH_ENABLED:-false}
+      - MYNES_AUTH_USERNAME=${MYNES_AUTH_USERNAME:-}
+      - MYNES_AUTH_PASSWORD=${MYNES_AUTH_PASSWORD:-}
+      - MYNES_MQTT_HOST=${MYNES_MQTT_HOST:-}
+      - HA_URL=${HA_URL:-}
+      - HA_TOKEN=${HA_TOKEN:-}
+    volumes:
+      - mynes-data:/app/data
+      - mynes-config:/app/config
+      # Optional: names your containers and the docker networks behind the
+      # br-* bridges. Remove it to keep the Docker API out of MyNeS.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Bluetooth LE discovery: bleak reaches the host's BlueZ over the D-Bus
+      # system bus, so no USB passthrough and no privileged mode - the app still
+      # runs unprivileged. Harmless if the host has no bluetoothd: MyNeS reports
+      # the bus as unreachable instead of failing. Remove to disable BLE.
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    healthcheck:
+      test: ["CMD", "python", "-c", "import http.client as h; c=h.HTTPConnection('localhost',5883,timeout=5); c.request('GET','/api/health'); exit(0 if c.getresponse().status < 500 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
