@@ -256,7 +256,7 @@ class StartMysql
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'MYSQL_ROOT_PASSWORD') {
-                $this->resolvedMysqlRootPassword = $rawValue;
+                $this->resolvedMysqlRootPassword = $this->database->composeCommandValue($env, $rawValue);
             }
         }
 

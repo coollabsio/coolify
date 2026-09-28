@@ -75,10 +75,10 @@ it('keeps raw secret values separate from compose environment formatting', funct
         ->toContain('$environment_variables->push($env->key.\'=\'.$resolvedValue);')
         ->toContain(...$rawAssignments);
 })->with([
-    'clickhouse' => ['StartClickhouse', ['$this->resolvedClickhouseUser = $rawValue;', '$this->resolvedClickhousePassword = $rawValue;']],
-    'dragonfly' => ['StartDragonfly', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
-    'keydb' => ['StartKeydb', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
+    'clickhouse' => ['StartClickhouse', ['$this->resolvedClickhouseUser = $this->database->composeCommandValue($env, $rawValue);', '$this->resolvedClickhousePassword = $this->database->composeCommandValue($env, $rawValue);']],
+    'dragonfly' => ['StartDragonfly', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->composeRedisPassword())']],
+    'keydb' => ['StartKeydb', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->composeRedisPassword())']],
     'mongodb' => ['StartMongodb', ['$this->resolvedMongoUsername = $rawValue;', '$this->resolvedMongoPassword = $rawValue;', '$this->resolvedMongoDatabase = $rawValue;', 'json_encode($this->resolvedMongoPassword']],
-    'mysql' => ['StartMysql', ['$this->resolvedMysqlRootPassword = $rawValue;']],
-    'postgresql' => ['StartPostgresql', ['$this->resolvedPostgresUser = $rawValue;', '$this->resolvedPostgresDatabase = $rawValue;']],
+    'mysql' => ['StartMysql', ['$this->resolvedMysqlRootPassword = $this->database->composeCommandValue($env, $rawValue);']],
+    'postgresql' => ['StartPostgresql', ['$this->resolvedPostgresUser = $this->database->composeCommandValue($env, $rawValue);', '$this->resolvedPostgresDatabase = $this->database->composeCommandValue($env, $rawValue);']],
 ]);

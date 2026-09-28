@@ -187,8 +187,8 @@ YAML);
 
     $env = composeNetworkDeploymentEnv($application);
 
-    expect($env)->toContain('SHARED_NETWORK=traefik_public')
-        ->and($env)->toContain('OTHER_NETWORK=edge_net');
+    expect($env)->toContain('SHARED_NETWORK='.escapeComposeEnvFileValue('traefik_public', allowInterpolation: true))
+        ->and($env)->toContain('OTHER_NETWORK='.escapeComposeEnvFileValue('edge_net', allowInterpolation: true));
 
     $buildEnv = composeNetworkDeploymentEnv($application, method: 'generate_buildtime_environment_variables')->implode("\n");
 
@@ -209,5 +209,5 @@ YAML);
 
     $application->parse();
 
-    expect(composeNetworkDeploymentEnv($application, 7))->toContain('SHARED_NETWORK=traefik_public');
+    expect(composeNetworkDeploymentEnv($application, 7))->toContain('SHARED_NETWORK='.escapeComposeEnvFileValue('traefik_public', allowInterpolation: true));
 });

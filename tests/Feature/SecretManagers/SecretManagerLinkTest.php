@@ -242,9 +242,9 @@ test('redis remote credentials stay deployment-local and use raw values in the s
     expect($password->fresh()->value)->toBe('{{team.REDIS_PASSWORD}}')
         ->and($sharedPassword->fresh()->value)->toBe('{{vault.REDIS_PASSWORD}}')
         ->and($username->fresh()->value)->toBe('{{vault.REDIS_USERNAME}}')
-        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
+        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$$$word')
         ->and($environmentVariables)->toContain('REDIS_USERNAME=remote-user')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$\$\$word'");
 });
 
 test('all deployable environment-variable resources support secret managers', function (string $resourceClass) {

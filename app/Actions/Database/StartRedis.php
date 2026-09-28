@@ -27,6 +27,8 @@ class StartRedis
 
     private ?string $resolvedRedisUsername = null;
 
+    private bool $redisPasswordUsesLegacyEscaping = true;
+
     public function handle(StandaloneRedis $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -252,6 +254,7 @@ class StartRedis
 
                 if ($env->key === 'REDIS_PASSWORD') {
                     $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
 
                     if (! $usesSecretManager) {
                         $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
@@ -274,6 +277,7 @@ class StartRedis
 
                 if ($env->key === 'REDIS_PASSWORD') {
                     $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
                 } elseif ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
                 }
@@ -290,6 +294,9 @@ class StartRedis
     private function buildStartCommand(): string
     {
         $redisPassword = $this->resolvedRedisPassword ?? $this->database->redis_password;
+        if (! $this->redisPasswordUsesLegacyEscaping) {
+            $redisPassword = escapeDollarSign(escapeshellarg((string) $redisPassword));
+        }
         $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 

@@ -25,6 +25,8 @@ class StartKeydb
 
     private string $resolvedRedisPassword;
 
+    private bool $redisPasswordUsesLegacyEscaping = true;
+
     public function handle(StandaloneKeydb $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -103,7 +105,7 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'keydb-cli', '--pass', $this->composeRedisPassword(), 'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -253,6 +255,7 @@ class StartKeydb
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
                 $this->resolvedRedisPassword = $rawValue;
+                $this->redisPasswordUsesLegacyEscaping = ! $this->database->useExactEscaping($env);
             }
         }
 
@@ -276,11 +279,21 @@ class StartKeydb
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
     }
 
+    /**
+     * Compose interpolates `$` in the command and healthcheck, so exact passwords double it.
+     */
+    private function composeRedisPassword(): string
+    {
+        return $this->redisPasswordUsesLegacyEscaping
+            ? $this->resolvedRedisPassword
+            : escapeDollarSign($this->resolvedRedisPassword);
+    }
+
     private function buildStartCommand(): string
     {
         $hasKeydbConf = ! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf);
         $keydbConfPath = '/etc/keydb/keydb.conf';
-        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
+        $escapedRedisPassword = escapeshellarg($this->composeRedisPassword());
 
         if ($hasKeydbConf) {
             $confContent = $this->database->keydb_conf;

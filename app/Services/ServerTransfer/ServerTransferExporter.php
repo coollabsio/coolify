@@ -838,6 +838,7 @@ class ServerTransferExporter
                 'is_shown_once' => (bool) $variable->is_shown_once,
                 'is_shared' => (bool) $variable->is_shared,
                 'is_required' => (bool) ($variable->is_required ?? false),
+                'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'comment' => $variable->comment,
                 'order' => $variable->order,
             ];

@@ -160,9 +160,9 @@ class StartClickhouse
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'CLICKHOUSE_USER') {
-                $this->resolvedClickhouseUser = $rawValue;
+                $this->resolvedClickhouseUser = $this->database->composeCommandValue($env, $rawValue);
             } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
-                $this->resolvedClickhousePassword = $rawValue;
+                $this->resolvedClickhousePassword = $this->database->composeCommandValue($env, $rawValue);
             }
         }
 

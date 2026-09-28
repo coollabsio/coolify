@@ -1034,6 +1034,8 @@ class ServerTransferImporter
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
                     'is_shared' => (bool) data_get($variable, 'is_shared', false),
                     'is_required' => (bool) data_get($variable, 'is_required', false),
+                    // Exports from older versions have no flag; their values use the old escaping.
+                    'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
                     'comment' => data_get($variable, 'comment'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
