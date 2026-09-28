@@ -97,8 +97,7 @@ it('does not retain locked values from generated build-time debug logs', functio
     expect($retainedLogs)
         ->not->toContain('harmless-single-marker')
         ->not->toContain('harmless-first-marker')
-        ->not->toContain('harmless-second-marker')
-        ->toContain(REDACTED);
+        ->not->toContain('harmless-second-marker');
 
     $member = User::factory()->create();
     $application->team()->members()->attach($member->id, ['role' => 'member']);
@@ -110,6 +109,24 @@ it('does not retain locked values from generated build-time debug logs', functio
         ->toContain('[DEBUG]')
         ->not->toContain('harmless-first-marker')
         ->not->toContain('harmless-second-marker');
+});
+
+it('does not print build-time values in the development debug lines', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'normal-secret-marker']);
+    createApplicationEnvironmentVariable($application, ['key' => 'LITERAL_TOKEN', 'value' => 'literal-secret-marker', 'is_literal' => true]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $debugLines = collect($job->recordedLogEntries)->filter(fn (string $line) => str_contains($line, '[DEBUG]'))->implode("\n");
+    expect($debugLines)
+        ->toContain('[DEBUG] Build-time env: DB_PASSWORD')
+        ->toContain('[DEBUG] Build-time env: LITERAL_TOKEN')
+        ->not->toContain('normal-secret-marker')
+        ->not->toContain('literal-secret-marker');
 });
 
 it('redacts generated multiline forms in remote command and output logging', function () {

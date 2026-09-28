@@ -1916,7 +1916,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs_dict[$key] = $escapedValue;
 
                     if (isDev()) {
-                        $this->application_deployment_queue->addLogEntry("[DEBUG] Nixpacks var: {$key}={$escapedValue}");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] Nixpacks var: {$key}");
                     }
                 }
             }
@@ -2015,7 +2015,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $escapedValue = escapeBashEnvValue($value);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
-                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (value replaced)");
                     }
 
                     $envs_dict[$env->key] = $escapedValue;
@@ -2023,16 +2023,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$resolvedValue}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Value length: '.strlen($escapedValue));
                     }
                 } else {
                     // For normal vars, use double quotes to allow $VAR expansion
                     $escapedValue = escapeBashDoubleQuoted($resolvedValue);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
-                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (value replaced)");
                     }
 
                     $envs_dict[$env->key] = $escapedValue;
@@ -2040,8 +2038,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$resolvedValue}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Value length: '.strlen($escapedValue));
                     }
                 }
             }
@@ -2076,7 +2073,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $escapedValue = escapeBashEnvValue($value);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
-                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (value replaced)");
                     }
 
                     $envs_dict[$env->key] = $escapedValue;
@@ -2084,16 +2081,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: literal/multiline');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   raw real_value: {$resolvedValue}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   stripped value: {$value}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Value length: '.strlen($escapedValue));
                     }
                 } else {
                     // For normal vars, use double quotes to allow $VAR expansion
                     $escapedValue = escapeBashDoubleQuoted($resolvedValue);
 
                     if (isDev() && isset($envs_dict[$env->key])) {
-                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (was: {$envs_dict[$env->key]}, now: {$escapedValue})");
+                        $this->application_deployment_queue->addLogEntry("[DEBUG] User override: {$env->key} (value replaced)");
                     }
 
                     $envs_dict[$env->key] = $escapedValue;
@@ -2101,8 +2096,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if (isDev()) {
                         $this->application_deployment_queue->addLogEntry("[DEBUG] Build-time env: {$env->key}");
                         $this->application_deployment_queue->addLogEntry('[DEBUG]   Type: normal (allows expansion)');
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   real_value: {$resolvedValue}");
-                        $this->application_deployment_queue->addLogEntry("[DEBUG]   final escaped: {$escapedValue}");
+                        $this->application_deployment_queue->addLogEntry('[DEBUG]   Value length: '.strlen($escapedValue));
                     }
                 }
             }
