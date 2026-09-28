@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
-use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
@@ -87,7 +86,6 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function buildRestartCommands(string $configuration): array
     {
-        $proxyType = $this->server->proxyType();
         $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
         $proxy_path = $this->server->proxyPath();
         $stopTimeout = 30;
@@ -134,9 +132,6 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            if (isDev() && $proxyType === ProxyTypes::CADDY->value) {
-                $proxy_path = '/data/coolify/proxy/caddy';
-            }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "echo 'Starting proxy...'",

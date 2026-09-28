@@ -14,8 +14,10 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -112,6 +114,33 @@ class ServicesController extends Controller
                 'logdrain_custom_config_parser',
             ]);
         }
+    }
+
+    /**
+     * Hostnames of every service application before an update, keyed by service application id.
+     *
+     * @return array<int, array<int, string>>
+     */
+    private function serviceApplicationDnsHostnames(Service $service): array
+    {
+        $cleanup = app(ManagedDnsRecordCleanup::class);
+
+        return $service->applications()->get()
+            ->mapWithKeys(fn (ServiceApplication $application): array => [$application->id => $cleanup->hostnamesOf($application)])
+            ->all();
+    }
+
+    /**
+     * Queues the release of managed DNS records for hostnames that a service application no longer uses.
+     *
+     * @param  array<int, array<int, string>>  $previousHostnames
+     */
+    private function queueReleaseOfRemovedServiceHostnames(Service $service, array $previousHostnames, int $teamId): void
+    {
+        $cleanup = app(ManagedDnsRecordCleanup::class);
+        $service->applications()->get()
+            ->filter(fn (ServiceApplication $application): bool => isset($previousHostnames[$application->id]))
+            ->each(fn (ServiceApplication $application) => $cleanup->queueReleaseOfRemovedHostnames($application, $previousHostnames[$application->id], $teamId));
     }
 
     private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
@@ -1246,7 +1275,7 @@ class ServicesController extends Controller
 
             // Validate for command injection BEFORE saving to database
             try {
-                validateDockerComposeForInjection($dockerComposeRaw);
+                validateDockerComposeForInjection($dockerComposeRaw, composeResourceDirectory($service));
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1271,26 +1300,30 @@ class ServicesController extends Controller
         if ($request->has('is_container_label_escape_enabled')) {
             $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
         }
+        $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
         $service->save();
 
         $service->parse();
 
+        $urlResult = null;
         if ($request->has('urls') && is_array($request->urls)) {
             $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-            if ($urlResult !== null) {
-                if (isset($urlResult['errors'])) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => $urlResult['errors'],
-                    ], 422);
-                }
-                if (isset($urlResult['conflicts'])) {
-                    return response()->json([
-                        'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                        'conflicts' => $urlResult['conflicts'],
-                        'warning' => $urlResult['warning'],
-                    ], 409);
-                }
+        }
+        // URLs of some containers can be saved before a later container fails, so release before any error response.
+        $this->queueReleaseOfRemovedServiceHostnames($service, $previousDnsHostnames, (int) $teamId);
+        if ($urlResult !== null) {
+            if (isset($urlResult['errors'])) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $urlResult['errors'],
+                ], 422);
+            }
+            if (isset($urlResult['conflicts'])) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $urlResult['conflicts'],
+                    'warning' => $urlResult['warning'],
+                ], 409);
             }
         }
 

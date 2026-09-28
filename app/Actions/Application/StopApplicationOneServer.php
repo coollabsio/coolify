@@ -28,7 +28,7 @@ class StopApplicationOneServer
                     if ($containerName) {
                         instant_remote_process(
                             [
-                                dockerStopCommand($timeout, $containerName, $server),
+                                dockerStopCommand($timeout, escapeshellarg($containerName), $server),
                                 dockerRemoveCommand($containerName),
                             ],
                             $server

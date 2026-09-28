@@ -6,6 +6,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 
 function importResource(string $class, ?string $databaseType = null): object
@@ -14,6 +15,9 @@ function importResource(string $class, ?string $databaseType = null): object
     $resource->shouldReceive('getMorphClass')->andReturn($class);
     if ($class === ServiceDatabase::class) {
         $resource->shouldReceive('databaseType')->andReturn($databaseType);
+    }
+    if ($class === StandaloneSqlite::class) {
+        $resource->shouldReceive('databaseFilePath')->andReturn('/var/lib/sqlite/database.sqlite');
     }
 
     return $resource;
@@ -30,6 +34,7 @@ test('builds database-specific restore commands', function (string $class, ?stri
     'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER'],
     'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER'],
     'mongodb' => [StandaloneMongodb::class, null, 'mongorestore'],
+    'sqlite' => [StandaloneSqlite::class, null, '.restore'],
     'service postgres' => [ServiceDatabase::class, 'postgresql', 'pg_restore'],
     'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER'],
     'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER'],

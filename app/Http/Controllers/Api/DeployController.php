@@ -12,6 +12,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
+use App\Support\ResourceStartActivity;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -582,7 +583,12 @@ class DeployController extends Controller
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to start this database.', 'deployment_uuid' => null];
                 }
-                StartDatabase::dispatch($resource);
+                $reservation = StartDatabase::reserveOperation($resource);
+                if ($reservation === null) {
+                    $message = ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+                    break;
+                }
+                StartDatabase::dispatchReserved(StartDatabase::class, $resource, $reservation);
 
                 $resource->started_at ??= now();
                 $resource->save();

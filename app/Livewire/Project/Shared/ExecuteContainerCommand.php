@@ -153,6 +153,9 @@ class ExecuteContainerCommand extends Component
         if ($this->containers->count() === 1) {
             $this->selected_container = $this->containerTarget($this->containers->first());
             $this->connectToContainer();
+        } elseif ($this->containers->count() > 1) {
+            // The terminal was rendered with auto-start before the containers were known.
+            $this->dispatch(Terminal::AUTO_START_CANCELLED_EVENT)->to(Terminal::class);
         }
 
         $this->containersLoaded = true;
@@ -190,7 +193,7 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
@@ -200,7 +203,7 @@ class ExecuteContainerCommand extends Component
     public function connectToContainer()
     {
         if ($this->selected_container === 'default') {
-            $this->dispatch('error', 'Please select a container.');
+            $this->failTerminalSession('Please select a container.');
 
             return;
         }
@@ -251,10 +254,18 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
+    }
+
+    /**
+     * Stop the terminal "connecting…" state and show why. The terminal also shows the toast.
+     */
+    private function failTerminalSession(string $message): void
+    {
+        $this->dispatch(Terminal::SESSION_FAILED_EVENT, message: $message)->to(Terminal::class);
     }
 
     public function render()

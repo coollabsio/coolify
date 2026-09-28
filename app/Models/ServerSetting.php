@@ -135,6 +135,16 @@ class ServerSetting extends Model
         'compose_version_checked_at',
     ];
 
+    /**
+     * Model-level defaults that mirror database column defaults, so a freshly
+     * created instance exposes them without a refresh.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_traffic_analytics_enabled' => false,
+    ];
+
     protected $casts = [
         'force_disabled' => 'boolean',
         'force_docker_cleanup' => 'boolean',

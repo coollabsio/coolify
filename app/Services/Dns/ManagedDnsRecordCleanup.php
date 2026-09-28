@@ -3,11 +3,13 @@
 namespace App\Services\Dns;
 
 use App\Enums\ManagedDnsDeletionResult;
+use App\Jobs\ReleaseRemovedDnsHostnamesJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
 use App\Models\ServiceApplication;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -21,7 +23,74 @@ use Throwable;
  */
 class ManagedDnsRecordCleanup
 {
-    public function __construct(private CloudflareDnsProvider $provider) {}
+    /**
+     * A record without references is released only after this time, so a record that was just created is never touched.
+     */
+    public const ORPHAN_GRACE_MINUTES = 60;
+
+    public function __construct(
+        private CloudflareDnsProvider $provider,
+        private ManagedDnsHostnameLock $hostnameLock,
+    ) {}
+
+    /**
+     * Hostnames the resource used before a domain change (from hostnamesOf()) and no longer uses now.
+     *
+     * @param  array<int, string>  $previousHostnames
+     * @return array<int, string>
+     */
+    public function removedHostnames(Model $resource, array $previousHostnames): array
+    {
+        $current = $this->hostnamesOf($resource->fresh() ?? $resource);
+
+        return collect($previousHostnames)
+            ->map(fn (string $hostname): string => $this->normalizeHostname($hostname))
+            ->reject(fn (string $hostname): bool => in_array($hostname, $current, true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Releases every hostname that the resource no longer uses after a domain edit. The same rules as for a removed
+     * domain apply: records still used by another live resource stay, and only owned records are deleted.
+     *
+     * @param  array<int, string>  $previousHostnames
+     */
+    public function releaseRemovedHostnames(Model $resource, array $previousHostnames, int $teamId, bool $deleteRecord = true): ?ManagedDnsDeletionResult
+    {
+        $worst = null;
+        foreach ($this->removedHostnames($resource, $previousHostnames) as $hostname) {
+            $worst = $this->worseResult($worst, $this->releaseHostname($resource, $hostname, $teamId, $deleteRecord));
+        }
+
+        return $worst;
+    }
+
+    /**
+     * Queues the release of hostnames the resource no longer uses after a domain edit (API and other non-interactive
+     * paths). Nothing is queued when the resource references no managed record for a removed hostname.
+     *
+     * @param  array<int, string>  $previousHostnames
+     */
+    public function queueReleaseOfRemovedHostnames(Model $resource, array $previousHostnames, int $teamId): void
+    {
+        $removed = $this->removedHostnames($resource, $previousHostnames);
+        if ($removed === []) {
+            return;
+        }
+
+        $referenced = ManagedDnsRecord::query()
+            ->where('team_id', $teamId)
+            ->whereIn('name', $removed)
+            ->whereHas('references', fn (Builder $query) => $this->whereResourceKeys($query, [[$resource->getMorphClass(), $resource->getKey()]]))
+            ->exists();
+        if (! $referenced) {
+            return;
+        }
+
+        ReleaseRemovedDnsHostnamesJob::dispatch($resource->getMorphClass(), $resource->getKey(), $teamId, $removed)->afterCommit();
+    }
 
     /**
      * Releases the resource's reference after one of its URLs was removed.
@@ -44,10 +113,7 @@ class ManagedDnsRecordCleanup
 
         $worst = null;
         foreach ($records as $record) {
-            $result = $this->release($record, $keys, $deleteRecord, $resource);
-            if ($result === ManagedDnsDeletionResult::ChangedExternally || $result === ManagedDnsDeletionResult::Failed) {
-                $worst = $worst === ManagedDnsDeletionResult::Failed ? $worst : $result;
-            }
+            $worst = $this->worseResult($worst, $this->release($record, $keys, $deleteRecord, $resource));
         }
 
         return $worst;
@@ -67,7 +133,7 @@ class ManagedDnsRecordCleanup
         $successful = true;
         foreach ($records as $record) {
             try {
-                if ($this->release($record, $keys, true) === ManagedDnsDeletionResult::Failed) {
+                if ($this->release($record, $keys, true)?->shouldRetry()) {
                     $successful = false;
                 }
             } catch (Throwable $e) {
@@ -84,10 +150,92 @@ class ManagedDnsRecordCleanup
     }
 
     /**
+     * Releases orphaned records: records whose references all point to deleted (or soft-deleted) resources, and
+     * records without references that are older than the grace period. Records with a live reference are not touched.
+     * Each orphan goes through release(), so a hostname that a live resource uses again keeps its record, and
+     * Busy or Failed records stay for the next run. Never throws.
+     *
+     * @return array<string, int> Number of records per outcome (a ManagedDnsDeletionResult value, "kept" or "forgotten").
+     */
+    public function releaseOrphanedRecords(): array
+    {
+        $counts = [];
+        $cutoff = now()->subMinutes(self::ORPHAN_GRACE_MINUTES);
+
+        ManagedDnsRecord::query()
+            ->where(fn (Builder $query) => $query->has('references')->orWhere('created_at', '<=', $cutoff))
+            ->with('references.resource')
+            ->chunkById(100, function (Collection $records) use (&$counts): void {
+                foreach ($records as $record) {
+                    if ($record->references->contains(fn (ManagedDnsRecordReference $reference): bool => $reference->resource !== null)) {
+                        continue;
+                    }
+
+                    $outcome = $this->releaseOrphanedRecord($record);
+                    $counts[$outcome] = ($counts[$outcome] ?? 0) + 1;
+                }
+            });
+
+        return $counts;
+    }
+
+    private function releaseOrphanedRecord(ManagedDnsRecord $record): string
+    {
+        try {
+            $result = $this->release($record, [], true);
+        } catch (Throwable $e) {
+            Log::warning('Managed DNS orphaned record cleanup failed.', [
+                'managed_dns_record_id' => $record->id,
+                'hostname' => $record->name,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ManagedDnsDeletionResult::Failed->value;
+        }
+
+        if ($result !== null) {
+            return $result->value;
+        }
+
+        return ManagedDnsRecord::query()->whereKey($record->getKey())->exists() ? 'kept' : 'forgotten';
+    }
+
+    /**
+     * Runs under the hostname lock, so a concurrent create or reference for the same hostname either finishes before
+     * the usage re-check or starts after the record is gone. When the lock is not free in time, nothing changes and
+     * Busy is returned so the caller can retry.
+     *
      * @param  array<int, array{0: string, 1: int|string}>  $releasingKeys
+     * @param  Model|null  $contextResource  The releasing resource of a hostname release; it keeps the record when it uses the hostname again.
      */
     public function release(ManagedDnsRecord $record, array $releasingKeys, bool $deleteRecord, ?Model $contextResource = null): ?ManagedDnsDeletionResult
     {
+        try {
+            return $this->hostnameLock->run(
+                (int) $record->team_id,
+                $record->name,
+                fn (): ?ManagedDnsDeletionResult => $this->releaseLocked($record, $releasingKeys, $deleteRecord, $contextResource),
+            );
+        } catch (LockTimeoutException) {
+            $this->auditSkipped($record, 'hostname_busy');
+
+            return ManagedDnsDeletionResult::Busy;
+        }
+    }
+
+    /**
+     * @param  array<int, array{0: string, 1: int|string}>  $releasingKeys
+     */
+    private function releaseLocked(ManagedDnsRecord $record, array $releasingKeys, bool $deleteRecord, ?Model $contextResource): ?ManagedDnsDeletionResult
+    {
+        $record = $record->fresh();
+        if ($record === null) {
+            return null;
+        }
+        if ($contextResource !== null && in_array($record->name, $this->hostnamesOf($contextResource->fresh() ?? $contextResource), true)) {
+            return null;
+        }
+
         $releasing = collect($releasingKeys)->map(fn (array $key): string => $key[0].'|'.$key[1]);
         $otherReferences = $record->references()->get()
             ->reject(fn (ManagedDnsRecordReference $reference): bool => $releasing->contains($reference->resource_type.'|'.$reference->resource_id));
@@ -184,6 +332,18 @@ class ManagedDnsRecordCleanup
             ->all();
     }
 
+    private function worseResult(?ManagedDnsDeletionResult $current, ?ManagedDnsDeletionResult $next): ?ManagedDnsDeletionResult
+    {
+        $rank = fn (?ManagedDnsDeletionResult $result): int => match ($result) {
+            ManagedDnsDeletionResult::Failed => 3,
+            ManagedDnsDeletionResult::Busy => 2,
+            ManagedDnsDeletionResult::ChangedExternally => 1,
+            default => 0,
+        };
+
+        return $rank($next) > $rank($current) ? $next : $current;
+    }
+
     private function teamIdOf(Model $resource): ?int
     {
         $teamId = match (true) {
@@ -229,6 +389,11 @@ class ManagedDnsRecordCleanup
      */
     private function deleteReferences(ManagedDnsRecord $record, array $keys): void
     {
+        // An empty nested where adds no constraint and would delete every reference of the record.
+        if ($keys === []) {
+            return;
+        }
+
         $this->whereResourceKeys($record->references()->getQuery(), $keys)->delete();
     }
 

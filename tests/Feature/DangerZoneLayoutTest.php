@@ -5,10 +5,11 @@ it('uses one shared visual treatment for all danger zone actions', function () {
 
     expect($component)
         ->toContain("@props(['title'])")
-        ->toContain('sm:flex-row sm:items-center sm:justify-between')
-        ->toContain('text-red-700 dark:text-red-300')
-        ->toContain('@isset($action)')
-        ->not->toContain('bg-red-50');
+        ->toContain('sm:flex-row sm:items-start sm:justify-between')
+        ->toContain('rounded-lg border border-red-200 bg-red-50')
+        ->toContain('dark:border-red-500/25 dark:bg-red-500/[0.08]')
+        ->toContain('Permanent')
+        ->toContain('@isset($action)');
 
     foreach ([
         'livewire/destination/show.blade.php',

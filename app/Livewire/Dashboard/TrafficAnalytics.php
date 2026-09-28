@@ -60,33 +60,18 @@ class TrafficAnalytics extends Component
 
         [$from, $to] = $this->window();
 
-        $overviews = [];
-        $seriesByBucket = [];
+        $aggregator = new TrafficAnalyticsAggregator;
 
         foreach ($this->servers as $server) {
             try {
                 $client = $this->trafficClient($server);
 
-                $overviews[] = $client->overview(null, $from, $to);
+                $aggregator->addOverview($client->overview(null, $from, $to));
 
                 // Per-bucket status series, summed across servers, for the sparklines.
                 // Isolated so a series hiccup (older Sentinel) never drops a server's overview.
                 try {
-                    foreach ($client->series(null, $this->range) as $bucket) {
-                        $data = $bucket->toArray();
-                        $ts = (int) ($data['bucket'] ?? 0);
-
-                        $seriesByBucket[$ts] ??= ['bucket' => $ts, 's2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0, 'requests' => 0, 'bytesIn' => 0, 'bytesOut' => 0, 'uniqueVisitors' => 0, 'p95' => 0.0];
-                        $seriesByBucket[$ts]['s2xx'] += (int) ($data['s2xx'] ?? 0);
-                        $seriesByBucket[$ts]['s3xx'] += (int) ($data['s3xx'] ?? 0);
-                        $seriesByBucket[$ts]['s4xx'] += (int) ($data['s4xx'] ?? 0);
-                        $seriesByBucket[$ts]['s5xx'] += (int) ($data['s5xx'] ?? 0);
-                        $seriesByBucket[$ts]['requests'] += (int) ($data['requests'] ?? 0);
-                        $seriesByBucket[$ts]['bytesIn'] += (int) ($data['bytesIn'] ?? 0);
-                        $seriesByBucket[$ts]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
-                        $seriesByBucket[$ts]['uniqueVisitors'] += (int) ($data['uniqueVisitors'] ?? 0);
-                        $seriesByBucket[$ts]['p95'] = max($seriesByBucket[$ts]['p95'], (float) ($data['p95'] ?? 0));
-                    }
+                    $aggregator->addSeries($client->series(null, $this->range));
                 } catch (\Throwable $e) {
                     // Leave this server out of the sparkline series.
                     \Log::debug('Traffic series fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
@@ -99,7 +84,7 @@ class TrafficAnalytics extends Component
             }
         }
 
-        if (empty($overviews)) {
+        if (! $aggregator->hasOverview()) {
             // Every server's fetch failed; don't present an all-zero KPI panel as if it were real data.
             $this->overview = null;
             $this->latencyApproximate = false;
@@ -109,14 +94,13 @@ class TrafficAnalytics extends Component
             return;
         }
 
-        $result = TrafficAnalyticsAggregator::sumOverviews($overviews);
+        $result = $aggregator->overview();
 
         $this->overview = $result['overview']->toArray();
         $this->latencyApproximate = $result['latencyApproximate'];
         $this->uniquesApproximate = $result['uniquesApproximate'];
 
-        ksort($seriesByBucket);
-        $this->series = array_values($seriesByBucket);
+        $this->series = $aggregator->series();
 
         $this->dispatch("refreshChartData-{$this->chartId}-status", [
             'requestsSpark' => $this->requestsSpark(),

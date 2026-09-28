@@ -50,7 +50,7 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - uploads:/app/uploads:ro
+      - chibisafe-uploads:/app/uploads:ro
       - type: bind
         source: ./Caddyfile
         target: /etc/caddy/Caddyfile

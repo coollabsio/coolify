@@ -11,6 +11,7 @@
                     || request()->routeIs('project.service.scheduled-tasks*')
                     || request()->routeIs('project.service.webhooks')
                     || request()->routeIs('project.service.resource-operations')
+                    || request()->routeIs('project.service.analytics')
                     || request()->routeIs('project.service.tags')
                     || request()->routeIs('project.service.danger')
                     || request()->routeIs('project.service.index*')

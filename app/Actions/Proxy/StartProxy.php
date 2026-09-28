@@ -2,7 +2,6 @@
 
 namespace App\Actions\Proxy;
 
-use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
@@ -49,11 +48,6 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            if (isDev()) {
-                if ($proxyType === ProxyTypes::CADDY->value) {
-                    $proxy_path = '/data/coolify/proxy/caddy';
-                }
-            }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",

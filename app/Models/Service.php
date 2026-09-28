@@ -7,6 +7,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -44,7 +45,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -1153,7 +1154,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('coollabsio/openclaw'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_OPENCLAW')->first();
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
                     $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
                     if ($username) {

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
+use App\Exceptions\DeploymentException;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -12,6 +13,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
@@ -129,7 +131,7 @@ use Symfony\Component\Yaml\Yaml;
 class Application extends BaseModel
 {
     /** @use HasFactory<ApplicationFactory> */
-    use Auditable, ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, ReleasesManagedDnsRecords, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -555,6 +557,9 @@ class Application extends BaseModel
             }
             $server = data_get($this, 'destination.server');
             foreach ($persistentStorages as $storage) {
+                if ($storage->isSharedWithAnotherResource()) {
+                    continue;
+                }
                 instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
             }
         }
@@ -738,7 +743,7 @@ class Application extends BaseModel
             $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
 
-        if (! filter_var($git_repository, FILTER_VALIDATE_URL)) {
+        if (! filter_var($git_repository, FILTER_VALIDATE_URL) || ! in_array(parse_url($git_repository, PHP_URL_SCHEME), ['http', 'https'], true)) {
             return null;
         }
 
@@ -2221,6 +2226,12 @@ class Application extends BaseModel
         ]);
     }
 
+    /**
+     * Reads the Compose file from the repository and saves it only after validateDockerComposeForInjection()
+     * accepts it, because the parser and the deployment build shell commands from parts of it.
+     *
+     * @throws DeploymentException If the Compose file is not safe to use (the message is HTML-escaped)
+     */
     public function loadComposeFile($isInit = false, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         // Use provided restore values or capture current values as fallback
@@ -2270,6 +2281,16 @@ class Application extends BaseModel
             instant_remote_process($commands, $this->destination->server, false);
         }
         if ($composeFileContent) {
+            try {
+                validateDockerComposeForInjection($composeFileContent, composeResourceDirectory($this));
+            } catch (\Exception $e) {
+                $this->docker_compose_location = $initialDockerComposeLocation;
+                $this->base_directory = $initialBaseDirectory;
+                $this->save();
+
+                throw new DeploymentException(e("The Docker Compose file at {$workdir}{$composeFile} (branch: {$this->git_branch}) is not safe to use, so Coolify did not load it. {$e->getMessage()}"));
+            }
+
             $this->docker_compose_raw = $composeFileContent;
             $this->save();
             $parsedServices = $this->parse();

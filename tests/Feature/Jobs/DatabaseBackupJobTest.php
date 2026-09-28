@@ -367,7 +367,7 @@ test('all dump all database commands use shared helper compression', function ()
         ->toContain('$this->buildCompressedDumpCommand($backupCommand)')
         ->toContain('mysqldump -u root')
         ->toContain('mariadb-dump -u root')
-        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
+        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(3)
         ->and($source)->not->toContain('| gzip >');
 });
 

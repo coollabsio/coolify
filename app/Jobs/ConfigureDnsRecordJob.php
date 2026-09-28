@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Events\DnsRecordConfigurationFinished;
 use App\Models\DnsProviderZone;
 use App\Services\Dns\CloudflareDnsProvider;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -16,7 +17,10 @@ class ConfigureDnsRecordJob implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public int $tries = 1;
+    /** Only a busy hostname lock is retried; any other exception fails the job at once. */
+    public int $tries = 3;
+
+    public int $maxExceptions = 1;
 
     public int $timeout = 30;
 
@@ -39,27 +43,36 @@ class ConfigureDnsRecordJob implements ShouldQueue
 
         try {
             $provider->createRecord($zone, $this->hostname, $this->content, $this->resource());
+        } catch (LockTimeoutException) {
+            if ($this->attempts() < $this->tries) {
+                $this->release(10 * $this->attempts());
 
-            DnsRecordConfigurationFinished::dispatch(
-                $this->teamId,
-                $this->resourceType,
-                $this->resourceId,
-                $this->hostname,
-                true,
-                $zone->integrationToken->name,
-                "DNS record added for {$this->hostname}.",
-            );
+                return;
+            }
+
+            $this->finished($zone, false, 'Another DNS change for this hostname is still in progress. Try again later.');
+
+            return;
         } catch (Throwable $exception) {
-            DnsRecordConfigurationFinished::dispatch(
-                $this->teamId,
-                $this->resourceType,
-                $this->resourceId,
-                $this->hostname,
-                false,
-                $zone->integrationToken->name,
-                $exception->getMessage(),
-            );
+            $this->finished($zone, false, $exception->getMessage());
+
+            return;
         }
+
+        $this->finished($zone, true, "DNS record added for {$this->hostname}.");
+    }
+
+    private function finished(DnsProviderZone $zone, bool $successful, string $message): void
+    {
+        DnsRecordConfigurationFinished::dispatch(
+            $this->teamId,
+            $this->resourceType,
+            $this->resourceId,
+            $this->hostname,
+            $successful,
+            $zone->integrationToken->name,
+            $message,
+        );
     }
 
     public function failed(?Throwable $exception): void

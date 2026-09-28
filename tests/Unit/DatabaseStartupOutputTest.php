@@ -13,6 +13,7 @@ it('formats image progress output consistently', function (string $action) {
     'mongodb' => 'StartMongodb',
     'mysql' => 'StartMysql',
     'redis' => 'StartRedis',
+    'sqlite' => 'StartSqlite',
 ]);
 
 it('prints image names as text', function (string $image) {

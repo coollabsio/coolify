@@ -9,6 +9,7 @@ use App\Models\DnsProviderZone;
 use App\Models\ManagedDnsRecord;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 
 trait InteractsWithDnsProviders
@@ -50,8 +51,13 @@ trait InteractsWithDnsProviders
             return;
         }
         try {
-            $record = $cloudflare->createRecord($zone, $hostname, $content, $this->dnsResourceForHostname($hostname));
-            $this->referenceDnsRecordFromAllResources($record, $hostname);
+            $cloudflare->createRecord(
+                $zone,
+                $hostname,
+                $content,
+                $this->dnsResourceForHostname($hostname),
+                $this->otherDnsResourcesForHostname($hostname),
+            );
             $this->markDnsManaged($hostname, $zone->integrationToken->name);
             $this->dispatch('success', "DNS record created for {$hostname}.");
             $this->loadDnsProviderProposals();
@@ -59,6 +65,8 @@ trait InteractsWithDnsProviders
             $this->dnsProviderConflicts[$hostname.'|'.$zoneId] = [
                 'record_id' => $e->providerRecordId, 'current' => $e->currentValue, 'proposed' => $e->proposedValue,
             ];
+        } catch (LockTimeoutException) {
+            $this->dispatch('error', $this->dnsHostnameBusyMessage($hostname));
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
@@ -149,18 +157,20 @@ trait InteractsWithDnsProviders
             return;
         }
         try {
-            $record = app(CloudflareDnsProvider::class)->replaceRecord(
+            app(CloudflareDnsProvider::class)->replaceRecord(
                 $zone,
                 (string) ($conflict['record_id'] ?? ''),
                 $hostname,
                 $content,
                 $this->dnsResourceForHostname($hostname),
                 (string) ($conflict['current'] ?? ''),
+                $this->otherDnsResourcesForHostname($hostname),
             );
-            $this->referenceDnsRecordFromAllResources($record, $hostname);
             unset($this->dnsProviderConflicts[$key]);
             $this->dispatch('success', "DNS record replaced for {$hostname}.");
             $this->loadDnsProviderProposals();
+        } catch (LockTimeoutException) {
+            $this->dispatch('error', $this->dnsHostnameBusyMessage($hostname));
         } catch (\Throwable $e) {
             unset($this->dnsProviderConflicts[$key]);
             $this->dispatch('error', $e->getMessage());
@@ -241,27 +251,65 @@ trait InteractsWithDnsProviders
         }
 
         $result = app(ManagedDnsRecordCleanup::class)->releaseHostname($resource, $hostname, currentTeam()->id, $deleteRecord);
+        $this->reportManagedDnsRelease($result, 'removed');
+    }
 
+    /**
+     * Captures the hostnames of a resource before a domain edit, for releaseManagedDnsForEditedDomains().
+     *
+     * @return array<int, string>
+     */
+    protected function managedDnsHostnamesOf(Model $resource): array
+    {
+        return app(ManagedDnsRecordCleanup::class)->hostnamesOf($resource->fresh() ?? $resource);
+    }
+
+    /**
+     * Releases the hostnames that the resource no longer uses after a domain edit, like a removed domain.
+     * An edit has no "also delete the DNS record" choice, so the safe default applies: only records that Coolify
+     * created and that no live resource uses any more are deleted; records changed outside Coolify stay.
+     *
+     * @param  array<int, string>  $previousHostnames
+     */
+    protected function releaseManagedDnsForEditedDomains(Model $resource, array $previousHostnames): void
+    {
+        $result = app(ManagedDnsRecordCleanup::class)->releaseRemovedHostnames($resource, $previousHostnames, currentTeam()->id);
+        $this->reportManagedDnsRelease($result, 'updated');
+    }
+
+    private function reportManagedDnsRelease(?ManagedDnsDeletionResult $result, string $change): void
+    {
         if ($result === ManagedDnsDeletionResult::ChangedExternally) {
-            $this->dispatch('warning', 'The domain was removed, but its DNS record changed externally and was left untouched.');
+            $this->dispatch('warning', "The domain was {$change}, but its DNS record changed externally and was left untouched.");
         } elseif ($result === ManagedDnsDeletionResult::Failed) {
-            $this->dispatch('warning', 'The domain was removed, but its DNS record could not be deleted because Cloudflare did not respond. It was left untouched.');
+            $this->dispatch('warning', "The domain was {$change}, but its DNS record could not be deleted because Cloudflare did not respond. It was left untouched.");
+        } elseif ($result === ManagedDnsDeletionResult::Busy) {
+            $this->dispatch('warning', "The domain was {$change}, but another DNS change for the same hostname was in progress. Its DNS record was left untouched.");
         }
+    }
+
+    private function dnsHostnameBusyMessage(string $hostname): string
+    {
+        return "Another DNS change for {$hostname} is in progress. Try again in a few seconds.";
     }
 
     /**
      * Service domains can share a hostname across several service applications; each of them references the record.
+     *
+     * @return array<int, Model>
      */
-    protected function referenceDnsRecordFromAllResources(ManagedDnsRecord $record, string $hostname): void
+    protected function otherDnsResourcesForHostname(string $hostname): array
     {
         if (property_exists($this, 'application') || ! property_exists($this, 'service') || $this->service === null) {
-            return;
+            return [];
         }
 
         $cleanup = app(ManagedDnsRecordCleanup::class);
-        $this->service->applications()->get()
+
+        return $this->service->applications()->get()
             ->filter(fn (Model $application): bool => in_array(strtolower($hostname), $cleanup->hostnamesOf($application), true))
-            ->each(fn (Model $application) => $record->addReference($application));
+            ->values()
+            ->all();
     }
 
     protected function authorizeDnsProviderChange(): void
