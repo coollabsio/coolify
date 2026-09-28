@@ -222,6 +222,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
                 auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
