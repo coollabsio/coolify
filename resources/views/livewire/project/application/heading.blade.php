@@ -6,7 +6,8 @@
                     {{ $application->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$application->status" align="right" />
+                    <x-status-summary :status="$application->status" align="right"
+                        :healthcheck-url="route('project.application.healthcheck', $parameters)" />
                     <x-applications.links :application="$application" compact />
                     @if ($this->runningDeploymentUrl)
                         <x-deploying-indicator :href="$this->runningDeploymentUrl" />

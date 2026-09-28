@@ -26,6 +26,12 @@ class Status extends Component
 
     public function render(): View
     {
-        return view('livewire.project.database.status');
+        return view('livewire.project.database.status', [
+            'healthcheckUrl' => route('project.database.healthcheck', [
+                'project_uuid' => $this->database->environment->project->uuid,
+                'environment_uuid' => $this->database->environment->uuid,
+                'database_uuid' => $this->database->uuid,
+            ]),
+        ]);
     }
 }

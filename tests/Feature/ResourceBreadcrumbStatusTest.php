@@ -44,7 +44,12 @@ it('refreshes the breadcrumb database status after it changes', function () {
     ]);
 
     $component = Livewire::test(DatabaseStatus::class, ['database' => $database])
-        ->assertSee('Running');
+        ->assertSee('Running')
+        ->assertSeeHtml('href="'.route('project.database.healthcheck', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'database_uuid' => $database->uuid,
+        ]).'"');
 
     $database->update(['status' => 'exited']);
 
