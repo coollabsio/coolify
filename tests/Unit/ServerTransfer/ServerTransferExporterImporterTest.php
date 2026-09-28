@@ -379,6 +379,26 @@ test('import reuses existing private key fingerprint on same team', function () 
     expect($server->private_key_id)->toBe($originalKeyId);
 });
 
+test('import into another team creates its own key when the same key exists in a different team', function () {
+    $bundle = $this->exporter->export($this->server);
+    $sourceKeyId = $this->privateKey->id;
+    $targetTeam = Team::factory()->create();
+
+    // Free the IP without deleting the source team's key.
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->team_id)->toBe($targetTeam->id)
+        ->and($server->private_key_id)->not->toBe($sourceKeyId)
+        ->and($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
+        ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
+});
+
 test('encrypted export decrypts for import', function () {
     $bundle = $this->exporter->export($this->server);
     $encrypted = ServerTransferBundle::encryptWithPassphrase($bundle, 'transfer-pass');

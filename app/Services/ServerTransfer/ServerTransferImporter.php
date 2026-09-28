@@ -384,14 +384,12 @@ class ServerTransferImporter
             ?? data_get($payload, 'fingerprint');
 
         if ($fingerprint) {
-            $existing = PrivateKey::query()->where('fingerprint', $fingerprint)->first();
+            // Keys are unique per team, so only a key of the target team can be reused.
+            $existing = PrivateKey::query()
+                ->where('team_id', $teamId)
+                ->where('fingerprint', $fingerprint)
+                ->first();
             if ($existing) {
-                if ((int) $existing->team_id !== $teamId) {
-                    throw ValidationException::withMessages([
-                        'private_key' => ['This SSH private key already exists on another team on this instance.'],
-                    ]);
-                }
-
                 return $existing;
             }
         }
