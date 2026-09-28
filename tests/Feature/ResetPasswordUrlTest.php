@@ -4,13 +4,11 @@ use App\Models\InstanceSettings;
 use App\Models\User;
 use App\Notifications\TransactionalEmails\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Cache::forget('instance_settings_fqdn_host');
     Once::flush();
 });
 
