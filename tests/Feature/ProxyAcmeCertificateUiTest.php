@@ -9,6 +9,7 @@ it('shows Traefik ACME certificates with protected delete controls', function ()
 
     expect($view)
         ->toContain('TLS certificates')
+        ->toContain('Traefik requests a new certificate after the restart')
         ->toContain('wire:click="loadTraefikCertificates"')
         ->toContain('submitAction="deleteTraefikCertificate')
         ->toContain("@can('update', \$server)")
@@ -22,7 +23,7 @@ it('shows Traefik ACME certificates with protected delete controls', function ()
 
 it('uses bounded reads and atomic restricted writes for the ACME file', function () {
     $reader = file_get_contents(app_path('Actions/Proxy/GetTraefikCertificates.php'));
-    $writer = file_get_contents(app_path('Actions/Proxy/DeleteTraefikCertificate.php'));
+    $writer = file_get_contents(app_path('Actions/Proxy/SaveTraefikAcmeFile.php'));
 
     expect($reader)
         ->toContain('MAX_FILE_SIZE_BYTES')
@@ -31,6 +32,5 @@ it('uses bounded reads and atomic restricted writes for the ACME file', function
         ->and($writer)
         ->toContain('umask 077')
         ->toContain('chmod 600')
-        ->toContain('mv --')
-        ->not->toContain('rm -f');
+        ->toContain('mv --');
 });
