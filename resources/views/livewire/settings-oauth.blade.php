@@ -110,11 +110,11 @@
                     </div>
 
                     <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                        <x-forms.checkbox canGate="update" :canResource="$settings"
+                            id="oauth_settings_map.{{ $provider }}.allow_registration"
+                            label="Allow {{ $provider === 'oidc' ? 'OIDC' : 'OAuth' }} user creation"
+                            helper="Allow a successful {{ $provider === 'oidc' ? 'OIDC' : 'OAuth' }} login to create a user when password registration is disabled." />
                         @if ($provider === 'oidc')
-                            <x-forms.checkbox canGate="update" :canResource="$settings"
-                                id="oauth_settings_map.{{ $provider }}.allow_registration"
-                                label="Allow OIDC user creation"
-                                helper="Allow a successful OIDC login to create a user when password registration is disabled." />
                             <x-forms.checkbox canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.require_email_verified"
                                 label="Require verified email" />

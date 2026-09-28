@@ -230,8 +230,8 @@ class OauthLoginService
     }
 
     /**
-     * Only OIDC exposes a provider-level user creation setting. Other providers
-     * follow the instance registration setting, as before OIDC support.
+     * Providers can allow user creation even when general password registration
+     * is disabled on the instance.
      */
     private function canCreateUser(OauthSetting $oauthSetting): bool
     {
@@ -239,7 +239,7 @@ class OauthLoginService
             return true;
         }
 
-        return $oauthSetting->provider === 'oidc' && $oauthSetting->allow_registration;
+        return (bool) $oauthSetting->allow_registration;
     }
 
     private function createUser(string $name, string $email, OauthSetting $oauthSetting): User

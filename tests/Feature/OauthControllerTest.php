@@ -226,12 +226,11 @@ it('registers a new user from a verified provider identity', function () {
 });
 
 it('does not register a new user through a non-OIDC provider when registration is disabled', function (string $provider, array $rawClaims) {
-    // Upgraded installs have allow_registration = true on every provider row (column default).
     OauthSetting::updateOrCreate(['provider' => $provider], [
         'client_id' => 'client-id',
         'client_secret' => 'client-secret',
         'enabled' => true,
-        'allow_registration' => true,
+        'allow_registration' => false,
     ]);
 
     expect(fn () => app(OauthLoginService::class)->login($provider, (object) [
@@ -244,6 +243,31 @@ it('does not register a new user through a non-OIDC provider when registration i
     $this->assertGuest();
     expect(User::count())->toBe(0)
         ->and(OauthIdentity::count())->toBe(0);
+})->with([
+    'github' => ['github', []],
+    'google' => ['google', ['verified_email' => true, 'hd' => 'example.com']],
+]);
+
+it('registers a new user through a non-OIDC provider when allow_registration is true even if instance registration is disabled', function (string $provider, array $rawClaims) {
+    InstanceSettings::findOrFail(0)->update(['is_registration_enabled' => false]);
+    OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+        'allow_registration' => true,
+    ]);
+
+    $user = app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'new-user@example.com',
+        'name' => 'New User',
+        'id' => 'provider-user-id',
+        'user' => $rawClaims,
+    ], OauthSetting::where('provider', $provider)->firstOrFail());
+
+    expect($user->email)->toBe('new-user@example.com');
+    $this->assertAuthenticatedAs($user);
+    expect(User::count())->toBe(1)
+        ->and(OauthIdentity::where('provider_user_id', 'provider-user-id')->count())->toBe(1);
 })->with([
     'github' => ['github', []],
     'google' => ['google', ['verified_email' => true, 'hd' => 'example.com']],

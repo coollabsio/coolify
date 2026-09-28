@@ -235,3 +235,17 @@ it('toggles provider enabled state from the action button', function () {
 
     expect(OauthSetting::where('provider', 'authentik')->first()->enabled)->toBeTrue();
 });
+
+it('persists allow_registration for non-OIDC providers', function () {
+    actingAsInstanceAdmin();
+
+    $setting = OauthSetting::where('provider', 'authentik')->first();
+    $setting->update(['allow_registration' => false]);
+
+    Livewire::test(SettingsOauth::class, ['provider' => 'authentik'])
+        ->set('oauth_settings_map.authentik.allow_registration', true)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($setting->fresh()->allow_registration)->toBeTrue();
+});
