@@ -792,6 +792,20 @@ fi
 
 # Verify minimum Docker version
 MIN_DOCKER_VERSION=24
+
+set +e
+docker version --format '{{.Server.Version}}' >/dev/null 2>&1
+DOCKER_DAEMON_STATUS=$?
+set -e
+
+if [ $DOCKER_DAEMON_STATUS -ne 0 ]; then
+    echo " - Docker daemon is not running. Attempting to start the service..."
+    if ! restart_docker_service; then
+        echo " - ERROR: Failed to start the Docker service. Please enable and start it manually."
+        exit 1
+    fi
+fi
+
 INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1)
 if [ -z "$INSTALLED_DOCKER_VERSION" ]; then
     warn "Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
