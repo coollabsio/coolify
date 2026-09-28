@@ -236,6 +236,48 @@ describe('GitHub Source Change Component', function () {
             ->and($privateKey->refresh()->name)->toBe('github-app-actual-github-slug');
     });
 
+    test('saving settings keeps key selection within the source team', function (string $action) {
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $ownKey = PrivateKey::create([
+            'name' => 'own-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $ownKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $foreignKey->id)
+            ->call($action);
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $ownKey->id)
+            ->call($action)
+            ->assertHasNoErrors();
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+    })->with(['submit', 'instantSave']);
+
     test('ghe.com installation path encodes the organization segment', function () {
         $githubApp = new GithubApp;
         $githubApp->forceFill([

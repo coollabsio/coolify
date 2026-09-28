@@ -5,12 +5,25 @@ use App\Livewire\Source\Gitlab\Change;
 use App\Models\Application;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+function gitlabTestPrivateKey(): string
+{
+    $key = openssl_pkey_new([
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+    ]);
+
+    openssl_pkey_export($key, $privateKey);
+
+    return $privateKey;
+}
 
 beforeEach(function () {
     $this->team = Team::factory()->create();
@@ -102,6 +115,42 @@ describe('GitLab App authorization', function () {
             ->assertDispatched('success');
 
         expect($this->gitlabApp->refresh()->is_system_wide)->toBeTrue();
+    });
+
+    test('saving settings keeps key selection within the source team', function () {
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => gitlabTestPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $ownKey = PrivateKey::create([
+            'name' => 'own-team-key',
+            'private_key' => gitlabTestPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+        $this->gitlabApp->update([
+            'api_url' => 'https://gitlab.com/api/v4',
+            'html_url' => 'https://gitlab.com',
+        ]);
+
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $foreignKey->id)
+            ->call('submit');
+
+        expect($this->gitlabApp->refresh()->private_key_id)->toBeNull();
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $ownKey->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        expect($this->gitlabApp->refresh()->private_key_id)->toBe($ownKey->id);
     });
 
     test('instantSave rejects unsafe GitLab URLs', function (string $url) {

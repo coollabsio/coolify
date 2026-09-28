@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -102,7 +103,7 @@ class Change extends Component
             'contents' => 'nullable|string',
             'metadata' => 'nullable|string',
             'pullRequests' => 'nullable|string',
-            'privateKeyId' => 'nullable|int',
+            'privateKeyId' => ['nullable', 'integer', Rule::exists('private_keys', 'id')->where('team_id', $this->github_app->team_id)],
             'webhook_endpoint' => ['required', 'string', 'url'],
             'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
             'use_custom_webhook_endpoint' => ['required', 'bool'],
@@ -448,6 +449,8 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->github_app);
+
+            $this->validateOnly('privateKeyId');
 
             $this->syncData(true);
             $this->github_app->save();
