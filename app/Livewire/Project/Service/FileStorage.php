@@ -137,7 +137,7 @@ class FileStorage extends Component
             $this->fileStorage->save();
         } else {
             // Sync from model
-            $this->content = $this->fileStorage->content;
+            $this->content = auth()->user()?->can('update', $this->resource) ? $this->fileStorage->content : null;
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
             $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }
