@@ -1,5 +1,8 @@
 <?php
 
+// 0 or an invalid value would remove the time limit of every remote command.
+$sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
+
 return [
     'coolify' => [
         'version' => env('COOLIFY_VERSION') ?: '4.4',
@@ -79,7 +82,7 @@ return [
         'mux_orphan_reap_enabled' => env('SSH_MUX_ORPHAN_REAP_ENABLED', false), // false = dry-run, only log orphans
         'connection_timeout' => 10,
         'server_interval' => 20,
-        'command_timeout' => env('SSH_COMMAND_TIMEOUT', 3600),
+        'command_timeout' => $sshCommandTimeout > 0 ? $sshCommandTimeout : 3600,
         'max_retries' => env('SSH_MAX_RETRIES', 3),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
