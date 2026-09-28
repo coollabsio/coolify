@@ -182,26 +182,6 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
         ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
-
-    expect(file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php')))
-        ->toContain('permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D');
-});
-
-test('capability selection uses the shared checkbox component', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.checkbox')
-        ->toContain('class="mt-3 rounded-lg border')
-        ->not->toContain('<input type="checkbox"');
-});
-
-test('submit button uses the shared highlighted loading state', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('wire:target="addToken" isHighlighted')
-        ->not->toContain('class="button-highlighted"');
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {

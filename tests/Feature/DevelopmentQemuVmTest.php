@@ -181,6 +181,24 @@ it('seeds localhost through the container command', function () {
         ->and(Server::query()->findOrFail(0)->ip)->toBe('192.168.122.10');
 });
 
+it('seeds localhost with the forwarded ssh address of a lima vm', function () {
+    $this->seed(ServerSeeder::class);
+
+    expect(Artisan::call('dev:qemu:seed', [
+        'profile' => 'debian-non-root',
+        '--as-localhost' => true,
+        '--ip' => 'host.docker.internal',
+        '--port' => '53022',
+    ]))->toBe(Command::SUCCESS);
+
+    $server = Server::query()->findOrFail(0);
+
+    expect($server->ip)->toBe('host.docker.internal')
+        ->and($server->port)->toBe(53022)
+        ->and($server->user)->toBe('coolify')
+        ->and(Server::query()->count())->toBe(1);
+});
+
 it('replaces the seeded qemu server with the selected non-root equivalent', function () {
     SeedDevelopmentQemuServer::run('ubuntu-root');
     $server = SeedDevelopmentQemuServer::run('ubuntu-non-root');

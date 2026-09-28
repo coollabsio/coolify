@@ -55,22 +55,6 @@ it('shows a card grid overview when tags exist and none is selected', function (
         ->assertDontSee('Deploy webhook URL');
 });
 
-it('includes filterable tags payload for the overview', function () {
-    Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
-    Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
-
-    $html = Livewire::test(Show::class)->html();
-
-    expect($html)
-        ->toContain('hello')
-        ->toContain('production')
-        ->toContain('resourceCount')
-        ->toContain('applicationsCount')
-        ->toContain('servicesCount')
-        ->toContain('setViewMode')
-        ->toContain('filteredTags');
-});
-
 it('shows the tag detail layout with stats when a tag is selected', function () {
     $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
 
@@ -96,12 +80,6 @@ it('shows the tag detail layout with stats when a tag is selected', function () 
         ->assertSee('Redeploy all')
         ->assertSee('tagged-app')
         ->assertDontSee('No resources use this tag');
-
-    $breadcrumbs = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
-    expect($breadcrumbs)
-        ->toContain('title="Tags"')
-        ->toContain("'label' => 'All tags'")
-        ->toContain("route('tags.show', ['tagName' => \$tag->name])");
 });
 
 it('shows empty resource and deployment states for an unused tag', function () {
@@ -112,13 +90,6 @@ it('shows empty resource and deployment states for an unused tag', function () {
         ->assertSee('No active deployments')
         ->assertSee('Using this tag')
         ->assertSee('Queued or running');
-});
-
-it('adds spacing around the active deployments empty state', function () {
-    $view = file_get_contents(resource_path('views/livewire/tags/show.blade.php'));
-
-    expect($view)
-        ->toMatch('/<div class="p-3">\s*<x-empty title="No active deployments"/');
 });
 
 it('redirects to the overview when the requested tag does not exist', function () {

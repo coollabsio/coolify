@@ -87,10 +87,9 @@ it('does not infer the restart limit from an exited existing container', functio
     ])->stoppedAfterRestartLimit())->toBeFalse();
 });
 
-it('shows a stopped after restart limit warning in the status badge', function () {
-    $html = view('components.status.index', [
-        'resource' => applicationWithRestartState(),
-        'showRefreshButton' => false,
+it('shows a stopped after restart limit warning badge', function () {
+    $html = view('components.application.restart-limit-warning', [
+        'application' => applicationWithRestartState(),
     ])->render();
 
     expect($html)->toContain('Restart limit reached')
@@ -99,13 +98,12 @@ it('shows a stopped after restart limit warning in the status badge', function (
 });
 
 it('does not show the restart limit warning for a normal manual stop', function () {
-    $html = view('components.status.index', [
-        'resource' => applicationWithRestartState([
+    $html = view('components.application.restart-limit-warning', [
+        'application' => applicationWithRestartState([
             'restart_count' => 0,
             'last_restart_type' => null,
             'restart_limit_reached' => false,
         ]),
-        'showRefreshButton' => false,
     ])->render();
 
     expect($html)->not->toContain('Restart limit reached');

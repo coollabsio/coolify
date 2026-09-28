@@ -255,6 +255,13 @@ it('shows Vultr power on button when stopped even if server was previously funct
         ->assertSee('Power On');
 });
 
+it('hides Vultr power on button while the instance is running', function () {
+    $this->server->update(['vultr_instance_status' => 'active']);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertDontSee('Power On');
+});
+
 it('starts a Vultr instance', function () {
     Http::fake([
         'https://api.vultr.com/v2/instances/instance-1/start' => Http::response([], 204),

@@ -1,5 +1,7 @@
 <?php
 
+use App\Services\ContainerStatusAggregator;
+
 /**
  * Unit tests for GetContainersStatus service aggregation logic (SSH path).
  *
@@ -22,27 +24,25 @@ it('implements service multi-container aggregation in SSH path', function () {
         ->toContain('private function aggregateServiceContainerStatuses($services)')
         ->toContain('$this->aggregateServiceContainerStatuses($services);');
 
-    // Verify service aggregation uses same logic as applications
+    // Verify service aggregation uses the shared aggregator, like applications
     expect($actionFile)
-        ->toContain('$hasUnknown = false;');
+        ->toContain('use App\\Services\\ContainerStatusAggregator;')
+        ->toContain('$aggregator = new ContainerStatusAggregator;');
 });
 
 it('services use same priority as applications in SSH path', function () {
     $actionFile = file_get_contents(__DIR__.'/../../app/Actions/Docker/GetContainersStatus.php');
 
-    // Both aggregation methods should use the same priority logic
-    $priorityLogic = <<<'PHP'
-                if ($hasUnhealthy) {
-                    $aggregatedStatus = 'running (unhealthy)';
-                } elseif ($hasUnknown) {
-                    $aggregatedStatus = 'running (unknown)';
-                } else {
-                    $aggregatedStatus = 'running (healthy)';
-                }
-PHP;
+    // Both aggregation methods delegate the priority logic to ContainerStatusAggregator
+    expect($actionFile)
+        ->toContain('return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);')
+        ->toContain('$aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, preserveRestarting: true);');
 
-    // Should appear in service aggregation
-    expect($actionFile)->toContain($priorityLogic);
+    // The shared aggregator prioritizes unhealthy > unknown > healthy
+    $aggregator = new ContainerStatusAggregator;
+    expect($aggregator->aggregateFromStrings(collect(['running (healthy)', 'running (unknown)', 'running (unhealthy)'])))->toBe('running:unhealthy')
+        ->and($aggregator->aggregateFromStrings(collect(['running (healthy)', 'running (unknown)'])))->toBe('running:unknown')
+        ->and($aggregator->aggregateFromStrings(collect(['running (healthy)', 'running (healthy)'])))->toBe('running:healthy');
 });
 
 it('collects service containers before aggregating in SSH path', function () {
@@ -63,17 +63,14 @@ it('SSH and Sentinel paths use identical service aggregation logic', function ()
     $jobFile = file_get_contents(__DIR__.'/../../app/Jobs/PushServerUpdateJob.php');
     $actionFile = file_get_contents(__DIR__.'/../../app/Actions/Docker/GetContainersStatus.php');
 
-    // Both should track the same status flags
-    expect($jobFile)->toContain('$hasUnknown = false;');
-    expect($actionFile)->toContain('$hasUnknown = false;');
-
-    // Both should check for unknown status
-    expect($jobFile)->toContain('if (str($status)->contains(\'unknown\')) {');
-    expect($actionFile)->toContain('if (str($status)->contains(\'unknown\')) {');
-
-    // Both should have elseif for unknown priority
-    expect($jobFile)->toContain('} elseif ($hasUnknown) {');
-    expect($actionFile)->toContain('} elseif ($hasUnknown) {');
+    // Both paths delegate status aggregation to the same shared service
+    foreach ([$jobFile, $actionFile] as $file) {
+        expect($file)
+            ->toContain('use App\\Services\\ContainerStatusAggregator;')
+            ->toContain('$aggregator = new ContainerStatusAggregator;')
+            ->toContain('$aggregator->aggregateFromStrings($relevantStatuses,')
+            ->toContain('preserveRestarting: true);');
+    }
 });
 
 it('handles service status updates consistently', function () {
@@ -84,7 +81,7 @@ it('handles service status updates consistently', function () {
     expect($jobFile)->toContain('[$serviceId, $subType, $subId] = explode(\':\', $key);');
     expect($actionFile)->toContain('[$serviceId, $subType, $subId] = explode(\':\', $key);');
 
-    // Both should handle excluded containers
-    expect($jobFile)->toContain('$excludedContainers = collect();');
-    expect($actionFile)->toContain('$excludedContainers = collect();');
+    // Both should handle excluded containers through the shared trait helper
+    expect($jobFile)->toContain('$excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);');
+    expect($actionFile)->toContain('$excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);');
 });

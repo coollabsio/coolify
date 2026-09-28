@@ -64,11 +64,14 @@ it('exposes Jean Server authentication and access settings', function () {
                 'rules' => 'required',
                 'isPassword' => true,
                 'sortOrder' => 1,
+                'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN',
             ],
             'Allowed Origins' => [
                 'key' => 'JEAN_ALLOWED_ORIGINS',
                 'value' => 'https://jean.example.com',
+                'rules' => 'nullable|string',
                 'sortOrder' => 2,
+                'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS',
             ],
         ]);
 });

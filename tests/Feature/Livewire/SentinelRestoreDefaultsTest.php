@@ -78,13 +78,22 @@ it('does not let team members restore Sentinel defaults', function () {
     $member = User::factory()->create();
     $this->server->team->members()->attach($member->id, ['role' => 'member']);
     $before = $this->server->settings->fresh()->getAttributes();
+    Queue::fake();
+
+    // The action itself re-checks permission, even on a component that an owner opened.
+    $component = Livewire::test(Sentinel::class, ['server' => $this->server]);
     $this->actingAs($member);
     session(['currentTeam' => $this->server->team]);
+    $component->call('restoreDefaultConfiguration');
 
+    Queue::assertNothingPushed();
+
+    // Members cannot open the Sentinel settings at all, so the restore action is never reachable.
     Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->call('restoreDefaultConfiguration');
+        ->assertForbidden();
 
-    expect($this->server->settings->fresh()->getAttributes())->toBe($before);
+    expect($member->can('manageSentinel', $this->server))->toBeFalse()
+        ->and($this->server->settings->fresh()->getAttributes())->toBe($before);
 });
 
 it('shows local troubleshooting guidance when Sentinel is out of sync', function () {

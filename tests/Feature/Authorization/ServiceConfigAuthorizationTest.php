@@ -16,7 +16,9 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(function () {
+        InstanceSettings::updateOrCreate(['id' => 0], []);
+    });
 
     $this->team = Team::factory()->create();
 
@@ -197,17 +199,26 @@ test('member does not see terminal link for service', function () {
         'query' => [],
     ])
         ->assertDontSee('Terminal');
+
+    // The terminal link lives in the service settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-service.configuration-sidebar :service="$service" current-route="project.service.configuration" />',
+        ['service' => $this->service]
+    )
+        ->assertSee(route('project.service.configuration', $this->serviceParams), false)
+        ->assertDontSee(route('project.service.command', $this->serviceParams), false);
 });
 
 test('admin sees terminal link for service', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ServiceHeading::class, [
-        'service' => $this->service,
-        'parameters' => $this->serviceParams,
-        'query' => [],
-    ])
+    // The terminal link lives in the service settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-service.configuration-sidebar :service="$service" current-route="project.service.configuration" />',
+        ['service' => $this->service]
+    )
+        ->assertSee(route('project.service.command', $this->serviceParams), false)
         ->assertSee('Terminal');
 });
 

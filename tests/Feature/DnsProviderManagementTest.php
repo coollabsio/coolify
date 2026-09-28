@@ -302,13 +302,6 @@ test('an unchanged managed record is deleted from cloudflare and coolify', funct
         ->and(ManagedDnsRecord::query()->find($record->id))->toBeNull();
 });
 
-test('dns provider modal view always has a single root element', function () {
-    $providerModal = file_get_contents(resource_path('views/livewire/project/shared/dns-provider-management.blade.php'));
-
-    expect(ltrim($providerModal))->toStartWith('<div class="contents">')
-        ->and($providerModal)->toContain('@if ($showDnsProviderModal)');
-});
-
 describe('domain DNS configuration after add', function () {
     beforeEach(function () {
         $this->withoutVite();

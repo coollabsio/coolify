@@ -27,6 +27,9 @@ it('sets unreachable fields on servers when subscription ends', function () {
 });
 
 it('cleans up unsubscribed server IP after 7 days via cleanup command', function () {
+    // Subscriptions only exist on Coolify Cloud; self-hosted instances force-disable the server instead.
+    config(['constants.coolify.self_hosted' => false]);
+
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'team_id' => $team->id,

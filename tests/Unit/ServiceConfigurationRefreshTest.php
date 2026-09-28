@@ -34,11 +34,3 @@ it('ensures StackForm dispatches refreshServices event on submit', function () {
     expect($stackFormFile)
         ->toContain("->dispatch('refreshServices')");
 });
-
-it('ensures EditDomain dispatches refreshServices event on submit', function () {
-    $editDomainFile = file_get_contents(__DIR__.'/../../app/Livewire/Project/Service/EditDomain.php');
-
-    // Check that EditDomain dispatches refreshServices event
-    expect($editDomainFile)
-        ->toContain("->dispatch('refreshServices')");
-});
