@@ -87,12 +87,17 @@
                                 </div>
                                 <div>
                                     @if ($image['containers'] === [])
-                                        <x-forms.button canGate="update" :canResource="$server" isError
-                                            wire:click="delete('{{ $image['reference'] }}')"
-                                            wire:confirm="Delete {{ $image['reference'] }} from this server? It has to be pulled or built again to be used."><x-reicon
-                                                name="trash" class="size-3.5" />
-                                            Delete
-                                        </x-forms.button>
+                                        @can('update', $server)
+                                            <x-modal-confirmation title="Delete Docker Image?" buttonTitle="Delete"
+                                                submitAction="delete({{ $image['reference'] }})" :actions="[
+                                                    'Delete ' . $image['reference'] . ' from this server.',
+                                                    'It has to be pulled or built again before it can be used.',
+                                                ]"
+                                                confirmationText="{{ $image['reference'] }}"
+                                                confirmationLabel="Confirm by entering the image reference"
+                                                shortConfirmationLabel="Image" step2ButtonText="Delete Image"
+                                                isErrorButton :confirmWithPassword="false" />
+                                        @endcan
                                     @endif
                                 </div>
                             </div>

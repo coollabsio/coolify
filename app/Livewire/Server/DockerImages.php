@@ -53,7 +53,7 @@ class DockerImages extends Component
         }
     }
 
-    public function delete(string $reference): void
+    public function delete(string $reference, string $password = ''): void
     {
         try {
             $this->authorize('update', $this->server);
