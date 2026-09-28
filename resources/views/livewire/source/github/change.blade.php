@@ -104,6 +104,12 @@
                                 <x-application.settings-section title="General"
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
+                                        @if ($isConnected)
+                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                                wire:click.prevent="testConnection">
+                                                Test connection
+                                            </x-forms.button>
+                                        @endif
                                         <x-forms.button type="button" wire:click.prevent="updateGithubAppName">
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Sync name
