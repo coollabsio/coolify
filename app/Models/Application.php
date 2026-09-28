@@ -1608,7 +1608,7 @@ class Application extends BaseModel
                     ];
                 }
 
-                $private_key = data_get($gitlabSource, 'privateKey.private_key');
+                $private_key = gitlabAppPrivateKey($gitlabSource)?->private_key;
 
                 if ($private_key) {
                     $fullRepoUrl = $customRepository;
@@ -1910,7 +1910,7 @@ class Application extends BaseModel
                     ];
                 }
 
-                $private_key = data_get($gitlabSource, 'privateKey.private_key');
+                $private_key = gitlabAppPrivateKey($gitlabSource)?->private_key;
 
                 if ($private_key) {
                     $fullRepoUrl = $customRepository;
