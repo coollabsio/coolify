@@ -151,7 +151,7 @@ test('a client supplied private key identifier from another team is rejected by 
         ->call('selectExistingPrivateKey');
 })->throws(ModelNotFoundException::class);
 
-test('a member cannot load a team private key through onboarding query parameters', function () {
+test('a member cannot restore a restricted onboarding selection', function () {
     $member = User::factory()->create();
     $member->teams()->attach($this->otherTeam, ['role' => 'member']);
     $this->otherTeam->update(['show_boarding' => false]);
@@ -163,7 +163,7 @@ test('a member cannot load a team private key through onboarding query parameter
     ])->assertForbidden();
 });
 
-test('a member cannot select a team private key through an onboarding action', function () {
+test('a member cannot use a restricted onboarding selection', function () {
     $member = User::factory()->create();
     $member->teams()->attach($this->otherTeam, ['role' => 'member']);
     $this->otherTeam->update(['show_boarding' => false]);
@@ -175,7 +175,7 @@ test('a member cannot select a team private key through an onboarding action', f
         ->assertForbidden();
 });
 
-test('an owner can select an existing key without exposing its private value', function () {
+test('an owner can select an existing onboarding resource', function () {
     actAsBoardingUser($this->otherOwner, $this->otherTeam);
 
     $component = Livewire::test(Index::class)
@@ -188,7 +188,7 @@ test('an owner can select an existing key without exposing its private value', f
     expect($component->get('createdPrivateKey')->getAttributes())->not->toHaveKey('private_key');
 });
 
-test('an owner can resume onboarding with an existing key without exposing its private value', function () {
+test('an owner can resume onboarding with an existing resource', function () {
     actAsBoardingUser($this->otherOwner, $this->otherTeam);
 
     $component = Livewire::test(Index::class, [
@@ -202,7 +202,7 @@ test('an owner can resume onboarding with an existing key without exposing its p
     expect($component->get('createdPrivateKey')->getAttributes())->not->toHaveKey('private_key');
 });
 
-test('an owner can create a server with an existing key without loading its private value', function () {
+test('an owner can create a server from an existing onboarding resource', function () {
     actAsBoardingUser($this->otherOwner, $this->otherTeam);
 
     Livewire::test(Index::class)
