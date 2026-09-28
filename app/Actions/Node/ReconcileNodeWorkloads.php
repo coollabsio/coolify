@@ -28,7 +28,7 @@ class ReconcileNodeWorkloads
                     ->where('is_managed', true),
             ])
             ->get();
-        $activeOperations = NodeOperation::query()
+        $busyWorkloadIds = NodeOperation::query()
             ->where('node_id', $node->id)
             ->whereIn('node_workload_id', $workloads->modelKeys())
             ->whereIn('command_type', ['workload.deploy.v1', 'workload.lifecycle.v1'])
@@ -39,17 +39,13 @@ class ReconcileNodeWorkloads
                 NodeOperationStatus::VERIFYING,
                 NodeOperationStatus::UNCERTAIN,
             ])
-            ->latest('id')
-            ->get()
-            ->unique('node_workload_id')
-            ->keyBy('node_workload_id');
+            ->distinct()
+            ->pluck('node_workload_id');
         $operationCount = 0;
 
         foreach ($workloads as $workload) {
-            $activeOperation = $activeOperations->get($workload->id);
-            if ($activeOperation !== null) {
-                $operationCount += $this->retryUncertainOperation($activeOperation);
-
+            // An uncertain operation stays here until the stale operation recovery or a manual Recover closes it.
+            if ($busyWorkloadIds->contains($workload->id)) {
                 continue;
             }
 
@@ -62,20 +58,6 @@ class ReconcileNodeWorkloads
         }
 
         return $operationCount;
-    }
-
-    private function retryUncertainOperation(NodeOperation $operation): int
-    {
-        if ($operation->status !== NodeOperationStatus::UNCERTAIN) {
-            return 0;
-        }
-
-        match ($operation->command_type) {
-            'workload.deploy.v1' => DeployNodeWorkloadJob::dispatch($operation->id),
-            'workload.lifecycle.v1' => ManageNodeWorkloadJob::dispatch($operation->id),
-        };
-
-        return 1;
     }
 
     private function reconcileWorkload(

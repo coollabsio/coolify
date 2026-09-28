@@ -155,15 +155,16 @@ it('persists deployment and lifecycle intent for later reconciliation', function
     expect($this->workload->refresh()->desired_state)->toBe(NodeWorkloadDesiredState::STOPPED);
 });
 
-it('retries an uncertain operation instead of creating a duplicate', function () {
+it('does not replay an uncertain operation or create a duplicate', function () {
     $deployment = CreateDeploymentOperation::run($this->node, $this->revision);
     $deployment['operation']->update(['status' => NodeOperationStatus::UNCERTAIN]);
     Queue::fake();
 
-    ReconcileNodeWorkloads::run($this->node);
+    $count = ReconcileNodeWorkloads::run($this->node);
 
-    expect($this->node->operations()->count())->toBe(1);
-    Queue::assertPushed(DeployNodeWorkloadJob::class, fn ($job) => $job->operationId === $deployment['operation']->id);
+    expect($count)->toBe(0)
+        ->and($this->node->operations()->count())->toBe(1);
+    Queue::assertNothingPushed();
 });
 
 function createManagedContainer(object $test, NodeWorkloadRevision $revision, string $state): NodeContainer

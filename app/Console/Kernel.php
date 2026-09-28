@@ -13,6 +13,7 @@ use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\InspectNodeClusterNetworksJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\RecoverStaleNodeOperationsJob;
 use App\Jobs\RefreshConnectedNodesJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledJobManager;
@@ -58,6 +59,9 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(30);
         $this->scheduleInstance->job(new RefreshConnectedNodesJob)
             ->everyMinute()
+            ->onOneServer();
+        $this->scheduleInstance->job(new RecoverStaleNodeOperationsJob)
+            ->everyFiveMinutes()
             ->onOneServer();
         $this->scheduleInstance->job(new InspectNodeClusterNetworksJob)
             ->everyMinute()

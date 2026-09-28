@@ -16,15 +16,15 @@ class ClaimOperation
     use AsAction;
 
     /** @param array<string, mixed>|null $result */
-    public function handle(NodeOperation $operation, NodeOperationStatus $status, ?array $result = null): ?NodeOperation
+    public function handle(NodeOperation $operation, NodeOperationStatus $status, ?array $result = null, ?string $error = null): ?NodeOperation
     {
-        return DB::transaction(function () use ($operation, $status, $result): ?NodeOperation {
+        return DB::transaction(function () use ($operation, $status, $result, $error): ?NodeOperation {
             $current = NodeOperation::query()->lockForUpdate()->findOrFail($operation->id);
             if ($current->status !== $operation->status || ! $current->status->canTransitionTo($status)) {
                 return null;
             }
 
-            return TransitionOperation::run($current, $status, $result);
+            return TransitionOperation::run($current, $status, $result, $error);
         });
     }
 }

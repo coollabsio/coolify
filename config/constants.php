@@ -126,6 +126,8 @@ return [
     'node' => [
         'operation_success_retention_days' => (int) env('NODE_OPERATION_SUCCESS_RETENTION_DAYS', 30),
         'operation_failure_retention_days' => (int) env('NODE_OPERATION_FAILURE_RETENTION_DAYS', 90),
+        // Must be longer than the longest Node operation worker timeout (15 minutes).
+        'operation_stale_after_minutes' => (int) env('NODE_OPERATION_STALE_AFTER_MINUTES', 20),
     ],
 
     'proxy' => [

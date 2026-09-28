@@ -26,7 +26,7 @@ enum NodeOperationStatus: string
             self::DISPATCHED => in_array($status, [self::RUNNING, self::SUCCEEDED, self::FAILED, self::TIMED_OUT, self::UNCERTAIN, self::CANCELLED], true),
             self::RUNNING => in_array($status, [self::VERIFYING, self::FAILED, self::TIMED_OUT, self::UNCERTAIN, self::CANCELLED], true),
             self::VERIFYING => in_array($status, [self::SUCCEEDED, self::FAILED, self::TIMED_OUT, self::UNCERTAIN, self::CANCELLED], true),
-            self::UNCERTAIN => in_array($status, [self::DISPATCHED, self::SUCCEEDED, self::FAILED, self::CANCELLED], true),
+            self::UNCERTAIN => in_array($status, [self::DISPATCHED, self::SUCCEEDED, self::FAILED, self::TIMED_OUT, self::CANCELLED], true),
             self::SUCCEEDED, self::FAILED, self::TIMED_OUT, self::CANCELLED => false,
         };
     }
