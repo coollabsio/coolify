@@ -216,12 +216,17 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server, bool
 
 function streamBackupFromServer(Server $server, string $filename, string $contentType): StreamedResponse
 {
+    $privateKey = $server->privateKey;
+    if (! $privateKey || $privateKey->team_id !== $server->team_id) {
+        throw new RuntimeException('Private key not found for this server.');
+    }
+
     $disk = Storage::build([
         'driver' => 'sftp',
         'host' => $server->ip,
         'port' => (int) $server->port,
         'username' => $server->user,
-        'privateKey' => $server->privateKey->getKeyLocation(),
+        'privateKey' => $privateKey->getKeyLocation(),
         'root' => '/',
     ]);
 
