@@ -30,7 +30,12 @@ beforeEach(function () {
 
     // Fake notifications to ensure none are sent
     Notification::fake();
-    Http::fake();
+    // app:init pulls the service templates and writes the real repository file,
+    // so answer with its current content instead of an empty body.
+    Http::fake([
+        config('constants.services.official') => Http::response(file_get_contents(service_templates_path())),
+        '*' => Http::response(),
+    ]);
     Process::fake();
     Queue::fake();
 

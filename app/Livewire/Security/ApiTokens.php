@@ -15,13 +15,7 @@ class ApiTokens extends Component
 
     public ?string $description = null;
 
-    /**
-     * Untyped on purpose: Livewire skips hydrating null into typed properties, which
-     * would silently revert a "Never" (null) choice back to the default on the next request.
-     *
-     * @var int|string|null
-     */
-    public $expiresInDays = 30;
+    public ?int $expiresInDays = 30;
 
     public $tokens = [];
 
@@ -149,7 +143,7 @@ class ApiTokens extends Component
                 throw new \Exception('You do not have permission to create tokens with read:sensitive permissions.');
             }
 
-            $expiresAt = filled($validated['expiresInDays'] ?? null) ? now()->addDays((int) $validated['expiresInDays']) : null;
+            $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
             $token = auth()->user()->createToken($this->description, $permissions, $expiresAt);
             auditLog('ui.api_token.created', [
                 'team_id' => currentTeam()->id,

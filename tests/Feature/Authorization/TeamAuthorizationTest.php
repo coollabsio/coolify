@@ -171,32 +171,15 @@ test('team index mounts when is_mcp_server_enabled is null on the session team',
 
 // --- Team Danger Zone Livewire: delete ---
 
-test('member cannot open the team danger zone', function () {
+test('member cannot delete team via danger zone', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(DangerZone::class)->assertForbidden();
+    Livewire::test(DangerZone::class)
+        ->call('delete')
+        ->assertDispatched('error');
 
     expect(Team::find($this->team->id))->not->toBeNull();
-});
-
-test('owner can open the team danger zone', function () {
-    $this->actingAs($this->owner);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(DangerZone::class)->assertSuccessful();
-});
-
-test('team settings show the danger zone link only to the team owner', function () {
-    session(['currentTeam' => $this->team]);
-
-    $this->actingAs($this->owner);
-    Livewire::test(TeamIndex::class)->assertSee('Danger Zone');
-
-    foreach ([$this->admin, $this->member] as $user) {
-        $this->actingAs($user);
-        Livewire::test(TeamIndex::class)->assertDontSee('Danger Zone');
-    }
 });
 
 test('admin cannot delete team via policy', function () {

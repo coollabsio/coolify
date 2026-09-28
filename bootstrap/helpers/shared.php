@@ -1484,12 +1484,6 @@ function service_templates_path(): string
  */
 function store_service_templates_bundle(string $json, ?string $fetchedAt = null): bool
 {
-    // A 200 response can still be an empty body or an error page; keep the current templates then.
-    $templates = json_decode($json, true);
-    if (! is_array($templates) || $templates === [] || array_is_list($templates)) {
-        return false;
-    }
-
     $fetchedAt ??= now()->toIso8601String();
     $path = service_templates_path();
 
@@ -1536,9 +1530,7 @@ function get_service_templates(bool $force = false): Collection
             if ($response->failed()) {
                 return collect([]);
             }
-            if (! store_service_templates_bundle($response->body())) {
-                return get_service_templates();
-            }
+            store_service_templates_bundle($response->body());
 
             return collect(json_decode($response->body()))->sortKeys();
         } catch (Throwable) {

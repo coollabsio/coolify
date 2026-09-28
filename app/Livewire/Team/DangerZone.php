@@ -16,7 +16,6 @@ class DangerZone extends Component
     public function mount(): void
     {
         $this->team = currentTeam();
-        $this->authorize('delete', $this->team);
     }
 
     public function delete(): mixed

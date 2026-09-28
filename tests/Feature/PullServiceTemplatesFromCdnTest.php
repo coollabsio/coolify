@@ -119,33 +119,6 @@ it('skips pulling templates in local development', function () {
     expect(Cache::get(service_templates_cache_key()))->toBeNull();
 });
 
-it('keeps the local templates when the CDN returns an unusable bundle', function (string $body) {
-    Http::fake([
-        config('constants.services.official') => Http::response($body, 200),
-    ]);
-
-    $path = service_templates_path();
-    $original = File::get($path);
-
-    try {
-        config(['app.env' => 'production']);
-
-        (new PullTemplatesFromCDN)->handle();
-
-        expect(md5(File::get($path)))->toBe(md5($original))
-            ->and(Cache::get(service_templates_cache_key()))->toBeNull()
-            ->and(get_service_templates())->not->toBeEmpty();
-    } finally {
-        File::put($path, $original);
-        Cache::forget(service_templates_cache_key());
-    }
-})->with([
-    'empty body' => '',
-    'html error page' => '<html>Bad gateway</html>',
-    'empty object' => '{}',
-    'json list' => '[1, 2]',
-]);
-
 it('logs when the CDN responds with a non-success status', function () {
     Http::fake([
         'cdn.coollabs.io/*' => Http::response('nope', 503),

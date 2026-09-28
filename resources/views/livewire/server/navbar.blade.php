@@ -85,9 +85,7 @@
             $activeServerMenuItem['route'],
             $serverRouteParameters,
         );
-        $showSentinelStatus = $server->isFunctional()
-            && $server->isSentinelEnabled()
-            && auth()->user()?->can('viewSentinel', $server);
+        $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
     @endphp
 

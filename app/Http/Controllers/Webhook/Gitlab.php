@@ -17,6 +17,7 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Visus\Cuid2\Cuid2;
 
 class Gitlab extends Controller
 {
@@ -184,7 +185,7 @@ class Gitlab extends Controller
                         continue;
                     }
 
-                    $deployment_uuid = new_public_id();
+                    $deployment_uuid = new Cuid2;
                     $result = queue_application_deployment(
                         application: $application,
                         deployment_uuid: $deployment_uuid,
@@ -202,7 +203,7 @@ class Gitlab extends Controller
                         'mode' => 'app',
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
-                        'deployment_uuid' => $deployment_uuid,
+                        'deployment_uuid' => $deployment_uuid->toString(),
                         'commit' => $commit,
                     ]);
 
@@ -274,7 +275,7 @@ class Gitlab extends Controller
                             continue;
                         }
 
-                        $deployment_uuid = new_public_id();
+                        $deployment_uuid = new Cuid2;
                         $found = ApplicationPreview::where('application_id', $application->id)
                             ->where('pull_request_id', $pull_request_id)
                             ->first();

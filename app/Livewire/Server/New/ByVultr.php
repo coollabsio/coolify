@@ -375,9 +375,7 @@ class ByVultr extends Component
             $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
         }
 
-        $prefix = "{$providerName} API error: ";
-
-        return str_starts_with($details, $prefix) ? $details : $prefix.$details;
+        return "{$providerName} API error: {$details}";
     }
 
     private function createVultrServer(VultrService $vultrService): array

@@ -15,10 +15,7 @@ trait HasSecretManager
 
     public static function bootHasSecretManager(): void
     {
-        // Return nothing: a non-null result halts the "deleting" event and skips later listeners.
-        static::deleting(function ($resource): void {
-            $resource->secretManagerLink()->delete();
-        });
+        static::deleting(fn ($resource) => $resource->secretManagerLink()->delete());
     }
 
     public function secretManagerLink(): MorphOne

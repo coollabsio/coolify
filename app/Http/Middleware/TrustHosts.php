@@ -28,7 +28,8 @@ class TrustHosts extends Middleware
         }
 
         // Skip host validation if no FQDN is configured (initial setup)
-        if ($this->configuredFqdnHost() === null) {
+        $fqdnHost = Cache::get('instance_settings_fqdn_host');
+        if ($fqdnHost === '' || $fqdnHost === null) {
             return $next($request);
         }
 
@@ -45,7 +46,27 @@ class TrustHosts extends Middleware
     {
         $trustedHosts = [];
 
-        $fqdnHost = $this->configuredFqdnHost();
+        // Trust the configured FQDN from InstanceSettings (cached to avoid DB query on every request)
+        // Use empty string as sentinel value instead of null so negative results are cached
+        $fqdnHost = Cache::remember('instance_settings_fqdn_host', 300, function () {
+            try {
+                $settings = InstanceSettings::get();
+                if ($settings && $settings->fqdn) {
+                    $url = Url::fromString($settings->fqdn);
+                    $host = $url->getHost();
+
+                    return $host ?: '';
+                }
+            } catch (\Exception $e) {
+                // If instance settings table doesn't exist yet (during installation),
+                // return empty string (sentinel) so this result is cached
+            }
+
+            return '';
+        });
+
+        // Convert sentinel value back to null for consumption
+        $fqdnHost = $fqdnHost !== '' ? $fqdnHost : null;
 
         if ($fqdnHost) {
             $trustedHosts[] = $fqdnHost;
@@ -75,32 +96,5 @@ class TrustHosts extends Middleware
         }
 
         return array_filter($trustedHosts);
-    }
-
-    /**
-     * Resolve the configured instance FQDN host, cached to avoid a DB query on every request.
-     *
-     * An empty string is cached as the "no FQDN" sentinel so negative results are cached too.
-     */
-    private function configuredFqdnHost(): ?string
-    {
-        $fqdnHost = Cache::remember('instance_settings_fqdn_host', 300, function () {
-            try {
-                $settings = InstanceSettings::get();
-                if ($settings && $settings->fqdn) {
-                    $url = Url::fromString($settings->fqdn);
-                    $host = $url->getHost();
-
-                    return $host ?: '';
-                }
-            } catch (\Exception $e) {
-                // If instance settings table doesn't exist yet (during installation),
-                // return empty string (sentinel) so this result is cached
-            }
-
-            return '';
-        });
-
-        return $fqdnHost !== '' ? $fqdnHost : null;
     }
 }

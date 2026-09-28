@@ -2,19 +2,15 @@
 
 namespace App\Livewire\Profile;
 
-use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 class Index extends Component
 {
-    use WithFileUploads;
-
     public int $userId;
 
     public string $email;

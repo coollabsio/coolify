@@ -163,7 +163,6 @@ class SettingsEmail extends Component
     public function toggleSmtp()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->resetErrorBag();
 
             if ($this->smtpEnabled) {
@@ -186,7 +185,6 @@ class SettingsEmail extends Component
     public function toggleResend()
     {
         try {
-            $this->authorize('update', $this->settings);
             $this->resetErrorBag();
 
             if ($this->resendEnabled) {

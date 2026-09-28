@@ -29,7 +29,7 @@ class OauthLoginService
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
         $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
-        session(['currentTeam' => $team]);
+        session(['currentTeam' => $user->currentTeam = $team]);
 
         if ($this->requiresTwoFactorChallenge($user)) {
             Auth::logout();
