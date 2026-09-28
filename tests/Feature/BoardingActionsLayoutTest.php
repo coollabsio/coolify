@@ -25,6 +25,16 @@ test('DigitalOcean is available as an onboarding server provider', function () {
         ->toContain('<livewire:server.new.by-digital-ocean :limit_reached="false" :from_onboarding="true" />');
 });
 
+test('Hostinger is available as an onboarding server provider', function () {
+    $view = file_get_contents(resource_path('views/livewire/boarding/index.blade.php'));
+
+    expect($view)
+        ->toContain('<x-modal-input title="Connect a Hostinger Server" isFullWidth>')
+        ->toContain('<x-hostinger-icon class="size-10 shrink-0 text-[#673de6]" />')
+        ->toContain('Deploy servers directly from your Hostinger account.')
+        ->toContain('<livewire:server.new.by-hostinger :limit_reached="false" :from_onboarding="true" />');
+});
+
 test('server type details are shown on the relevant cards instead of a technical details panel', function () {
     $view = file_get_contents(resource_path('views/livewire/boarding/index.blade.php'));
 
@@ -43,8 +53,8 @@ test('server type cards use the standard card hover treatment', function () {
     $hoverClasses = 'shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md';
     preg_match_all('/min-h-36[^\"]*'.preg_quote($hoverClasses, '/').'/', $view, $matches);
 
-    expect($matches[0])->toHaveCount(5)
-        ->and(substr_count($view, 'group relative cursor-pointer'))->toBe(5)
+    expect($matches[0])->toHaveCount(6)
+        ->and(substr_count($view, 'group relative cursor-pointer'))->toBe(6)
         ->and($view)->not->toContain('hover:border-coollabs/35 hover:bg-coollabs/[0.03]')
         ->and($view)->not->toContain('dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]');
 });

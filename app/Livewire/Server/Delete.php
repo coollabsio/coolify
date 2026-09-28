@@ -20,6 +20,8 @@ class Delete extends Component
 
     public bool $delete_from_digitalocean = false;
 
+    public bool $delete_from_hostinger = false;
+
     public bool $force_delete_resources = false;
 
     public function mount(string $server_uuid)
@@ -41,6 +43,7 @@ class Delete extends Component
             $this->delete_from_hetzner = in_array('delete_from_hetzner', $selectedActions);
             $this->delete_from_vultr = in_array('delete_from_vultr', $selectedActions);
             $this->delete_from_digitalocean = in_array('delete_from_digitalocean', $selectedActions);
+            $this->delete_from_hostinger = in_array('delete_from_hostinger', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
         }
         try {
@@ -72,7 +75,9 @@ class Delete extends Component
                 $this->delete_from_vultr,
                 $this->server->vultr_instance_id,
                 $this->delete_from_digitalocean,
-                $this->server->digitalocean_droplet_id
+                $this->server->digitalocean_droplet_id,
+                $this->delete_from_hostinger,
+                $this->server->hostinger_virtual_machine_id
             );
 
             return redirectRoute($this, 'server.index');
@@ -115,6 +120,14 @@ class Delete extends Component
                 'id' => 'delete_from_digitalocean',
                 'label' => 'Also delete droplet from DigitalOcean',
                 'default_warning' => 'The actual droplet on DigitalOcean will NOT be deleted.',
+            ];
+        }
+
+        if ($this->server->hostinger_virtual_machine_id) {
+            $checkboxes[] = [
+                'id' => 'delete_from_hostinger',
+                'label' => 'Also delete VPS from Hostinger (at the end of the paid period)',
+                'default_warning' => 'The VPS on Hostinger will NOT be deleted, and Hostinger will keep billing for it.',
             ];
         }
 
