@@ -20,10 +20,13 @@ class StopApplication
         if ($application?->additional_servers?->count() > 0) {
             $servers = $servers->merge($application->additional_servers);
         }
+        $errors = [];
         foreach ($servers as $server) {
             try {
                 if (! $server->isFunctional()) {
-                    return 'Server is not functional';
+                    $errors[] = "Server {$server->name} is not functional.";
+
+                    continue;
                 }
 
                 if ($server->isSwarm()) {
@@ -58,8 +61,11 @@ class StopApplication
                     CleanupDocker::dispatch($server, false, false);
                 }
             } catch (\Exception $e) {
-                return $e->getMessage();
+                $errors[] = $e->getMessage();
             }
+        }
+        if ($errors !== []) {
+            return implode(' ', $errors);
         }
 
         $status = [

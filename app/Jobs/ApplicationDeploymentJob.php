@@ -34,6 +34,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use JsonException;
@@ -315,6 +316,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         try {
             $this->validateDeploymentEnvironmentVariableKeys();
+            $this->ensureRegistryImageForMultipleServers();
+            $this->warnAboutVolumesOnMultipleServers();
         } catch (Exception $e) {
             $this->fail($e);
             throw $e;
@@ -619,6 +622,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
         $this->generate_image_names();
         $this->generate_compose_file();
+        if ($this->pull_image_for_additional_server()) {
+            $this->save_runtime_environment_variables();
+            $this->rolling_update();
+
+            return;
+        }
 
         // Save build-time .env file BEFORE the build
         $this->save_buildtime_environment_variables();
@@ -633,6 +642,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->push_to_docker_registry();
         $this->rolling_update();
+    }
+
+    /**
+     * An inline Dockerfile image has no commit tag. The main server builds it and pushes it with the
+     * `latest` tag just before it queues the additional servers, so an additional server pulls that
+     * image instead of building its own. A failed pull fails the deployment.
+     */
+    private function pull_image_for_additional_server(): bool
+    {
+        if (! $this->is_this_additional_server || str($this->application->docker_registry_image_name)->isEmpty()) {
+            return false;
+        }
+
+        $this->application_deployment_queue->addLogEntry("Pulling image ({$this->production_image_name}) that the main server pushed. Build step skipped.");
+        $this->execute_remote_command([
+            'docker pull '.escapeshellarg($this->production_image_name),
+            'hidden' => true,
+        ]);
+
+        return true;
     }
 
     private function deploy_dockerimage_buildpack()
@@ -715,14 +744,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $fileStorage->is_directory = true;
                         $fileStorage->content = null;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer();
-                        $fileStorage->saveStorageOnServer();
+                        $fileStorage->deleteStorageOnServer($this->mainServer);
+                        $fileStorage->saveStorageOnServer($this->mainServer);
                     } elseif ($fileStat->value() === 'regular file' && $fileStorage->is_directory) {
                         $fileStorage->is_directory = false;
                         $fileStorage->is_based_on_git = true;
                         $fileStorage->save();
-                        $fileStorage->deleteStorageOnServer();
-                        $fileStorage->saveStorageOnServer();
+                        $fileStorage->deleteStorageOnServer($this->mainServer);
+                        $fileStorage->saveStorageOnServer($this->mainServer);
                     }
                 }
             }
@@ -1002,14 +1031,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The queued ServerStorageSaveJob writes new content files, but it can run after the containers
      * start. Preserve-repository deployments write all file storages in write_deployment_configurations().
-     * Coolify writes file storages only on the main server of the application.
+     * Each deployment writes the files on its own server, so additional servers also get them.
      */
     private function write_missing_content_files(): void
     {
         if ($this->preserveRepository) {
-            return;
-        }
-        if ((int) data_get($this->application, 'destination.server_id') !== (int) $this->mainServer->id) {
             return;
         }
 
@@ -1173,7 +1199,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             foreach ($this->application->fileStorages as $fileStorage) {
                 if (! $fileStorage->is_host_file && ! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
-                    $fileStorage->saveStorageOnServer();
+                    $fileStorage->saveStorageOnServer($this->mainServer);
                 }
             }
             if ($this->use_build_server) {
@@ -1216,7 +1242,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function push_to_docker_registry()
     {
-        $forceFail = true;
         if (str($this->application->docker_registry_image_name)->isEmpty()) {
             return;
         }
@@ -1225,15 +1250,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($this->application->build_pack === 'dockerimage') {
             return;
-        }
-        if ($this->use_build_server) {
-            $forceFail = true;
-        }
-        if ($this->server->isSwarm() && $this->build_pack !== 'dockerimage') {
-            $forceFail = true;
-        }
-        if ($this->application->additional_servers->count() > 0) {
-            $forceFail = true;
         }
         if ($this->is_this_additional_server) {
             return;
@@ -1266,9 +1282,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (Exception $e) {
             $this->application_deployment_queue->addLogEntry('Failed to push image to docker registry. Please check debug logs for more information.');
-            if ($forceFail) {
-                throw new DeploymentException(get_class($e).': '.$e->getMessage(), $e->getCode(), $e);
-            }
+            throw new DeploymentException(get_class($e).': '.$e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -2140,6 +2154,42 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Coolify blocks new volumes on multi-server applications, but older applications can have both.
+     * Some applications accept separate data on each server (for example a cache), so the
+     * deployment continues and only shows a warning.
+     */
+    private function warnAboutVolumesOnMultipleServers(): void
+    {
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
+        if ($this->application->additional_servers()->doesntExist() || $this->application->persistentStorages()->doesntExist()) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry('Warning: This application uses multiple servers and has persistent storage. Volumes are not shared between servers, so each server has its own data.', 'stderr');
+    }
+
+    /**
+     * Additional servers pull the image that the main server pushes. Without a registry image, each
+     * server builds its own image, so the servers can run different code.
+     */
+    private function ensureRegistryImageForMultipleServers(): void
+    {
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
+        if ($this->application->additional_servers()->doesntExist()) {
+            return;
+        }
+        if (str($this->application->docker_registry_image_name)->isNotEmpty()) {
+            return;
+        }
+
+        throw new DeploymentException('Before deploying to multiple servers, you must set a Docker image in the General tab. More information: https://coolify.io/docs/knowledge-base/server/multiple-servers');
+    }
+
+    /**
      * Build-time names go into shell and Docker build commands, so they must be valid when the
      * deployment builds an image. Runtime-only variables only go into the .env file: existing ones
      * with names that new variables can no longer use (such as my-var) keep working, unless the
@@ -2640,23 +2690,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->prepare_builder_image(firstTry: false);
     }
 
-    private function deploy_to_additional_destinations()
+    /**
+     * @return int The number of deployments that Coolify queued on additional servers
+     */
+    private function deploy_to_additional_destinations(): int
     {
         if ($this->application->additional_networks->count() === 0) {
-            return;
+            return 0;
         }
         if ($this->pull_request_id !== 0) {
-            return;
+            return 0;
         }
         $destination_ids = $this->application->additional_networks->pluck('id');
         if ($this->server->isSwarm()) {
             $this->application_deployment_queue->addLogEntry('Additional destinations are not supported in swarm mode.');
 
-            return;
+            return 0;
         }
         if ($destination_ids->contains($this->destination->id)) {
-            return;
+            return 0;
         }
+        $queued = 0;
         foreach ($destination_ids as $destination_id) {
             $destination = StandaloneDocker::find($destination_id);
             if (! $destination) {
@@ -2669,16 +2723,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             $deployment_uuid = new_public_id();
-            queue_application_deployment(
+            // Deploy the exact commit and image tag of the main server, also for a rollback.
+            $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->application,
+                commit: $this->commit,
+                no_questions_asked: true,
                 server: $server,
                 destination: $destination,
-                no_questions_asked: true,
+                rollback: $this->rollback,
+                docker_registry_image_tag: $this->application_deployment_queue->docker_registry_image_tag,
+                parent_deployment_uuid: $this->deployment_uuid,
             );
+            if ($result['status'] !== 'queued') {
+                $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} was not queued: {$result['message']}", 'stderr');
+
+                continue;
+            }
+            $queued++;
             $deployment_url = base_url().'/project/'.data_get($this->application, 'environment.project.uuid').'/environment/'.data_get($this->application, 'environment.uuid').'/application/'.data_get($this->application, 'uuid')."/deployment/{$deployment_uuid}";
             $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: {$deployment_url}");
         }
+
+        return $queued;
     }
 
     private function set_coolify_variables()
@@ -5547,11 +5614,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
-        if (! $this->only_this_server) {
-            $this->deploy_to_additional_destinations();
+        if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
+            $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
+
+            return;
         }
 
-        $this->sendDeploymentNotification(DeploymentSuccess::class);
+        $queuedAdditionalDeployments = $this->only_this_server ? 0 : $this->deploy_to_additional_destinations();
+        if ($queuedAdditionalDeployments === 0) {
+            $this->sendDeploymentNotification(DeploymentSuccess::class);
+
+            return;
+        }
+        Cache::put("multi-server-deployment-queued:{$this->deployment_uuid}", true, now()->addDay());
+        $this->sendMultiServerDeploymentNotification($this->deployment_uuid);
     }
 
     /**
@@ -5559,7 +5635,45 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function handleFailedDeployment(): void
     {
+        if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
+            $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
+
+            return;
+        }
+
         $this->sendDeploymentNotification(DeploymentFailed::class);
+    }
+
+    /**
+     * The main server queues one deployment for each additional server. When all are queued and the
+     * last one ends, Coolify sends one notification: success if all servers succeeded, else failed
+     * with a link to the first deployment that did not succeed.
+     */
+    private function sendMultiServerDeploymentNotification(string $parentDeploymentUuid): void
+    {
+        if (! Cache::has("multi-server-deployment-queued:{$parentDeploymentUuid}")) {
+            return;
+        }
+        $deployments = ApplicationDeploymentQueue::query()
+            ->where('parent_deployment_uuid', $parentDeploymentUuid)
+            ->get(['deployment_uuid', 'status']);
+
+        $endStatuses = [
+            ApplicationDeploymentStatus::FINISHED->value,
+            ApplicationDeploymentStatus::FAILED->value,
+            ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+        ];
+        if ($deployments->contains(fn (ApplicationDeploymentQueue $deployment) => ! in_array($deployment->status, $endStatuses, true))) {
+            return;
+        }
+        if (! Cache::add("multi-server-deployment-notified:{$parentDeploymentUuid}", true, now()->addDay())) {
+            return;
+        }
+
+        $unsuccessful = $deployments->first(fn (ApplicationDeploymentQueue $deployment) => $deployment->status !== ApplicationDeploymentStatus::FINISHED->value);
+        $this->application->environment->project->team?->notify($unsuccessful
+            ? new DeploymentFailed($this->application, $unsuccessful->deployment_uuid, $this->preview)
+            : new DeploymentSuccess($this->application, $parentDeploymentUuid, $this->preview));
     }
 
     /**

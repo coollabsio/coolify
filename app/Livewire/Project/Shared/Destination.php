@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared;
 use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -156,6 +157,14 @@ class Destination extends Component
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $reason = $this->resource instanceof Application
+                ? $this->resource->additionalServersUnavailableReason()
+                : 'Only applications can use multiple servers.';
+            if ($reason) {
+                $this->dispatch('error', 'Failed to add server.', $reason);
+
+                return;
+            }
 
             $this->resource->additional_networks()->syncWithoutDetaching([
                 $network->id => ['server_id' => $server->id],

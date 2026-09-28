@@ -112,6 +112,11 @@
                                                     })
                                                 }
                                             })">
+                                            @if ($this->volumeUnavailableReason)
+                                                <x-callout type="warning" title="Volume mounts are unavailable" class="w-full">
+                                                    {{ $this->volumeUnavailableReason }}
+                                                </x-callout>
+                                            @else
                                             <form class="flex w-full flex-col gap-4"
                                                 wire:submit='submitPersistentVolume'>
                                                 <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
@@ -130,6 +135,7 @@
                                                     </div>
                                                 </div>
                                             </form>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

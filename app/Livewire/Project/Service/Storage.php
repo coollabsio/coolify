@@ -240,6 +240,14 @@ class Storage extends Component
         return collect($this->fileStorage)->where('is_directory', true);
     }
 
+    /**
+     * The reason why the resource cannot get a volume mount, or null if it can.
+     */
+    public function getVolumeUnavailableReasonProperty(): ?string
+    {
+        return $this->resource instanceof Application ? $this->resource->persistentStorageUnavailableReason() : null;
+    }
+
     public function getVolumeCountProperty()
     {
         return $this->cachedVolumeCount;
@@ -264,6 +272,12 @@ class Storage extends Component
                 'name' => ValidationPatterns::volumeNameRules(),
                 'mount_path' => 'required|string',
             ], ValidationPatterns::volumeNameMessages());
+
+            if ($reason = $this->volumeUnavailableReason) {
+                $this->dispatch('error', 'Failed to add volume.', $reason);
+
+                return;
+            }
 
             $name = $this->resource->uuid.'-'.$this->name;
 

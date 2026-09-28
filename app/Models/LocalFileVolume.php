@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
+use Closure;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -236,21 +238,21 @@ class LocalFileVolume extends BaseModel
         return (string) $content;
     }
 
-    public function deleteStorageOnServer()
+    /**
+     * Without a server, Coolify deletes the file on every server of the resource.
+     */
+    public function deleteStorageOnServer(?Server $server = null)
     {
         if ($this->is_host_file) {
             return;
         }
+        if (is_null($server)) {
+            return $this->runOnEveryServer(fn (Server $server) => $this->deleteStorageOnServer($server));
+        }
 
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
-        if ($isService) {
-            $workdir = $this->resource->service->workdir();
-            $server = $this->resource->service->server;
-        } else {
-            $workdir = $this->resource->workdir();
-            $server = $this->resource->destination->server;
-        }
+        $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
         $path = data_get_str($this, 'fs_path');
         if ($path->startsWith('.')) {
@@ -282,21 +284,21 @@ class LocalFileVolume extends BaseModel
         }
     }
 
-    public function saveStorageOnServer()
+    /**
+     * Without a server, Coolify writes the file on every server of the resource.
+     */
+    public function saveStorageOnServer(?Server $server = null)
     {
         if ($this->is_host_file) {
             return;
         }
+        if (is_null($server)) {
+            return $this->runOnEveryServer(fn (Server $server) => $this->saveStorageOnServer($server));
+        }
 
         $this->load(['service']);
         $isService = data_get($this->resource, 'service');
-        if ($isService) {
-            $workdir = $this->resource->service->workdir();
-            $server = $this->resource->service->server;
-        } else {
-            $workdir = $this->resource->workdir();
-            $server = $this->resource->destination->server;
-        }
+        $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
 
@@ -553,6 +555,49 @@ class LocalFileVolume extends BaseModel
         return $owner instanceof Application || $owner instanceof Service
             ? composeResourceDirectory($owner)
             : $owner->workdir();
+    }
+
+    /**
+     * The main server of the resource, and the additional servers of an application.
+     *
+     * @return Collection<int, Server>
+     */
+    public function servers(): Collection
+    {
+        $this->load(['service']);
+        if (data_get($this->resource, 'service')) {
+            return collect([$this->resource->service->server]);
+        }
+
+        $servers = collect([$this->resource->destination->server]);
+        if ($this->resource instanceof Application) {
+            $servers = $servers->merge($this->resource->additional_servers);
+        }
+
+        return $servers->filter()->unique('id')->values();
+    }
+
+    /**
+     * Runs the callback on every server, also when one server fails, and then throws the first error.
+     *
+     * @param  Closure(Server): mixed  $callback
+     */
+    protected function runOnEveryServer(Closure $callback): mixed
+    {
+        $result = null;
+        $firstError = null;
+        foreach ($this->servers() as $server) {
+            try {
+                $result = $callback($server);
+            } catch (\Throwable $e) {
+                $firstError ??= $e;
+            }
+        }
+        if ($firstError) {
+            throw $firstError;
+        }
+
+        return $result;
     }
 
     /**

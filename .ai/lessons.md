@@ -24,6 +24,7 @@
 - A source-text check is acceptable only for a correctness or security rule that rendering cannot prove easily, such as stable `wire:key` values or no raw user output.
 - Call the app code under test. Do not copy app logic into a test, assert only literals, constants, `class_exists`/`method_exists`, or PHP built-ins such as `escapeshellarg`.
 - Pest test files share one global function scope. Give file-level helper functions a unique name.
+- Call `Server::flushIdentityMap()` in `beforeEach` of tests that use `Server` models; the identity map leaks servers and settings between test files in one run.
 
 ## Keep dynamic Livewire identities stable
 - In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.

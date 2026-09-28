@@ -585,6 +585,33 @@ class Application extends BaseModel
             ->withPivot('server_id', 'status');
     }
 
+    /**
+     * The reason why this application cannot get a persistent volume, or null if it can.
+     */
+    public function persistentStorageUnavailableReason(): ?string
+    {
+        if ($this->additional_servers()->exists()) {
+            return 'Applications that use multiple servers cannot have persistent storage because volumes are not shared between servers.';
+        }
+
+        return null;
+    }
+
+    /**
+     * The reason why this application cannot deploy to additional servers, or null if it can.
+     */
+    public function additionalServersUnavailableReason(): ?string
+    {
+        if ($this->build_pack === 'dockercompose') {
+            return 'Docker Compose applications cannot use multiple servers.';
+        }
+        if ($this->persistentStorages()->exists()) {
+            return 'Applications with persistent storage cannot use multiple servers because volumes are not shared between servers.';
+        }
+
+        return null;
+    }
+
     public function is_public_repository(): bool
     {
         if (data_get($this, 'source.is_public')) {

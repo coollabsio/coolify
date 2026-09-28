@@ -97,6 +97,10 @@ class ConnectApplication extends Component
                 return null;
             }
 
+            if ($reason = $application->persistentStorageUnavailableReason()) {
+                throw new \Exception($reason);
+            }
+
             if ($application->persistentStorages()->where('standalone_sqlite_id', $this->database->id)->exists()) {
                 throw new \Exception("{$application->name} already mounts this database volume.");
             }

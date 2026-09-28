@@ -23241,6 +23241,10 @@
                     "only_this_server": {
                         "type": "boolean"
                     },
+                    "parent_deployment_uuid": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "rollback": {
                         "type": "boolean"
                     },
