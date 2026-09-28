@@ -46,19 +46,27 @@ describe('Log Viewer XSS Prevention', function () {
     });
 
     it('uses text nodes for search highlighting instead of injected html', function () {
-        $views = [
-            __DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php',
-            __DIR__.'/../../resources/views/livewire/project/shared/get-logs.blade.php',
-        ];
+        $deploymentView = file_get_contents(__DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php');
 
-        foreach ($views as $view) {
-            $contents = file_get_contents($view);
+        expect($deploymentView)
+            ->toContain('document.createTextNode')
+            ->toContain('mark.textContent')
+            ->not->toContain('innerHTML')
+            ->not->toContain('x-html');
+    });
 
-            expect($contents)
-                ->toContain('document.createTextNode')
-                ->toContain('mark.textContent')
-                ->not->toContain('innerHTML')
-                ->not->toContain('x-html');
-        }
+    it('renders runtime log text and highlight segments with x-text only', function () {
+        $runtimeView = file_get_contents(__DIR__.'/../../resources/views/livewire/project/shared/get-logs.blade.php');
+        $runtimeScript = file_get_contents(__DIR__.'/../../resources/js/runtime-logs.js');
+
+        expect($runtimeView)
+            ->toContain('x-text="segment.text"')
+            ->toContain('x-text="formatLogDetails(row.line.text)"')
+            ->not->toContain('innerHTML')
+            ->not->toContain('x-html');
+
+        expect($runtimeScript)
+            ->not->toContain('innerHTML')
+            ->not->toContain('insertAdjacentHTML');
     });
 });

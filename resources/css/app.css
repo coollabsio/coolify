@@ -3477,6 +3477,81 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     -webkit-appearance: none;
 }
 
+/* Runtime logs: "Lines", the number field and "All" as one control, styled like the search field. */
+.runtime-log-lines-group {
+    height: 2rem;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.dark .runtime-log-lines-group {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.runtime-log-lines-group:has(.logs-viewer-lines-input:focus) {
+    border-color: var(--color-coollabs);
+}
+
+.runtime-log-lines-group .logs-viewer-lines-label {
+    padding: 0 0.5rem 0 0.625rem;
+}
+
+.runtime-log-lines-group .logs-viewer-lines-input {
+    width: 3.75rem !important;
+    min-width: 3.75rem !important;
+    height: 100% !important;
+    border: 0 !important;
+    border-left: 1px solid var(--color-neutral-200) !important;
+    border-right: 1px solid var(--color-neutral-200) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.dark .runtime-log-lines-group .logs-viewer-lines-input {
+    border-left-color: rgba(255, 255, 255, 0.08) !important;
+    border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.runtime-log-lines-all {
+    height: 100%;
+    padding: 0 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #737373;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.runtime-log-lines-all:hover:not(:disabled, .runtime-log-lines-all-active) {
+    background: rgba(0, 0, 0, 0.05);
+    color: #171717;
+}
+
+.dark .runtime-log-lines-all {
+    color: var(--color-fg-faint);
+}
+
+.dark .runtime-log-lines-all:hover:not(:disabled, .runtime-log-lines-all-active) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-fg);
+}
+
+.runtime-log-lines-all.runtime-log-lines-all-active,
+.dark .runtime-log-lines-all.runtime-log-lines-all-active {
+    background: var(--color-coollabs);
+    color: #fff;
+}
+
+.runtime-log-lines-all:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 /* Compact badge that fits the dark logs chrome */
 .logs-viewer-status-badge {
     height: 1.5rem !important;
@@ -4024,8 +4099,16 @@ html[data-theme="custom"] .runtime-log-columns {
     color: #adbdc9;
 }
 
-.runtime-log-viewport [data-log-line].hidden + .runtime-log-detail {
-    display: none !important;
+.runtime-log-virtual-list {
+    position: relative;
+    width: 100%;
+}
+
+.runtime-log-virtual-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
 }
 
 .runtime-log-without-time {

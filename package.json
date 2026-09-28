@@ -18,6 +18,7 @@
     "dependencies": {
         "@tailwindcss/forms": "0.5.11",
         "@tailwindcss/typography": "0.5.20",
+        "@tanstack/virtual-core": "3.17.11",
         "@xterm/addon-fit": "0.11.0",
         "@xterm/xterm": "6.0.0",
         "cobe": "^2.0.1",

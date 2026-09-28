@@ -46,12 +46,15 @@ it('keys nested Livewire status components rendered inside navigation loops', fu
         ->toContain(':key="\'application-server-status-\'.$application->uuid"');
 });
 
-it('keys rolling log lines by content occurrence instead of list position', function () {
-    $logs = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+it('keys virtual log rows by stable line identity instead of list position', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+    $script = file_get_contents(resource_path('js/runtime-logs.js'));
 
-    expect($logs)
-        ->toContain('$lineOccurrences = [];')
-        ->toContain('$lineFingerprint = md5($line);')
-        ->toContain('wire:key="log-{{ $lineFingerprint }}-{{ $lineOccurrence }}"')
-        ->not->toContain("'line-' . \$index");
+    expect($view)
+        ->toContain(':key="row.key"')
+        ->not->toContain(':key="row.index"');
+
+    expect($script)
+        ->toContain('getItemKey: (index) => filtered[index]?.id ?? index')
+        ->toContain('id: nextId()');
 });
