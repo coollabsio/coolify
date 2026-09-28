@@ -20,6 +20,7 @@ use App\Rules\ValidServerIp;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -47,14 +48,20 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        $canReadSensitive = request()->attributes->get('can_read_sensitive', false) === true;
+        if ($canReadSensitive) {
             $server->makeVisible([
                 'logdrain_axiom_api_key',
                 'logdrain_newrelic_license_key',
             ]);
         }
 
-        return serializeApiResponse($server);
+        $serialized = serializeApiResponse($server);
+        if (! $canReadSensitive && is_array($serialized->get('proxy'))) {
+            $serialized->put('proxy', Arr::except($serialized->get('proxy'), ['last_saved_proxy_configuration']));
+        }
+
+        return $serialized;
     }
 
     #[OA\Get(
