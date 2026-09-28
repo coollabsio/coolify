@@ -75,12 +75,20 @@ class EmailChannel
 
             if ($isResendEnabled) {
                 $resend = Resend::client($settings->resend_api_key);
-                $resend->emails->send([
+                $response = $resend->emails->send([
                     'from' => mail_from_formatted($settings),
                     'to' => $recipients,
                     'subject' => $mailMessage->subject,
                     'html' => (string) $mailMessage->render(),
                 ]);
+
+                // The Resend SDK only throws for error names it knows; any other API error is returned as a response.
+                if (blank($response->getAttribute('id'))) {
+                    $error = $response->toArray();
+                    $error['message'] = $error['message'] ?? 'Resend did not accept the email.';
+
+                    throw new ErrorException($error);
+                }
             } elseif ($isSmtpEnabled) {
                 $transport = SmtpTransportFactory::fromSettings(
                     $settings,
@@ -96,12 +104,15 @@ class EmailChannel
                 $mailer->send($email);
             }
         } catch (ErrorException $e) {
-            // Map HTTP status codes to user-friendly messages
-            $userMessage = match ($e->getErrorCode()) {
-                403 => 'Invalid Resend API key. Please verify your API key in the Resend dashboard and update it in settings.',
-                401 => 'Your Resend API key has restricted permissions. Please use an API key with Full Access permissions.',
-                429 => 'Resend rate limit exceeded. Please try again in a few minutes.',
-                400 => 'Email validation failed: '.$e->getErrorMessage(),
+            ['status' => $statusCode, 'name' => $errorName] = self::resendErrorDetails($e);
+
+            // Map HTTP status codes and Resend error names to user-friendly messages.
+            // An invalid key comes back as 401 "validation_error"; an unverified domain as 403 "validation_error".
+            $userMessage = match (true) {
+                $errorName === 'restricted_api_key', $statusCode === 401 && $errorName === null => 'Your Resend API key has restricted permissions. Please use an API key with Full Access permissions.',
+                $statusCode === 401, $statusCode === 403 && $errorName !== 'validation_error' => 'Invalid Resend API key. Please verify your API key in the Resend dashboard and update it in settings.',
+                in_array($statusCode, [400, 422], true), $errorName === 'validation_error' => 'Email validation failed: '.$e->getErrorMessage(),
+                $statusCode === 429 && in_array($errorName, [null, 'rate_limit_exceeded'], true) => 'Resend rate limit exceeded. Please try again in a few minutes.',
                 default => 'Failed to send email via Resend: '.$e->getErrorMessage(),
             };
 
@@ -112,14 +123,14 @@ class EmailChannel
 
             send_internal_notification(sprintf(
                 "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
-                $e->getErrorCode(),
+                $statusCode,
                 $e->getErrorMessage(),
                 get_class($notification),
                 json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             ));
 
             // Don't report expected errors (invalid keys, validation) to Sentry
-            if (in_array($e->getErrorCode(), [403, 401, 400])) {
+            if (in_array($statusCode, [403, 401, 400, 422], true)) {
                 throw NonReportableException::fromException(new Exception($userMessage, $e->getCode(), $e));
             }
 
@@ -135,5 +146,23 @@ class EmailChannel
             }
             throw $e;
         }
+    }
+
+    /**
+     * Read the status code and error name from a Resend error.
+     *
+     * resend-php 0.18 reads only the legacy "code" key in getErrorCode(), while the
+     * API returns {"statusCode", "name", "message"}, so read the raw contents instead.
+     *
+     * @return array{status: int, name: ?string}
+     */
+    private static function resendErrorDetails(ErrorException $e): array
+    {
+        $contents = (fn (): array => $this->contents)->call($e);
+
+        return [
+            'status' => (int) ($contents['code'] ?? $contents['statusCode'] ?? 0),
+            'name' => isset($contents['name']) ? (string) $contents['name'] : null,
+        ];
     }
 }
