@@ -4,8 +4,11 @@ namespace App\Livewire\Server\DockerRegistries;
 
 use App\Models\Application;
 use App\Models\Server;
+use App\Models\Service;
 use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -20,7 +23,7 @@ class ServerRegistries extends Component
     #[Locked]
     public Server $server;
 
-    /** @var array<int, array{registry: string, logged_in: bool, source: ?string, username: ?string, used_by: array<int, array{name: string, link: ?string}>}> */
+    /** @var array<int, array{registry: string, logged_in: bool, source: ?string, username: ?string, used_by: array<int, array{type: string, name: string, link: ?string}>}> */
     public array $registries = [];
 
     public ?string $error = null;
@@ -48,9 +51,7 @@ class ServerRegistries extends Component
             }
         }
 
-        $usedBy = $this->server->applications()
-            ->filter(fn (Application $application) => filled($application->docker_registry_image_name))
-            ->groupBy(fn (Application $application) => DockerRegistryLogins::registryFromImage($application->docker_registry_image_name));
+        $usedBy = $this->imageUsers()->groupBy('registry');
 
         $this->registries = collect(array_keys($loggedIn))
             ->merge($usedBy->keys())
@@ -62,12 +63,44 @@ class ServerRegistries extends Component
                 'source' => $loggedIn[$registry]['source'] ?? null,
                 'username' => $loggedIn[$registry]['username'] ?? null,
                 'used_by' => ($usedBy[$registry] ?? collect())
-                    ->map(fn (Application $application) => ['name' => $application->name, 'link' => $application->link()])
+                    ->map(fn (array $user) => Arr::except($user, 'registry'))
                     ->values()
                     ->all(),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Every resource on this server that pulls or pushes a named image, with the registry of that image.
+     * A service is listed once per registry, even if several of its containers use it.
+     *
+     * @return Collection<int, array{registry: string, type: string, name: string, link: ?string}>
+     */
+    private function imageUsers(): Collection
+    {
+        $user = fn (string $image, string $type, string $name, ?string $link) => [
+            'registry' => DockerRegistryLogins::registryFromImage($image),
+            'type' => $type,
+            'name' => $name,
+            'link' => $link,
+        ];
+
+        $applications = $this->server->applications()
+            ->filter(fn (Application $application) => filled($application->docker_registry_image_name))
+            ->map(fn (Application $application) => $user($application->docker_registry_image_name, 'Application', $application->name, $application->link()));
+
+        $databases = $this->server->databases()
+            ->filter(fn ($database) => filled($database->image))
+            ->map(fn ($database) => $user($database->image, 'Database', $database->name, $database->link()));
+
+        $services = $this->server->services()->with(['applications', 'databases'])->get()
+            ->flatMap(fn (Service $service) => $service->applications->concat($service->databases)
+                ->filter(fn ($container) => filled($container->image))
+                ->map(fn ($container) => $user($container->image, 'Service', $service->name, $service->link())))
+            ->unique(fn (array $entry) => $entry['registry'].'|'.$entry['link'].'|'.$entry['name']);
+
+        return $applications->concat($databases)->concat($services)->values();
     }
 
     #[On('registryLoginsChanged')]

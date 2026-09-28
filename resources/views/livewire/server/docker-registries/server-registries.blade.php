@@ -55,12 +55,15 @@
                         @endif
                     </div>
                     <div class="flex min-w-0 flex-wrap gap-x-2 text-neutral-600 dark:text-fg-dim">
-                        @forelse ($row['used_by'] as $application)
-                            @if ($application['link'])
-                                <a href="{{ $application['link'] }}" {{ wireNavigate() }} class="truncate hover:underline">{{ $application['name'] }}</a>
-                            @else
-                                <span class="truncate">{{ $application['name'] }}</span>
-                            @endif
+                        @forelse ($row['used_by'] as $user)
+                            <span class="inline-flex min-w-0 items-baseline gap-1">
+                                @if ($user['link'])
+                                    <a href="{{ $user['link'] }}" {{ wireNavigate() }} class="truncate hover:underline">{{ $user['name'] }}</a>
+                                @else
+                                    <span class="truncate">{{ $user['name'] }}</span>
+                                @endif
+                                <span class="shrink-0 text-[11px] text-neutral-400 dark:text-fg-faint">{{ $user['type'] }}</span>
+                            </span>
                         @empty
                             <span class="text-neutral-400 dark:text-fg-faint">-</span>
                         @endforelse

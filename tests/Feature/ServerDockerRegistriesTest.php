@@ -10,12 +10,17 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -38,6 +43,8 @@ beforeEach(function () {
     $environment = Environment::factory()->create([
         'project_id' => Project::factory()->create(['team_id' => $this->team->id])->id,
     ]);
+    $this->environment = $environment;
+    $this->destination = $destination;
     $this->privateApp = Application::factory()->create([
         'name' => 'private-app',
         'docker_registry_image_name' => 'registry.example.com/team/app',
@@ -84,7 +91,7 @@ it('shows which registries a server is logged in to and which ones its applicati
                 'logged_in' => false,
                 'source' => null,
                 'username' => null,
-                'used_by' => [['name' => 'private-app', 'link' => $this->privateApp->link()]],
+                'used_by' => [['type' => 'Application', 'name' => 'private-app', 'link' => $this->privateApp->link()]],
             ],
         ])
         ->assertSee('Logged in')
@@ -507,4 +514,50 @@ it('sends only registry names and usernames to the browser, never secrets from t
             ->not->toContain('PROXY_SECRET')
             ->not->toContain('203.0.113.77');
     }
+});
+
+it('lists databases and service containers that use a registry, and each service only once', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+    $placement = [
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ];
+
+    $database = StandalonePostgresql::create([
+        'name' => 'private-db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => encrypt('password'),
+        'postgres_db' => 'app',
+        'image' => 'ghcr.io/acme/postgres:16',
+    ] + $placement);
+    StandalonePostgresql::create([
+        'name' => 'coolify-db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => encrypt('password'),
+        'postgres_db' => 'coolify',
+        'image' => 'ghcr.io/acme/internal:1',
+    ] + $placement);
+    $service = Service::factory()->create(['name' => 'private-stack', 'server_id' => $this->server->id] + $placement);
+    foreach (['web' => 'ghcr.io/acme/web:1', 'worker' => 'ghcr.io/acme/worker:1', 'cache' => 'redis:7'] as $name => $image) {
+        ServiceApplication::create(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => $name, 'image' => $image]);
+    }
+    ServiceDatabase::create(['uuid' => (string) Str::uuid(), 'service_id' => $service->id, 'name' => 'db', 'image' => 'ghcr.io/acme/db:1']);
+
+    $registries = collect(Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        ->assertSee('private-db')
+        ->assertSee('private-stack')
+        ->get('registries'))->keyBy('registry');
+
+    expect($registries['ghcr.io']['used_by'])->toBe([
+        ['type' => 'Database', 'name' => 'private-db', 'link' => $database->link()],
+        ['type' => 'Service', 'name' => 'private-stack', 'link' => $service->link()],
+    ])
+        ->and($registries['docker.io']['used_by'])->toBe([
+            ['type' => 'Service', 'name' => 'private-stack', 'link' => $service->link()],
+        ])
+        ->and($registries['docker.io']['logged_in'])->toBeFalse()
+        ->and($registries['registry.example.com']['used_by'][0]['type'])->toBe('Application');
 });
