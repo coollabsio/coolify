@@ -12,7 +12,6 @@ use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
-use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
@@ -70,7 +69,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
@@ -91,7 +90,7 @@ class Kernel extends ConsoleKernel
             $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
@@ -109,6 +108,19 @@ class Kernel extends ConsoleKernel
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
+    }
+
+    /**
+     * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
+     * past the catch-up window, and then due backups and tasks would be skipped.
+     */
+    private function scheduleScheduledJobManager(): void
+    {
+        $this->scheduleInstance->command('scheduled:dispatch')
+            ->everyMinute()
+            ->onOneServer()
+            ->withoutOverlapping(5)
+            ->runInBackground();
     }
 
     private function scheduleUpdates(): void

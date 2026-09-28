@@ -115,6 +115,20 @@ it('dispatches a recently missed daily task when deduplication cache is empty', 
     Queue::assertPushed(ScheduledTaskJob::class, 1);
 });
 
+it('runs the manager in the scheduler process through the scheduled:dispatch command', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 5, 27, 0, 1, 0, 'UTC'));
+    Queue::fakeExcept(ScheduledJobManager::class);
+
+    $application = createScheduledTaskApplication();
+    createScheduledApplicationTask($application, ['frequency' => '* * * * *']);
+
+    $this->artisan('scheduled:dispatch')->assertSuccessful();
+
+    Queue::assertNotPushed(ScheduledJobManager::class);
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+});
+
 it('dispatches one job when multiple managers evaluate the same occurrence', function () {
     config(['constants.coolify.self_hosted' => true]);
     Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
