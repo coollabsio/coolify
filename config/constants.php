@@ -62,10 +62,6 @@ return [
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
     ],
 
-    'nightwatch' => [
-        'is_nightwatch_enabled' => env('NIGHTWATCH_ENABLED', false),
-    ],
-
     'docker' => [
         'minimum_required_version' => '24.0',
         'stop_timeout_flag_since' => '28.0.0',

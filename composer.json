@@ -20,7 +20,6 @@
         "laravel/framework": "^12.65.0",
         "laravel/horizon": "^5.48.2",
         "laravel/mcp": "^0.6.7",
-        "laravel/nightwatch": "^1.28.6",
         "laravel/pail": "^1.2.7",
         "laravel/prompts": "^0.3.22",
         "laravel/reverb": "^1.10",
