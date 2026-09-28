@@ -88,6 +88,24 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
                                 @endif
+                                @if ($server->cloudProviderToken)
+                                    @if ($provider === 'Hetzner' && !$server->isFunctional() && $hetznerServerStatus === 'off')
+                                        <x-forms.button type="button" wire:click.prevent="startHetznerServer" isHighlighted
+                                            canGate="update" :canResource="$server">
+                                            Power On
+                                        </x-forms.button>
+                                    @elseif ($provider === 'DigitalOcean' && $digitalOceanDropletStatus === 'off')
+                                        <x-forms.button type="button" wire:click.prevent="startDigitalOceanDroplet"
+                                            isHighlighted canGate="update" :canResource="$server">
+                                            Power On
+                                        </x-forms.button>
+                                    @elseif ($provider === 'Vultr' && $vultrInstanceStatus === 'stopped')
+                                        <x-forms.button type="button" wire:click.prevent="startVultrInstance" isHighlighted
+                                            canGate="update" :canResource="$server">
+                                            Power On
+                                        </x-forms.button>
+                                    @endif
+                                @endif
                             @endif
                             @if ($server->server_metadata)
                                 <x-forms.button type="button" class="size-8! px-0!"
