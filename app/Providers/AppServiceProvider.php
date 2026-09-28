@@ -6,6 +6,7 @@ use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
+use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
@@ -40,11 +41,15 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Queue workers are long-running processes, so once() values (e.g. instanceSettings())
-     * would stay stale across jobs. Flush them before each job, like a fresh web request.
+     * and the Server identity map would stay stale across jobs. Flush them before each job,
+     * like a fresh web request.
      */
     private function configureQueue(): void
     {
-        Queue::before(fn () => Once::flush());
+        Queue::before(function (): void {
+            Once::flush();
+            Server::flushIdentityMap();
+        });
     }
 
     private function configureCommands(): void

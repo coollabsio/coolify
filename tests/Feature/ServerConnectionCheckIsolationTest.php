@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -95,4 +96,27 @@ it('resets unreachable_count after a successful connection check', function () {
     (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
 
     expect($server->fresh()->unreachable_count)->toBe(0);
+});
+
+it('logs the checking node and ssh error only when the connection state changes', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $logPath = tempnam(sys_get_temp_dir(), 'coolify-scheduled-log-');
+    config(['logging.channels.scheduled' => ['driver' => 'single', 'path' => $logPath, 'level' => 'debug']]);
+    Log::forgetChannel('scheduled');
+    Process::fake([
+        '*' => Process::result(errorOutput: 'ssh: connect to host 203.0.113.10 port 22: Connection refused', exitCode: 255),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+
+    $log = file_get_contents($logPath);
+    @unlink($logPath);
+
+    expect(substr_count($log, 'Server connection state changed'))->toBe(1)
+        ->and($log)->toContain('"is_reachable":false')
+        ->toContain('"was_reachable":true')
+        ->toContain('ssh exit 255: ssh: connect to host 203.0.113.10 port 22: Connection refused')
+        ->toContain('"host":"'.gethostname().'"');
 });

@@ -8,6 +8,8 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\Subscription;
 use App\Models\Team;
 use App\Services\ScheduledJobDeliveryService;
 use Cron\CronExpression;
@@ -99,9 +101,7 @@ class ScheduledJobManager implements ShouldQueue
         $this->dispatchedCount = 0;
         $this->skippedCount = 0;
 
-        Log::channel('scheduled')->info('ScheduledJobManager started', [
-            'execution_time' => $this->executionTime->toIso8601String(),
-        ]);
+        $this->logStart();
 
         app(ScheduledJobDeliveryService::class)->publishPending();
 
@@ -140,6 +140,11 @@ class ScheduledJobManager implements ShouldQueue
             'duration_ms' => $this->executionTime->diffInMilliseconds(Carbon::now()),
             'dispatched' => $this->dispatchedCount,
             'skipped' => $this->skippedCount,
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+            'memory_peak_mb' => round(memory_get_peak_usage(true) / 1048576, 1),
+            'open_occurrences_over_15_minutes' => rescue(fn () => app(ScheduledJobDeliveryService::class)->staleOpenOccurrenceCounts(), [], report: false),
         ]);
 
         // Write heartbeat so the UI can detect when the scheduler has stopped
@@ -147,6 +152,33 @@ class ScheduledJobManager implements ShouldQueue
             Cache::put('scheduled-job-manager:heartbeat', now()->toIso8601String(), 300);
         } catch (\Throwable) {
             // Non-critical; don't let heartbeat failure affect the job
+        }
+    }
+
+    /**
+     * Log which worker runs the manager and how late it starts. The manager only catches up
+     * occurrences from the last CATCH_UP_WINDOW_MINUTES, so a larger delay skips them silently.
+     */
+    private function logStart(): void
+    {
+        $previousStartedAt = rescue(fn () => Cache::get('scheduled-job-manager:last-started-at'), report: false);
+        rescue(fn () => Cache::put('scheduled-job-manager:last-started-at', $this->executionTime->toIso8601String(), 86400), report: false);
+        $queuedAt = data_get($this->job?->payload(), 'createdAt');
+
+        $context = [
+            'execution_time' => $this->executionTime->toIso8601String(),
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'queue_wait_seconds' => $queuedAt ? $this->executionTime->timestamp - (int) $queuedAt : null,
+            'seconds_since_previous_start' => $previousStartedAt ? (int) Carbon::parse($previousStartedAt)->diffInSeconds($this->executionTime) : null,
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+        ];
+
+        Log::channel('scheduled')->info('ScheduledJobManager started', $context);
+
+        $catchUpWindowSeconds = ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES * 60;
+        if ($context['queue_wait_seconds'] > $catchUpWindowSeconds || $context['seconds_since_previous_start'] > $catchUpWindowSeconds) {
+            Log::channel('scheduled-errors')->warning('ScheduledJobManager started late; occurrences due before the catch-up window were not run', $context);
         }
     }
 
@@ -294,7 +326,7 @@ class ScheduledJobManager implements ShouldQueue
             if ($skipReason !== null) {
                 if ($server === null || $this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
                     $this->skippedCount++;
-                    $this->logBackupSkip($backup, $skipReason);
+                    $this->logBackupSkip($backup, $skipReason, $server);
                 }
 
                 return;
@@ -449,7 +481,7 @@ class ScheduledJobManager implements ShouldQueue
                     $this->logSkip('volume_backup', 'server_not_functional', [
                         'backup_id' => $backup->id,
                         'team_id' => $backup->team_id,
-                        'server_id' => $server->id,
+                        ...$this->serverStateContext($server),
                     ]);
                 }
 
@@ -462,7 +494,7 @@ class ScheduledJobManager implements ShouldQueue
                     $this->logSkip('volume_backup', 'subscription_unpaid', [
                         'backup_id' => $backup->id,
                         'team_id' => $backup->team_id,
-                        'server_id' => $server->id,
+                        ...$this->serverStateContext($server),
                     ]);
                 }
 
@@ -712,13 +744,14 @@ class ScheduledJobManager implements ShouldQueue
         return validate_timezone($timezone) ? $timezone : config('app.timezone');
     }
 
-    private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason): void
+    private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason, ?Server $server): void
     {
         $this->logSkip('backup', $reason, [
             'backup_id' => $backup->id,
             'database_id' => $backup->database_id,
             'database_type' => $backup->database_type,
             'team_id' => $backup->team_id ?? null,
+            ...$this->serverStateContext($server),
         ]);
     }
 
@@ -728,6 +761,37 @@ class ScheduledJobManager implements ShouldQueue
             'task_id' => $task->id,
             'task_name' => $task->name,
             'team_id' => $server?->team_id,
+            ...$this->serverStateContext($server),
         ]);
+    }
+
+    /**
+     * Compare the server state that decided the skip with the current database state.
+     * A difference shows that the worker used stale server data.
+     *
+     * @return array<string, mixed>
+     */
+    private function serverStateContext(?Server $server): array
+    {
+        if ($server === null) {
+            return [];
+        }
+
+        $settings = ServerSetting::query()
+            ->where('server_id', $server->id)
+            ->first(['is_reachable', 'is_usable', 'force_disabled']);
+
+        return [
+            'server_id' => $server->id,
+            'server_ip_is_placeholder' => $server->hasPlaceholderIp(),
+            'used_is_reachable' => data_get($server->settings, 'is_reachable'),
+            'used_is_usable' => data_get($server->settings, 'is_usable'),
+            'used_force_disabled' => data_get($server->settings, 'force_disabled'),
+            'used_invoice_paid' => data_get($server->team?->subscription, 'stripe_invoice_paid'),
+            'db_is_reachable' => $settings?->is_reachable,
+            'db_is_usable' => $settings?->is_usable,
+            'db_force_disabled' => $settings?->force_disabled,
+            'db_invoice_paid' => Subscription::query()->where('team_id', $server->team_id)->value('stripe_invoice_paid'),
+        ];
     }
 }

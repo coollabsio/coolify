@@ -132,6 +132,7 @@ describe('ServerConnectionCheckJob unreachable_count', function () {
 
         $settings = Mockery::mock();
         $settings->is_reachable = true;
+        $settings->is_usable = true;
         $settings->force_disabled = false;
         $settings->shouldReceive('update')
             ->with(['is_reachable' => false, 'is_usable' => false])

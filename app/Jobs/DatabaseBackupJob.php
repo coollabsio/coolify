@@ -107,6 +107,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->team = Team::find($this->backup->team_id);
             if (! $this->team) {
+                $this->logSkippedRun('team_not_found');
                 $this->backup->delete();
 
                 return;
@@ -133,11 +134,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $status = str(data_get($this->database, 'status'));
             if (! $status->startsWith('running') && $this->database->id !== 0) {
-                Log::info('DatabaseBackupJob skipped: database not running', [
-                    'backup_id' => $this->backup->id,
-                    'database_id' => $this->database->id,
-                    'status' => (string) $status,
-                ]);
+                $this->logSkippedRun('database_not_running', ['database_status' => (string) $status]);
 
                 return;
             }
@@ -286,11 +283,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } elseif ($this->database instanceof StandaloneSqlite) {
                     $databasesToBackup = $this->database->sqlite_databases;
                 } else {
+                    $this->logSkippedRun('unsupported_database_type', ['service_database_type' => $databaseType]);
+
                     return;
                 }
             }
             $databasesToBackup = $this->databasesToBackup($databaseType, $databasesToBackup);
             if ($databasesToBackup === []) {
+                $this->logSkippedRun('no_databases_selected');
+
                 return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
@@ -888,6 +889,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $script = "compressor=\$({$compressorCommand}); exec \$compressor";
 
         return $dumpCommand.' | docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script);
+    }
+
+    /**
+     * Log a run that ends without a backup execution, so it does not look like a missed schedule.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logSkippedRun(string $reason, array $context = []): void
+    {
+        Log::channel('scheduled')->warning('Database backup job ended without a backup', [
+            'skip_reason' => $reason,
+            'backup_id' => $this->backup->id,
+            'database_id' => $this->backup->database_id,
+            'database_type' => $this->backup->database_type,
+            'team_id' => $this->backup->team_id,
+            'occurrence_uuid' => $this->occurrenceUuid,
+            ...$context,
+        ]);
     }
 
     private function markStaleExecutionsAsFailed(): void
