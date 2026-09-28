@@ -196,6 +196,18 @@ it('records the reason when Flux rejects a lifecycle command', function () {
         ->and($operation->error)->toBe('Flux rejected the workload lifecycle command with HTTP 502: Error: unable to start container: bind: address already in use');
 });
 
+it('leaves a lifecycle operation alone when another worker already started it', function () {
+    $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::START);
+    $operation->update(['status' => NodeOperationStatus::RUNNING, 'started_at' => now()]);
+    Http::preventStrayRequests();
+
+    (new ManageNodeWorkloadJob($operation->id))->handle();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::RUNNING)
+        ->and($operation->error)->toBeNull();
+    Http::assertNothingSent();
+});
+
 it('recovers from observed lifecycle state without replaying the command', function () {
     $operation = CreateLifecycleOperation::run($this->node, $this->revision, NodeWorkloadAction::STOP);
     $operation->update(['status' => NodeOperationStatus::UNCERTAIN, 'error' => 'Unknown result.']);

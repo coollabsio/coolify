@@ -78,8 +78,11 @@ class PublishNodeDiscoveryEndpoints
             return;
         }
 
+        if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+            return;
+        }
+
         try {
-            TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
             $url = config('constants.flux.internal_url');
             $token = config('constants.flux.internal_token');

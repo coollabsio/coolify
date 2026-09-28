@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\CreateDeploymentOperation;
 use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\TransitionOperation;
@@ -40,7 +41,9 @@ class MoveNodeWorkloadJob implements ShouldQueue
                 ->where('team_id', $operation->node->team_id)
                 ->where('node_cluster_id', $operation->node->node_cluster_id)
                 ->firstOrFail();
-            TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
+            if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+                return;
+            }
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
 
             $targetWasAssigned = $target->workloads()->whereKey($operation->workload->id)->exists();

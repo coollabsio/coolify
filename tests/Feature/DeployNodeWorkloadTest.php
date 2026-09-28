@@ -307,6 +307,17 @@ it('marks an unknown transport outcome as uncertain', function () {
         ->and($this->operation->error)->toBe('The deployment result is unknown.');
 });
 
+it('leaves an operation alone when another worker already started it', function () {
+    $this->operation->update(['status' => NodeOperationStatus::RUNNING, 'started_at' => now()]);
+    Http::preventStrayRequests();
+
+    (new DeployNodeWorkloadJob($this->operation->id))->handle();
+
+    expect($this->operation->refresh()->status)->toBe(NodeOperationStatus::RUNNING)
+        ->and($this->operation->error)->toBeNull();
+    Http::assertNothingSent();
+});
+
 it('does not dispatch a completed operation again', function () {
     $this->operation->update(['status' => NodeOperationStatus::SUCCEEDED, 'completed_at' => now()]);
     Http::preventStrayRequests();

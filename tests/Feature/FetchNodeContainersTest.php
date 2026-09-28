@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -157,6 +158,40 @@ it('publishes an owned expiring discovery snapshot for managed cluster workloads
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v1/commands/discovery.corrosion.endpoints.reconcile')
         && $request['server_id'] === $node->uuid
         && $request['owner_node_ip'] === $node->wireguard_ip);
+});
+
+it('lets a concurrent publisher of the same snapshot leave the running operation alone', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'instance_uuid' => 'instance-test']);
+    config()->set('constants.flux.internal_url', 'http://flux:7080');
+    config()->set('constants.flux.internal_token', 'internal-secret');
+    $user = User::factory()->create();
+    $team = $user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $user, 'Discovery mesh');
+    $node = Node::factory()->create(['team_id' => $team->id, 'name' => 'Worker Node A']);
+    AssignNodeToCluster::run($cluster, $node);
+    $cluster->update(['network_status' => 'active']);
+    $observedAt = Carbon::createFromTimestampMs(1_789_237_260_000);
+    $discoveryRequests = 0;
+
+    Http::fake(function (Request $request) use ($node, $observedAt, &$discoveryRequests) {
+        $discoveryRequests++;
+        // A second inventory refresh in the same second publishes the same snapshot.
+        PublishNodeDiscoveryEndpoints::run($node->fresh(), $observedAt);
+
+        return Http::response([
+            'command_id' => $request['command_id'],
+            'observed_at_unix_ms' => 1_789_237_260_100,
+            'owner_node_ip' => $node->wireguard_ip,
+            'endpoint_count' => 1,
+        ]);
+    });
+
+    PublishNodeDiscoveryEndpoints::run($node->refresh(), $observedAt);
+
+    $operation = $node->operations()->where('command_type', 'discovery.corrosion.endpoints.reconcile.v1')->sole();
+    expect($operation->status)->toBe(NodeOperationStatus::SUCCEEDED)
+        ->and($operation->error)->toBeNull()
+        ->and($discoveryRequests)->toBe(1);
 });
 
 it('withdraws and republishes workload discovery when a workload moves between nodes', function () {

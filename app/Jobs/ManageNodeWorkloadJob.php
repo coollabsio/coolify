@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadLifecycle;
 use App\Actions\Node\FetchContainers;
 use App\Actions\Node\TransitionOperation;
@@ -38,7 +39,7 @@ class ManageNodeWorkloadJob implements ShouldQueue
                 try {
                     $verification = $this->verify($operation);
                     if ($verification['converged']) {
-                        TransitionOperation::run(
+                        ClaimOperation::run(
                             $operation,
                             NodeOperationStatus::SUCCEEDED,
                             result: [...($operation->result ?? []), 'verification' => $verification],
@@ -51,7 +52,9 @@ class ManageNodeWorkloadJob implements ShouldQueue
                 }
             }
 
-            TransitionOperation::run($operation, NodeOperationStatus::DISPATCHED);
+            if (ClaimOperation::run($operation, NodeOperationStatus::DISPATCHED) === null) {
+                return;
+            }
             $operation = TransitionOperation::run($operation, NodeOperationStatus::RUNNING);
             $result = DispatchWorkloadLifecycle::run($operation);
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
