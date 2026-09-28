@@ -200,8 +200,8 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
     foreach ([
         'application' => $test->application->fresh(),
         'application_deployment_queue' => $queue,
-        'server' => $test->server,
-        'mainServer' => $test->server,
+        'server' => $test->server->fresh(),
+        'mainServer' => $test->server->fresh(),
         'deployment_uuid' => 'deployment-uuid',
         'workdir' => '/artifacts/deployment-uuid',
         'configuration_dir' => $test->application->workdir(),
@@ -343,18 +343,65 @@ test('a preserve-repository deployment writes content files before docker compos
         ->and($write)->toBeLessThan(ContentFilesUpRecorder::indexOf('deployment', ' up -d'));
 });
 
-test('a deployment to another server does not check the content files of the main server', function () {
+test('a deployment to an additional server writes missing content files on that server', function () {
     $volume = contentFilesVolume($this->application, 'config/app.conf');
     $otherServer = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->server->private_key_id,
-    ]);
+    ])->fresh();
     fakeContentFilesServer([$volume->fs_path => 'missing']);
 
     runComposeStart($this, ['server' => $otherServer, 'mainServer' => $otherServer]);
 
-    expect(contentFilesStateChecks())->toBe([]);
-    contentFilesAssertNoWrite();
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path));
+    expect(contentFilesStateChecks())->toHaveCount(1)
+        ->and(contentFilesStateChecks()[0])->toContain("@'{$otherServer->ip}'")
+        ->and($write)->not->toBeNull()
+        ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
+        ->and(ContentFilesUpRecorder::ssh()[$write])->not->toContain("@'{$this->server->ip}'");
+});
+
+test('a Dockerfile deployment to an additional server writes missing content files before the container starts', function () {
+    $this->application->update(['build_pack' => 'dockerfile', 'docker_compose_location' => null]);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    $otherServer = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+    ])->fresh();
+    fakeContentFilesServer([$volume->fs_path => 'missing']);
+
+    $job = new ContentFilesUpDeploymentJob;
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout') {
+        $this->logEntries[] = [$message, $type];
+    });
+    foreach ([
+        'application' => $this->application->fresh(),
+        'application_deployment_queue' => $queue,
+        'server' => $otherServer,
+        'mainServer' => $otherServer,
+        'deployment_uuid' => 'deployment-uuid',
+        'workdir' => '/artifacts/deployment-uuid',
+        'configuration_dir' => $this->application->workdir(),
+        'docker_compose_location' => '/docker-compose.yaml',
+        'coolify_variables' => '',
+        'pull_request_id' => 0,
+        'preserveRepository' => false,
+        'use_build_server' => false,
+        'saved_outputs' => collect(),
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'start_by_compose_file'))->invoke($job);
+
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'base64 -d | tee '.escapeshellarg($volume->fs_path));
+    $up = ContentFilesUpRecorder::indexOf('deployment', ' up --build -d');
+    expect($write)->not->toBeNull()
+        ->and($up)->not->toBeNull()
+        ->and($write)->toBeLessThan($up)
+        ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
+        ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
 });
 
 test('the content file check and write are safe for non-root servers', function () {

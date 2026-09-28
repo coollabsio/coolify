@@ -16,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 
 class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -24,6 +25,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public $tries = 1;
 
     public $timeout = 15;
+
+    private ?string $connectionError = null;
 
     public function __construct(
         public Server $server,
@@ -48,6 +51,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $wasReachable = (bool) $this->server->settings->is_reachable;
+        $wasUsable = (bool) $this->server->settings->is_usable;
         $wasNotified = (bool) $this->server->unreachable_notification_sent;
 
         try {
@@ -61,6 +65,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'server_id' => $this->server->id,
                     'server_name' => $this->server->name,
                 ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, 'force_disabled');
 
                 return;
             }
@@ -85,6 +90,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'server_name' => $this->server->name,
                     'server_ip' => $this->server->ip,
                 ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, $this->connectionError);
 
                 $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
 
@@ -98,6 +104,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'is_reachable' => true,
                 'is_usable' => $isUsable,
             ]);
+            $this->logConnectionStateChange($wasReachable, $wasUsable, true, $isUsable, $isUsable ? null : 'docker_not_available');
 
             if ($this->server->unreachable_count > 0) {
                 // Direct assignment: unreachable_count is not mass-assignable,
@@ -119,11 +126,35 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'is_usable' => false,
             ]);
             $this->server->increment('unreachable_count');
+            $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, $e->getMessage());
 
             $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
 
             return;
         }
+    }
+
+    /**
+     * Log a change of the state that scheduled jobs use to skip a server, with the node that ran
+     * the check. On a multi-node instance this shows when only one node cannot reach a server.
+     */
+    private function logConnectionStateChange(bool $wasReachable, bool $wasUsable, bool $isReachable, bool $isUsable, ?string $reason): void
+    {
+        if ($wasReachable === $isReachable && $wasUsable === $isUsable) {
+            return;
+        }
+
+        Log::channel('scheduled')->info('Server connection state changed', [
+            'server_id' => $this->server->id,
+            'is_reachable' => $isReachable,
+            'is_usable' => $isUsable,
+            'was_reachable' => $wasReachable,
+            'was_usable' => $wasUsable,
+            'unreachable_count' => $this->server->unreachable_count,
+            'reason' => $reason,
+            'host' => gethostname(),
+            'pid' => getmypid(),
+        ]);
     }
 
     public function failed(?\Throwable $exception): void
@@ -166,9 +197,13 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $commandString, true);
             $process = Process::timeout(10)->run($sshCommand);
+            if ($process->exitCode() !== 0) {
+                $this->connectionError = 'ssh exit '.$process->exitCode().': '.Str::limit(trim($process->errorOutput()), 300);
+            }
 
             return $process->exitCode() === 0;
         } catch (\Throwable $e) {
+            $this->connectionError = $e->getMessage();
             Log::debug('ServerConnectionCheck: Connection check failed', [
                 'server_id' => $this->server->id,
                 'error' => $e->getMessage(),

@@ -360,11 +360,11 @@
                 const selectedEndpoint = webhook_endpoint ? webhook_endpoint.trim() : '';
                 const customEndpoint = custom_webhook_endpoint ? custom_webhook_endpoint.trim() : '';
                 if (use_custom_webhook_endpoint && !customEndpoint) {
-                    alert('Please enter a custom webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a custom webhook endpoint.' });
                     return;
                 }
                 if (!use_custom_webhook_endpoint && !selectedEndpoint) {
-                    alert('Please enter a webhook endpoint.');
+                    window.toast('Error', { type: 'danger', description: 'Please enter a webhook endpoint.' });
                     return;
                 }
                 let baseUrl = (use_custom_webhook_endpoint ? customEndpoint : selectedEndpoint).replace(/\/+$/, '');

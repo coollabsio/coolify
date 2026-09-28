@@ -15,6 +15,7 @@ use App\Models\Server;
 use Cron\CronExpression;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ScheduledJobDeliveryService
 {
@@ -117,9 +118,36 @@ class ScheduledJobDeliveryService
             ->orderBy('id')
             ->chunkById(100, function ($occurrences): void {
                 foreach ($occurrences as $occurrence) {
-                    $this->publish($occurrence);
+                    try {
+                        $this->logOccurrence($occurrence, 'Scheduled occurrence publishing again', 'warning');
+                        $this->publish($occurrence);
+                    } catch (\Throwable $e) {
+                        Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
+                            'occurrence_uuid' => $occurrence->uuid,
+                            'schedule_key' => $occurrence->schedule_key,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
+    }
+
+    /**
+     * Count occurrences that are still open 15 minutes after they were created. Pending or
+     * enqueued rows here never started; claimed rows are still running or their worker died.
+     *
+     * @return array<string, int>
+     */
+    public function staleOpenOccurrenceCounts(): array
+    {
+        return ScheduledJobDelivery::query()
+            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
+            ->where('created_at', '<', now()->subMinutes(15))
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->map(fn ($count) => (int) $count)
+            ->all();
     }
 
     public function deleteOldOccurrences(): void
@@ -150,21 +178,22 @@ class ScheduledJobDeliveryService
                 'claim_token' => $claimToken,
                 'started_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ]) === 1
+            || ScheduledJobDelivery::query()
+                ->where('uuid', $uuid)
+                ->where('status', 'claimed')
+                ->where('claim_token', $claimToken)
+                ->exists();
 
-        if ($claimed === 1) {
-            return true;
-        }
+        $this->logOccurrence($uuid, $claimed ? 'Scheduled occurrence claimed' : 'Scheduled occurrence claim rejected', $claimed ? 'info' : 'warning');
 
-        return ScheduledJobDelivery::query()
-            ->where('uuid', $uuid)
-            ->where('status', 'claimed')
-            ->where('claim_token', $claimToken)
-            ->exists();
+        return $claimed;
     }
 
     public function complete(string $uuid, string $claimToken): void
     {
+        $this->logOccurrence($uuid, 'Scheduled occurrence completed', context: ['status' => 'completed']);
+
         ScheduledJobDelivery::query()
             ->where('uuid', $uuid)
             ->where('claim_token', $claimToken)
@@ -180,6 +209,39 @@ class ScheduledJobDeliveryService
                 'status' => 'failed',
                 'updated_at' => now(),
             ]);
+
+        $this->logOccurrence($uuid, 'Scheduled occurrence failed', 'warning');
+    }
+
+    /**
+     * Log one step of an occurrence. Search scheduled.log for its schedule_key to see when it
+     * was due, when a worker started it, and how it ended.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logOccurrence(ScheduledJobDelivery|string $occurrence, string $message, string $level = 'info', array $context = []): void
+    {
+        try {
+            $uuid = is_string($occurrence) ? $occurrence : $occurrence->uuid;
+            if (is_string($occurrence)) {
+                $occurrence = ScheduledJobDelivery::query()->where('uuid', $uuid)->first();
+            }
+
+            Log::channel('scheduled')->log($level, $message, [
+                'occurrence_uuid' => $uuid,
+                'schedule_key' => $occurrence?->schedule_key,
+                'status' => $occurrence?->status,
+                'scheduled_for' => $occurrence?->scheduled_for?->toIso8601String(),
+                'enqueued_at' => $occurrence?->enqueued_at?->toIso8601String(),
+                'started_at' => $occurrence?->started_at?->toIso8601String(),
+                'seconds_since_due' => $occurrence ? (int) $occurrence->scheduled_for->diffInSeconds(now()) : null,
+                'host' => gethostname(),
+                'pid' => getmypid(),
+                ...$context,
+            ]);
+        } catch (\Throwable) {
+            // Debug logging must never change the job result.
+        }
     }
 
     private function publish(ScheduledJobDelivery $occurrence): bool
@@ -212,9 +274,23 @@ class ScheduledJobDeliveryService
 
         if ($job === null) {
             ScheduledJobDelivery::query()->whereKey($occurrence->id)->update(['status' => 'skipped']);
+            Log::channel('scheduled')->warning('Scheduled occurrence skipped: resource not found', [
+                'occurrence_uuid' => $occurrence->uuid,
+                'schedule_key' => $occurrence->schedule_key,
+                'scheduled_for' => $occurrence->scheduled_for->toIso8601String(),
+            ]);
 
             return false;
         }
+
+        // An open previous occurrence usually means the previous run is still running. Jobs with
+        // WithoutOverlapping(...)->dontRelease() then drop this one without running it.
+        $previousOpen = ScheduledJobDelivery::query()
+            ->where('schedule_key', $occurrence->schedule_key)
+            ->where('scheduled_for', '<', $occurrence->scheduled_for)
+            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
+            ->orderByDesc('scheduled_for')
+            ->first(['uuid', 'status', 'scheduled_for']);
 
         dispatch($job);
 
@@ -226,6 +302,19 @@ class ScheduledJobDeliveryService
                 'enqueued_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        // Log from the loaded row: a fast worker can complete and delete the occurrence already.
+        $enqueued = ['status' => 'enqueued', 'enqueued_at' => now()->toIso8601String()];
+        if ($previousOpen) {
+            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued while the previous occurrence is still open', 'warning', [
+                ...$enqueued,
+                'previous_occurrence_uuid' => $previousOpen->uuid,
+                'previous_status' => $previousOpen->status,
+                'previous_scheduled_for' => $previousOpen->scheduled_for->toIso8601String(),
+            ]);
+        } else {
+            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued', context: $enqueued);
+        }
 
         return true;
     }

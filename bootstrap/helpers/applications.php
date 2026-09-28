@@ -12,7 +12,7 @@ use App\Models\StandaloneDocker;
 use Illuminate\Support\Facades\DB;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null)
 {
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
@@ -31,7 +31,7 @@ function queue_application_deployment(Application $application, string $deployme
         $destination_id = $destination->id;
     }
 
-    $admission = DB::transaction(function () use ($application, $application_id, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_webhook, $no_questions_asked, $only_this_server, $pull_request_id, $restart_only, $rollback, $server_id, $server_name) {
+    $admission = DB::transaction(function () use ($application, $application_id, $commit, $deployment_uuid, $deployment_url, $destination_id, $docker_registry_image_tag, $force_rebuild, $git_type, $is_api, $is_webhook, $no_questions_asked, $only_this_server, $parent_deployment_uuid, $pull_request_id, $restart_only, $rollback, $server_id, $server_name) {
         // Lock stable rows because an empty deployment queue has no row to lock.
         Application::query()->whereKey($application_id)->lockForUpdate()->firstOrFail();
         $serverForQueueCheck = Server::query()->whereKey($server_id)->lockForUpdate()->firstOrFail();
@@ -81,6 +81,7 @@ function queue_application_deployment(Application $application, string $deployme
             'rollback' => $rollback,
             'git_type' => $git_type,
             'only_this_server' => $only_this_server,
+            'parent_deployment_uuid' => $parent_deployment_uuid,
         ]);
     });
 

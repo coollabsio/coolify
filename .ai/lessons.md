@@ -24,6 +24,7 @@
 - A source-text check is acceptable only for a correctness or security rule that rendering cannot prove easily, such as stable `wire:key` values or no raw user output.
 - Call the app code under test. Do not copy app logic into a test, assert only literals, constants, `class_exists`/`method_exists`, or PHP built-ins such as `escapeshellarg`.
 - Pest test files share one global function scope. Give file-level helper functions a unique name.
+- Call `Server::flushIdentityMap()` in `beforeEach` of tests that use `Server` models; the identity map leaks servers and settings between test files in one run.
 
 ## Keep dynamic Livewire identities stable
 - In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.
@@ -56,6 +57,7 @@
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
 - Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
+- Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
 
 ## Fail closed at public webhook boundaries
 - Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.

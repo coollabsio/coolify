@@ -5287,6 +5287,10 @@ class ApplicationsController extends Controller
                 ], 422);
             }
 
+            if ($reason = $application->persistentStorageUnavailableReason()) {
+                return response()->json(['message' => $reason], 422);
+            }
+
             $storage = LocalPersistentVolume::create([
                 'name' => $application->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
@@ -6176,6 +6180,10 @@ class ApplicationsController extends Controller
 
         if ($application->additional_servers?->pluck('id')->contains($destination->server_id)) {
             return response()->json(['message' => 'A destination on this server is already attached.'], 422);
+        }
+
+        if ($reason = $application->additionalServersUnavailableReason()) {
+            return response()->json(['message' => $reason], 422);
         }
 
         $application->additional_networks()->attach($destination->id, ['server_id' => $destination->server_id]);
