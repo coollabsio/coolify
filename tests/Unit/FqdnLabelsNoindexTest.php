@@ -155,6 +155,15 @@ describe('Traefik noindex middleware', function () {
         expect(middlewaresOf($labels, 'https-0-testuuid'))->toContain('0-testuuid-noindex');
     });
 
+    test('the header is applied when the domain includes a port', function () {
+        $labels = traefikLabels(
+            domains: ['https://app.example.com:3000'],
+            noindex: ['https://app.example.com'],
+        );
+
+        expect(middlewaresOf($labels, 'https-0-testuuid'))->toContain('0-testuuid-noindex');
+    });
+
     test('a domain that is not configured is ignored', function () {
         $labels = traefikLabels(
             domains: ['https://example.com'],
@@ -219,6 +228,15 @@ describe('Caddy noindex header', function () {
         // The unflagged domain is untouched.
         expect($labels)->toContain('caddy_0.header=-Server');
         expect(collect($labels)->filter(fn ($l) => str_contains($l, 'caddy_0.header.'))->all())->toBeEmpty();
+    });
+
+    test('the header is applied when the domain includes a port', function () {
+        $labels = caddyLabels(
+            domains: ['https://app.example.com:3000'],
+            noindex: ['https://app.example.com'],
+        );
+
+        expect($labels)->toContain('caddy_0.header.1_X-Robots-Tag="noindex, nofollow"');
     });
 
     test('no flags means byte-identical output to before the feature', function () {
