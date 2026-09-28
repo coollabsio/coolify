@@ -105,6 +105,37 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     return $containers;
 }
 
+/**
+ * Map running Docker Compose containers to the names Sentinel records their metrics under.
+ *
+ * Sentinel keys container metrics by the `coolify.name` label and falls back to the container
+ * name, so containers deployed from a raw compose file (without that label) are still found.
+ *
+ * @param  Collection<int, array<string, mixed>>  $containers  Rows of `docker ps --format '{{json .}}'`.
+ * @return array<string, string> Compose service names keyed by Sentinel container name.
+ */
+function mapComposeContainersToMetricsNames(Collection $containers): array
+{
+    $metricsContainers = $containers
+        ->filter(fn ($container) => data_get($container, 'State') === 'running')
+        ->mapWithKeys(function ($container) {
+            $labels = format_docker_labels_to_json(data_get($container, 'Labels') ?: []);
+            $name = $labels->get('coolify.name') ?: data_get($container, 'Names');
+            if (! is_string($name) || ! ValidationPatterns::isValidContainerName($name)) {
+                return [];
+            }
+
+            return [$name => $labels->get('com.docker.compose.service') ?: $name];
+        });
+
+    $duplicateServices = $metricsContainers->duplicates();
+
+    return $metricsContainers
+        ->map(fn ($service, $name) => $duplicateServices->containsStrict($service) ? $name : $service)
+        ->sort()
+        ->all();
+}
+
 function getCurrentServiceContainerStatus(Server $server, int $id): Collection
 {
     $containers = collect([]);
@@ -373,6 +404,17 @@ function generateApplicationContainerName(Application $application, $pull_reques
 
         return ($application->settings->custom_container_name_prefix ?: $application->uuid).'-'.$now;
     }
+}
+
+/**
+ * Stable `coolify.name` label of a Docker Compose application container.
+ *
+ * Sentinel records container metrics under this label. Unlike the container name, it does not
+ * change between deployments, so each compose service keeps a single metrics history.
+ */
+function generateComposeContainerMetricsName(Application $application, string $serviceName, int $pullRequestId = 0): string
+{
+    return Str::slug(addPreviewDeploymentSuffix("{$serviceName}-{$application->uuid}", $pullRequestId));
 }
 
 /**
