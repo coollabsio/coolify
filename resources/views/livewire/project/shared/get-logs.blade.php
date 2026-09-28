@@ -1,3 +1,8 @@
+@if (! $canReadLogs)
+    <x-callout type="info" title="Hidden (only admins can view)">
+        Container logs can contain secrets.
+    </x-callout>
+@else
 <div @class(['w-full min-w-0', 'runtime-log-shell' => $collapsible])>
     <div id="screen" x-data="runtimeLogs(@js([
         'collapsible' => $collapsible,
@@ -309,3 +314,4 @@
         </div>
     </div>
 </div>
+@endif

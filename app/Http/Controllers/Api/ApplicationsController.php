@@ -2438,7 +2438,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get application logs.',
-        description: 'Get application logs by UUID.',
+        description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.',
         path: '/applications/{uuid}/logs',
         operationId: 'get-application-logs-by-uuid',
         security: [
@@ -2505,7 +2505,7 @@ class ApplicationsController extends Controller
     )]
     #[OA\Get(
         summary: 'Get preview application logs.',
-        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.',
         path: '/applications/{uuid}/previews/{pull_request_id}/logs',
         operationId: 'get-preview-application-logs-by-pull-request-id',
         security: [

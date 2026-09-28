@@ -150,6 +150,9 @@ class GetLogs extends Component
     #[Renderless]
     public function getLogs(?string $since = null): string
     {
+        if (! $this->canReadLogs()) {
+            return 'Unauthorized.';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return 'Unauthorized.';
         }
@@ -174,6 +177,9 @@ class GetLogs extends Component
 
     public function copyLogs(): string
     {
+        if (! $this->canReadLogs()) {
+            return '';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -191,6 +197,9 @@ class GetLogs extends Component
 
     public function downloadAllLogs(): string
     {
+        if (! $this->canReadLogs()) {
+            return '';
+        }
         if (! Server::ownedByCurrentTeam()->where('id', $this->server->id)->exists()) {
             return '';
         }
@@ -263,8 +272,19 @@ class GetLogs extends Component
         return "({$command}) 2>&1 | head -c ".($maxBytes + 1);
     }
 
+    /**
+     * Container output can contain secrets, so only users who can edit the resource (or the server,
+     * for server-level containers) may read it.
+     */
+    private function canReadLogs(): bool
+    {
+        return auth()->user()?->can('update', $this->resource ?? $this->server) ?? false;
+    }
+
     public function render()
     {
-        return view('livewire.project.shared.get-logs');
+        return view('livewire.project.shared.get-logs', [
+            'canReadLogs' => $this->canReadLogs(),
+        ]);
     }
 }

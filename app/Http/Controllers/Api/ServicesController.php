@@ -873,7 +873,7 @@ class ServicesController extends Controller
 
     #[OA\Get(
         summary: 'Get service logs.',
-        description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.',
+        description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/logs',
         operationId: 'get-service-logs-by-uuid',
         security: [

@@ -2612,7 +2612,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get database logs.',
-        description: 'Get database logs by UUID.',
+        description: 'Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.',
         path: '/databases/{uuid}/logs',
         operationId: 'get-database-logs-by-uuid',
         security: [

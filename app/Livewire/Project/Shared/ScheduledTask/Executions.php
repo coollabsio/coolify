@@ -126,6 +126,10 @@ class Executions extends Component
             return collect();
         }
 
+        if (! $this->canReadOutput()) {
+            return collect(['Hidden (only admins can view)']);
+        }
+
         if (! $this->selectedExecution->message) {
             return collect(['Waiting for task output...']);
         }
@@ -138,7 +142,7 @@ class Executions extends Component
     public function downloadLogs(int $executionId)
     {
         $execution = $this->executions->firstWhere('id', $executionId);
-        if (! $execution) {
+        if (! $execution || ! $this->canReadOutput()) {
             return;
         }
 
@@ -147,9 +151,17 @@ class Executions extends Component
         }, 'task-execution-'.$execution->id.'.log');
     }
 
+    /**
+     * Task output can contain secrets, so only users who can edit the task's resource may read it.
+     */
+    public function canReadOutput(): bool
+    {
+        return auth()->user()?->can('update', $this->task->application ?? $this->task->service) ?? false;
+    }
+
     public function hasMoreLogs()
     {
-        if (! $this->selectedExecution || ! $this->selectedExecution->message) {
+        if (! $this->selectedExecution || ! $this->selectedExecution->message || ! $this->canReadOutput()) {
             return false;
         }
         $lines = collect(explode("\n", $this->selectedExecution->message));
