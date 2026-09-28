@@ -136,6 +136,14 @@
             'visible' => $server->isFunctional(),
         ],
         [
+            'label' => 'Registries',
+            'route' => 'server.registries',
+            'active' => $activeMenu === 'registries',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => auth()->user()?->can('update', $server),
+        ],
+        [
             'label' => 'Log Drains',
             'route' => 'server.log-drains',
             'active' => $activeMenu === 'log-drains',

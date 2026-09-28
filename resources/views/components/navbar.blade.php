@@ -132,6 +132,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Destinations</span>
                 </a>
             </li>
+            @if (auth()->user()?->isAdmin())
+                <li>
+                    <a title="Registries" {{ wireNavigate() }}
+                        class="{{ request()->is('registries*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('registries.index') }}">
+                        <x-reicon name="layers" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Registries</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="S3 Storage" {{ wireNavigate() }}
                     class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
