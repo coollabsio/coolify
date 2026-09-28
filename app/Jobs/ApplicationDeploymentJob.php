@@ -1031,7 +1031,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The queued ServerStorageSaveJob writes new content files, but it can run after the containers
      * start. Preserve-repository deployments write all file storages in write_deployment_configurations().
-     * Each deployment writes the files on its own server, so additional servers also get them.
+     * Each deployment writes the missing files on its own server before the containers start, so
+     * additional servers also get them.
      */
     private function write_missing_content_files(): void
     {
@@ -4602,8 +4603,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ->values();
     }
 
+    /**
+     * `docker compose up` creates a missing bind source as an empty directory, so content files are
+     * written first. This also gives a server that was added later the files it does not have.
+     */
     private function start_by_compose_file()
     {
+        $this->write_missing_content_files();
+
         try {
             // Ensure .env file exists before docker compose tries to load it (defensive programming)
             $this->execute_remote_command(

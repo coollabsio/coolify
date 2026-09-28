@@ -57,6 +57,7 @@
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
 - Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
+- Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
 
 ## Fail closed at public webhook boundaries
 - Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.
