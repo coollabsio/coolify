@@ -154,6 +154,52 @@
                         @endif
                     </x-application.settings-section>
 
+                    @if (isDev())
+                    <x-application.settings-section id="server-management-ownership-section"
+                        title="Management ownership (Dev)"
+                        helper="Choose whether this Coolify instance can control this server.">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
+                                <div class="text-sm font-medium text-neutral-950 dark:text-fg">
+                                    Manage this server from this instance
+                                </div>
+                                <p class="mt-1 max-w-2xl text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                    @if ($server->isTransferredAway())
+                                        Automations are disabled here. Existing workloads continue to run on the server.
+                                    @else
+                                        This instance runs deployments, webhooks, scheduled tasks, backups, proxy updates,
+                                        and monitoring for this server.
+                                    @endif
+                                </p>
+                            </div>
+
+                            <button type="button" role="switch"
+                                aria-checked="{{ $server->isTransferredAway() ? 'false' : 'true' }}"
+                                wire:click="toggleManagement"
+                                wire:loading.attr="disabled"
+                                wire:target="toggleManagement"
+                                wire:confirm="{{ $server->isTransferredAway()
+                                    ? 'Take ownership of this server? Confirm that no other Coolify instance manages it.'
+                                    : 'Stop managing this server from this instance? Deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring will be disabled here.' }}"
+                                @cannot('update', $server) disabled @endcannot
+                                class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 {{ $server->isTransferredAway()
+                                    ? 'border-neutral-300 bg-neutral-200 dark:border-white/[0.14] dark:bg-white/[0.08]'
+                                    : 'border-coollabs bg-coollabs dark:border-warning dark:bg-warning' }}">
+                                <span class="sr-only">Manage this server from this instance</span>
+                                <span aria-hidden="true"
+                                    class="inline-block size-5 rounded-full bg-white shadow-sm transition-transform dark:bg-black {{ $server->isTransferredAway() ? 'translate-x-1' : 'translate-x-6' }}"></span>
+                            </button>
+                        </div>
+
+                        @if ($server->isTransferredAway())
+                            <x-callout type="warning" title="Management is disabled on this instance" class="mt-4">
+                                Before you enable management, disable this server on every other Coolify instance. Two
+                                active instances can cause conflicting deployments, proxy changes, backups, and restarts.
+                            </x-callout>
+                        @endif
+                    </x-application.settings-section>
+                    @endif
+
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
                         <x-slot:actions>

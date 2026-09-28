@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Rules\ValidServerIp;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -350,6 +351,45 @@ class Show extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function toggleManagement(ServerTransferClaimer $claimer): void
+    {
+        abort_unless(isDev(), 404);
+        $this->authorize('update', $this->server);
+
+        if ($this->server->isLocalhost()) {
+            $this->dispatch('error', 'The Coolify host cannot be transferred.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway() && $this->server->team->serverOverflow()) {
+            $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway()) {
+            $claimer->claim($this->server, writeRemote: false, rebindSentinel: true);
+            $event = 'ui.server.management_enabled';
+            $message = 'This Coolify instance now manages the server.';
+        } else {
+            $claimer->markTransferred($this->server);
+            $event = 'ui.server.management_disabled';
+            $message = 'Server automations are disabled on this Coolify instance.';
+        }
+
+        $this->server->refresh();
+        $this->syncData();
+
+        auditLog($event, [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ]);
+
+        $this->dispatch('success', $message);
     }
 
     public function checkLocalhostConnection()

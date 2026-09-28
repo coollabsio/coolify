@@ -55,8 +55,14 @@ class ServerTransferClaimer
                 $server->settings->sentinel_custom_url = $instanceUrl;
                 $server->settings->ensureValidSentinelToken();
                 $server->settings->is_sentinel_enabled = true;
-                $server->settings->save();
                 $sentinelRebound = true;
+            }
+
+            if ($server->settings) {
+                if (! $server->team->serverOverflow()) {
+                    $server->settings->force_disabled = false;
+                }
+                $server->settings->save();
             }
 
             $metadata = $server->server_metadata ?? [];
