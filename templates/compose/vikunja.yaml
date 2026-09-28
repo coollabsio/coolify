@@ -11,7 +11,7 @@ services:
     environment:
       - SERVICE_URL_VIKUNJA
       - VIKUNJA_SERVICE_PUBLICURL=$SERVICE_URL_VIKUNJA
-      - VIKUNJA_SERVICE_JWTSECRET=$SERVICE_PASSWORD_JWTSECRET
+      - VIKUNJA_SERVICE_SECRET=$SERVICE_PASSWORD_JWTSECRET
       - VIKUNJA_SERVICE_ENABLEREGISTRATION=true
       - VIKUNJA_DATABASE_PATH=/db/vikunja.db
       - VIKUNJA_DATABASE_TYPE=sqlite
@@ -20,9 +20,17 @@ services:
       - vikunja-sqlite-data:/db
     depends_on:
       - init
+    healthcheck:
+      test: [ "CMD", "/app/vikunja/vikunja", "healthcheck" ]
+      interval: 30s
+      timeout: 5s  
+      retries: 3
+      start_period: 15s
+
   init:
     image: busybox
     restart: no
     volumes:
+      - vikunja-data:/app/vikunja
       - vikunja-sqlite-data:/db
-    command: ["sh", "-c", "touch /db/vikunja.db && chown -R 1000 /db"]
+    command: ["sh", "-c", "touch /db/vikunja.db && chown -R 1000 /db && chown -R 1000 /app/vikunja"]
