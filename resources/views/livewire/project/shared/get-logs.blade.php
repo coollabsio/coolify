@@ -215,15 +215,23 @@
                         </div>
                         <div class="logs-viewer-end runtime-logs-viewer-end">
                             <div class="logs-viewer-meta">
-                                <form x-on:submit.prevent="refresh()" class="logs-viewer-lines runtime-log-lines-group">
-                                    <span class="logs-viewer-lines-label">Lines</span>
-                                    <input type="number" wire:model="numberOfLines" placeholder="100" min="-1" max="50000"
+                                <form x-on:submit.prevent="refreshLines()" class="logs-viewer-lines runtime-log-lines-group">
+                                    <span class="logs-viewer-lines-label relative" :aria-busy="loadingLines">
+                                        <span :class="loadingLines ? 'invisible' : ''">Lines</span>
+                                        <x-loading compact x-cloak x-show="loadingLines" aria-label="Loading logs"
+                                            class="absolute inset-0 text-inherit!" />
+                                    </span>
+                                    <input type="number" wire:model="numberOfLines" x-on:input="allLines = Number($event.target.value) === -1" placeholder="100" min="-1" max="50000"
                                         title="Number of lines (max 50,000; use -1 for all)" {{ $streamLogs ? 'readonly' : '' }}
                                         class="input logs-viewer-lines-input" />
                                     <button type="button" x-on:click="showAllLogs()" title="Show all logs"
-                                        :class="$wire.numberOfLines == -1 ? 'runtime-log-lines-all-active' : ''"
-                                        :aria-pressed="$wire.numberOfLines == -1"
-                                        class="runtime-log-lines-all" {{ $streamLogs ? 'disabled' : '' }}>All</button>
+                                        :class="allLines ? 'runtime-log-lines-all-active' : ''"
+                                        :aria-pressed="allLines" :aria-busy="loadingAll"
+                                        class="runtime-log-lines-all relative" {{ $streamLogs ? 'disabled' : '' }}>
+                                        <span :class="loadingAll ? 'invisible' : ''">All</span>
+                                        <x-loading compact x-cloak x-show="loadingAll" aria-label="Loading all logs"
+                                            class="absolute inset-0 text-inherit!" />
+                                    </button>
                                 </form>
                             </div>
                             <div class="logs-viewer-search relative">

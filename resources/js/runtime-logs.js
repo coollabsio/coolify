@@ -158,6 +158,9 @@ export function initializeRuntimeLogsComponent() {
             containerName: config.containerName ?? 'logs',
             findShortcutLabel: /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘F' : 'Ctrl+F',
             logsLoaded: false,
+            allLines: false,
+            loadingAll: false,
+            loadingLines: false,
             loading: false,
             fullscreen: false,
             alwaysScroll: false,
@@ -178,6 +181,7 @@ export function initializeRuntimeLogsComponent() {
             scrollMargin: 0,
 
             init() {
+                this.allLines = Number(this.$wire.numberOfLines) === -1;
                 this.$watch('searchQuery', () => this.applyFilters());
                 this.$nextTick(() => this.mountVirtualizer());
                 streamTimer = setInterval(() => this.streamTick(), STREAM_INTERVAL_MS);
@@ -257,13 +261,26 @@ export function initializeRuntimeLogsComponent() {
                 }
             },
 
+            async refreshLines() {
+                if (this.loading) return;
+                this.loadingLines = true;
+                try {
+                    await this.refresh();
+                } finally {
+                    this.loadingLines = false;
+                }
+            },
+
             async showAllLogs() {
                 if (this.loading) return;
                 this.loading = true;
+                this.loadingAll = true;
                 try {
                     this.replaceLines(await this.$wire.showAllLogs());
+                    this.allLines = true;
                 } finally {
                     this.loading = false;
+                    this.loadingAll = false;
                 }
             },
 
