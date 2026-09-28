@@ -394,16 +394,6 @@ it('copies the parent domain port override onto a generated preview domain', fun
         ->toBe([8080]);
 });
 
-it('saves generated preview domains once in the application parser', function () {
-    $parser = file_get_contents(base_path('bootstrap/helpers/parsers.php'));
-    $previewGeneration = Str::of($parser)
-        ->after('// If the domain is set, we need to generate the FQDNs for the preview')
-        ->before('$defaultLabels = defaultLabels');
-
-    expect($previewGeneration->substrCount('$preview->save();'))->toBe(1)
-        ->and((string) $previewGeneration)->toContain('$preview->fqdn = $fqdns->implode(\',\');');
-});
-
 it('keeps every generated preview domain port override in the legacy compose parser', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',

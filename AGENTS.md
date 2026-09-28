@@ -38,7 +38,7 @@ Use the following workflow to test a self-hosted upgrade:
 1. Install the source version with the upgrade script:
 
    ```bash
-   bash upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
+   bash scripts/upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
    ```
 
 2. Set the current Coolify version and rebuild the cached configuration:
@@ -68,7 +68,7 @@ npm run build                   # production build
 
 ## Browser Tests (Pest Browser Plugin)
 
-Uses `pestphp/pest-plugin-browser` with Laravel Dusk 8. New browser tests go in `tests/v4/Browser/`.
+Uses `pestphp/pest-plugin-browser` (Playwright). Browser tests go in `tests/v4/Browser/`.
 
 ```bash
 # Run all browser tests
@@ -83,7 +83,7 @@ php artisan test --compact --filter='can login with valid credentials'
 
 ### Writing Browser Tests
 
-- Place new tests in `tests/v4/Browser/` — legacy Dusk tests in `tests/Browser/` should not be used as reference.
+- Place new tests in `tests/v4/Browser/`.
 - Use `RefreshDatabase` and seed required data (at minimum `InstanceSettings::create(['id' => 0])`) in `beforeEach`.
 - Key API: `visit()`, `fill(field, value)`, `click(text)`, `assertSee()`, `assertDontSee()`, `assertPathIs()`, `screenshot()`.
 - Always call `screenshot()` at the end of each test for debugging.
@@ -100,11 +100,10 @@ function loginAsRoot(): mixed
 ```
 
 - See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
-- Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
 
 ### How Browser Tests Actually Run (no Docker, no display needed)
 
-`visit()` does NOT hit the dev app on `localhost:8000` and does NOT use the Dusk ChromeDriver on `:4444` (that config in `tests/DuskTestCase.php` is legacy). Instead the Pest Browser Plugin:
+`visit()` does NOT hit the dev app on `localhost:8000`. Instead the Pest Browser Plugin:
 
 1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `npm install && npx playwright install chromium`).
 2. Boots an **in-process amphp HTTP server** on a random port that serves the Laravel app from the test process itself.
@@ -256,7 +255,6 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/socialite (SOCIALITE) - v5
 - livewire/livewire (LIVEWIRE) - v3
 - laravel/boost (BOOST) - v2
-- laravel/dusk (DUSK) - v8
 - laravel/pint (PINT) - v1
 - pestphp/pest (PEST) - v4
 - phpunit/phpunit (PHPUNIT) - v12

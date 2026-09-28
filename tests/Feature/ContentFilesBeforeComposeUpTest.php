@@ -499,21 +499,6 @@ test('the storage save job does not delete a directory that is not empty', funct
     expect($volume->fresh()->is_directory)->toBeFalse();
 });
 
-test('the Compose deployment writes content files after it removes the old containers', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $methodStart = strpos($source, 'private function deploy_docker_compose_buildpack()');
-    $methodEnd = strpos($source, 'private function pull_docker_compose_images()', $methodStart);
-    $deploymentMethod = substr($source, $methodStart, $methodEnd - $methodStart);
-
-    $stopPosition = strpos($deploymentMethod, '$this->stop_running_container(force: true);');
-    $startPosition = strpos($deploymentMethod, '$this->start_docker_compose_services();');
-
-    expect($stopPosition)->not->toBeFalse()
-        ->and($startPosition)->not->toBeFalse()
-        ->and($stopPosition)->toBeLessThan($startPosition)
-        ->and(substr_count($deploymentMethod, ' up -d'))->toBe(0);
-});
-
 test('the server file sync keeps the content of a file storage when a directory is at its path', function () {
     $volume = contentFilesVolume($this->application, 'conf/app.conf');
     fakeContentFilesServer([$volume->fs_path => 'directory']);

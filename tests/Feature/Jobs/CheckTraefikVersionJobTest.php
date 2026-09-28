@@ -5,7 +5,6 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
@@ -88,37 +87,6 @@ it('versions.json contains traefik branches with patch versions', function () {
     expect($newestBranch)->toBe('3.7');
 });
 
-it('formats version with v prefix for display', function () {
-    // Test the formatVersion logic from notification class
-    $version = '3.6';
-    $formatted = str_starts_with($version, 'v') ? $version : "v{$version}";
-
-    expect($formatted)->toBe('v3.6');
-
-    $versionWithPrefix = 'v3.6';
-    $formatted2 = str_starts_with($versionWithPrefix, 'v') ? $versionWithPrefix : "v{$versionWithPrefix}";
-
-    expect($formatted2)->toBe('v3.6');
-});
-
-it('compares semantic versions correctly', function () {
-    // Test version comparison logic used in job
-    $currentVersion = 'v3.5';
-    $latestVersion = 'v3.6';
-
-    $isOutdated = version_compare(ltrim($currentVersion, 'v'), ltrim($latestVersion, 'v'), '<');
-
-    expect($isOutdated)->toBeTrue();
-
-    // Test equal versions
-    $sameVersion = version_compare(ltrim('3.6', 'v'), ltrim('3.6', 'v'), '=');
-    expect($sameVersion)->toBeTrue();
-
-    // Test newer version
-    $newerVersion = version_compare(ltrim('3.7', 'v'), ltrim('3.6', 'v'), '>');
-    expect($newerVersion)->toBeTrue();
-});
-
 it('notification class accepts servers collection with outdated info', function () {
     $team = Team::factory()->create();
     $server1 = Server::factory()->make([
@@ -175,47 +143,6 @@ it('job handles servers with no proxy type', function () {
 
     // Server without proxy configuration returns null for proxyType()
     expect($server->proxyType())->toBeNull();
-});
-
-it('handles latest tag correctly', function () {
-    // Test that 'latest' tag is not considered for outdated comparison
-    $currentVersion = 'latest';
-    $latestVersion = '3.6';
-
-    // Job skips notification for 'latest' tag
-    $shouldNotify = $currentVersion !== 'latest';
-
-    expect($shouldNotify)->toBeFalse();
-});
-
-it('groups servers by team correctly', function () {
-    $team1 = Team::factory()->create(['name' => 'Team 1']);
-    $team2 = Team::factory()->create(['name' => 'Team 2']);
-
-    $servers = collect([
-        (object) ['team_id' => $team1->id, 'name' => 'Server 1'],
-        (object) ['team_id' => $team1->id, 'name' => 'Server 2'],
-        (object) ['team_id' => $team2->id, 'name' => 'Server 3'],
-    ]);
-
-    $grouped = $servers->groupBy('team_id');
-
-    expect($grouped)->toHaveCount(2);
-    expect($grouped[$team1->id])->toHaveCount(2);
-    expect($grouped[$team2->id])->toHaveCount(1);
-});
-
-it('server check job exists and has correct structure', function () {
-    expect(class_exists(CheckTraefikVersionForServerJob::class))->toBeTrue();
-
-    // Verify CheckTraefikVersionForServerJob has required properties
-    $reflection = new ReflectionClass(CheckTraefikVersionForServerJob::class);
-    expect($reflection->hasProperty('tries'))->toBeTrue();
-    expect($reflection->hasProperty('timeout'))->toBeTrue();
-
-    // Verify it implements ShouldQueue
-    $interfaces = class_implements(CheckTraefikVersionForServerJob::class);
-    expect($interfaces)->toContain(ShouldQueue::class);
 });
 
 it('sends immediate notifications when outdated traefik is detected', function () {

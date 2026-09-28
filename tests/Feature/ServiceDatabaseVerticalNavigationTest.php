@@ -1,14 +1,5 @@
 <?php
 
-use App\Livewire\Project\Service\DatabaseBackups;
-
-it('declares the database backup mount return type', function () {
-    $returnType = (new ReflectionMethod(DatabaseBackups::class, 'mount'))->getReturnType();
-
-    expect($returnType)->not->toBeNull()
-        ->and($returnType->getName())->toBe('mixed');
-});
-
 it('refreshes backup executions from backup broadcasts on the current team channel', function () {
     $serviceExecutions = file_get_contents(app_path('Livewire/Project/Service/BackupExecutions.php'));
     $serviceBackups = file_get_contents(app_path('Livewire/Project/Service/VolumeBackup/Index.php'));

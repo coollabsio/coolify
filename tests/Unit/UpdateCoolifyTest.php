@@ -44,10 +44,6 @@ afterEach(function () {
     Mockery::close();
 });
 
-it('has UpdateCoolify action class', function () {
-    expect(class_exists(UpdateCoolify::class))->toBeTrue();
-});
-
 it('validates cache against running version before fallback', function () {
     updateCoolifyTestCreateRootServerAndSettings();
 
@@ -202,12 +198,6 @@ it('preserves an explicit custom helper image override', function () {
     ]);
 
     expect(coolifyHelperImage())->toBe('registry.example.com/custom/helper');
-});
-
-it('uses the database registry for sentinel images', function () {
-    $action = file_get_contents(app_path('Actions/Server/StartSentinel.php'));
-
-    expect($action)->toContain("\$image = coolifyRegistryUrl().'/coollabsio/sentinel:'.\$version;");
 });
 
 it('rejects invalid registry values and does not sync them', function () {

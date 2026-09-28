@@ -5,9 +5,6 @@ it('gates Traefik ACME certificate deletion behind update authorization', functi
     $component = file_get_contents(app_path('Livewire/Server/Proxy.php'));
 
     expect($view)
-        ->toContain('TLS certificates')
-        ->toContain('Traefik requests a new certificate after the restart')
-        ->toContain('wire:click="loadTraefikCertificates"')
         ->toContain('submitAction="deleteTraefikCertificate')
         ->toContain("@can('update', \$server)")
         ->and($component)

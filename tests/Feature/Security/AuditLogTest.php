@@ -215,11 +215,6 @@ describe('security UI audit logging', function () {
         Livewire::test(CloudInitScripts::class)
             ->call('deleteScript', $script->id);
     });
-
-    test('cloud provider token form does not contain debug ray calls', function () {
-        expect(file_get_contents(app_path('Livewire/Security/CloudProviderTokenForm.php')))
-            ->not->toContain('ray'.'(');
-    });
 });
 
 describe('webhook signature failure logging', function () {

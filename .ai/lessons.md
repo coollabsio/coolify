@@ -22,6 +22,8 @@
 - Do not write tests that read Blade or CSS files as text to assert layout, classes, or copy; they break on every redesign and miss real failures.
 - Render the component (`Livewire::test()`, an HTTP request) and assert the result, including authorization; use a few `tests/v4/Browser` tests with screenshots for visual flows.
 - A source-text check is acceptable only for a correctness or security rule that rendering cannot prove easily, such as stable `wire:key` values or no raw user output.
+- Call the app code under test. Do not copy app logic into a test, assert only literals, constants, `class_exists`/`method_exists`, or PHP built-ins such as `escapeshellarg`.
+- Pest test files share one global function scope. Give file-level helper functions a unique name.
 
 ## Keep dynamic Livewire identities stable
 - In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.

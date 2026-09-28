@@ -55,15 +55,6 @@ it('types service backup S3 storage state as a nullable Eloquent collection', fu
         ->and($property->getDefaultValue())->toBeNull();
 });
 
-it('provides the volume backup domain classes and relationship', function () {
-    expect(class_exists(ScheduledVolumeBackup::class))->toBeTrue()
-        ->and(class_exists(ScheduledVolumeBackupExecution::class))->toBeTrue()
-        ->and(class_exists(VolumeBackupJob::class))->toBeTrue()
-        ->and(class_exists(VolumeBackups::class))->toBeTrue()
-        ->and(method_exists(LocalPersistentVolume::class, 'scheduledBackups'))->toBeTrue()
-        ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
-});
-
 it('allows large volume backups to run for ten hours by default', function () {
     $backup = new ScheduledVolumeBackup;
     $job = new VolumeBackupJob($backup);
@@ -670,16 +661,6 @@ it('stores volume backup schedules and executions', function () {
 it('records the S3 storage used by each volume backup execution', function () {
     expect(Schema::hasColumn('scheduled_volume_backup_executions', 's3_storage_id'))->toBeTrue()
         ->and((new ScheduledVolumeBackupExecution)->s3())->not->toBeNull();
-});
-
-it('exposes actions to manage and run volume backups', function () {
-    expect(method_exists(VolumeBackups::class, 'save'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'backupNow'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'toggleEnabled'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'delete'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'cleanupFailed'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'cleanupDeleted'))->toBeTrue()
-        ->and(method_exists(VolumeBackups::class, 'deleteBackup'))->toBeTrue();
 });
 
 it('declares the volume backup action return types', function () {

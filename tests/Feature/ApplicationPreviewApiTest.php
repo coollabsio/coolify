@@ -177,17 +177,6 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
             ->assertUnprocessable()
             ->assertJson(['message' => 'Invalid pull_request_id.']);
     });
-
-    test('uses the pull request id to select the preview container', function () {
-        $controller = file_get_contents(app_path('Http/Controllers/Api/ApplicationsController.php'));
-        $openApi = json_decode(file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
-
-        expect($controller)
-            ->toContain("\$request->route('pull_request_id')")
-            ->toContain('getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId)')
-            ->and($openApi['paths'])
-            ->toHaveKey('/applications/{uuid}/previews/{pull_request_id}/logs');
-    });
 });
 
 describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', function () {

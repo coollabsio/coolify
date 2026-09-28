@@ -2,8 +2,6 @@
 
 use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
-use Illuminate\Contracts\Queue\ShouldBeEncrypted;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -25,14 +23,6 @@ beforeEach(function () {
 
 afterEach(function () {
     Mockery::close();
-});
-
-it('has correct job configuration', function () {
-    $job = new CheckForUpdatesJob;
-
-    $interfaces = class_implements($job);
-    expect($interfaces)->toContain(ShouldQueue::class);
-    expect($interfaces)->toContain(ShouldBeEncrypted::class);
 });
 
 it('uses max of CDN and cache versions', function () {
@@ -122,30 +112,6 @@ it('never downgrades from current running version', function () {
     $job = new CheckForUpdatesJob;
     $job->handle();
 });
-
-it('uses data_set for safe version mutation', function () {
-    Http::fake([
-        '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.10']],
-        ], 200),
-    ]);
-
-    File::shouldReceive('exists')->andReturn(false);
-    File::shouldReceive('put')->once();
-    Cache::shouldReceive('forget')->once();
-
-    config(['constants.coolify.version' => '4.0.5']);
-
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
-
-    $job = new CheckForUpdatesJob;
-
-    // Should not throw even if structure is unexpected
-    // data_set() handles nested path creation
-    $job->handle();
-})->skip('Needs better mock setup for instanceSettings');
 
 it('preserves other component versions when preventing Coolify downgrade', function () {
     // CDN has older Coolify but newer Traefik

@@ -1,16 +1,5 @@
 <?php
 
-function renderedDataLineTextValue(string $logContent): string
-{
-    $escapedContent = e($logContent);
-    $html = '<span data-line-text="'.$escapedContent.'">'.$escapedContent.'</span>';
-
-    $document = new DOMDocument;
-    $document->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-    return $document->documentElement->getAttribute('data-line-text');
-}
-
 describe('Log Viewer HTML Tag Preservation', function () {
     it('lets Blade escape deployment log data attributes only once', function () {
         $view = file_get_contents(__DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php');
@@ -21,30 +10,9 @@ describe('Log Viewer HTML Tag Preservation', function () {
             ->not->toContain('data-log-content="{{ htmlspecialchars($searchableContent) }}"')
             ->not->toContain('data-line-text="{{ htmlspecialchars($lineContent) }}"');
     });
-
-    it('preserves literal html-like log text for client-side search reset and highlighting', function () {
-        $logContent = '<div>A</div>';
-
-        expect(renderedDataLineTextValue($logContent))->toBe($logContent);
-    });
 });
 
 describe('Log Viewer XSS Prevention', function () {
-    it('keeps script-like log output as text in Blade rendered markup', function () {
-        $maliciousLog = '<script>alert("XSS")</script>';
-        $escapedLog = e($maliciousLog);
-
-        expect($escapedLog)
-            ->toContain('&lt;script&gt;')
-            ->not->toContain('<script>');
-    });
-
-    it('keeps dangerous attributes as literal dataset text for textContent rendering', function () {
-        $maliciousLog = '<img src=x onerror="alert(1)">';
-
-        expect(renderedDataLineTextValue($maliciousLog))->toBe($maliciousLog);
-    });
-
     it('uses text nodes for search highlighting instead of injected html', function () {
         $deploymentView = file_get_contents(__DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php');
 

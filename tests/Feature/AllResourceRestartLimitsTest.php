@@ -1,8 +1,5 @@
 <?php
 
-use App\Actions\Docker\GetContainersStatus;
-use App\Actions\Service\StopServiceApplication;
-use App\Jobs\PushServerUpdateJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ServiceApplication;
@@ -44,48 +41,7 @@ it('gives independently runnable application resources restart limit state', fun
     [ServiceApplication::class],
 ]);
 
-it('collects restart counts for preview and service containers from both status sources', function () {
-    $dockerStatus = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelStatus = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($dockerStatus)
-        ->toContain('previewContainerRestartCounts')
-        ->toContain('serviceContainerRestartCounts')
-        ->and($sentinelStatus)
-        ->toContain('previewContainerRestartCounts')
-        ->toContain('serviceContainerRestartCounts');
-});
-
-it('ignores docker compose one-off job containers in both status sources', function () {
-    $dockerStatus = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-    $sentinelStatus = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
-
-    expect($dockerStatus)
-        ->toContain("filter_var(data_get(\$labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)")
-        ->and($sentinelStatus)
-        ->toContain("filter_var(\$labels->get('com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)");
-});
-
-it('imports the application model used when claiming a restart limit', function () {
-    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
-
-    expect($statusAction)
-        ->toContain('use App\\Models\\Application;')
-        ->toContain('Application::query()');
-});
-
 it('limits restarts only for applications', function () {
-    $migrations = collect(glob(database_path('migrations/*.php')))
-        ->map(fn (string $path): string => file_get_contents($path))
-        ->implode("\n");
-
-    expect($migrations)
-        ->toContain("'application_previews'")
-        ->toContain("'service_applications'")
-        ->toContain("'max_restart_count'")
-        ->toContain("'restart_limit_reached'")
-        ->toContain("dropColumn(['max_restart_count', 'restart_limit_reached'])");
-
     $databaseModels = [
         ServiceDatabase::class,
         StandalonePostgresql::class,
@@ -118,48 +74,9 @@ it('limits restarts only for applications', function () {
         expect(Schema::hasColumn($databaseTable, 'max_restart_count'))->toBeFalse()
             ->and(Schema::hasColumn($databaseTable, 'restart_limit_reached'))->toBeFalse();
     }
-
-    foreach ([GetContainersStatus::class, PushServerUpdateJob::class] as $statusUpdater) {
-        $source = file_get_contents((new ReflectionClass($statusUpdater))->getFileName());
-
-        expect($source)
-            ->not->toContain('$database->trackRestartCount')
-            ->not->toContain('$database->stoppedAfterRestartLimit()');
-    }
-
-    $stopServiceResource = file_get_contents((new ReflectionClass(StopServiceApplication::class))->getFileName());
-
-    expect($stopServiceResource)
-        ->toContain('$resetRestartCount && $serviceApplication instanceof ServiceApplication');
 });
 
 it('makes restart limits opt in for new application resources', function () {
-    $migrationPaths = glob(database_path('migrations/*_make_restart_limits_opt_in.php'));
-
-    expect($migrationPaths)->toHaveCount(1);
-
-    $migration = file_get_contents($migrationPaths[0]);
-
-    expect($migration)
-        ->toContain("['applications', 'application_previews', 'service_applications']")
-        ->toContain("integer('max_restart_count')->default(0)->change()")
-        ->toContain('public $withinTransaction = false;')
-        ->toContain("->where('max_restart_count', 10)")
-        ->toContain('->chunkById(5000')
-        ->toContain("->whereIn('id', \$resources->pluck('id'))")
-        ->toContain("'max_restart_count' => 0")
-        ->toContain("'restart_limit_reached' => false");
-
-    $applicationSettings = file_get_contents(app_path('Livewire/Project/Application/Advanced.php'));
-    $serviceSettings = file_get_contents(app_path('Livewire/Project/Service/Index.php'));
-
-    expect($applicationSettings)
-        ->toContain('public int $maxRestartCount = 0;')
-        ->toContain('$this->application->max_restart_count ?? 0')
-        ->and($serviceSettings)
-        ->toContain('public mixed $maxRestartCount = 0;')
-        ->toContain('$this->serviceApplication->max_restart_count ?? 0');
-
     foreach ([Application::class, ApplicationPreview::class, ServiceApplication::class] as $modelClass) {
         expect((new $modelClass)->max_restart_count)->toBe(0);
     }

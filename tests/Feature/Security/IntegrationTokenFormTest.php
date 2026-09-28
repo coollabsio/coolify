@@ -153,14 +153,6 @@ test('at least one capability is required when adding a cloudflare token', funct
     Http::assertNothingSent();
 });
 
-test('provider validation uses the provider names declared by the model', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenForm.php'));
-
-    expect($component)
-        ->toContain("implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))")
-        ->not->toContain('in:cloudflare,doppler,infisical,vault');
-});
-
 test('integration tokens page lists saved provider and capabilities', function () {
     IntegrationToken::query()->create([
         'team_id' => $this->team->id,
@@ -306,15 +298,6 @@ test('an invalid replacement does not rotate the integration token', function ()
         ->assertDispatched('error');
 
     expect($savedToken->fresh()->token)->toBe('original-token');
-});
-
-test('editor updates its row without rerendering the teleported parent modal', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenEditor.php'));
-
-    expect($component)
-        ->toContain("'integration-token-updated'")
-        ->toContain("'integration-token-deleted'")
-        ->not->toContain('integrationTokenChanged');
 });
 
 test('new integration token form controls declare authorization matching server-side actions', function () {

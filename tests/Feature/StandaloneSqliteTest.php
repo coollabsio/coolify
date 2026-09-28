@@ -77,13 +77,6 @@ it('generates a compose file that passes the database files to the image', funct
         ->and($service['volumes'])->toBe(['sqlite-data-'.$this->database->uuid.':/var/lib/sqlite']);
 });
 
-it('backs up with a read-only VACUUM INTO snapshot instead of a SQL dump', function () {
-    expect(file_get_contents(app_path('Jobs/DatabaseBackupJob.php')))
-        ->toContain('sqlite3 -readonly')
-        ->toContain('VACUUM INTO')
-        ->not->toContain('.dump');
-});
-
 it('restores a gzipped backup with .restore into the first database file', function () {
     $command = app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->database, '/tmp/restore_1', false);
 
