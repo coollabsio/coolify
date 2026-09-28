@@ -151,8 +151,8 @@ class EmailChannel
     /**
      * Read the status code and error name from a Resend error.
      *
-     * resend-php 0.18 reads only the legacy "code" key in getErrorCode(), while the
-     * API returns {"statusCode", "name", "message"}, so read the raw contents instead.
+     * getErrorCode() and getErrorType() fail when a body has neither "code"/"statusCode"
+     * nor "type"/"name" (for example the legacy nested format), so read the raw contents.
      *
      * @return array{status: int, name: ?string}
      */
