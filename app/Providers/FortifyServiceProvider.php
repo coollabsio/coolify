@@ -27,7 +27,7 @@ class FortifyServiceProvider extends ServiceProvider
             public function toResponse($request)
             {
                 // First user (root) will be redirected to /settings instead of / on registration.
-                if ($request->user()->currentTeam->id === 0) {
+                if ($request->user()->currentTeam()?->id === 0) {
                     return redirect()->route('settings.index');
                 }
 
@@ -88,9 +88,9 @@ class FortifyServiceProvider extends ServiceProvider
                     if (! $user->teams()->where('team_id', $invitation->team->id)->exists()) {
                         $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
                     }
-                    $user->currentTeam = $invitation->team;
+                    $team = $invitation->team;
                     $invitation->delete();
-                    session(['currentTeam' => $user->currentTeam]);
+                    session(['currentTeam' => $team]);
                 } else {
                     // Restore the last active team; only fall back when unambiguous.
                     $team = $user->resolveStoredTeam();
@@ -98,7 +98,7 @@ class FortifyServiceProvider extends ServiceProvider
                         $team = $user->recreate_personal_team();
                     }
                     if ($team) {
-                        session(['currentTeam' => $user->currentTeam = $team]);
+                        session(['currentTeam' => $team]);
                     }
                     // Otherwise (multiple teams, no stored choice) leave the session
                     // team unset so the user is sent to the team-selection screen.
