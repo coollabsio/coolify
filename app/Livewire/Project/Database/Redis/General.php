@@ -122,9 +122,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->redisPassword = '';
-        }
     }
 
     private function syncData(bool $toModel = false): void
@@ -155,7 +152,8 @@ class General extends Component
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->redisVersion = $this->database->getRedisVersion();
             $this->redisUsername = $this->database->redis_username;
-            $this->redisPassword = $this->database->redis_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->redisPassword = $canSeeCredentials ? $this->database->redis_password : '';
         }
     }
 

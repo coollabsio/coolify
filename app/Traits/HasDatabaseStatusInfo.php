@@ -82,6 +82,7 @@ trait HasDatabaseStatusInfo
     public function refresh(): void
     {
         $this->database->refresh();
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
         if ($this->isPasswordHiddenForMember) {
             $this->dbUrl = null;
             $this->dbUrlPublic = null;

@@ -76,9 +76,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->clickhouseAdminPassword = '';
-        }
     }
 
     protected function rules(): array
@@ -141,7 +138,8 @@ class General extends Component
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;
-            $this->clickhouseAdminPassword = $this->database->clickhouse_admin_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->clickhouseAdminPassword = $canSeeCredentials ? $this->database->clickhouse_admin_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;

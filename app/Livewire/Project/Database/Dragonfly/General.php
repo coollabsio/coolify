@@ -74,9 +74,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->dragonflyPassword = '';
-        }
     }
 
     protected function rules(): array
@@ -133,7 +130,8 @@ class General extends Component
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->dragonflyPassword = $this->database->dragonfly_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->dragonflyPassword = $canSeeCredentials ? $this->database->dragonfly_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;

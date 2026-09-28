@@ -76,9 +76,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->keydbPassword = '';
-        }
     }
 
     protected function rules(): array
@@ -138,7 +135,8 @@ class General extends Component
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->keydbConf = $this->database->keydb_conf;
-            $this->keydbPassword = $this->database->keydb_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->keydbPassword = $canSeeCredentials ? $this->database->keydb_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
