@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -124,9 +125,7 @@ it('lists the team servers for admins on the registries page', function () {
 it('does not show registry logins to members', function () {
     actingAsDockerRegistriesRole($this->team, 'member');
 
-    Livewire::test(DockerRegistries::class)
-        ->assertViewHas('servers', fn ($servers) => $servers->isEmpty())
-        ->assertSee('Only team admins can see registry logins');
+    Livewire::test(DockerRegistries::class)->assertForbidden();
 
     $this->get(route('server.show', ['server_uuid' => $this->server->uuid]))
         ->assertOk()
@@ -448,3 +447,64 @@ it('checks that the host belongs to the chosen cloud provider', function (string
     'aws with other host' => ['aws', 'dkr.ecr.eu-west-1.amazonaws.com', false],
     'other accepts any host' => ['custom', 'registry.example.com:5000', true],
 ]);
+
+it('returns 403 on the registries pages for members', function () {
+    actingAsDockerRegistriesRole($this->team, 'member');
+
+    $this->get(route('registries.index'))->assertForbidden();
+    $this->get(route('server.registries', ['server_uuid' => $this->server->uuid]))->assertForbidden();
+});
+
+it('does not open the registries page of another team server', function () {
+    actingAsDockerRegistriesRole(Team::factory()->create(), 'owner');
+
+    $response = $this->get(route('server.registries', ['server_uuid' => $this->server->uuid]));
+
+    expect($response->status())->toBeIn([403, 404])
+        ->and($response->getContent())->not->toContain('registry.example.com');
+    Livewire::test(Login::class, ['server' => $this->server])->assertForbidden();
+});
+
+it('does not let the browser swap the server of a card or of the login form', function (string $component) {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+    $otherServer = Server::factory()->create([
+        'team_id' => Team::factory()->create()->id,
+        'private_key_id' => PrivateKey::factory()->create()->id,
+    ]);
+
+    $test = $component === 'card'
+        ? Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        : Livewire::test(Login::class, ['server' => $this->server]);
+
+    expect(fn () => $test->set('server', $otherServer->id))->toThrow(CannotUpdateLockedPropertyException::class);
+})->with(['card', 'login form']);
+
+it('sends only registry names and usernames to the browser, never secrets from the Docker config', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    $this->server->update(['ip' => '203.0.113.77']);
+    makeDockerRegistriesServerReachable($this->server);
+    Process::fake(fn () => Process::result(output: json_encode([
+        'auths' => ['ghcr.io' => ['auth' => base64_encode('octocat:SECRET_TOKEN'), 'identitytoken' => 'ID_TOKEN_SECRET']],
+        'credsStore' => 'pass',
+        'proxies' => ['default' => ['httpProxy' => 'http://proxyuser:PROXY_SECRET@proxy']],
+    ])));
+
+    $card = Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server]);
+    $form = Livewire::test(Login::class, ['server' => $this->server, 'editRegistry' => 'ghcr.io', 'currentUsername' => 'octocat']);
+
+    expect(array_keys($card->snapshot['data']))->toBe(['server', 'registries', 'error'])
+        ->and(array_keys($form->snapshot['data']))->toBe(['server', 'provider', 'editRegistry', 'registry', 'username', 'password'])
+        ->and($form->snapshot['data']['password'])->toBe('');
+
+    foreach ([$card, $form] as $component) {
+        $payload = json_encode($component->snapshot).$component->html();
+        expect($payload)
+            ->not->toContain('SECRET_TOKEN')
+            ->not->toContain(base64_encode('octocat:SECRET_TOKEN'))
+            ->not->toContain('ID_TOKEN_SECRET')
+            ->not->toContain('PROXY_SECRET')
+            ->not->toContain('203.0.113.77');
+    }
+});

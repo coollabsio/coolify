@@ -12,8 +12,8 @@
     </div>
 
     @if ($servers->isEmpty())
-        <x-empty title="No servers to show"
-            description="Only team admins can see registry logins, and only for servers of the current team."
+        <x-empty title="No servers yet"
+            description="Add a server to manage its Docker registry logins."
             icon-name="servers" />
     @else
         <div class="flex flex-col gap-4">

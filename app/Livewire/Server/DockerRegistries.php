@@ -7,6 +7,11 @@ use Livewire\Component;
 
 class DockerRegistries extends Component
 {
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+    }
+
     public function render()
     {
         $servers = Server::ownedByCurrentTeamCached()

@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
@@ -16,6 +17,7 @@ class ServerRegistries extends Component
 {
     use AuthorizesRequests;
 
+    #[Locked]
     public Server $server;
 
     /** @var array<int, array{registry: string, logged_in: bool, source: ?string, username: ?string, used_by: array<int, array{name: string, link: ?string}>}> */

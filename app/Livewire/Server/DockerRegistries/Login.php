@@ -29,6 +29,7 @@ class Login extends Component
         'custom' => ['label' => 'Other', 'registry' => '', 'username' => '', 'placeholder' => 'registry.example.com', 'hint' => ''],
     ];
 
+    #[Locked]
     public Server $server;
 
     public string $provider = 'custom';
