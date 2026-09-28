@@ -116,13 +116,6 @@ function makeAnalyticsApplication(Team $team, PrivateKey $privateKey, Environmen
     ]);
 }
 
-it('only lazy loads application analytics when traffic analytics is enabled', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
-
-    expect($configuration)
-        ->toContain(':lazy="$application->destination?->server?->isTrafficAnalyticsEnabled()"');
-});
-
 it('renders the disabled state in the initial application analytics page response', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
 

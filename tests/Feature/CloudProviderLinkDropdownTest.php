@@ -60,7 +60,7 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
     ]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Hetzner')
         ->assertSee('DigitalOcean')
         ->assertSee('Vultr')
@@ -70,13 +70,13 @@ it('shows link cloud provider dropdown with available unlinked providers', funct
         ->assertSee('Server ID')
         ->assertSee('Droplet ID')
         ->assertSee('Instance ID')
-        ->assertSee('Search by IP')
+        ->assertSee('Search by server IP')
         ->assertSee('Search');
 });
 
 it('hides link cloud provider dropdown when no providers can be linked', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertDontSee('Link Cloud Provider');
+        ->assertDontSee('Link provider');
 });
 
 it('does not list providers already linked to the server', function () {
@@ -97,7 +97,7 @@ it('does not list providers already linked to the server', function () {
     $this->server->update(['hetzner_server_id' => 123]);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Link Cloud Provider')
+        ->assertSee('Link provider')
         ->assertSee('Vultr Token')
         ->assertDontSee('Hetzner Token');
 });

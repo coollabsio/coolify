@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\CheckTraefikVersionForServerJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Server\TraefikVersionOutdated;
@@ -10,11 +11,15 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Notification::fake();
+    InstanceSettings::unguarded(function () {
+        InstanceSettings::updateOrCreate(['id' => 0], []);
+    });
 });
 
 it('detects servers table has detected_traefik_version column', function () {
@@ -38,7 +43,8 @@ it('notification settings have traefik_outdated fields', function () {
 
     // Check Telegram notification settings
     expect($team->telegramNotificationSettings)->toHaveKey('traefik_outdated_telegram_notifications');
-    expect($team->telegramNotificationSettings)->toHaveKey('telegram_notifications_traefik_outdated_thread_id');
+    // Thread ids default to null, so check the loaded columns instead of isset().
+    expect($team->telegramNotificationSettings->getAttributes())->toHaveKey('telegram_notifications_traefik_outdated_thread_id');
 
     // Check Slack notification settings
     expect($team->slackNotificationSettings)->toHaveKey('traefik_outdated_slack_notifications');
@@ -349,6 +355,10 @@ it('notification transforms multiple servers with URLs correctly', function () {
 });
 
 it('notification uses base_url helper not config app.url', function () {
+    config(['app.url' => 'http://localhost']);
+    InstanceSettings::query()->whereKey(0)->update(['fqdn' => 'https://coolify.example.com']);
+    Once::flush();
+
     $team = Team::factory()->create();
     $server = Server::factory()->create([
         'name' => 'Test Server',
@@ -368,5 +378,6 @@ it('notification uses base_url helper not config app.url', function () {
     // Verify URL starts with base_url() not config('app.url')
     $generatedUrl = $mail->viewData['servers'][0]['url'];
     expect($generatedUrl)->toStartWith(base_url());
+    expect($generatedUrl)->toBe('https://coolify.example.com/server/test-uuid/proxy');
     expect($generatedUrl)->not->toContain('localhost');
 });

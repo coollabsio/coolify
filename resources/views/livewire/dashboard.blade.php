@@ -27,7 +27,7 @@
 
             @if ($dashboardProjects->isEmpty())
                 <x-empty title="No projects yet"
-                    description="Use New to create your first deployment workspace."
+                    description="Create your first deployment workspace from Projects."
                     icon-name="projects" size="sm" />
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

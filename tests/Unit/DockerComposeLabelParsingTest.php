@@ -32,9 +32,16 @@ it('ensures label parsing converts array values to strings', function () {
 it('falls back to the template port for service application proxy labels', function () {
     $sharedFile = file_get_contents(__DIR__.'/../../bootstrap/helpers/shared.php');
 
+    // Proxy labels for service applications use the per-service routing port...
     expect($sharedFile)->toContain(
-        '? ($savedService->getRequiredPort() ?? $predefinedPort)'
+        "? \$savedService->getRequiredPort()\n                            : \$predefinedPort;"
     );
+
+    // ...which falls back to the one-click template port for HTTP-facing services
+    $serviceApplicationFile = file_get_contents(__DIR__.'/../../app/Models/ServiceApplication.php');
+    expect($serviceApplicationFile)
+        ->toContain('if ($declaresHttpUrl) {')
+        ->toContain('return $this->service->getRequiredPort();');
 });
 
 it('verifies label parsing array check occurs before preg_match', function () {

@@ -27,19 +27,6 @@ describe('Log Viewer HTML Tag Preservation', function () {
 
         expect(renderedDataLineTextValue($logContent))->toBe($logContent);
     });
-
-    it('does not strip tags with DOMParser based html decoding', function () {
-        $views = [
-            __DIR__.'/../../resources/views/livewire/project/application/deployment/show.blade.php',
-            __DIR__.'/../../resources/views/livewire/project/shared/get-logs.blade.php',
-        ];
-
-        foreach ($views as $view) {
-            expect(file_get_contents($view))
-                ->not->toContain('decodeHtml(text)')
-                ->not->toContain('DOMParser().parseFromString');
-        }
-    });
 });
 
 describe('Log Viewer XSS Prevention', function () {

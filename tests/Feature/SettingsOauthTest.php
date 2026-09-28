@@ -36,7 +36,7 @@ beforeEach(function () {
     OauthSetting::create(['provider' => 'bitbucket']);
 });
 
-it('uses the standard settings design and keeps every oauth provider on one page', function () {
+it('keeps every oauth provider on one page', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
@@ -49,7 +49,6 @@ it('uses the standard settings design and keeps every oauth provider on one page
         ->assertSee('OpenID Connect')
         ->assertSee('Disable password registration when OAuth is enabled')
         ->assertSee('Client secret')
-        ->assertSee('application-settings-form', false)
         ->assertDontSee(route('settings.oauth.provider', 'authentik'), false);
 });
 
@@ -65,14 +64,8 @@ it('has an icon for openid connect', function () {
     expect(public_path('svgs/oidc.svg'))->toBeFile();
 });
 
-it('auto saves registration policy without a general save button', function () {
+it('auto saves registration policy', function () {
     actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee("wire:click='saveRegistrationPolicy'", false)
-        ->assertDontSee('Save</button>', false);
 
     Livewire::test(SettingsOauth::class)
         ->set('disable_registration_when_oauth_enabled', true)
@@ -94,39 +87,7 @@ it('shows oidc fields with a naked okta issuer url example', function () {
         ->assertDontSee('/oauth2/default', false);
 });
 
-it('groups oidc fields in the expected desktop order', function () {
-    $view = file_get_contents(resource_path('views/livewire/settings-oauth.blade.php'));
-    $fields = [
-        'redirect_uri',
-        'base_url',
-        'client_id',
-        'client_secret',
-        'scopes',
-        'clock_skew_seconds',
-        'custom_label',
-    ];
-    $positions = array_map(
-        fn (string $field): int|false => strpos($view, "id=\"oauth_settings_map.{{ \$provider }}.$field\""),
-        $fields,
-    );
-
-    expect($positions)->not->toContain(false)
-        ->and($positions)->toBe(collect($positions)->sort()->values()->all())
-        ->and($view)->toContain('<div class="lg:col-span-2">');
-});
-
-it('shows provider enable controls as settings section actions', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Enable')
-        ->assertDontSee('label="Enabled"', false)
-        ->assertDontSee('p-4 border dark:border-coolgray-300 border-neutral-200', false);
-});
-
-it('stacks oidc option checkboxes vertically', function () {
+it('shows oidc option checkboxes', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
@@ -134,8 +95,7 @@ it('stacks oidc option checkboxes vertically', function () {
         ->assertSuccessful()
         ->assertSee('Allow OIDC user creation')
         ->assertSee('Require verified email')
-        ->assertSee('Use PKCE')
-        ->assertDontSee('flex flex-col gap-2 pt-2 md:flex-row', false);
+        ->assertSee('Use PKCE');
 });
 
 it('does not show unknown oauth providers', function () {

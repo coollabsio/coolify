@@ -17,6 +17,7 @@ use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -338,6 +339,8 @@ class Show extends Component
             if ($this->is_required && $this->resource instanceof Service) {
                 event(new ApplicationConfigurationChanged($this->resource->team()->id));
             }
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return handleError($e);
         }

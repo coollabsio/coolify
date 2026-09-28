@@ -18,6 +18,11 @@
 - Do not add billing restrictions, live reconciliation, or fallback behavior unless the request includes them.
 - Treat implementation constraints as details. Do not expand a requested team-level control into a more complex policy model.
 
+## Test behavior, not source markup
+- Do not write tests that read Blade or CSS files as text to assert layout, classes, or copy; they break on every redesign and miss real failures.
+- Render the component (`Livewire::test()`, an HTTP request) and assert the result, including authorization; use a few `tests/v4/Browser` tests with screenshots for visual flows.
+- A source-text check is acceptable only for a correctness or security rule that rendering cannot prove easily, such as stable `wire:key` values or no raw user output.
+
 ## Keep dynamic Livewire identities stable
 - In dynamic lists, key components and actions with immutable record identities, not counts, indexes, or array positions.
 - Use targeted refresh events. Do not refresh a parent and a child that the parent can remove or hide during the same operation.

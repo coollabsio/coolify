@@ -262,7 +262,7 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
         $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->first();
         expect($backup)->not->toBeNull();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
         expect($backup->team_id)->toBe($this->team->id);
     });
 
@@ -310,7 +310,7 @@ describe('PATCH /api/v1/databases/{uuid}/backups/{scheduled_backup_uuid}', funct
         $response->assertStatus(200);
         $backup->refresh();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
     });
 
     test('rejects s3_storage_uuid from another team on update', function () {

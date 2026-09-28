@@ -334,8 +334,8 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('webhook_endpoint', 'http://staging.example.com')
             ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
             ->assertSet('use_custom_webhook_endpoint', true)
-            ->assertSee('Use custom webhook endpoint')
-            ->assertSee('Selected endpoint')
+            ->assertSee('Webhook endpoint')
+            ->assertSee('Use a custom endpoint')
             ->assertSee('Custom endpoint')
             ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
     });
@@ -689,7 +689,7 @@ describe('GitHub Source Change Component', function () {
             ->and($public->isConnected())->toBeTrue();
     });
 
-    test('shows connected badge and test connection for installed github apps', function () {
+    test('shows test connection for installed github apps', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -713,8 +713,8 @@ describe('GitHub Source Change Component', function () {
             ->test(Change::class)
             ->assertSuccessful()
             ->assertSet('isConnected', true)
-            ->assertSee('Connected')
-            ->assertSee('Test Connection');
+            ->assertSee('Test connection')
+            ->assertSeeHtml('wire:click.prevent="testConnection"');
     });
 
     test('testConnection succeeds when github app credentials are valid', function () {
@@ -808,6 +808,6 @@ describe('GitHub Source Change Component', function () {
             ->assertSee('Finished GitHub App')
             ->assertSee('Connected')
             ->assertSee('Incomplete GitHub App')
-            ->assertSee('Setup required');
+            ->assertSee('Setup incomplete');
     });
 });

@@ -2,7 +2,7 @@
 # Manage the development instance of the current git branch.
 #
 # Usage:
-#   ./scripts/dev start [qemu-profile]   # start this branch's instance (KVM VM or testing-host)
+#   ./scripts/dev start [qemu-profile]   # start this branch's instance (KVM VM, Lima VM, or testing-host)
 #   ./scripts/dev stop [qemu-profile]    # stop containers and VMs; data is kept
 #   ./scripts/dev run [qemu-profile]     # start, follow logs, stop on exit (Jean)
 #   ./scripts/dev urls                   # all instances, ports, and state
@@ -10,15 +10,19 @@
 #   ./scripts/dev destroy <name>         # delete containers, volumes, VMs, and the port slot
 #   ./scripts/dev teardown               # destroy this worktree's instance if it exists (Jean)
 #
-# Each branch is one instance: Compose project, container, volumes, and KVM VMs are
+# Each branch is one instance: Compose project, container, volumes, and VMs are
 # named after it, so stop + start keeps the same data. Detached HEAD uses the
 # checkout directory name. Set COOLIFY_DEV_INSTANCE=<name> to override.
+#
+# Server backend (auto): KVM on Linux with /dev/kvm and root/sudo, Lima on macOS when
+# limactl (Lima >= 2.0) is installed, else the testing-host container. Lima VMs are
+# named coolify-dev-<slot>-<profile>; rebuild one with: limactl delete -f <vm>
 #
 # Ports: the main checkout uses 8000 (Reverb 6001, terminal 6002, db 5432, redis 6379,
 # vite 5173). Worktrees use 20000 + slot*10: app +0, Reverb +1, terminal +2, db +3,
 # redis +4, vite +5, mailpit +6/+7, minio +8/+9.
 #
-# Env: COOLIFY_DEV_SERVER_BACKEND=auto|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
+# Env: COOLIFY_DEV_SERVER_BACKEND=auto|lima|testing-host, COOLIFY_DEV_KVM_PROFILE=<profile>
 #
 set -euo pipefail
 
@@ -34,7 +38,7 @@ QEMU_STORAGE="${DEVELOPMENT_QEMU_STORAGE_PATH:-/var/lib/libvirt/images/coolify-d
 LEGACY_CONTAINERS=(coolify coolify-db coolify-redis coolify-vite coolify-mail coolify-minio coolify-minio-init coolify-testing-host)
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \?//'
+  sed -n '2,26p' "$0" | sed 's/^# \?//'
 }
 
 normalize_name() {
@@ -170,15 +174,22 @@ compose() {
 
 select_backend() {
   backend="${COOLIFY_DEV_SERVER_BACKEND:-auto}"
-  if [[ "$backend" != "auto" && "$backend" != "testing-host" ]]; then
-    echo 'COOLIFY_DEV_SERVER_BACKEND must be auto or testing-host.' >&2
+  if [[ "$backend" != "auto" && "$backend" != "lima" && "$backend" != "testing-host" ]]; then
+    echo 'COOLIFY_DEV_SERVER_BACKEND must be auto, lima, or testing-host.' >&2
     exit 2
   fi
   privileged=()
   if [[ $EUID -ne 0 ]]; then
     privileged=(sudo -n -E)
   fi
-  if [[ "$backend" == "auto" && -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] &&
+  if [[ "$backend" == "lima" ]]; then
+    command -v limactl >/dev/null || {
+      echo 'COOLIFY_DEV_SERVER_BACKEND=lima needs limactl (brew install lima).' >&2
+      exit 2
+    }
+  elif [[ "$backend" == "auto" && "$(uname -s)" == Darwin ]] && command -v limactl >/dev/null; then
+    backend=lima
+  elif [[ "$backend" == "auto" && -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] &&
     { [[ $EUID -eq 0 ]] || { command -v sudo >/dev/null && sudo -n -E true; }; }; then
     backend=kvm
   else
@@ -247,6 +258,120 @@ vm_domains() {
     grep -E "^coolify-dev-${instance}--" || true
 }
 
+# Lima VMs of an instance are named coolify-dev-<slot>-<profile>; Lima names allow no "--".
+lima_vm() { echo "coolify-dev-$(env_value "$instance" DEVELOPMENT_QEMU_SLOT)-$1"; }
+
+lima_vms() {
+  command -v limactl >/dev/null || return 0
+  limactl list --format '{{.Name}} {{.Status}}' 2>/dev/null |
+    awk -v prefix="$(lima_vm '')" -v status="${1:-}" \
+      'index($1, prefix) == 1 && (status == "" || $2 == status) { print $1 }'
+}
+
+# Same users, SSH key, and Docker setup as the KVM profiles in config/development-qemu.php.
+# Provision scripts run on every boot, so each step is idempotent. The host directories
+# are not mounted, and only guest ports 80 and 443 are forwarded to the host.
+lima_config() {
+  local image user key
+  case "$1" in
+    ubuntu-root | ubuntu-non-root) image=ubuntu-24.04 ;;
+    debian-root | debian-non-root) image=debian-12 ;;
+    centos-root | centos-non-root) image=centos-stream-9 ;;
+    alpine-root | alpine-non-root) image=alpine-3.23 ;;
+    *)
+      echo "Unknown profile '$1'. Use a profile from config/development-qemu.php." >&2
+      return 1
+      ;;
+  esac
+  user=root
+  [[ "$1" == *-non-root ]] && user=coolify
+  key="$(sed -n "s/^ *'public_key' => '\(.*\)',\$/\1/p" config/development-qemu.php 2>/dev/null)"
+  if [[ -z "$key" ]]; then
+    echo 'Cannot read public_key from config/development-qemu.php.' >&2
+    return 1
+  fi
+  cat <<YAML
+minimumLimaVersion: 2.0.0
+base: template:_images/${image}
+cpus: 2
+memory: 2GiB
+disk: 20GiB
+mounts: []
+containerd:
+  system: false
+  user: false
+portForwards:
+- guestPort: 80
+- guestPort: 443
+- guestIP: 0.0.0.0
+  guestPortRange: [1, 65535]
+  proto: any
+  ignore: true
+- guestPortRange: [1, 65535]
+  proto: any
+  ignore: true
+provision:
+- mode: system
+  script: |
+    #!/bin/sh
+    set -eu
+    user='${user}'
+    key='${key}'
+    if ! command -v docker >/dev/null; then
+      if command -v apk >/dev/null; then
+        apk add docker docker-cli-buildx docker-cli-compose sudo
+      else
+        curl -fsSL https://get.docker.com | sh
+      fi
+    fi
+    if command -v systemctl >/dev/null; then
+      systemctl enable --now docker
+    else
+      # OpenRC can report an error for a start during boot; the runlevels start both services.
+      rc-update add cgroups boot
+      rc-update add docker default
+      rc-service cgroups start || true
+      rc-service docker start || true
+    fi
+    home=/root
+    if [ "\$user" != root ]; then
+      # A fixed high UID: Lima creates its own user later with the host UID (Alpine reboots first).
+      if ! id "\$user" >/dev/null 2>&1; then
+        if command -v useradd >/dev/null; then
+          useradd -m -u 2000 -s /bin/bash "\$user"
+        else
+          adduser -D -u 2000 -s /bin/ash "\$user"
+        fi
+        echo "\$user:*" | chpasswd -e
+      fi
+      echo "\$user ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/90-coolify-dev
+      chmod 440 /etc/sudoers.d/90-coolify-dev
+      if command -v usermod >/dev/null; then usermod -aG docker "\$user"; else addgroup "\$user" docker; fi
+      home="/home/\$user"
+    fi
+    mkdir -p "\$home/.ssh"
+    grep -qxF "\$key" "\$home/.ssh/authorized_keys" 2>/dev/null || echo "\$key" >>"\$home/.ssh/authorized_keys"
+    chmod 700 "\$home/.ssh"
+    chmod 600 "\$home/.ssh/authorized_keys"
+    chown -R "\$user:" "\$home/.ssh"
+YAML
+}
+
+# Coolify connects over the SSH port that Lima forwards to the host loopback, which
+# host.docker.internal reaches in Docker Desktop, OrbStack, and Colima.
+start_lima_vm() {
+  local vm config port
+  vm="$(lima_vm "$profile")"
+  if ! limactl list --quiet 2>/dev/null | grep -qxF "$vm"; then
+    config="$(lima_config "$profile")"
+    limactl create --tty=false --name="$vm" - <<<"$config"
+  fi
+  limactl start --tty=false "$vm"
+  port="$(limactl list --format '{{.SSHLocalPort}}' "$vm")"
+  compose "$instance" exec -T coolify php artisan dev:qemu:seed "$profile" --as-localhost \
+    --ip=host.docker.internal --port="$port"
+}
+
 start_backend() {
   stop_other_checkout_instances
   echo "==> Instance ${instance} → $(env_value "$instance" APP_URL) (backend: ${backend})"
@@ -266,6 +391,9 @@ start_backend() {
       DEVELOPMENT_QEMU_DOCKER_NETWORK="$(project_name "$instance")" \
       DEVELOPMENT_QEMU_COOLIFY_CONTAINER="$(project_name "$instance")" \
       "${privileged[@]}" php artisan dev:qemu "$profile" --as-localhost
+  elif [[ "$backend" == "lima" ]]; then
+    echo "Using Lima profile: $profile"
+    start_lima_vm
   else
     compose "$instance" exec -T coolify php artisan db:seed --class=ServerSeeder --force
   fi
@@ -277,6 +405,12 @@ stop_backend() {
     for domain in $(vm_domains --state-running); do
       if [[ -z "$profile_arg" || "$domain" == "coolify-dev-${instance}--${profile_arg}" ]]; then
         "${privileged[@]}" virsh --connect qemu:///system shutdown "$domain"
+      fi
+    done
+  elif [[ "$backend" == "lima" ]]; then
+    for domain in $(lima_vms Running); do
+      if [[ -z "$profile_arg" || "$domain" == "$(lima_vm "$profile_arg")" ]]; then
+        limactl stop "$domain"
       fi
     done
   fi
@@ -308,6 +442,9 @@ cmd_destroy() {
   tailscale_serve off
   subnet="$(docker network inspect "$(project_name "$name")" --format '{{(index .IPAM.Config 0).Subnet}}' 2>/dev/null || true)"
   compose "$name" --profile '*' down --remove-orphans --volumes
+  for domain in $(lima_vms); do
+    limactl delete --force "$domain"
+  done
   if command -v virsh >/dev/null; then
     for domain in $(vm_domains --all); do
       "${privileged[@]}" virsh --connect qemu:///system destroy "$domain" >/dev/null 2>&1 || true

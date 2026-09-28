@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Js;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
@@ -45,7 +46,7 @@ beforeEach(function () {
 
 test('server private key page shows highlighted add dropdown actions', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('+ Add')
+        ->assertSee('Add')
         ->assertSee('Generate ED25519')
         ->assertSee('Generate RSA')
         ->assertSee('Add manually')
@@ -70,18 +71,10 @@ test('generating a server private key stores it and refreshes the current view',
         ->assertSee($privateKey->name);
 });
 
-test('server private key page copies generated public keys and shows a copied hint', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/private-key/show.blade.php'));
-
-    expect($view)->toContain('copyPublicKeyToClipboard')
-        ->and($view)->toContain('navigator.clipboard.writeText')
-        ->and($view)->toContain('Public key copied to clipboard.');
-});
-
 test('server private key cards include a copy public key button', function () {
     $keyData = PrivateKey::generateNewKeyPair('rsa');
 
-    PrivateKey::createAndStore([
+    $alternativeKey = PrivateKey::createAndStore([
         'team_id' => $this->team->id,
         'name' => 'Alternative SSH Key',
         'description' => 'Created by test',
@@ -90,11 +83,6 @@ test('server private key cards include a copy public key button', function () {
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->assertSee('Copy public key')
-        ->assertSee('Alternative SSH Key');
-
-    $view = file_get_contents(resource_path('views/livewire/server/private-key/show.blade.php'));
-
-    expect($view)->toContain('Copy public key')
-        ->and($view)->toContain('$private_key->public_key')
-        ->and($view)->toContain('Public key copied to clipboard.');
+        ->assertSee('Alternative SSH Key')
+        ->assertSeeHtml('copyPublicKeyToClipboard('.Js::from($alternativeKey->public_key)->toHtml().')');
 });

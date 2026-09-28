@@ -1,9 +1,6 @@
 <?php
 
-use App\Actions\Proxy\DeleteTraefikCertificate;
-use App\Actions\Proxy\GetTraefikCertificates;
-
-it('shows Traefik ACME certificates with protected delete controls', function () {
+it('gates Traefik ACME certificate deletion behind update authorization', function () {
     $view = file_get_contents(resource_path('views/livewire/server/proxy.blade.php'));
     $component = file_get_contents(app_path('Livewire/Server/Proxy.php'));
 
@@ -14,11 +11,7 @@ it('shows Traefik ACME certificates with protected delete controls', function ()
         ->toContain('submitAction="deleteTraefikCertificate')
         ->toContain("@can('update', \$server)")
         ->and($component)
-        ->toContain('public function loadTraefikCertificates(): void')
-        ->toContain('public function deleteTraefikCertificate(string $certificateId, string $password = \'\'): void')
-        ->toContain("\$this->authorize('update', \$this->server)")
-        ->toContain(GetTraefikCertificates::class)
-        ->toContain(DeleteTraefikCertificate::class);
+        ->toContain("\$this->authorize('update', \$this->server)");
 });
 
 it('uses bounded reads and atomic restricted writes for the ACME file', function () {

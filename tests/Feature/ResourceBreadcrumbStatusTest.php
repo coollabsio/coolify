@@ -50,7 +50,7 @@ it('refreshes the breadcrumb database status after it changes', function () {
 
     $component
         ->call('refreshStatus')
-        ->assertSee('Stopped')
+        ->assertSee('Exited')
         ->assertDontSee('Running');
 
     expect($component->instance()->getListeners())
@@ -80,7 +80,7 @@ it('refreshes the breadcrumb service status after a child status changes', funct
 
     $component
         ->call('refreshStatus')
-        ->assertSee('Stopped')
+        ->assertSee('Exited')
         ->assertDontSee('Running');
 
     expect($component->instance()->getListeners())

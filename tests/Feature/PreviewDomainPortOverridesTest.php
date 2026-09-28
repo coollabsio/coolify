@@ -19,16 +19,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('opens preview domain settings from browser data and shows a dns spinner', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-
-    expect($view)
-        ->not->toContain('wire:click="startEdit(')
-        ->toContain('@click="openEditDomain(')
-        ->toContain('<x-loading compact aria-label="Checking DNS"')
-        ->not->toContain('<x-loading-on-button wire:loading.delay');
-});
-
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.driver' => 'file']);

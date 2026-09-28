@@ -419,7 +419,8 @@ it('uses persisted buildx metadata when pruning the railpack builder', function 
     $sourceFile = file_get_contents(__DIR__.'/../../../../app/Actions/Server/CleanupDocker.php');
 
     expect($sourceFile)
-        ->toContain('docker run --rm -v \\$HOME/.docker/buildx:/root/.docker/buildx')
+        ->toContain(": '\$HOME/.docker/buildx';")
+        ->toContain('docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx')
         ->toContain('docker buildx prune --builder coolify-railpack -af')
         ->not->toContain('--buildkitd-flags');
 });

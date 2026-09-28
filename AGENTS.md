@@ -15,8 +15,8 @@ For UI/UX design specifications, principles, and visual standards, consult the l
 Docker Compose-based dev setup with services: coolify (app, which also runs Reverb WebSockets and the terminal server), postgres, redis, vite, testing-host, mailpit, minio.
 
 ```bash
-# One dev instance per git branch (containers, volumes, KVM VMs named after the branch)
-./scripts/dev start [qemu-profile]           # KVM VM as localhost when /dev/kvm + root/sudo, else testing-host
+# One dev instance per git branch (containers, volumes, VMs named after the branch)
+./scripts/dev start [qemu-profile]           # localhost VM: KVM (Linux, /dev/kvm + root/sudo) or Lima (macOS, limactl), else testing-host
 ./scripts/dev stop                           # stop containers and VMs; data is kept for the next start
 ./scripts/dev run                            # start + follow logs, stop on exit (Jean run script)
 ./scripts/dev urls                           # all instances, URLs, ports, and checkouts
@@ -29,7 +29,7 @@ Docker Compose-based dev setup with services: coolify (app, which also runs Reve
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 

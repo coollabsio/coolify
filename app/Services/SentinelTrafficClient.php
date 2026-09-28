@@ -729,11 +729,9 @@ class SentinelTrafficClient
     {
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        return instant_remote_process(
-            [$this->buildFetchCommand($token, $url)],
-            $this->server,
-            false
-        );
+        // Throw the real SSH/docker error (for example, an unreadable SSH key or a missing
+        // container). A literal "null" body comes back as null; guard() rejects the empty string.
+        return instant_remote_process([$this->buildFetchCommand($token, $url)], $this->server) ?? '';
     }
 
     /**
@@ -743,11 +741,7 @@ class SentinelTrafficClient
     {
         $token = $this->server->settings->ensureValidSentinelToken();
 
-        return instant_remote_process(
-            [$this->buildBatchCommand($token, $urls)],
-            $this->server,
-            false
-        );
+        return instant_remote_process([$this->buildBatchCommand($token, $urls)], $this->server) ?? '';
     }
 
     /**
@@ -762,7 +756,7 @@ class SentinelTrafficClient
      */
     protected function buildFetchCommand(string $token, string $url): string
     {
-        return "docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$url}\"'";
+        return "docker exec coolify-sentinel sh -c 'curl -sS -H \"Authorization: Bearer {$token}\" \"{$url}\"'";
     }
 
     /**
