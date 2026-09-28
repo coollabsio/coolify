@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
+use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
@@ -900,9 +901,24 @@ class ServersController extends Controller
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
-        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN);
-        if ($deleteFromProvider && ! $server->hetzner_server_id && ! $server->vultr_instance_id && ! $server->digitalocean_droplet_id) {
-            return response()->json(['message' => 'Server is not linked to a cloud provider.'], 422);
+        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($deleteFromProvider)) {
+            return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
+        }
+        if ($deleteFromProvider) {
+            $linkedProviders = array_keys(array_filter([
+                'hetzner' => $server->hetzner_server_id,
+                'vultr' => $server->vultr_instance_id,
+                'digitalocean' => $server->digitalocean_droplet_id,
+            ]));
+            if (empty($linkedProviders)) {
+                return response()->json(['message' => 'Server is not linked to a cloud provider.'], 422);
+            }
+            foreach ($linkedProviders as $provider) {
+                if (! CloudProviderToken::whereTeamId($server->team_id)->whereProvider($provider)->exists()) {
+                    return response()->json(['message' => "No {$provider} token found for this team. Add one before deleting the server from the cloud provider."], 422);
+                }
+            }
         }
 
         if ($force) {
