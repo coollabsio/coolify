@@ -144,18 +144,20 @@ test('team members cannot change server management ownership', function () {
     expect($this->server->fresh()->isTransferredAway())->toBeFalse();
 });
 
-test('server overview explains the management ownership switch', function () {
+test('server overview shows a management button that matches the ownership state', function () {
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertSee('Manage this server from this instance')
-        ->assertSee('This instance runs deployments, webhooks, scheduled tasks, backups, proxy updates,')
-        ->assertSee('and monitoring for this server.');
+        ->assertSee('Disable management')
+        ->assertDontSee('Enable management')
+        ->call('toggleManagement')
+        ->assertSee('Enable management')
+        ->assertDontSee('Disable management');
 });
 
 test('management ownership is not available outside development', function () {
     config(['app.env' => 'production']);
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
-        ->assertDontSee('Manage this server from this instance')
+        ->assertDontSee('Disable management')
         ->call('toggleManagement')
         ->assertNotFound();
 
