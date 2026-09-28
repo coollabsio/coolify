@@ -278,6 +278,37 @@ describe('GitHub Source Change Component', function () {
         expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
     })->with(['submit', 'instantSave']);
 
+    test('github app tokens only use a key from the source team', function () {
+        Http::fake();
+
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        GithubApp::query()->whereKey($githubApp->id)->update(['private_key_id' => $foreignKey->id]);
+        $githubApp->refresh();
+
+        expect(fn () => generateGithubJwt($githubApp))->toThrow(RuntimeException::class)
+            ->and(syncGithubAppName($githubApp))->toBeNull()
+            ->and($foreignKey->refresh()->name)->toBe('other-team-key');
+
+        Http::assertNothingSent();
+    });
+
     test('ghe.com installation path encodes the organization segment', function () {
         $githubApp = new GithubApp;
         $githubApp->forceFill([
