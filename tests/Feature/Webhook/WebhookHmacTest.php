@@ -631,6 +631,34 @@ describe('Gitea Manual Webhook HMAC', function () {
     });
 });
 
+describe('Manual Webhook HMAC in the local environment', function () {
+    test('rejects an invalid signature when APP_ENV is local', function (string $provider) {
+        config(['app.env' => 'local']);
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
+
+        $response = sendManualWebhookPush($this, $provider, $application, validSignature: false);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Invalid signature')
+            ->not->toContain('Deployment queued');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+    })->with(['github', 'gitea', 'bitbucket']);
+
+    test('accepts a valid signature when APP_ENV is local', function (string $provider) {
+        config(['app.env' => 'local']);
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
+
+        $response = sendManualWebhookPush($this, $provider, $application);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Deployment queued')
+            ->not->toContain('Invalid signature');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
+    })->with(['github', 'gitea', 'bitbucket']);
+});
+
 describe('Manual Webhook Repository Matching', function () {
     test('github rejects empty repository without leaking applications', function () {
         $app = createApplicationWithWebhook(overrides: ['name' => 'secret-github-app']);

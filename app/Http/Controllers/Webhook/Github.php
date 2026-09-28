@@ -119,7 +119,7 @@ class Github extends Controller
                         continue;
                     }
                     $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-                    if (! hash_equals($x_hub_signature_256, $hmac) && ! isDev()) {
+                    if (! hash_equals($x_hub_signature_256, $hmac)) {
                         auditLogWebhookFailure('github', 'invalid_signature', [
                             'application_uuid' => $application->uuid,
                             'application_name' => $application->name,

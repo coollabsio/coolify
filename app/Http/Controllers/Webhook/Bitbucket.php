@@ -120,7 +120,7 @@ class Bitbucket extends Controller
                 }
                 $hash = $parts[1];
                 $payloadHash = hash_hmac('sha256', $rawPayload, $webhook_secret);
-                if (! hash_equals($hash, $payloadHash) && ! isDev()) {
+                if (! hash_equals($hash, $payloadHash)) {
                     auditLogWebhookFailure('bitbucket', 'invalid_signature', [
                         'application_uuid' => $application->uuid,
                         'application_name' => $application->name,
