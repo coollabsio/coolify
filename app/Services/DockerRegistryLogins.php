@@ -3,7 +3,11 @@
 namespace App\Services;
 
 use App\Helpers\SshMultiplexingHelper;
+use App\Models\Application;
 use App\Models\Server;
+use App\Models\Service;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -55,6 +59,100 @@ class DockerRegistryLogins
         ksort($registries);
 
         return $registries;
+    }
+
+    /**
+     * Combine the logins of a server with the registries its resources need, one row per registry.
+     *
+     * @param  array<string, array{source: string, username: ?string}>  $loggedIn
+     * @return array<int, array{registry: string, logged_in: bool, source: ?string, username: ?string, used_by: array<int, array{type: string, name: string, link: ?string}>}>
+     */
+    public static function rows(Server $server, array $loggedIn): array
+    {
+        $usedBy = self::usersOf($server)->groupBy('registry');
+
+        return collect(array_keys($loggedIn))
+            ->merge($usedBy->keys())
+            ->unique()
+            ->sort()
+            ->map(fn (string $registry) => [
+                'registry' => $registry,
+                'logged_in' => isset($loggedIn[$registry]),
+                'source' => $loggedIn[$registry]['source'] ?? null,
+                'username' => $loggedIn[$registry]['username'] ?? null,
+                'used_by' => ($usedBy[$registry] ?? collect())
+                    ->map(fn (array $user) => Arr::except($user, 'registry'))
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Every resource that pulls or pushes a named image on this server, with the registry of that image.
+     *
+     * A build server builds and pushes for any application of its team that uses build servers, because
+     * the deployment picks a random build server. A service is listed once per registry.
+     *
+     * @return Collection<int, array{registry: string, type: string, name: string, link: ?string}>
+     */
+    public static function usersOf(Server $server): Collection
+    {
+        $user = fn (string $image, string $type, string $name, ?string $link) => [
+            'registry' => self::registryFromImage($image),
+            'type' => $type,
+            'name' => $name,
+            'link' => $link,
+        ];
+
+        $applications = $server->applications()
+            ->filter(fn (Application $application) => filled($application->docker_registry_image_name))
+            ->map(fn (Application $application) => $user($application->docker_registry_image_name, 'Application', $application->name, $application->link()));
+
+        $databases = $server->databases()
+            ->filter(fn ($database) => filled($database->image))
+            ->map(fn ($database) => $user($database->image, 'Database', $database->name, $database->link()));
+
+        $services = $server->services()->with(['applications', 'databases'])->get()
+            ->flatMap(fn (Service $service) => $service->applications->concat($service->databases)
+                ->filter(fn ($container) => filled($container->image))
+                ->map(fn ($container) => $user($container->image, 'Service', $service->name, $service->link())))
+            ->unique(fn (array $entry) => $entry['registry'].'|'.$entry['link'].'|'.$entry['name']);
+
+        $builds = $server->isBuildServer()
+            ? self::applicationsBuiltOnBuildServers($server)
+                ->map(fn (Application $application) => $user($application->docker_registry_image_name, 'Build', $application->name, $application->link()))
+            : collect();
+
+        return $applications->concat($databases)->concat($services)->concat($builds)->values();
+    }
+
+    /**
+     * Applications of the build server's team that a deployment builds on a build server and pushes to a registry.
+     *
+     * @return Collection<int, Application>
+     */
+    private static function applicationsBuiltOnBuildServers(Server $buildServer): Collection
+    {
+        return Application::query()
+            ->whereRelation('environment.project', 'team_id', $buildServer->team_id)
+            ->whereNotNull('docker_registry_image_name')
+            ->where('docker_registry_image_name', '!=', '')
+            ->with(['settings', 'destination.server.settings'])
+            ->orderBy('name')
+            ->get()
+            ->filter(function (Application $application) use ($buildServer) {
+                $deploymentServer = $application->destination?->server;
+                if ($deploymentServer === null || $deploymentServer->is($buildServer)) {
+                    return false;
+                }
+                $mustBuildElsewhere = ! $deploymentServer->canBuildApplications()
+                    && ! in_array($application->build_pack, ['dockerimage', 'dockercompose'], true);
+
+                return $mustBuildElsewhere || (bool) data_get($application, 'settings.is_build_server_enabled');
+            })
+            ->values();
     }
 
     /**
@@ -126,14 +224,23 @@ class DockerRegistryLogins
         );
     }
 
+    /**
+     * Check that the saved login still works. Without a username, docker login reuses the saved credentials
+     * (also through credential helpers) and fails at once instead of prompting, because stdin is empty.
+     */
+    public static function checkLogin(Server $server, string $registry): void
+    {
+        self::run($server, 'docker --config "$HOME/.docker" login'.self::registryArgument($registry).' </dev/null');
+    }
+
     public static function logout(Server $server, string $registry): void
     {
         self::run($server, 'docker --config "$HOME/.docker" logout'.self::registryArgument($registry));
     }
 
-    public static function audit(Server $server, string $action, string $registry, bool $succeeded = true): void
+    public static function audit(Server $server, string $action, string $registry, bool $succeeded = true, string $source = 'ui'): void
     {
-        auditLog("ui.server.registry_{$action}", [
+        auditLog("{$source}.server.registry_{$action}", [
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
             'team_id' => $server->team_id,
@@ -162,9 +269,14 @@ class DockerRegistryLogins
             return;
         }
 
-        $lines = collect(preg_split('/\R/', trim($process->errorOutput())))
-            ->map(fn (string $line) => trim($line))
-            ->reject(fn (string $line) => $line === '' || str_starts_with($line, 'WARNING!') || str_contains($line, 'credential-stores'));
+        $lines = collect(preg_split('/\R/', trim($process->errorOutput()."\n".$process->output())))
+            ->map(fn (string $line) => trim(str_replace('Login did not succeed, error:', '', $line)))
+            ->reject(fn (string $line) => $line === ''
+                || str_starts_with($line, 'WARNING!')
+                || str_contains($line, 'credential-stores')
+                || str_starts_with($line, 'Info ->')
+                || str_starts_with($line, 'Authenticating with existing credentials')
+                || str_contains($line, 'cannot perform an interactive login'));
         $dockerErrors = $lines->filter(fn (string $line) => str_starts_with($line, 'Error'));
         $error = ($dockerErrors->isNotEmpty() ? $dockerErrors : $lines)->implode(' ');
         $secrets = array_filter($secrets, fn (string $secret) => $secret !== '');

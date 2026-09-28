@@ -5,6 +5,7 @@ namespace App\Livewire\Server\DockerRegistries;
 use App\Models\Server;
 use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
@@ -29,8 +30,12 @@ class Login extends Component
         'custom' => ['label' => 'Other', 'registry' => '', 'username' => '', 'placeholder' => 'registry.example.com', 'hint' => ''],
     ];
 
+    /** The server of a card. Null on the overview page, where the user picks the servers. */
     #[Locked]
-    public Server $server;
+    public ?Server $server = null;
+
+    /** @var array<int, string> uuids of the servers to log in to, when there is no card server */
+    public array $selectedServers = [];
 
     public string $provider = 'custom';
 
@@ -44,17 +49,61 @@ class Login extends Component
 
     public string $password = '';
 
-    public function mount(Server $server, ?string $editRegistry = null, ?string $currentUsername = null): void
+    /**
+     * The server parameter has no type hint on purpose: with one, Livewire would inject an empty Server model on the overview page.
+     *
+     * @param  Server|null  $server
+     */
+    public function mount($server = null, ?string $editRegistry = null, ?string $currentUsername = null, ?string $presetRegistry = null): void
     {
-        $this->authorize('update', $server);
-        $this->server = $server;
+        if ($server instanceof Server) {
+            $this->authorize('update', $server);
+            $this->server = $server;
+        } else {
+            abort_unless(auth()->user()?->isAdmin(), 403);
+        }
 
         if ($editRegistry !== null) {
             $this->editRegistry = DockerRegistryLogins::normalizeRegistry($editRegistry);
             $this->provider = self::providerFor($this->editRegistry);
             $this->registry = $this->editRegistry;
             $this->username = $currentUsername ?? '';
+        } elseif ($presetRegistry !== null) {
+            $this->registry = DockerRegistryLogins::normalizeRegistry($presetRegistry);
+            $this->provider = self::providerFor($this->registry);
+            $this->username = $this->preset()['username'];
         }
+    }
+
+    /**
+     * Servers of the current team that the user may log in to from the overview page.
+     *
+     * @return Collection<int, Server>
+     */
+    private function availableServers(): Collection
+    {
+        return Server::ownedByCurrentTeamCached()
+            ->filter(fn (Server $server) => $server->isFunctional() && auth()->user()->can('update', $server))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    private function targetServers(): Collection
+    {
+        if ($this->server !== null) {
+            $this->authorize('update', $this->server);
+
+            return collect([$this->server]);
+        }
+
+        $this->validate(['selectedServers' => ['required', 'array', 'min:1']], ['selectedServers.required' => 'Choose at least one server.']);
+        $servers = Server::ownedByCurrentTeam()->whereIn('uuid', $this->selectedServers)->get();
+        abort_if($servers->count() !== count(array_unique($this->selectedServers)), 403);
+        $servers->each(fn (Server $server) => $this->authorize('update', $server));
+
+        return $servers;
     }
 
     public static function providerFor(string $registry): string
@@ -86,7 +135,7 @@ class Login extends Component
 
     public function login(): void
     {
-        $this->authorize('update', $this->server);
+        $servers = $this->targetServers();
         $preset = $this->preset();
         $this->registry = $this->editRegistry
             ?? ($preset['registry'] !== '' ? $preset['registry'] : DockerRegistryLogins::normalizeRegistry($this->registry));
@@ -97,26 +146,36 @@ class Login extends Component
             'password' => ['required', 'string', 'max:20000'],
         ], [
             'registry.regex' => $hostRules
-                ? "Enter a {$preset['label']} host, for example {$preset['placeholder']}. Choose Other for a different registry."
+                ? "Enter a valid {$preset['label']} host, for example {$preset['placeholder']}. Choose Other for a different registry."
                 : 'Enter a registry host, for example ghcr.io or registry.example.com:5000.',
             'username.regex' => 'The username must not contain spaces.',
         ]);
 
-        try {
-            DockerRegistryLogins::login($this->server, $this->registry, $this->username, $this->password);
-        } catch (Throwable $exception) {
-            $this->password = '';
-            DockerRegistryLogins::audit($this->server, $this->auditAction(), $this->registry, succeeded: false);
-            $this->dispatch('error', 'Login failed.', e($exception->getMessage()));
+        $failures = [];
+        foreach ($servers as $server) {
+            try {
+                DockerRegistryLogins::login($server, $this->registry, $this->username, $this->password);
+                DockerRegistryLogins::audit($server, $this->auditAction(), $this->registry);
+                $this->dispatch('registryLoginsChanged', serverId: $server->id);
+            } catch (Throwable $exception) {
+                DockerRegistryLogins::audit($server, $this->auditAction(), $this->registry, succeeded: false);
+                $failures[$server->name] = $exception->getMessage();
+            }
+        }
+        $this->password = '';
+
+        if ($failures !== []) {
+            $details = collect($failures)->map(fn (string $error, string $name) => count($servers) > 1 ? e($name).': '.e($error) : e($error))->implode('<br>');
+            $this->dispatch('error', count($failures) === count($servers) ? 'Login failed.' : 'Login failed on some servers.', $details);
 
             return;
         }
 
-        DockerRegistryLogins::audit($this->server, $this->auditAction(), $this->registry);
         $this->dispatch('success', $this->editRegistry ? "Updated the login for {$this->registry}." : "Logged in to {$this->registry}.");
-        $this->editRegistry ? $this->reset('password') : $this->reset('provider', 'registry', 'username', 'password');
+        if ($this->editRegistry === null) {
+            $this->reset('provider', 'registry', 'username', 'selectedServers');
+        }
         $this->dispatch('close-modal');
-        $this->dispatch('registryLoginsChanged', serverId: $this->server->id);
     }
 
     private function auditAction(): string
@@ -127,6 +186,7 @@ class Login extends Component
     public function render()
     {
         return view('livewire.server.docker-registries.login', [
+            'serverOptions' => $this->server === null ? $this->availableServers() : collect(),
             'preset' => $this->preset(),
             'providerOptions' => collect(self::PROVIDERS)
                 ->map(fn (array $preset, string $value) => ['value' => $value, 'label' => $preset['label']])

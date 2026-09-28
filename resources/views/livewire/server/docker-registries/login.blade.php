@@ -1,5 +1,24 @@
 <div>
     <form wire:submit="login" class="flex flex-col gap-3">
+        @if ($server === null)
+            <div>
+                <p class="mb-1.5 text-sm font-medium">Servers <x-highlighted text="*" /></p>
+                @if ($serverOptions->isEmpty())
+                    <p class="text-[12px] text-neutral-500 dark:text-fg-dim">No reachable server to log in to.</p>
+                @else
+                    <div class="flex max-h-48 flex-col overflow-y-auto">
+                        @foreach ($serverOptions as $option)
+                            <x-forms.checkbox id="registry-login-server-{{ $option->uuid }}" :domValue="$option->uuid"
+                                wire:model="selectedServers" wire:key="registry-login-server-{{ $option->uuid }}"
+                                :label="e($option->name)" fullWidth />
+                        @endforeach
+                    </div>
+                @endif
+                @error('selectedServers')
+                    <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
+                @enderror
+            </div>
+        @endif
         @if ($editRegistry === null)
             <x-forms.listbox id="provider" label="Provider" live portal :options="$providerOptions" />
         @endif

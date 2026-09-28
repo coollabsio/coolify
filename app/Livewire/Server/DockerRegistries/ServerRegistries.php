@@ -2,13 +2,9 @@
 
 namespace App\Livewire\Server\DockerRegistries;
 
-use App\Models\Application;
 use App\Models\Server;
-use App\Models\Service;
 use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -28,6 +24,9 @@ class ServerRegistries extends Component
 
     public ?string $error = null;
 
+    /** @var array<string, array{ok: bool, message: string}> result of the last login check, per registry */
+    public array $loginChecks = [];
+
     public function mount(Server $server): void
     {
         $this->authorize('update', $server);
@@ -39,6 +38,7 @@ class ServerRegistries extends Component
     {
         $this->authorize('update', $this->server);
         $this->error = null;
+        $this->loginChecks = [];
 
         $loggedIn = [];
         if (! $this->server->isFunctional()) {
@@ -51,56 +51,7 @@ class ServerRegistries extends Component
             }
         }
 
-        $usedBy = $this->imageUsers()->groupBy('registry');
-
-        $this->registries = collect(array_keys($loggedIn))
-            ->merge($usedBy->keys())
-            ->unique()
-            ->sort()
-            ->map(fn (string $registry) => [
-                'registry' => $registry,
-                'logged_in' => isset($loggedIn[$registry]),
-                'source' => $loggedIn[$registry]['source'] ?? null,
-                'username' => $loggedIn[$registry]['username'] ?? null,
-                'used_by' => ($usedBy[$registry] ?? collect())
-                    ->map(fn (array $user) => Arr::except($user, 'registry'))
-                    ->values()
-                    ->all(),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Every resource on this server that pulls or pushes a named image, with the registry of that image.
-     * A service is listed once per registry, even if several of its containers use it.
-     *
-     * @return Collection<int, array{registry: string, type: string, name: string, link: ?string}>
-     */
-    private function imageUsers(): Collection
-    {
-        $user = fn (string $image, string $type, string $name, ?string $link) => [
-            'registry' => DockerRegistryLogins::registryFromImage($image),
-            'type' => $type,
-            'name' => $name,
-            'link' => $link,
-        ];
-
-        $applications = $this->server->applications()
-            ->filter(fn (Application $application) => filled($application->docker_registry_image_name))
-            ->map(fn (Application $application) => $user($application->docker_registry_image_name, 'Application', $application->name, $application->link()));
-
-        $databases = $this->server->databases()
-            ->filter(fn ($database) => filled($database->image))
-            ->map(fn ($database) => $user($database->image, 'Database', $database->name, $database->link()));
-
-        $services = $this->server->services()->with(['applications', 'databases'])->get()
-            ->flatMap(fn (Service $service) => $service->applications->concat($service->databases)
-                ->filter(fn ($container) => filled($container->image))
-                ->map(fn ($container) => $user($container->image, 'Service', $service->name, $service->link())))
-            ->unique(fn (array $entry) => $entry['registry'].'|'.$entry['link'].'|'.$entry['name']);
-
-        return $applications->concat($databases)->concat($services)->values();
+        $this->registries = DockerRegistryLogins::rows($this->server, $loggedIn);
     }
 
     #[On('registryLoginsChanged')]
@@ -108,6 +59,25 @@ class ServerRegistries extends Component
     {
         if ($serverId === $this->server->id) {
             $this->loadRegistries();
+        }
+    }
+
+    public function testLogin(string $registry): void
+    {
+        $this->authorize('update', $this->server);
+        $registry = DockerRegistryLogins::normalizeRegistry($registry);
+        $isLoggedIn = collect($this->registries)->contains(fn (array $row) => $row['registry'] === $registry && $row['logged_in']);
+        if (! $isLoggedIn || ! preg_match(DockerRegistryLogins::REGISTRY_PATTERN, $registry)) {
+            return;
+        }
+
+        try {
+            DockerRegistryLogins::checkLogin($this->server, $registry);
+            $this->loginChecks[$registry] = ['ok' => true, 'message' => 'The login works.'];
+            $this->dispatch('success', "The login for {$registry} works.");
+        } catch (Throwable $exception) {
+            $this->loginChecks[$registry] = ['ok' => false, 'message' => $exception->getMessage()];
+            $this->dispatch('error', "The login for {$registry} does not work.", e($exception->getMessage()));
         }
     }
 
@@ -130,7 +100,7 @@ class ServerRegistries extends Component
         }
 
         DockerRegistryLogins::audit($this->server, 'logout', $registry);
-        $this->dispatch('success', "Logged out from {$registry}.");
+        $this->dispatch('success', "Deleted the login for {$registry}.");
         $this->loadRegistries();
     }
 

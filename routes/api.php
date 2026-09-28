@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\SentinelController;
 use App\Http\Controllers\Api\ServerCloudflareTunnelController;
 use App\Http\Controllers\Api\ServerDockerCleanupController;
+use App\Http\Controllers\Api\ServerDockerRegistriesController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
@@ -190,6 +191,11 @@ Route::group([
 
     Route::get('/servers/{uuid}/validate', [OtherController::class, 'post_required'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
+
+    Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
+    Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/registries/{registry}/check', [ServerDockerRegistriesController::class, 'check'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/registries/{registry}', [ServerDockerRegistriesController::class, 'logout'])->middleware(['api.ability:write']);
 
     Route::get('/servers/{uuid}/proxy', [ServerProxyController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/proxy', [ServerProxyController::class, 'update'])->middleware(['api.ability:write']);

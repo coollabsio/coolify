@@ -16,6 +16,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\DockerRegistryLogins;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
@@ -281,7 +282,7 @@ it('logs out from a registry', function () {
     fakeDockerRegistryServer();
 
     Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
-        ->assertSee('Log out')
+        ->assertSee('Delete the login for ghcr.io?')
         ->assertSeeHtml('logout(ghcr.io)')
         ->call('logout', 'ghcr.io', '')
         ->assertDispatched('success');
@@ -501,8 +502,8 @@ it('sends only registry names and usernames to the browser, never secrets from t
     $card = Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server]);
     $form = Livewire::test(Login::class, ['server' => $this->server, 'editRegistry' => 'ghcr.io', 'currentUsername' => 'octocat']);
 
-    expect(array_keys($card->snapshot['data']))->toBe(['server', 'registries', 'error'])
-        ->and(array_keys($form->snapshot['data']))->toBe(['server', 'provider', 'editRegistry', 'registry', 'username', 'password'])
+    expect(array_keys($card->snapshot['data']))->toBe(['server', 'registries', 'error', 'loginChecks'])
+        ->and(array_keys($form->snapshot['data']))->toBe(['server', 'selectedServers', 'provider', 'editRegistry', 'registry', 'username', 'password'])
         ->and($form->snapshot['data']['password'])->toBe('');
 
     foreach ([$card, $form] as $component) {
@@ -583,9 +584,156 @@ it('shows one user by name and many users as a summary with a grouped list', fun
     ] + $placement);
 
     Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
-        ->assertSeeInOrder(['docker.io', 'hub-db', 'Database'])
+        ->assertSee('1 resource on this server uses')
+        ->assertSee('Docker Hub images. Public images need no login.')
         ->assertSee('3 applications')
         ->assertSee('Applications (3)')
         ->assertSee('second-app')
         ->assertSee('third-app');
+});
+
+it('shows applications that build on a build server on that build server', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+    $buildServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
+    $buildServer->settings->update(['server_role' => 'build', 'is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $buildServer->refresh();
+    $this->privateApp->settings->update(['is_build_server_enabled' => true]);
+    $placement = [
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ];
+    Application::factory()->create(['name' => 'local-build', 'docker_registry_image_name' => 'registry.example.com/team/local'] + $placement);
+    $otherTeamServer = Server::factory()->create(['team_id' => Team::factory()->create()->id, 'private_key_id' => PrivateKey::factory()->create()->id]);
+    $otherTeamServer->settings->update(['server_role' => 'build']);
+
+    $users = collect(Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $buildServer])->get('registries'))
+        ->keyBy('registry');
+
+    expect($users['registry.example.com']['used_by'])->toBe([
+        ['type' => 'Build', 'name' => 'private-app', 'link' => $this->privateApp->link()],
+    ]);
+    expect(DockerRegistryLogins::usersOf($otherTeamServer->refresh()))->toBeEmpty();
+});
+
+it('offers a login with the registry filled in on a row that is not logged in', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+
+    Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        ->assertSee('Log in to registry.example.com');
+
+    Livewire::test(Login::class, ['server' => $this->server, 'presetRegistry' => '123456789012.dkr.ecr.eu-west-1.amazonaws.com'])
+        ->assertSet('provider', 'aws')
+        ->assertSet('registry', '123456789012.dkr.ecr.eu-west-1.amazonaws.com')
+        ->assertSet('username', 'AWS');
+});
+
+it('tests a saved login and shows the result on the row', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    $checkFails = false;
+    Process::fake(function ($process) use (&$checkFails) {
+        if (str_contains($process->command, '</dev/null')) {
+            return $checkFails
+                ? Process::result(errorOutput: "Authenticating with existing credentials... [Username: octocat]\nLogin did not succeed, error: Error response from daemon: unauthorized\nerror: cannot perform an interactive login from a non-TTY device", exitCode: 1)
+                : Process::result(output: 'Login Succeeded');
+        }
+
+        return Process::result(output: json_encode(['auths' => ['ghcr.io' => ['auth' => base64_encode('octocat:x')]]]));
+    });
+
+    $component = Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        ->call('testLogin', 'ghcr.io')
+        ->assertSet('loginChecks', ['ghcr.io' => ['ok' => true, 'message' => 'The login works.']])
+        ->assertDispatched('success', 'The login for ghcr.io works.');
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker --config \"\$HOME/.docker\" login 'ghcr.io' </dev/null"));
+
+    $checkFails = true;
+    $component->call('testLogin', 'ghcr.io')
+        ->assertSet('loginChecks', ['ghcr.io' => ['ok' => false, 'message' => 'Error response from daemon: unauthorized']])
+        ->assertSee('Login failed')
+        ->call('loadRegistries')
+        ->assertSet('loginChecks', []);
+});
+
+it('does not test registries that are not logged in', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+
+    Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        ->call('testLogin', 'registry.example.com')
+        ->assertSet('loginChecks', []);
+
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, '</dev/null'));
+});
+
+it('logs in to several servers at once from the overview page', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    $secondServer = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->server->private_key_id]);
+    makeDockerRegistriesServerReachable($secondServer);
+    fakeDockerRegistryServer();
+
+    Livewire::test(Login::class)
+        ->assertSee($this->server->name)
+        ->assertSee($secondServer->name)
+        ->set('registry', 'registry.example.com')
+        ->set('username', 'robot')
+        ->set('password', 'token')
+        ->call('login')
+        ->assertHasErrors('selectedServers')
+        ->set('password', 'token')
+        ->set('selectedServers', [$this->server->uuid, $secondServer->uuid])
+        ->call('login')
+        ->assertHasNoErrors()
+        ->assertDispatched('registryLoginsChanged', serverId: $this->server->id)
+        ->assertDispatched('registryLoginsChanged', serverId: $secondServer->id)
+        ->assertDispatched('success', 'Logged in to registry.example.com.')
+        ->assertSet('selectedServers', []);
+
+    expect(AuditEvent::query()->where('event', 'ui.server.registry_login')->count())->toBe(2);
+});
+
+it('reports the servers where a multi-server login failed', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer('Error response from daemon: unauthorized');
+
+    Livewire::test(Login::class)
+        ->set('selectedServers', [$this->server->uuid])
+        ->set('registry', 'registry.example.com')
+        ->set('username', 'robot')
+        ->set('password', 'token')
+        ->call('login')
+        ->assertDispatched('error', 'Login failed.', 'Error response from daemon: unauthorized')
+        ->assertNotDispatched('registryLoginsChanged');
+});
+
+it('refuses a multi-server login to a server of another team', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+    $foreignServer = Server::factory()->create(['team_id' => Team::factory()->create()->id, 'private_key_id' => PrivateKey::factory()->create()->id]);
+
+    Livewire::test(Login::class)
+        ->assertDontSee($foreignServer->name)
+        ->set('selectedServers', [$this->server->uuid, $foreignServer->uuid])
+        ->set('registry', 'registry.example.com')
+        ->set('username', 'robot')
+        ->set('password', 'token')
+        ->call('login')
+        ->assertForbidden();
+
+    Process::assertDidntRun(fn ($process) => str_contains($process->command, ' login '));
+});
+
+it('does not open the overview login form for members', function () {
+    actingAsDockerRegistriesRole($this->team, 'member');
+
+    Livewire::test(Login::class)->assertForbidden();
 });

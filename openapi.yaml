@@ -2325,7 +2325,7 @@ paths:
       tags:
         - Applications
       summary: 'Get application logs.'
-      description: 'Get application logs by UUID.'
+      description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-application-logs-by-uuid
       parameters:
         -
@@ -2383,7 +2383,7 @@ paths:
       tags:
         - Applications
       summary: 'Get preview application logs.'
-      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.'
+      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-preview-application-logs-by-pull-request-id
       parameters:
         -
@@ -5469,7 +5469,7 @@ paths:
       tags:
         - Databases
       summary: 'Get database logs.'
-      description: 'Get database logs by UUID.'
+      description: 'Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-database-logs-by-uuid
       parameters:
         -
@@ -10012,6 +10012,179 @@ paths:
       security:
         -
           bearerAuth: []
+  '/servers/{uuid}/registries':
+    get:
+      tags:
+        - Servers
+      summary: 'List server registry logins'
+      description: 'List the Docker registries a server is logged in to and the registries its resources pull from or push to. Reads the Docker config of the server over SSH. Credentials are never returned, only registry names and usernames. Requires the `read:sensitive` ability.'
+      operationId: list-server-registries
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Registry logins of the server.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  registries: { type: array, items: { properties: { registry: { type: string, example: ghcr.io }, logged_in: { type: boolean, example: true }, source: { description: 'Where the Docker config stores the credentials.', type: [string, 'null'], enum: [auths, credHelpers] }, username: { type: [string, 'null'], example: octocat }, used_by: { type: array, items: { properties: { type: { type: string, example: Application }, name: { type: string }, link: { type: [string, 'null'] } }, type: object } } }, type: object } }
+                  error: { description: 'Set when the logins could not be read from the server.', type: [string, 'null'] }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Servers
+      summary: 'Log in to a registry on a server'
+      description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login.'
+      operationId: login-server-registry
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - registry
+                - username
+                - password
+              properties:
+                registry:
+                  description: 'Registry host, optionally with a port. Use docker.io for Docker Hub.'
+                  type: string
+                  example: ghcr.io
+                username:
+                  type: string
+                  example: octocat
+                password:
+                  description: 'Password or access token. Never returned.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'Logged in.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Logged in to ghcr.io.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/registries/{registry}/check':
+    post:
+      tags:
+        - Servers
+      summary: 'Check a registry login on a server'
+      description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server.'
+      operationId: check-server-registry-login
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+        -
+          name: registry
+          in: path
+          description: 'Registry host, optionally with a port, for example registry.example.com:5000.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The login works.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'The login for ghcr.io works.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/registries/{registry}':
+    delete:
+      tags:
+        - Servers
+      summary: 'Log out from a registry on a server'
+      description: 'Run docker logout on the server for a registry.'
+      operationId: logout-server-registry
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+        -
+          name: registry
+          in: path
+          description: 'Registry host, optionally with a port, for example registry.example.com:5000.'
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Logged out.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Logged out from ghcr.io.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/servers/{uuid}/log-drains':
     get:
       tags:
@@ -11176,7 +11349,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -11234,7 +11407,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: post-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -11663,7 +11836,7 @@ paths:
       tags:
         - 'Service databases'
       summary: 'Get service database logs'
-      description: 'Get Docker logs for a compose database container.'
+      description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-database-logs-by-service-and-database-uuid
       parameters:
         -
@@ -12157,7 +12330,7 @@ paths:
       tags:
         - Services
       summary: 'Get service logs.'
-      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.'
+      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-logs-by-uuid
       parameters:
         -
