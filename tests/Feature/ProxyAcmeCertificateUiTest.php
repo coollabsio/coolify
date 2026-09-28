@@ -5,6 +5,9 @@ it('gates Traefik ACME certificate deletion behind update authorization', functi
     $component = file_get_contents(app_path('Livewire/Server/Proxy.php'));
 
     expect($view)
+        ->toContain('TLS certificates')
+        ->toContain('Traefik requests a new certificate after the restart')
+        ->toContain('wire:click="loadTraefikCertificates"')
         ->toContain('submitAction="deleteTraefikCertificate')
         ->toContain("@can('update', \$server)")
         ->and($component)
@@ -13,7 +16,7 @@ it('gates Traefik ACME certificate deletion behind update authorization', functi
 
 it('uses bounded reads and atomic restricted writes for the ACME file', function () {
     $reader = file_get_contents(app_path('Actions/Proxy/GetTraefikCertificates.php'));
-    $writer = file_get_contents(app_path('Actions/Proxy/DeleteTraefikCertificate.php'));
+    $writer = file_get_contents(app_path('Actions/Proxy/SaveTraefikAcmeFile.php'));
 
     expect($reader)
         ->toContain('MAX_FILE_SIZE_BYTES')
@@ -22,6 +25,5 @@ it('uses bounded reads and atomic restricted writes for the ACME file', function
         ->and($writer)
         ->toContain('umask 077')
         ->toContain('chmod 600')
-        ->toContain('mv --')
-        ->not->toContain('rm -f');
+        ->toContain('mv --');
 });

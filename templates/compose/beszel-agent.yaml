@@ -6,16 +6,16 @@
 
 services:
   beszel-agent:
-    image: 'henrygd/beszel-agent:0.18.7' # Released on 6 April 2026
+    image: 'henrygd/beszel-agent:0.19.0' # Released on 3 September 2026
     network_mode: host # Network stats graphs won't work if agent cannot access host system network stack
     environment:
       # Required
-      - LISTEN=/beszel_socket/beszel.sock
-      - HUB_URL=$SERVICE_URL_BESZEL
+      - LISTEN=${LISTEN:-/beszel_socket/beszel.sock}   # Must stay inside the beszel_socket volume
+      - HUB_URL=${HUB_URL:-$SERVICE_URL_BESZEL}        # Defaults to the hub from the beszel template
       - TOKEN=${TOKEN}            # From hub token settings
       - KEY=${KEY}                # SSH public key(s) from hub
       # Optional
-      - DISABLE_SSH=${DISABLE_SSH:-false}        # Disable SSH
+      - DISABLE_SSH=${DISABLE_SSH:-false}         # Disable SSH
       - LOG_LEVEL=${LOG_LEVEL:-warn}              # Logging level
       - SKIP_GPU=${SKIP_GPU:-false}               # Skip GPU monitoring
       - SYSTEM_NAME=${SYSTEM_NAME}                # Custom system name
