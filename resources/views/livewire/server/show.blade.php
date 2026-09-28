@@ -124,17 +124,37 @@
                                 </x-forms.button>
                             </x-process-dialog>
                             @if (isDev())
-                                <x-forms.button type="button" wire:click="toggleManagement"
-                                    wire:confirm="{{ $server->isTransferredAway()
-                                        ? 'Enable management? Confirm that no other Coolify instance manages this server. Two active instances can cause conflicting deployments, proxy changes, backups, and restarts.'
-                                        : 'Disable management? Deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring will stop on this instance. Existing workloads continue to run.' }}"
-                                    title="{{ $server->isTransferredAway()
-                                        ? 'Let this instance run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server'
-                                        : 'Stop deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server on this instance' }}"
-                                    canGate="update" :canResource="$server">
-                                    <x-reicon name="{{ $server->isTransferredAway() ? 'play-circle' : 'stop-circle' }}" class="size-3.5" />
-                                    {{ $server->isTransferredAway() ? 'Enable management' : 'Disable management' }}
-                                </x-forms.button>
+                                <div wire:key="server-management-{{ $server->isTransferredAway() ? 'enable' : 'disable' }}">
+                                    @if ($server->isTransferredAway())
+                                        <x-modal-confirmation title="Enable management on this instance?"
+                                            submitAction="toggleManagement" :confirmWithText="false"
+                                            :confirmWithPassword="false" step2ButtonText="Enable management"
+                                            warningMessage="Before you continue, disable this server on every other Coolify instance. Two active instances can cause conflicting deployments, proxy changes, backups, and restarts."
+                                            :actions="['This instance will run deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring for this server.']">
+                                            <x-slot:trigger>
+                                                <x-forms.button type="button" canGate="update" :canResource="$server">
+                                                    <x-reicon name="play-circle" class="size-3.5" />
+                                                    Enable management
+                                                </x-forms.button>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
+                                    @else
+                                        <x-modal-confirmation title="Disable management on this instance?"
+                                            submitAction="toggleManagement" :confirmWithText="false"
+                                            :confirmWithPassword="false" step2ButtonText="Disable management"
+                                            :actions="[
+                                                'Deployments, webhooks, scheduled tasks, backups, proxy updates, and monitoring will stop on this instance for this server.',
+                                                'Existing workloads continue to run on the server.',
+                                            ]">
+                                            <x-slot:trigger>
+                                                <x-forms.button type="button" canGate="update" :canResource="$server">
+                                                    <x-reicon name="stop-circle" class="size-3.5" />
+                                                    Disable management
+                                                </x-forms.button>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
+                                    @endif
+                                </div>
                             @endif
                             @if ($server->isTransferredAway())
                                 <x-status-badge label="Transferred away" type="warning" />

@@ -50,12 +50,20 @@
                                 label="Write ownership file on the host via SSH (optional)" />
                         </div>
                         <div>
-                            <x-forms.button canGate="update" :canResource="$server" wire:click="migrateServer"
-                                wire:loading.attr="disabled"
-                                wire:confirm="Transfer this server to the target instance? Automations will be disabled here.">
-                                <span wire:loading.remove wire:target="migrateServer">Transfer server</span>
-                                <span wire:loading wire:target="migrateServer">Transferring…</span>
-                            </x-forms.button>
+                            <x-modal-confirmation title="Transfer this server?" submitAction="migrateServer"
+                                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Transfer server"
+                                :actions="[
+                                    'The server will be transferred to the target instance.',
+                                    'Automations for this server will be disabled on this instance.',
+                                ]">
+                                <x-slot:trigger>
+                                    <x-forms.button canGate="update" :canResource="$server" wire:loading.attr="disabled"
+                                        wire:target="migrateServer">
+                                        <span wire:loading.remove wire:target="migrateServer">Transfer server</span>
+                                        <span wire:loading wire:target="migrateServer">Transferring…</span>
+                                    </x-forms.button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
                         </div>
                         @if (count($lastWarnings) > 0)
                             <x-callout type="warning" title="Warnings">
@@ -116,11 +124,16 @@
                                 <p class="mb-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
                                     Disable automations after a manual import on the target.
                                 </p>
-                                <x-forms.button canGate="update" :canResource="$server" wire:click="completeTransfer"
-                                    wire:loading.attr="disabled"
-                                    wire:confirm="Disable automations on this server?">
-                                    Mark transferred & disable automations
-                                </x-forms.button>
+                                <x-modal-confirmation title="Disable automations on this server?"
+                                    submitAction="completeTransfer" :confirmWithText="false"
+                                    :confirmWithPassword="false" step2ButtonText="Disable automations"
+                                    :actions="['The server will be marked as transferred and automations will be disabled on this instance.']">
+                                    <x-slot:trigger>
+                                        <x-forms.button canGate="update" :canResource="$server">
+                                            Mark transferred & disable automations
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
                             </div>
 
                             <div>

@@ -148,7 +148,8 @@ test('server overview shows a management button that matches the ownership state
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->assertSee('Disable management')
         ->assertDontSee('Enable management')
-        ->call('toggleManagement')
+        ->assertDontSeeHtml('wire:confirm')
+        ->call('toggleManagement', '')
         ->assertSee('Enable management')
         ->assertDontSee('Disable management');
 });
