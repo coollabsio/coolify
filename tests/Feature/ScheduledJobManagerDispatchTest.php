@@ -12,6 +12,8 @@ use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -127,6 +129,47 @@ it('runs the manager in the scheduler process through the scheduled:dispatch com
 
     Queue::assertNotPushed(ScheduledJobManager::class);
     Queue::assertPushed(ScheduledTaskJob::class, 1);
+});
+
+it('loads the server chain of scheduled database backups without a query for each backup', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $database = createScheduledBackupDatabase();
+    createScheduledDatabaseBackup($database, ['frequency' => '0 2 * * *']);
+    foreach (range(1, 2) as $number) {
+        $otherDatabase = StandalonePostgresql::create([
+            ...$database->only(['image', 'postgres_user', 'postgres_password', 'postgres_db', 'status', 'environment_id', 'destination_id', 'destination_type']),
+            'name' => "database-{$number}",
+        ]);
+        createScheduledDatabaseBackup($otherDatabase, ['frequency' => '0 2 * * *']);
+    }
+    createScheduledServiceDatabaseBackup(['frequency' => '0 2 * * *'], Application::query()->first());
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    (new ScheduledJobManager)->handle();
+    $queries = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    $perBackupLookups = $queries->filter(fn (string $query) => str_contains($query, '"standalone_dockers"."id" = ?')
+        || str_contains($query, '"services"."id" = ?')
+        || str_contains($query, '"server_settings"."server_id" = ?'));
+
+    expect($perBackupLookups)->toBeEmpty();
+});
+
+it('dispatches a due backup of a service database', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 0, 5, 0, 'UTC'));
+    Queue::fake();
+
+    $backup = createScheduledServiceDatabaseBackup(['frequency' => '* * * * *']);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job) => $job->backup->is($backup));
 });
 
 it('dispatches one job when multiple managers evaluate the same occurrence', function () {
@@ -441,4 +484,32 @@ function createScheduledApplicationTask(Application $application, array $overrid
     $task->save();
 
     return $task->fresh();
+}
+
+function createScheduledServiceDatabaseBackup(array $overrides = [], ?Application $application = null): ScheduledDatabaseBackup
+{
+    $application ??= createScheduledTaskApplication();
+    $service = Service::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $database = ServiceDatabase::create([
+        'name' => 'postgres',
+        'image' => 'postgres:16-alpine',
+        'service_id' => $service->id,
+    ]);
+
+    $backup = new ScheduledDatabaseBackup;
+    $backup->forceFill(array_merge([
+        'enabled' => true,
+        'save_s3' => false,
+        'frequency' => '* * * * *',
+        'database_id' => $database->id,
+        'database_type' => $database->getMorphClass(),
+        'team_id' => $application->environment->project->team_id,
+    ], $overrides));
+    $backup->save();
+
+    return $backup->fresh();
 }

@@ -8,12 +8,14 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
 use App\Models\Team;
 use App\Services\ScheduledJobDeliveryService;
 use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -193,9 +195,19 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
+    /**
+     * Load the server chain of each backup with the chunk. Otherwise $backup->server()
+     * queries the destination, service, server, and settings once for each backup.
+     */
     private function scheduledBackupQuery(?int $lastBackupId): Builder
     {
-        return ScheduledDatabaseBackup::with(['database', 'team.subscription'])
+        return ScheduledDatabaseBackup::with([
+            'team.subscription',
+            'database' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                ServiceDatabase::class => ['service.destination.server.settings', 'service.destination.server.team.subscription'],
+                ...array_fill_keys(STANDALONE_DATABASE_MODELS, ['destination.server.settings', 'destination.server.team.subscription']),
+            ]),
+        ])
             ->where('enabled', true)
             ->when($lastBackupId !== null, fn (Builder $query) => $query->where('id', '>', $lastBackupId))
             ->orderBy('id')
