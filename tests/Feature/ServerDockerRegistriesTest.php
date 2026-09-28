@@ -561,3 +561,31 @@ it('lists databases and service containers that use a registry, and each service
         ->and($registries['docker.io']['logged_in'])->toBeFalse()
         ->and($registries['registry.example.com']['used_by'][0]['type'])->toBe('Application');
 });
+
+it('shows one user by name and many users as a summary with a grouped list', function () {
+    actingAsDockerRegistriesRole($this->team, 'admin');
+    makeDockerRegistriesServerReachable($this->server);
+    fakeDockerRegistryServer();
+    $placement = [
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ];
+    foreach (['second-app', 'third-app'] as $name) {
+        Application::factory()->create(['name' => $name, 'docker_registry_image_name' => 'registry.example.com/team/'.$name] + $placement);
+    }
+    StandalonePostgresql::create([
+        'name' => 'hub-db',
+        'postgres_user' => 'postgres',
+        'postgres_password' => encrypt('password'),
+        'postgres_db' => 'app',
+        'image' => 'postgres:16',
+    ] + $placement);
+
+    Livewire::withoutLazyLoading()->test(ServerRegistries::class, ['server' => $this->server])
+        ->assertSeeInOrder(['docker.io', 'hub-db', 'Database'])
+        ->assertSee('3 applications')
+        ->assertSee('Applications (3)')
+        ->assertSee('second-app')
+        ->assertSee('third-app');
+});
