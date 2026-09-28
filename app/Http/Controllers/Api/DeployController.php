@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\UpsertApplicationPreview;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\Tag;
@@ -432,11 +432,33 @@ class DeployController extends Controller
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
                 $dockerTagForResource = $dockerTag;
+                $gitType = null;
                 if ($pr !== 0) {
+                    if ($resource instanceof Application) {
+                        try {
+                            $this->authorize('deploy', $resource);
+                        } catch (AuthorizationException) {
+                            $deployments->push(['message' => 'Unauthorized to deploy this application.', 'resource_uuid' => $uuid]);
+
+                            continue;
+                        }
+                    }
+
                     $preview = null;
-                    if ($resource instanceof Application && $resource->build_pack === 'dockerimage') {
-                        $preview = $this->upsertDockerImagePreview($resource, $pr, $dockerTag);
-                        $dockerTagForResource = $preview?->docker_registry_image_tag;
+                    if ($resource instanceof Application) {
+                        if ($dockerTag !== null && $resource->build_pack !== 'dockerimage') {
+                            $deployments->push(['message' => 'docker_tag can only be used with Docker Image applications.', 'resource_uuid' => $uuid]);
+
+                            continue;
+                        }
+                        $preview = UpsertApplicationPreview::run(
+                            application: $resource,
+                            pullRequestId: $pr,
+                            dockerRegistryImageTag: $dockerTag,
+                        );
+                        if ($resource->build_pack === 'dockerimage') {
+                            $dockerTagForResource = $preview?->docker_registry_image_tag;
+                        }
                     } else {
                         $preview = $resource->previews()->where('pull_request_id', $pr)->first();
                     }
@@ -445,8 +467,9 @@ class DeployController extends Controller
 
                         continue;
                     }
+                    $gitType = $preview->git_type;
                 }
-                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource);
+                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource, $gitType);
                 if (isset($result['status']) && $result['status'] === 429) {
                     return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
                 }
@@ -519,7 +542,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null, ?string $gitType = null): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -544,6 +567,7 @@ class DeployController extends Controller
                     force_rebuild: $force,
                     pull_request_id: $pr,
                     is_api: true,
+                    git_type: $gitType,
                     docker_registry_image_tag: $dockerTag,
                 );
                 if ($result['status'] === 'queue_full') {
@@ -603,34 +627,6 @@ class DeployController extends Controller
         }
 
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
-    }
-
-    private function upsertDockerImagePreview(Application $application, int $pullRequestId, ?string $dockerTag): ?ApplicationPreview
-    {
-        $preview = $application->previews()->where('pull_request_id', $pullRequestId)->first();
-
-        if (! $preview && $dockerTag === null) {
-            return null;
-        }
-
-        if (! $preview) {
-            $preview = ApplicationPreview::create([
-                'application_id' => $application->id,
-                'pull_request_id' => $pullRequestId,
-                'pull_request_html_url' => '',
-                'docker_registry_image_tag' => $dockerTag,
-            ]);
-            $preview->generate_preview_fqdn();
-
-            return $preview;
-        }
-
-        if ($dockerTag !== null && $preview->docker_registry_image_tag !== $dockerTag) {
-            $preview->docker_registry_image_tag = $dockerTag;
-            $preview->save();
-        }
-
-        return $preview;
     }
 
     #[OA\Get(

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\UpsertApplicationPreview;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
@@ -135,38 +136,22 @@ class Previews extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            if ($this->application->build_pack === 'dockercompose') {
-                $this->setDeploymentUuid();
-                $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && ! is_null($pull_request_html_url)) {
-                    $found = ApplicationPreview::create([
-                        'application_id' => $this->application->id,
-                        'pull_request_id' => $pull_request_id,
-                        'pull_request_html_url' => $pull_request_html_url,
-                        'docker_compose_domains' => $this->application->docker_compose_domains,
-                    ]);
-                }
-                $found->generate_preview_fqdn_compose();
-                $this->application->refresh();
-                $this->syncDockerTags();
-            } else {
-                $this->setDeploymentUuid();
-                $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
-                    $found = ApplicationPreview::create([
-                        'application_id' => $this->application->id,
-                        'pull_request_id' => $pull_request_id,
-                        'pull_request_html_url' => $pull_request_html_url ?? '',
-                        'docker_registry_image_tag' => $docker_registry_image_tag,
-                    ]);
-                }
-                if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
-                    $found->docker_registry_image_tag = $docker_registry_image_tag;
-                    $found->save();
-                }
-                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
-                $this->application->refresh();
-                $this->syncDockerTags();
+            $this->setDeploymentUuid();
+            $preview = UpsertApplicationPreview::run(
+                application: $this->application,
+                pullRequestId: $pull_request_id,
+                pullRequestHtmlUrl: $pull_request_html_url,
+                dockerRegistryImageTag: $docker_registry_image_tag,
+                generateWithoutApplicationDomain: $this->application->build_pack !== 'dockercompose',
+                regenerateFqdn: true,
+            );
+            if (! $preview) {
+                throw new \RuntimeException('Preview could not be created.');
+            }
+
+            $this->application->refresh();
+            $this->syncDockerTags();
+            if ($this->application->build_pack !== 'dockercompose') {
                 $this->dispatch('update_links');
                 $this->dispatch('success', 'Preview added.');
             }
@@ -210,25 +195,21 @@ class Previews extends Component
         try {
             $this->authorize('deploy', $this->application);
             $this->setDeploymentUuid();
-            $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
-                $found = ApplicationPreview::create([
-                    'application_id' => $this->application->id,
-                    'pull_request_id' => $pull_request_id,
-                    'pull_request_html_url' => $pull_request_html_url ?? '',
-                    'docker_registry_image_tag' => $docker_registry_image_tag,
-                ]);
-            }
-            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
-                $found->docker_registry_image_tag = $docker_registry_image_tag;
-                $found->save();
+            $preview = UpsertApplicationPreview::run(
+                application: $this->application,
+                pullRequestId: $pull_request_id,
+                pullRequestHtmlUrl: $pull_request_html_url,
+                dockerRegistryImageTag: $docker_registry_image_tag,
+            );
+            if (! $preview) {
+                throw new \RuntimeException('Preview could not be created.');
             }
             $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $this->deployment_uuid,
                 force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
-                git_type: $found->git_type ?? null,
+                git_type: $preview->git_type,
                 docker_registry_image_tag: $docker_registry_image_tag,
             );
             if ($result['status'] === 'queue_full') {
