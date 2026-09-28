@@ -110,8 +110,9 @@ class Form extends Component
             $this->endpointPartsChanged = false;
             $this->bucket = $this->storage->bucket;
             $this->region = $this->storage->region;
-            $this->key = $this->storage->key;
-            $this->secret = $this->storage->secret;
+            $canSeeCredentials = auth()->user()?->can('update', $this->storage) ?? false;
+            $this->key = $canSeeCredentials ? $this->storage->key : '';
+            $this->secret = $canSeeCredentials ? $this->storage->secret : '';
             $this->isUsable = $this->storage->is_usable;
         }
     }
@@ -121,10 +122,6 @@ class Form extends Component
         $this->syncData(false);
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->key = '';
-            $this->secret = '';
-        }
     }
 
     public function testConnection()
