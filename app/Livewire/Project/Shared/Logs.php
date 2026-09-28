@@ -28,6 +28,9 @@ class Logs extends Component
 
     public array $serverContainers = [];
 
+    /** @var array<int, string> */
+    public array $serverErrors = [];
+
     public $container = [];
 
     public $parameters;
@@ -47,7 +50,7 @@ class Logs extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+            "echo-private:team.{$teamId},ServiceChecked" => 'loadAllContainers',
         ];
     }
 
@@ -55,6 +58,7 @@ class Logs extends Component
     {
         try {
             foreach ($this->servers as $server) {
+                unset($this->serverErrors[$server->id]);
                 $this->serverContainers[$server->id] = $this->getContainersForServer($server);
             }
             $this->containersLoaded = true;
@@ -107,7 +111,8 @@ class Logs extends Component
 
             return [];
         } catch (\Exception $e) {
-            // Log error but don't fail the entire operation
+            // Keep the error for this server so the page does not report it as "no containers".
+            $this->serverErrors[$server->id] = $e->getMessage();
 
             return [];
         }
