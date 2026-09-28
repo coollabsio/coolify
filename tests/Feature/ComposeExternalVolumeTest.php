@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -811,7 +812,7 @@ describe('warnings', function () {
         $uuid = $service->uuid;
         legacyExternalVolumeRow(legacyExternalVolumeServiceResource($service, 'web'), "{$uuid}_shared-data");
 
-        $command = StartService::run($service->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(StartService::run($service->fresh()));
 
         $echo = 'echo '.escapeshellarg('Warning: '.legacyExternalVolumeWarning("{$uuid}_shared-data"));
         expect($command)->toContain($echo)
@@ -824,7 +825,7 @@ describe('warnings', function () {
         $serviceApplication = legacyExternalVolumeServiceResource($service, 'web');
         legacyExternalVolumeRow($serviceApplication, "{$uuid}_shared-data");
 
-        $command = DeployServiceApplication::run($serviceApplication->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(DeployServiceApplication::run($serviceApplication->fresh()));
 
         $echo = 'echo '.escapeshellarg('Warning: '.legacyExternalVolumeWarning("{$uuid}_shared-data"));
         expect($command)->toContain($echo)
@@ -847,7 +848,7 @@ describe('warnings', function () {
     it('shows no warning when a service starts with the external volume as written', function () {
         $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
 
-        $command = StartService::run($service->fresh())->getExtraProperty('command');
+        $command = RemoteProcessCommand::read(StartService::run($service->fresh()));
 
         expect($command)->not->toContain('declared as external');
     });

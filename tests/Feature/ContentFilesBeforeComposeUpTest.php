@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
@@ -386,7 +387,7 @@ test('starting a service writes missing content files before docker compose up',
 
     $activity = StartService::run($service->fresh());
 
-    $command = $activity->getExtraProperty('command');
+    $command = RemoteProcessCommand::read($activity);
     expect(contentFilesStateChecks())->toHaveCount(1)
         ->and($command)->toContain("echo 'Writing 1 missing configuration file.'")
         ->and($command)->toContain("echo 'Warning: A directory that is not empty is at {$workerConf->fs_path} on the server.")
@@ -414,7 +415,7 @@ test('deploying one service application writes only its missing content files', 
 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());
 
-    $command = $activity->getExtraProperty('command');
+    $command = RemoteProcessCommand::read($activity);
     expect(contentFilesStateChecks())->toHaveCount(1)
         ->and(contentFilesStateChecks()[0])->not->toContain(escapeshellarg($workerConf->fs_path))
         ->and(strpos($command, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($command, ' up -d'));
@@ -436,7 +437,7 @@ test('starting a service without content files does not run the file check', fun
 
     expect(contentFilesStateChecks())->toBe([])
         ->and($activity)->toBeInstanceOf(Activity::class)
-        ->and($activity->getExtraProperty('command'))->not->toContain('missing configuration file');
+        ->and(RemoteProcessCommand::read($activity))->not->toContain('missing configuration file');
 });
 
 test('the content file step continues when the server does not report a state', function () {

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Enums\ProcessStatus;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -54,6 +55,8 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         // A database import that Coolify stopped after a restart must not run again when
         // the queue retries this job. Its cleanup is already queued.
         if (DatabaseImportCleanup::stopRequested($this->activity)) {
+            RemoteProcessCommand::forget($this->activity);
+
             return;
         }
 
@@ -65,6 +68,10 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         ]);
 
         $remote_process();
+
+        // The task is finished. A failed run throws before this line and is removed in failed(),
+        // because a retry of the job must still be able to read the command.
+        RemoteProcessCommand::forget($this->activity);
     }
 
     /**
@@ -84,7 +91,6 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
             'job' => 'CoolifyTask',
             'activity_id' => $this->activity->id,
             'server_uuid' => $this->activity->getExtraProperty('server_uuid'),
-            'command_preview' => substr($this->activity->getExtraProperty('command') ?? '', 0, 200),
             'error' => $exception?->getMessage(),
             'total_attempts' => $this->attempts(),
             'trace' => $exception?->getTraceAsString(),
@@ -100,6 +106,9 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
             'failed_at' => now()->toIso8601String(),
         ], fn ($value) => $value !== null));
         $this->activity->save();
+
+        // No attempt is left, so the command (which can contain secrets) is no longer needed.
+        RemoteProcessCommand::forget($this->activity);
 
         // Dispatch cleanup event on failure (same as on success)
         if ($this->call_event_on_finish) {
