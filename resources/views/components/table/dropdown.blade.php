@@ -17,6 +17,9 @@
         this.open = true;
         this.$nextTick(() => this.updatePosition());
     },
+    close() {
+        this.open = false;
+    },
     updatePosition() {
         const trigger = this.$refs.trigger.getBoundingClientRect();
         const panel = this.$refs.panel.getBoundingClientRect();
