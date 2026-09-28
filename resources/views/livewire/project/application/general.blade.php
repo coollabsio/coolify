@@ -328,33 +328,40 @@
             @endif
             @if ($buildPack === 'dockercompose')
                 <div x-data="{ showRaw: true }" class="mt-5">
-                    <div class="mb-2 flex items-center justify-between gap-4">
-                        <h3>Docker Compose</h3>
-                        <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
-                            @click.prevent="showRaw = !showRaw"
-                            x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
-                    </div>
-                    @if ($application->settings->is_raw_compose_deployment_enabled)
-                        <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                            label="Docker compose content (applicationId: {{ $application->id }})"
-                            helper="You need to modify the docker compose file in the git repository."
-                            monacoEditorLanguage="yaml" useMonacoEditor />
-                    @else
-                        @if ((int) $application->compose_parsing_version >= 3)
-                            <div x-show="showRaw">
-                                <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
-                                    label="Docker compose content (raw)"
+                    @can('update', $application)
+                        <div class="mb-2 flex items-center justify-between gap-4">
+                            <h3>Docker Compose</h3>
+                            <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
+                                @click.prevent="showRaw = !showRaw"
+                                x-text="showRaw ? 'Show deployable compose' : 'Show raw compose'"></x-forms.button>
+                        </div>
+                        @if ($application->settings->is_raw_compose_deployment_enabled)
+                            <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                label="Docker compose content (applicationId: {{ $application->id }})"
+                                helper="You need to modify the docker compose file in the git repository."
+                                monacoEditorLanguage="yaml" useMonacoEditor />
+                        @else
+                            @if ((int) $application->compose_parsing_version >= 3)
+                                <div x-show="showRaw">
+                                    <x-forms.textarea rows="10" readonly id="dockerComposeRaw"
+                                        label="Docker compose content (raw)"
+                                        helper="You need to modify the docker compose file in the git repository."
+                                        monacoEditorLanguage="yaml" useMonacoEditor />
+                                </div>
+                            @endif
+                            <div x-show="showRaw === false">
+                                <x-forms.textarea rows="10" readonly id="dockerCompose"
+                                    label="Docker compose content"
                                     helper="You need to modify the docker compose file in the git repository."
                                     monacoEditorLanguage="yaml" useMonacoEditor />
                             </div>
                         @endif
-                        <div x-show="showRaw === false">
-                            <x-forms.textarea rows="10" readonly id="dockerCompose"
-                                label="Docker compose content"
-                                helper="You need to modify the docker compose file in the git repository."
-                                monacoEditorLanguage="yaml" useMonacoEditor />
-                        </div>
-                    @endif
+                    @else
+                        <h3 class="mb-2">Docker Compose</h3>
+                        <x-callout type="info" title="Hidden (only admins can view)" class="mb-4">
+                            The Docker Compose file can contain secrets.
+                        </x-callout>
+                    @endcan
                     <div class="w-full sm:w-96">
                         <x-forms.checkbox label="Escape special characters in labels?"
                             helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."

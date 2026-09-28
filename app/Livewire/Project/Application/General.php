@@ -298,6 +298,11 @@ class General extends Component
             // Still sync data even on error, so form fields are populated
             $this->syncData();
         }
+        if (isset($this->parsedServices) && ! auth()->user()?->can('update', $this->application)) {
+            $this->parsedServices = collect([
+                'services' => collect(data_get($this->parsedServices, 'services', []))->map(fn () => []),
+            ]);
+        }
         if ($this->application->build_pack === 'dockercompose') {
             // Only update if user has permission
             try {
@@ -435,8 +440,9 @@ class General extends Component
             $this->dockerRegistryImageName = $this->application->docker_registry_image_name;
             $this->dockerRegistryImageTag = $this->application->docker_registry_image_tag;
             $this->dockerComposeLocation = $this->application->docker_compose_location;
-            $this->dockerCompose = $this->application->docker_compose;
-            $this->dockerComposeRaw = $this->application->docker_compose_raw;
+            $canViewCompose = auth()->user()?->can('update', $this->application) ?? false;
+            $this->dockerCompose = $canViewCompose ? $this->application->docker_compose : null;
+            $this->dockerComposeRaw = $canViewCompose ? $this->application->docker_compose_raw : null;
             $this->dockerComposeCustomStartCommand = $this->application->docker_compose_custom_start_command;
             $this->dockerComposeCustomBuildCommand = $this->application->docker_compose_custom_build_command;
             $this->customLabels = $this->application->parseContainerLabels();

@@ -305,3 +305,42 @@ it('redacts newly added environment values for team members', function () {
         ->and(data_get($envChange, 'new_display_value'))->toBe('••••••••')
         ->and(data_get($envChange, 'type'))->toBe('added');
 });
+
+it('redacts compose content for team members in the change list', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $application = configurationCheckerApplication($this->environment, [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: old-compose-value\n",
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $application->update(['docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: new-compose-value\n"]);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    $composeChange = collect(data_get($component->get('configurationDiff'), 'changes', []))
+        ->first(fn (array $change): bool => str_ends_with((string) data_get($change, 'key'), 'docker_compose_raw'));
+
+    expect($composeChange)->not->toBeNull()
+        ->and(json_encode($component->snapshot).$component->html())
+        ->not->toContain('old-compose-value')
+        ->not->toContain('new-compose-value');
+});
+
+it('keeps compose changes visible to an owner in the change list', function () {
+    $application = configurationCheckerApplication($this->environment, [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: old-compose-value\n",
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $application->update(['docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: new-compose-value\n"]);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    expect(json_encode($component->get('configurationDiff')))->toContain('new-compose-value');
+});

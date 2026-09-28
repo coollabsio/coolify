@@ -26,7 +26,7 @@ class StackForm extends Component
 
     public ?string $description = null;
 
-    public string $dockerComposeRaw;
+    public ?string $dockerComposeRaw = null;
 
     public ?string $dockerCompose = null;
 
@@ -83,8 +83,9 @@ class StackForm extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->service->name;
             $this->description = $this->service->description;
-            $this->dockerComposeRaw = $this->service->docker_compose_raw;
-            $this->dockerCompose = $this->service->docker_compose;
+            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
+            $this->dockerCompose = $canViewCompose ? $this->service->docker_compose : null;
             $this->connectToDockerNetwork = $this->service->connect_to_docker_network;
         }
     }
