@@ -310,6 +310,17 @@ it('does not let a user who lost the admin role log in or log out', function (st
     Process::assertDidntRun(fn ($process) => str_contains($process->command, ' login ') || str_contains($process->command, ' logout '));
 })->with(['login', 'logout']);
 
+it('does not render the registries page again for a user who lost the admin role', function () {
+    $user = actingAsDockerRegistriesRole($this->team, 'admin');
+    $component = Livewire::test(DockerRegistries::class)->assertOk();
+
+    $user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+    $user->refresh();
+    Cache::flush();
+
+    $component->call('$refresh')->assertForbidden();
+});
+
 it('does not open the login form for members', function () {
     actingAsDockerRegistriesRole($this->team, 'member');
 

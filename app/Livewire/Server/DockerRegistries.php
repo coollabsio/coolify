@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class DockerRegistries extends Component
 {
-    public function mount(): void
+    public function boot(): void
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
     }
