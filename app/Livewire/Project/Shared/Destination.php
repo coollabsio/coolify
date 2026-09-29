@@ -158,7 +158,7 @@ class Destination extends Component
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
             $reason = $this->resource instanceof Application
-                ? $this->resource->additionalServersUnavailableReason()
+                ? $this->resource->additionalServersUnavailableReason($server)
                 : 'Only applications can use multiple servers.';
             if ($reason) {
                 $this->dispatch('error', 'Failed to add server.', $reason);

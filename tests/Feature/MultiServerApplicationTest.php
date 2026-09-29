@@ -2,6 +2,7 @@
 
 use App\Actions\Application\StopApplication;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Database\Sqlite\ConnectApplication;
@@ -152,6 +153,37 @@ describe('volume warning', function () {
         $job = makeVolumeWarningJob($this->application, $logEntries);
 
         callMultiServerDeploymentJob($job, 'warnAboutVolumesOnMultipleServers');
+
+        expect($logEntries)->toBe([]);
+    });
+});
+
+describe('mixed proxy warning', function () {
+    test('warns in the deployment log when an additional server uses another proxy', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::TRAEFIK->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->extraServer->save();
+        $logEntries = [];
+        $job = makeVolumeWarningJob($this->application->fresh(), $logEntries);
+
+        callMultiServerDeploymentJob($job, 'warnAboutMixedProxiesOnMultipleServers');
+
+        expect($logEntries)->toBe([[
+            'Warning: The primary server uses TRAEFIK and extra-server uses CADDY. All servers of an application must use the same proxy, because they share the same proxy labels. The domains of this application will not work through the proxy on extra-server.',
+            'stderr',
+        ]]);
+    });
+
+    test('does not warn when all servers use the same proxy', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->extraServer->save();
+        $logEntries = [];
+        $job = makeVolumeWarningJob($this->application->fresh(), $logEntries);
+
+        callMultiServerDeploymentJob($job, 'warnAboutMixedProxiesOnMultipleServers');
 
         expect($logEntries)->toBe([]);
     });
@@ -363,6 +395,103 @@ describe('adding a server in the UI', function () {
             ->call('addServer', $this->extraDestination->id, $this->extraServer->id);
 
         expect($this->application->fresh()->additional_networks)->toHaveCount(1);
+    });
+
+    test('rejects a server that uses a different proxy than the primary server', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::TRAEFIK->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->extraServer->save();
+
+        Livewire::test(Destination::class, ['resource' => $this->application->fresh()])
+            ->call('addServer', $this->extraDestination->id, $this->extraServer->id)
+            ->assertDispatched('error');
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('adds a server without a proxy next to a primary server with a proxy', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::TRAEFIK->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::NONE->value);
+        $this->extraServer->save();
+
+        Livewire::test(Destination::class, ['resource' => $this->application->fresh()])
+            ->call('addServer', $this->extraDestination->id, $this->extraServer->id);
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(1);
+    });
+});
+
+describe('adding a server through the API', function () {
+    beforeEach(function () {
+        $this->application->additional_networks()->detach();
+        config(['app.maintenance.store' => 'array']);
+        InstanceSettings::query()->whereKey(0)->update(['is_api_enabled' => true]);
+        session(['currentTeam' => $this->team]);
+        $this->token = $this->user->createToken('test-token', ['*']);
+    });
+
+    test('rejects a server that uses a different proxy than the primary server', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::TRAEFIK->value);
+        $this->extraServer->save();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->token->plainTextToken)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/destinations", [
+                'destination_uuid' => $this->extraDestination->uuid,
+            ])
+            ->assertStatus(422);
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(0);
+    });
+
+    test('adds a server that uses the same proxy as the primary server', function () {
+        $this->mainServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->mainServer->save();
+        $this->extraServer->proxy->set('type', ProxyTypes::CADDY->value);
+        $this->extraServer->save();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->token->plainTextToken)
+            ->postJson("/api/v1/applications/{$this->application->uuid}/destinations", [
+                'destination_uuid' => $this->extraDestination->uuid,
+            ])
+            ->assertStatus(201);
+
+        expect($this->application->fresh()->additional_networks)->toHaveCount(1);
+    });
+});
+
+describe('caddy network label on additional servers', function () {
+    test('uses the network of the server that is deployed', function () {
+        $this->extraDestination->update(['network' => 'extra-network']);
+        $labels = collect([
+            "caddy_ingress_network={$this->mainDestination->network}",
+            'caddy_0=app.example.com',
+        ]);
+
+        $job = makeMultiServerDeploymentJob([
+            'application' => $this->application,
+            'destination' => $this->extraDestination->fresh(),
+        ]);
+
+        expect(callMultiServerDeploymentJob($job, 'useDestinationNetworkInCaddyLabels', $labels)->all())->toBe([
+            'caddy_ingress_network=extra-network',
+            'caddy_0=app.example.com',
+        ]);
+    });
+
+    test('keeps the labels on the primary server', function () {
+        $labels = collect(["caddy_ingress_network={$this->mainDestination->network}"]);
+
+        $job = makeMultiServerDeploymentJob([
+            'application' => $this->application,
+            'destination' => $this->mainDestination,
+        ]);
+
+        expect(callMultiServerDeploymentJob($job, 'useDestinationNetworkInCaddyLabels', $labels)->all())
+            ->toBe(["caddy_ingress_network={$this->mainDestination->network}"]);
     });
 });
 

@@ -318,6 +318,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->ensureRegistryImageForMultipleServers();
             $this->warnAboutVolumesOnMultipleServers();
+            $this->warnAboutMixedProxiesOnMultipleServers();
         } catch (Exception $e) {
             $this->fail($e);
             throw $e;
@@ -2172,6 +2173,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Servers that were added before the proxy check can still use another proxy than the primary server.
+     */
+    private function warnAboutMixedProxiesOnMultipleServers(): void
+    {
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
+
+        foreach ($this->application->additional_servers as $server) {
+            if ($reason = $this->application->proxyMismatchReason($server)) {
+                $this->application_deployment_queue->addLogEntry("Warning: {$reason} The domains of this application will not work through the proxy on {$server->name}.", 'stderr');
+            }
+        }
+    }
+
+    /**
      * Additional servers pull the image that the main server pushes. Without a registry image, each
      * server builds its own image, so the servers can run different code.
      */
@@ -2689,6 +2706,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Restart the helper container with updated environment variables (including actual SOURCE_COMMIT)
         $this->prepare_builder_image(firstTry: false);
+    }
+
+    /**
+     * Proxy labels are generated for the primary server. On an additional server whose
+     * network has another name, point Caddy to the network the container joins there.
+     */
+    private function useDestinationNetworkInCaddyLabels(Collection $labels): Collection
+    {
+        $primaryNetwork = $this->application->destination->network;
+        $network = $this->destination->network;
+        if ($network === $primaryNetwork) {
+            return $labels;
+        }
+
+        return $labels->map(fn ($label) => $label === "caddy_ingress_network={$primaryNetwork}" ? "caddy_ingress_network={$network}" : $label);
     }
 
     /**
@@ -3754,6 +3786,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
+        $labels = $this->useDestinationNetworkInCaddyLabels($labels);
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
                 return escapeDollarSign($value);

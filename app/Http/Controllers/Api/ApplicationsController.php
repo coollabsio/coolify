@@ -6182,7 +6182,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'A destination on this server is already attached.'], 422);
         }
 
-        if ($reason = $application->additionalServersUnavailableReason()) {
+        if ($reason = $application->additionalServersUnavailableReason($destination->server)) {
             return response()->json(['message' => $reason], 422);
         }
 
