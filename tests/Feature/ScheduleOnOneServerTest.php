@@ -72,3 +72,15 @@ it('schedules stuck resource cleanup in the background once per day', function (
         ->and($event->withoutOverlapping)->toBeTrue()
         ->and($event->runInBackground)->toBeTrue();
 });
+
+it('runs the scheduled job dispatcher from the scheduler instead of a queue', function () {
+    $events = collect(app(Schedule::class)->events());
+
+    $event = $events->first(fn ($event) => str_contains((string) $event->command, 'scheduled:dispatch'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('* * * * *')
+        ->and($event->onOneServer)->toBeTrue()
+        ->and($event->runInBackground)->toBeTrue()
+        ->and($events->contains(fn ($event) => str_contains((string) $event->description, 'ScheduledJobManager')))->toBeFalse();
+});

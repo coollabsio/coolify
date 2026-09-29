@@ -11,21 +11,18 @@ use Throwable;
 class ServerTransferClaimer
 {
     /**
-     * Claim a managed host for this Coolify instance.
+     * Take management of a server on this Coolify instance and bind Sentinel to it.
      *
      * Database ownership (metadata + Sentinel settings) is committed in one transaction so a
-     * mid-flight failure rolls back. Remote SSH claim-file writes happen after commit and are
-     * best-effort — they cannot participate in the DB transaction.
+     * mid-flight failure rolls back.
      *
      * @return array{
      *     server_uuid: string,
      *     claim: array<string, mixed>,
-     *     sentinel_rebound: bool,
-     *     claim_written: bool,
      *     message: string
      * }
      */
-    public function claim(Server $server, bool $writeRemote = true, bool $rebindSentinel = true): array
+    public function claim(Server $server): array
     {
         if ($server->id === 0) {
             throw new RuntimeException('Cannot claim the Coolify host itself.');
@@ -47,18 +44,13 @@ class ServerTransferClaimer
             'schema_version' => ServerTransferBundle::SCHEMA_VERSION,
         ];
 
-        $result = DB::transaction(function () use ($server, $claim, $rebindSentinel, $instanceUrl) {
+        return DB::transaction(function () use ($server, $claim, $instanceUrl) {
             $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
 
-            $sentinelRebound = false;
-            if ($rebindSentinel && $server->settings) {
+            if ($server->settings) {
                 $server->settings->sentinel_custom_url = $instanceUrl;
                 $server->settings->ensureValidSentinelToken();
                 $server->settings->is_sentinel_enabled = true;
-                $sentinelRebound = true;
-            }
-
-            if ($server->settings) {
                 if (! $server->team->serverOverflow()) {
                     $server->settings->force_disabled = false;
                 }
@@ -70,8 +62,6 @@ class ServerTransferClaimer
                 'status' => 'claimed',
                 'claimed_at' => $claim['claimed_at'],
                 'claim' => $claim,
-                'claim_written' => false,
-                'sentinel_rebound' => $sentinelRebound,
             ]);
             $server->server_metadata = $metadata;
             $server->save();
@@ -79,26 +69,9 @@ class ServerTransferClaimer
             return [
                 'server_uuid' => $server->uuid,
                 'claim' => $claim,
-                'sentinel_rebound' => $sentinelRebound,
-                'claim_written' => false,
+                'message' => 'This Coolify instance now manages the server.',
             ];
         });
-
-        // Remote host I/O is outside the transaction (cannot be rolled back with DB rows).
-        $claimWritten = false;
-        if ($writeRemote) {
-            $claimWritten = $this->writeClaimFile($server, $claim);
-            if ($claimWritten) {
-                $this->persistClaimWritten($server);
-            }
-        }
-
-        $result['claim_written'] = $claimWritten;
-        $result['message'] = $claimWritten
-            ? 'Server claimed. Ownership file written and Sentinel rebound to this instance.'
-            : 'Server claimed in Coolify. Remote ownership file was not written (SSH unavailable or skipped).';
-
-        return $result;
     }
 
     /**
@@ -108,15 +81,18 @@ class ServerTransferClaimer
      * All database writes run in one transaction so partial disable state cannot stick on failure.
      * Local SSH key cache cleanup runs after commit (filesystem; not transactional).
      *
+     * $managementDisabled marks a manual "Disable management" action: the server is not moved yet,
+     * only ready to be transferred to another instance.
+     *
      * @return array{server_uuid: string, message: string}
      */
-    public function markTransferred(Server $server, ?string $exportId = null, ?string $targetInstanceUrl = null): array
+    public function markTransferred(Server $server, ?string $exportId = null, ?string $targetInstanceUrl = null, bool $managementDisabled = false): array
     {
         if ($server->id === 0) {
             throw new RuntimeException('Cannot transfer the Coolify host itself.');
         }
 
-        $result = DB::transaction(function () use ($server, $exportId, $targetInstanceUrl) {
+        $result = DB::transaction(function () use ($server, $exportId, $targetInstanceUrl, $managementDisabled) {
             $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
 
             if ($server->settings) {
@@ -131,6 +107,7 @@ class ServerTransferClaimer
                 'export_id' => $exportId ?? data_get($metadata, 'transfer.export_id'),
                 'target_instance_url' => $targetInstanceUrl,
                 'transferred_at' => now()->toIso8601String(),
+                'management_disabled' => $managementDisabled,
             ]);
             $server->server_metadata = $metadata;
             $server->save();
@@ -144,21 +121,6 @@ class ServerTransferClaimer
         $this->clearLocalSshArtifacts($server);
 
         return $result;
-    }
-
-    private function persistClaimWritten(Server $server): void
-    {
-        DB::transaction(function () use ($server) {
-            $server = Server::query()->lockForUpdate()->find($server->id);
-            if (! $server) {
-                return;
-            }
-
-            $metadata = $server->server_metadata ?? [];
-            data_set($metadata, 'transfer.claim_written', true);
-            $server->server_metadata = $metadata;
-            $server->save();
-        });
     }
 
     /**
@@ -222,33 +184,5 @@ class ServerTransferClaimer
             'path' => $path,
             'written' => $written,
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $claim
-     */
-    private function writeClaimFile(Server $server, array $claim): bool
-    {
-        $json = json_encode($claim, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-        $b64 = base64_encode($json);
-        $path = ServerTransferBundle::CLAIM_PATH;
-
-        try {
-            instant_remote_process([
-                'mkdir -p /data/coolify',
-                'echo '.escapeshellarg($b64).' | base64 -d > '.escapeshellarg($path),
-                'chmod 600 '.escapeshellarg($path),
-                'chown 9999:root '.escapeshellarg($path).' || true',
-            ], $server, true);
-
-            return true;
-        } catch (Throwable $e) {
-            Log::warning('Failed to write instance claim file', [
-                'server_uuid' => $server->uuid,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
     }
 }

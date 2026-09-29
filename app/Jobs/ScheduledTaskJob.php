@@ -127,7 +127,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             $this->executionId = $this->task_log->id;
 
             if ($this->resource->type() === 'application') {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0);
                 if ($containers->count() > 0) {
                     $containers->each(function ($container) {
                         $this->containers[] = str_replace('/', '', $container['Names']);

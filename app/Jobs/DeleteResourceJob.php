@@ -264,7 +264,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedStackName = escapeshellarg("{$application->uuid}-{$pull_request_id}");
                 instant_remote_process(["docker stack rm {$escapedStackName}"], $server);
             } else {
-                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pull_request_id)->toArray();
+                $containers = getCurrentApplicationContainerStatus($server, $application, $pull_request_id)->toArray();
                 $this->stopPreviewContainers($containers, $server);
             }
         } catch (\Throwable $e) {

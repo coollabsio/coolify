@@ -318,6 +318,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->ensureRegistryImageForMultipleServers();
             $this->warnAboutVolumesOnMultipleServers();
+            $this->warnAboutMixedProxiesOnMultipleServers();
         } catch (Exception $e) {
             $this->fail($e);
             throw $e;
@@ -2172,6 +2173,22 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * Servers that were added before the proxy check can still use another proxy than the primary server.
+     */
+    private function warnAboutMixedProxiesOnMultipleServers(): void
+    {
+        if ($this->pull_request_id !== 0) {
+            return;
+        }
+
+        foreach ($this->application->additional_servers as $server) {
+            if ($reason = $this->application->proxyMismatchReason($server)) {
+                $this->application_deployment_queue->addLogEntry("Warning: {$reason} The domains of this application will not work through the proxy on {$server->name}.", 'stderr');
+            }
+        }
+    }
+
+    /**
      * Additional servers pull the image that the main server pushes. Without a registry image, each
      * server builds its own image, so the servers can run different code.
      */
@@ -2689,6 +2706,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Restart the helper container with updated environment variables (including actual SOURCE_COMMIT)
         $this->prepare_builder_image(firstTry: false);
+    }
+
+    /**
+     * Proxy labels are generated for the primary server. On an additional server whose
+     * network has another name, point Caddy to the network the container joins there.
+     */
+    private function useDestinationNetworkInCaddyLabels(Collection $labels): Collection
+    {
+        $primaryNetwork = $this->application->destination->network;
+        $network = $this->destination->network;
+        if ($network === $primaryNetwork) {
+            return $labels;
+        }
+
+        return $labels->map(fn ($label) => $label === "caddy_ingress_network={$primaryNetwork}" ? "caddy_ingress_network={$network}" : $label);
     }
 
     /**
@@ -3754,12 +3786,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
+        $labels = $this->useDestinationNetworkInCaddyLabels($labels);
         if ($this->application->settings->is_container_label_escape_enabled) {
             $labels = $labels->map(function ($value, $key) {
                 return escapeDollarSign($value);
             });
         }
-        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
+        $labels = $labels->merge(defaultLabels($this->application->uuid, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
@@ -4551,12 +4584,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled) {
-                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
                         $this->graceful_shutdown_container($containerName);
                     });
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     if ($this->pull_request_id === 0) {
                         $containers = $containers->filter(function ($container) {
                             return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id);
@@ -5432,7 +5465,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->pre_deployment_command)) {
             return;
         }
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
         if ($containers->count() == 0) {
             $this->application_deployment_queue->addLogEntry('Pre-deployment command: No running containers found. Skipping.');
 
@@ -5477,7 +5510,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Executing post-deployment command (see debug log for output).');
 
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
         if ($containers->count() == 0) {
             $this->application_deployment_queue->addLogEntry('Post-deployment command: No running containers found. Skipping.');
 

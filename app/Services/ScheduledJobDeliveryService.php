@@ -8,107 +8,28 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\VolumeBackupJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
-use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
-use Cron\CronExpression;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 
 class ScheduledJobDeliveryService
 {
-    public const CATCH_UP_WINDOW_MINUTES = 10;
+    /**
+     * Record a pending delivery for one occurrence of a schedule. Returns null when the
+     * occurrence already has a delivery.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function create(string $scheduleKey, CarbonInterface $scheduledFor, string $jobType, int $resourceId, array $payload = []): ?ScheduledJobDelivery
+    {
+        $delivery = ScheduledJobDelivery::createOrFirst(
+            ['schedule_key' => $scheduleKey, 'scheduled_for' => $scheduledFor->utc()],
+            ['job_type' => $jobType, 'resource_id' => $resourceId, 'payload' => $payload, 'status' => 'pending'],
+        );
 
-    public function recordAndPublish(
-        string $scheduleKey,
-        string $frequency,
-        string $timezone,
-        string $jobType,
-        int $resourceId,
-        array $payload = [],
-        ?Carbon $executionTime = null,
-    ): bool {
-        $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
-        $cron = new CronExpression(VALID_CRON_STRINGS[$frequency] ?? $frequency);
-        $scheduledFor = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
-
-        if (! $scheduledFor->gte($executionTime->copy()->subMinutes(self::CATCH_UP_WINDOW_MINUTES))) {
-            return false;
-        }
-
-        $delivery = DB::transaction(function () use ($scheduleKey, $scheduledFor, $jobType, $resourceId, $payload): ?ScheduledJobDelivery {
-            ScheduledJobState::query()->insertOrIgnore([
-                'uuid' => new_public_id(),
-                'schedule_key' => $scheduleKey,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $state = ScheduledJobState::query()
-                ->where('schedule_key', $scheduleKey)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
-                return null;
-            }
-
-            $state->update(['last_scheduled_for' => $scheduledFor->utc()]);
-
-            return ScheduledJobDelivery::create([
-                'schedule_key' => $scheduleKey,
-                'scheduled_for' => $scheduledFor->utc(),
-                'job_type' => $jobType,
-                'resource_id' => $resourceId,
-                'payload' => $payload,
-                'status' => 'pending',
-            ]);
-        });
-
-        if ($delivery === null) {
-            return false;
-        }
-
-        return $this->publish($delivery);
-    }
-
-    public function recordSkipped(
-        string $scheduleKey,
-        string $frequency,
-        string $timezone,
-        ?Carbon $executionTime = null,
-    ): bool {
-        $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
-        $cron = new CronExpression(VALID_CRON_STRINGS[$frequency] ?? $frequency);
-        $scheduledFor = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
-
-        if (! $scheduledFor->gte($executionTime->copy()->subMinutes(self::CATCH_UP_WINDOW_MINUTES))) {
-            return false;
-        }
-
-        return DB::transaction(function () use ($scheduleKey, $scheduledFor): bool {
-            ScheduledJobState::query()->insertOrIgnore([
-                'uuid' => new_public_id(),
-                'schedule_key' => $scheduleKey,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $state = ScheduledJobState::query()
-                ->where('schedule_key', $scheduleKey)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
-                return false;
-            }
-
-            $state->update(['last_scheduled_for' => $scheduledFor->utc()]);
-
-            return true;
-        });
+        return $delivery->wasRecentlyCreated ? $delivery : null;
     }
 
     public function publishPending(): void
@@ -130,24 +51,6 @@ class ScheduledJobDeliveryService
                     }
                 }
             });
-    }
-
-    /**
-     * Count occurrences that are still open 15 minutes after they were created. Pending or
-     * enqueued rows here never started; claimed rows are still running or their worker died.
-     *
-     * @return array<string, int>
-     */
-    public function staleOpenOccurrenceCounts(): array
-    {
-        return ScheduledJobDelivery::query()
-            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
-            ->where('created_at', '<', now()->subMinutes(15))
-            ->selectRaw('status, count(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->map(fn ($count) => (int) $count)
-            ->all();
     }
 
     public function deleteOldOccurrences(): void
@@ -244,7 +147,7 @@ class ScheduledJobDeliveryService
         }
     }
 
-    private function publish(ScheduledJobDelivery $occurrence): bool
+    public function publish(ScheduledJobDelivery $occurrence): bool
     {
         if ($occurrence->status !== 'pending') {
             return false;
@@ -283,15 +186,6 @@ class ScheduledJobDeliveryService
             return false;
         }
 
-        // An open previous occurrence usually means the previous run is still running. Jobs with
-        // WithoutOverlapping(...)->dontRelease() then drop this one without running it.
-        $previousOpen = ScheduledJobDelivery::query()
-            ->where('schedule_key', $occurrence->schedule_key)
-            ->where('scheduled_for', '<', $occurrence->scheduled_for)
-            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
-            ->orderByDesc('scheduled_for')
-            ->first(['uuid', 'status', 'scheduled_for']);
-
         dispatch($job);
 
         ScheduledJobDelivery::query()
@@ -304,17 +198,7 @@ class ScheduledJobDeliveryService
             ]);
 
         // Log from the loaded row: a fast worker can complete and delete the occurrence already.
-        $enqueued = ['status' => 'enqueued', 'enqueued_at' => now()->toIso8601String()];
-        if ($previousOpen) {
-            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued while the previous occurrence is still open', 'warning', [
-                ...$enqueued,
-                'previous_occurrence_uuid' => $previousOpen->uuid,
-                'previous_status' => $previousOpen->status,
-                'previous_scheduled_for' => $previousOpen->scheduled_for->toIso8601String(),
-            ]);
-        } else {
-            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued', context: $enqueued);
-        }
+        $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued', context: ['status' => 'enqueued', 'enqueued_at' => now()->toIso8601String()]);
 
         return true;
     }

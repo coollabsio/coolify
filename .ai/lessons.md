@@ -5,6 +5,8 @@
 - When a symptom matches an earlier fix, inspect that fix and prove why it no longer works before adding another workaround.
 - Test old reports against the current branch because later changes can make the report obsolete.
 - Use the same regression test before and after the production change so the result shows the behavior difference.
+- Several dev instances can run from one checkout (see `./scripts/dev urls`). After you add a migration, run it on each running instance of that checkout, or those instances fail on the new code.
+- The checkout is shared with other sessions. When the full suite fails, rerun each failing file alone and compare with a clean `git archive HEAD` copy before you connect a failure to your change.
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 
@@ -56,6 +58,8 @@
 ## Make distributed schedules durable
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
 - Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
+- Store the next due time on each schedule and select only due rows; claim a run with `UPDATE ... WHERE next_run_at = :old`. Do not evaluate every cron expression each minute: on a remote database the per-row queries alone exceed the one-minute budget.
+- Run a per-minute dispatcher from the scheduler process, not as a queued job, so queue backlog cannot delay it.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
 - Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
 
@@ -78,3 +82,12 @@
 
 ## Format only your own files
 - `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.
+
+## Match containers by UUID, never by numeric id
+- Container ownership labels are `coolify.applicationUuid`, `coolify.serviceUuid`, `coolify.service.subUuid`, and `coolify.databaseUuid`. Numeric ids change when a server moves to another instance.
+- Use `resolveContainerOwner()`, `resolveServiceContainerOwner()`, and `containersOwnedBy()` / `dockerPsByOwnerCommands()` from `bootstrap/helpers/docker.php`. Order: UUID label, then `com.docker.compose.project` (the UUID only since July 2024), then the local numeric id label of older containers.
+- Read owners from the flat label list. `Arr::undot()` breaks `com.docker.compose.project` because `com.docker.compose.project.config_files` is nested under it.
+
+## Non-root SSH users: keep file access behind sudo
+- `parseCommandsByLineForSudo()` does not prefix `cd` or `echo`, and the SSH user's shell opens redirects (`>`, `<`) and expands globs. On the Coolify host, `/data/coolify` is `9999:root 0700`, so these fail for a non-root user.
+- In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs.

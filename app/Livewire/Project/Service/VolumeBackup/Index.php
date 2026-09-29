@@ -8,6 +8,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -17,6 +18,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Service $service;
 
@@ -37,13 +39,13 @@ class Index extends Component
 
     public function getListeners(): array
     {
-        $teamId = currentTeam()->id;
-
         return [
             'refreshVolumeBackups' => '$refresh',
             'modalClosed' => 'closeScheduleModal',
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
-            "echo-private:team.{$teamId},BackupCreated" => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceChecked' => '$refresh',
+                'BackupCreated' => '$refresh',
+            ]),
         ];
     }
 

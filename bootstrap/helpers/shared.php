@@ -1111,6 +1111,28 @@ function validate_timezone(string $timezone): bool
     return in_array($timezone, timezone_identifiers_list());
 }
 
+/**
+ * The next due time of a cron frequency after $after, in UTC. An invalid frequency returns null.
+ * With $includeCurrentMinute, a frequency that is due in the minute of $after returns that minute.
+ */
+function next_cron_run_at(string $frequency, ?string $timezone, DateTimeInterface $after, bool $includeCurrentMinute = false): ?CarbonImmutable
+{
+    $frequency = trim($frequency);
+    $timezone = filled($timezone) && validate_timezone($timezone) ? $timezone : config('app.timezone');
+
+    try {
+        $cron = new Cron\CronExpression(VALID_CRON_STRINGS[$frequency] ?? $frequency);
+        $time = CarbonImmutable::instance($after)->setTimezone($timezone);
+        if ($includeCurrentMinute) {
+            $time = $time->startOfMinute();
+        }
+
+        return CarbonImmutable::instance($cron->getNextRunDate($time, 0, $includeCurrentMinute))->utc();
+    } catch (Throwable) {
+        return null;
+    }
+}
+
 function parseEnvFormatToArray($env_file_contents)
 {
     $env_array = [];
@@ -3193,13 +3215,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     ? $savedService->noindexDomains()
                     : collect([]);
                 $defaultLabels = defaultLabels(
-                    id: $resource->id,
+                    uuid: $resource->uuid,
                     name: $containerName,
                     projectName: $resource->project()->name,
                     resourceName: $resource->name,
                     type: 'service',
                     subType: $isDatabase ? 'database' : 'application',
-                    subId: $savedService->id,
+                    subUuid: $savedService->uuid,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
                 );
@@ -4122,7 +4144,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
 
             $defaultLabels = defaultLabels(
-                id: $resource->id,
+                uuid: $resource->uuid,
                 name: $containerName,
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,

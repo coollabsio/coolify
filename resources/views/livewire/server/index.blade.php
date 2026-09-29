@@ -11,7 +11,7 @@
                     <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
                         class="button w-fit shrink-0 whitespace-nowrap">
                         <x-reicon name="upload" class="size-3.5" />
-                        Import transfer
+                        Import server
                         <x-status-badge label="Dev" />
                     </a>
                 @endcan
@@ -28,7 +28,7 @@
 
     @php
         $serverRows = $servers->map(function ($server) {
-            $isTransferredAway = $server->isTransferredAway();
+            $isTransferredAway = isDev() && $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
@@ -38,6 +38,7 @@
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && $server->sentinelStatus() === 'out_of_sync';
 
             $status = match (true) {
+                $isTransferredAway && $server->isManagementDisabled() => 'Transferable',
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',

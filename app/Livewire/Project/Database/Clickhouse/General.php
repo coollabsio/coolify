@@ -7,14 +7,15 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ?Server $server = null;
 
@@ -46,18 +47,9 @@ class General extends Component
 
     public function getListeners(): array
     {
-        $user = Auth::user();
-        if (! $user) {
-            return [];
-        }
-        $team = $user->currentTeam();
-        if (! $team) {
-            return [];
-        }
-
-        return [
-            "echo-private:team.{$team->id},DatabaseProxyStopped" => 'databaseProxyStopped',
-        ];
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
     }
 
     public function mount()

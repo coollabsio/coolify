@@ -9,23 +9,10 @@ use Livewire\Component;
 
 class DeploymentsIndicator extends Component
 {
-    public bool $expanded = false;
-
     /**
-     * Persisted across polls. Livewire update requests are not the page route,
-     * so this must not be re-derived from request()->routeIs() on every render.
+     * Where the indicator is rendered: 'sidebar' (desktop sidebar footer) or 'mobile' (mobile top bar).
      */
-    public bool $shouldShow = true;
-
-    public function mount(): void
-    {
-        $this->shouldShow = $this->shouldShowForCurrentRequest();
-    }
-
-    public function updateShouldShowFromPath(string $path): void
-    {
-        $this->shouldShow = ! $this->isDashboardPath($path);
-    }
+    public string $variant = 'sidebar';
 
     #[Computed]
     public function deployments()
@@ -54,29 +41,8 @@ class DeploymentsIndicator extends Component
         return $this->deployments->count();
     }
 
-    public function toggleExpanded()
-    {
-        $this->expanded = ! $this->expanded;
-    }
-
     public function render()
     {
         return view('livewire.deployments-indicator');
-    }
-
-    private function shouldShowForCurrentRequest(): bool
-    {
-        if (request()->routeIs('dashboard')) {
-            return false;
-        }
-
-        return ! $this->isDashboardPath(request()->path());
-    }
-
-    private function isDashboardPath(string $path): bool
-    {
-        $normalized = trim($path, '/');
-
-        return $normalized === '' || $normalized === '/';
     }
 }

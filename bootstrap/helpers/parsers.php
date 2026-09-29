@@ -1835,7 +1835,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $defaultLabels = defaultLabels(
-            id: $resource->id,
+            uuid: $resource->uuid,
             name: $containerName,
             projectName: $resource->project()->name,
             resourceName: $resource->name,
@@ -3098,13 +3098,13 @@ function serviceParser(Service $resource): Collection
             : collect([]);
 
         $defaultLabels = defaultLabels(
-            id: $resource->id,
+            uuid: $resource->uuid,
             name: $containerName,
             projectName: $resource->project()->name,
             resourceName: $resource->name,
             type: 'service',
             subType: $savedService instanceof ServiceDatabase ? 'database' : 'application',
-            subId: $savedService->id,
+            subUuid: $savedService->uuid,
             subName: $savedService->human_name ?? $savedService->name,
             environment: $resource->environment->name,
         );

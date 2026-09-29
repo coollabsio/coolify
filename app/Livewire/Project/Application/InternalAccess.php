@@ -28,7 +28,7 @@ class InternalAccess extends Component
         try {
             $containers = getCurrentApplicationContainerStatus(
                 $this->application->destination->server,
-                $this->application->id,
+                $this->application,
                 0
             );
             $currentContainer = $containers->first(

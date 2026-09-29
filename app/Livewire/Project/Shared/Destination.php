@@ -8,6 +8,8 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Services\ScheduleNextRunRecalculator;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -15,6 +17,7 @@ use Livewire\Component;
 class Destination extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $resource;
 
@@ -22,12 +25,12 @@ class Destination extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'mount',
             'refresh' => 'mount',
+            ...$this->teamChannelListeners([
+                'ApplicationStatusChanged' => 'loadData',
+                'ServiceStatusChanged' => 'mount',
+            ]),
         ];
     }
 
@@ -136,6 +139,7 @@ class Destination extends Component
                     ->wherePivot('server_id', $server->id)
                     ->detach($network->id);
                 $this->resource->additional_networks()->attach($mainDestination->id, ['server_id' => $mainDestination->server->id]);
+                app(ScheduleNextRunRecalculator::class)->forResource($this->resource);
             });
             $this->resource->refresh();
             $this->refreshServers();
@@ -158,7 +162,7 @@ class Destination extends Component
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
             $reason = $this->resource instanceof Application
-                ? $this->resource->additionalServersUnavailableReason()
+                ? $this->resource->additionalServersUnavailableReason($server)
                 : 'Only applications can use multiple servers.';
             if ($reason) {
                 $this->dispatch('error', 'Failed to add server.', $reason);

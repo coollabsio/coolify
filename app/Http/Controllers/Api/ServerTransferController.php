@@ -43,8 +43,6 @@ class ServerTransferController extends Controller
                 properties: [
                     new OA\Property(property: 'target_url', type: 'string', example: 'https://coolify-b.example.com'),
                     new OA\Property(property: 'target_token', type: 'string', description: 'API token on the target instance (root or write)'),
-                    new OA\Property(property: 'write_remote', type: 'boolean', default: false),
-                    new OA\Property(property: 'rebind_sentinel', type: 'boolean', default: true),
                     new OA\Property(property: 'preserve_uuids', type: 'boolean', default: true),
                     new OA\Property(property: 'adopt_mode', type: 'boolean', default: true),
                 ]
@@ -85,12 +83,10 @@ class ServerTransferController extends Controller
         $validator = customApiValidator($request->all(), [
             'target_url' => 'required|string|url',
             'target_token' => 'required|string',
-            'write_remote' => 'boolean|nullable',
-            'rebind_sentinel' => 'boolean|nullable',
             'preserve_uuids' => 'boolean|nullable',
             'adopt_mode' => 'boolean|nullable',
         ]);
-        $allowedFields = ['target_url', 'target_token', 'write_remote', 'rebind_sentinel', 'preserve_uuids', 'adopt_mode'];
+        $allowedFields = ['target_url', 'target_token', 'preserve_uuids', 'adopt_mode'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
@@ -109,8 +105,6 @@ class ServerTransferController extends Controller
                 server: $server,
                 targetUrl: $request->string('target_url')->toString(),
                 targetToken: $request->string('target_token')->toString(),
-                writeRemote: $request->boolean('write_remote', false),
-                rebindSentinel: $request->boolean('rebind_sentinel', true),
                 preserveUuids: $request->boolean('preserve_uuids', true),
                 adoptMode: $request->boolean('adopt_mode', true),
             );
@@ -190,7 +184,7 @@ class ServerTransferController extends Controller
 
     #[OA\Post(
         summary: 'Import server transfer bundle',
-        description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default).',
+        description: 'Import a server transfer bundle into this Coolify instance (adopt mode by default). This instance then manages the server, and Sentinel reports to it.',
         path: '/servers/import',
         operationId: 'import-server-transfer-bundle',
         security: [['bearerAuth' => []]],
@@ -204,9 +198,6 @@ class ServerTransferController extends Controller
                     new OA\Property(property: 'dry_run', type: 'boolean', default: false),
                     new OA\Property(property: 'preserve_uuids', type: 'boolean', default: true),
                     new OA\Property(property: 'adopt_mode', type: 'boolean', default: true, description: 'Import without forcing redeploy; keep statuses for adoption'),
-                    new OA\Property(property: 'claim', type: 'boolean', default: true, description: 'Automatically claim the host for this instance after import'),
-                    new OA\Property(property: 'write_remote', type: 'boolean', default: false, description: 'When claiming, write ownership file on the host via SSH'),
-                    new OA\Property(property: 'rebind_sentinel', type: 'boolean', default: true, description: 'When claiming, rebind Sentinel to this instance'),
                 ]
             )
         ),
@@ -237,11 +228,8 @@ class ServerTransferController extends Controller
             'dry_run' => 'boolean|nullable',
             'preserve_uuids' => 'boolean|nullable',
             'adopt_mode' => 'boolean|nullable',
-            'claim' => 'boolean|nullable',
-            'write_remote' => 'boolean|nullable',
-            'rebind_sentinel' => 'boolean|nullable',
         ]);
-        $allowedFields = ['bundle', 'passphrase', 'dry_run', 'preserve_uuids', 'adopt_mode', 'claim', 'write_remote', 'rebind_sentinel'];
+        $allowedFields = ['bundle', 'passphrase', 'dry_run', 'preserve_uuids', 'adopt_mode'];
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
@@ -274,9 +262,6 @@ class ServerTransferController extends Controller
                 dryRun: $request->boolean('dry_run', false),
                 preserveUuids: $request->boolean('preserve_uuids', true),
                 adoptMode: $request->boolean('adopt_mode', true),
-                claim: $request->boolean('claim', true),
-                writeRemote: $request->boolean('write_remote', false),
-                rebindSentinel: $request->boolean('rebind_sentinel', true),
             );
         } catch (Throwable $e) {
             $status = $e instanceof ValidationException ? 422 : 422;
@@ -296,73 +281,6 @@ class ServerTransferController extends Controller
         ]);
 
         return response()->json($result, $result['dry_run'] ? 200 : 201);
-    }
-
-    #[OA\Post(
-        summary: 'Claim imported server',
-        description: 'Claim a managed host for this instance: write ownership file and rebind Sentinel.',
-        path: '/servers/{uuid}/claim',
-        operationId: 'claim-server',
-        security: [['bearerAuth' => []]],
-        tags: ['Servers'],
-        parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-        ],
-        requestBody: new OA\RequestBody(
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'write_remote', type: 'boolean', default: true),
-                    new OA\Property(property: 'rebind_sentinel', type: 'boolean', default: true),
-                ]
-            )
-        ),
-        responses: [
-            new OA\Response(response: 200, description: 'Claim result'),
-            new OA\Response(response: 404, ref: '#/components/responses/404'),
-        ]
-    )]
-    public function claim(Request $request, string $uuid): JsonResponse
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-
-        $server = Server::whereTeamId($teamId)->whereUuid($uuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-
-        $this->authorize('update', $server);
-
-        $validator = customApiValidator($request->all(), [
-            'write_remote' => 'boolean|nullable',
-            'rebind_sentinel' => 'boolean|nullable',
-        ]);
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $result = $this->claimer->claim(
-                $server,
-                writeRemote: $request->boolean('write_remote', true),
-                rebindSentinel: $request->boolean('rebind_sentinel', true),
-            );
-        } catch (Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        auditLog('api.server.claim', [
-            'team_id' => $teamId,
-            'server_uuid' => $server->uuid,
-            'claim_written' => $result['claim_written'],
-        ]);
-
-        return response()->json($result);
     }
 
     #[OA\Post(
