@@ -41,6 +41,7 @@ class IssueFluxCredential
             'discovery.corrosion.inspect.v1',
             'discovery.corrosion.reconcile.v1',
             'discovery.corrosion.endpoints.reconcile.v1',
+            'logs.read.v1',
         ], $capabilities));
 
         $credential = JWT::encode([

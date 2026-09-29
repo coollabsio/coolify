@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Node\InstallSentinel;
+use App\Actions\Node\RollbackSentinel;
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
 use App\Models\InstanceSettings;
 use App\Models\Node;
@@ -129,4 +130,57 @@ it('elevates the encoded installer for a non-root server user', function () {
     expect(parseCommandsByLineForSudo(collect([$command]), $server)[0])
         ->toStartWith("sudo bash -c '")
         ->toContain('base64 -d | bash');
+});
+
+it('accepts a pinned digest image and keeps the replaced binary only after a healthy install', function () {
+    $authority = EnsureFluxCertificateAuthority::run();
+    $image = 'ghcr.io/coollabsio/sentinel-host@sha256:'.str_repeat('a', 64);
+    $script = InstallSentinel::installationScript('token', 'https://coolify.example/api/v1/sentinel', $image, $authority->certificate_pem, $authority->version);
+
+    expect($script)->toContain("image='{$image}'")
+        ->toContain('install -m 0755 "$backup_directory/sentinel" /usr/local/bin/sentinel.previous.new')
+        ->toContain('mv -f /usr/local/bin/sentinel.previous.new /usr/local/bin/sentinel.previous')
+        ->and(strpos($script, 'sentinel.previous.new /usr/local/bin/sentinel.previous'))
+        ->toBeGreaterThan(strpos($script, 'curl --fail --silent http://127.0.0.1:8888/api/health'))
+        ->toBeLessThan(strpos($script, 'completed=true'));
+});
+
+it('rejects malformed digest images', function (string $image) {
+    $authority = EnsureFluxCertificateAuthority::run();
+
+    expect(fn () => InstallSentinel::installationScript('token', 'https://coolify.example/api/v1/sentinel', $image, $authority->certificate_pem, $authority->version))
+        ->toThrow(InvalidArgumentException::class);
+})->with([
+    'short digest' => ['ghcr.io/coollabsio/sentinel-host@sha256:abc'],
+    'uppercase digest' => ['ghcr.io/coollabsio/sentinel-host@sha256:'.str_repeat('A', 64)],
+    'digest with command' => ['ghcr.io/coollabsio/sentinel-host@sha256:'.str_repeat('a', 64).';reboot'],
+]);
+
+it('builds a fixed rollback script without user input', function () {
+    expect(RollbackSentinel::rollbackScript())
+        ->toContain('if [ ! -f /usr/local/bin/sentinel.previous ]; then')
+        ->toContain('mv -f /usr/local/bin/sentinel.previous /usr/local/bin/sentinel')
+        ->toContain('systemctl restart sentinel.service')
+        ->toContain('systemctl is-active --quiet sentinel.service')
+        ->not->toContain('{$');
+});
+
+it('elevates the encoded rollback for a non-root server user', function () {
+    $node = new Node(['user' => 'coolify']);
+    $command = InstallSentinel::remoteCommand(RollbackSentinel::rollbackScript());
+
+    expect(parseCommandsByLineForSudo(collect([$command]), $node)[0])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('base64 -d | bash')
+        ->toContain(base64_encode(RollbackSentinel::rollbackScript()));
+});
+
+it('does not use ssh for a rollback outside development', function () {
+    config()->set('app.env', 'production');
+    config()->set('constants.sentinel.host_enabled', true);
+    Process::fake();
+
+    expect(RollbackSentinel::run(new Node))->toBeNull();
+
+    Process::assertNothingRan();
 });

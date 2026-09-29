@@ -78,3 +78,22 @@ This decision does not define:
 - the final UI layout and filtering controls;
 - optional export to Loki, OpenTelemetry, or another log system; or
 - long-term central log retention.
+
+## Amendment (2026-09-28)
+
+Corrosion and discovery DNS run as separate processes next to Sentinel. They
+do not write into Sentinel's in-memory buffer. Sentinel reads their journald
+entries for fixed units (`corrosion.service` and
+`coolify-discovery-dns.service`) through the same `logs.read.v1` command. The
+request selects a source (`sentinel`, `corrosion`, or `discovery_dns`); it
+never carries a unit name, command, or journal path. The rule against running
+`journalctl` inside Sentinel applies only to Sentinel's own logs.
+
+The first slice returns recent events with manual refresh and a 5-second
+auto-refresh in the UI. It does not add a follow stream yet.
+
+Limits: the Sentinel buffer keeps at most 2,000 events and 1 MiB, and one
+response returns at most 500 events. Coolify falls back to SSH and journald
+when the Node is not connected to Flux, does not advertise `logs.read.v1`, or
+Flux is unreachable. The SSH fallback redacts bearer tokens, JWT-like strings,
+and `token=`, `password=`, and `secret=` values before display.

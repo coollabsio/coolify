@@ -138,10 +138,41 @@
 
     @if ($nodes->isNotEmpty())
         <section class="mt-8">
-            <div class="mb-3">
-                <h2 class="text-[15px]! font-semibold!">Nodes</h2>
-                <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Hosts that can run cluster applications.</p>
+            @php
+                $sentinelUpgradeRunning = in_array(data_get($sentinelUpgradeSummary, 'status'), ['queued', 'running'], true);
+            @endphp
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                    <h2 class="text-[15px]! font-semibold!">Nodes</h2>
+                    <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Hosts that can run cluster applications.</p>
+                </div>
+                @if ($sentinelUpgradeNodes->isNotEmpty() && ! $sentinelUpgradeRunning)
+                    @can('manageSentinel', $sentinelUpgradeNodes->first())
+                        <div class="w-fit shrink-0">
+                            <x-modal-confirmation title="Upgrade Sentinel on all Nodes?" buttonTitle="Upgrade all"
+                                submitAction="upgradeAllSentinels" :actions="[
+                                    'Sentinel ' . data_get($sentinelRelease, 'version') . ' is installed over SSH on ' . $sentinelUpgradeNodes->count() . ' ' . Str::plural('Node', $sentinelUpgradeNodes->count()) . ', one at a time.',
+                                    'The upgrade stops at the first Node that fails. That Node is restored to its previous version.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade all" />
+                        </div>
+                    @endcan
+                @endif
             </div>
+            @if ($sentinelUpgradeSummary !== null)
+                <div @if ($sentinelUpgradeRunning) wire:poll.5s @endif
+                    class="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-neutral-600 dark:text-fg-dim">
+                    <span>Sentinel upgrade</span>
+                    <x-status-badge :status="str(data_get($sentinelUpgradeSummary, 'status'))->title()->toString()"
+                        :type="match (data_get($sentinelUpgradeSummary, 'status')) { 'succeeded' => 'success', 'failed' => 'error', default => 'warning' }" />
+                    <span>{{ count(data_get($sentinelUpgradeSummary, 'upgraded', [])) }} upgraded</span>
+                    @if (filled(data_get($sentinelUpgradeSummary, 'failed_node_name')))
+                        <span>&middot; Stopped at {{ data_get($sentinelUpgradeSummary, 'failed_node_name') }}</span>
+                    @endif
+                    @if (filled(data_get($sentinelUpgradeSummary, 'error')))
+                        <p class="w-full text-red-600 dark:text-red-400">{{ data_get($sentinelUpgradeSummary, 'error') }}</p>
+                    @endif
+                </div>
+            @endif
             <div
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
@@ -171,9 +202,12 @@
                         <div class="truncate text-[12px] text-neutral-600 dark:text-fg-dim">
                             {{ $node->cluster?->name ?? 'Unassigned' }}
                         </div>
-                        <div>
+                        <div class="flex flex-col items-start gap-1">
                             <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'"
                                 :type="$node->is_usable ? 'success' : 'warning'" />
+                            @if ($node->needsSentinelUpgrade($sentinelRelease))
+                                <x-status-badge status="Upgrade available" type="warning" />
+                            @endif
                         </div>
                     </a>
                 @endforeach

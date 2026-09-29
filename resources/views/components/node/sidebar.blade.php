@@ -42,6 +42,14 @@
             'warning' => $sentinelNeedsAttention,
         ],
         [
+            'label' => 'Logs',
+            'route' => 'node.logs',
+            'active' => $activeMenu === 'logs',
+            'icon' => 'file-content',
+            'group' => 'Operations',
+            'visible' => auth()->user()?->can('manageSentinel', $node),
+        ],
+        [
             'label' => 'Terminal',
             'route' => 'node.command',
             'active' => $activeMenu === 'terminal',

@@ -7,10 +7,12 @@ use App\Actions\Node\CreateLifecycleOperation;
 use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
 use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Actions\Node\RepairFluxTrust;
+use App\Actions\Node\UpgradeSentinel;
 use App\Actions\Node\ValidateNode;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
 use App\Actions\Sentinel\PingFluxConnection;
@@ -20,6 +22,7 @@ use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Jobs\MoveNodeWorkloadJob;
+use App\Jobs\UpgradeNodeSentinelJob;
 use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeWorkload;
@@ -47,6 +50,14 @@ class Show extends Component
     /** @var array<string, mixed>|null */
     public ?array $fluxConnection = null;
 
+    /** @var array{version: string, digest: string, image: string}|null */
+    #[Locked]
+    public ?array $sentinelRelease = null;
+
+    /** @var array{uuid: string, status: string, version: ?string, error: ?string, updated_at: ?string}|null */
+    #[Locked]
+    public ?array $sentinelUpgrade = null;
+
     /** @var array<string, array{status: string, type: string}> */
     public array $workloadStates = [];
 
@@ -71,6 +82,27 @@ class Show extends Component
     public function installSentinel(): void
     {
         $this->runAction(fn () => InstallSentinel::run($this->node), 'Host Sentinel installed and started.');
+    }
+
+    public function upgradeSentinel(): void
+    {
+        $this->authorize('manageSentinel', $this->node);
+
+        try {
+            $operation = UpgradeSentinel::make()->start($this->node, auth()->user());
+            UpgradeNodeSentinelJob::dispatch($operation->id);
+            $this->dispatch('success', 'Sentinel upgrade queued.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+        $this->loadFluxConnection();
+    }
+
+    public function pollSentinelUpgrade(): void
+    {
+        $this->authorize('view', $this->node);
+        $this->node->refresh();
+        $this->loadFluxConnection();
     }
 
     public function restartSentinel(): void
@@ -329,6 +361,18 @@ class Show extends Component
     private function loadFluxConnection(): void
     {
         $this->fluxConnection = Cache::get($this->node->cacheKey());
+        $this->sentinelRelease = FetchLatestSentinelRelease::run();
+        $operation = $this->node->operations()
+            ->where('command_type', UpgradeSentinel::COMMAND_TYPE)
+            ->latest('id')
+            ->first();
+        $this->sentinelUpgrade = $operation === null ? null : [
+            'uuid' => $operation->uuid,
+            'status' => $operation->status->value,
+            'version' => data_get($operation->request, 'version'),
+            'error' => $operation->error,
+            'updated_at' => $operation->updated_at?->toIso8601String(),
+        ];
     }
 
     private function loadNodeData(): void

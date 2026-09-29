@@ -38,6 +38,7 @@ class RecoverStaleOperations
     private const COORDINATED_ERRORS = [
         'workload.move.v1' => 'The move stopped before completion. Check the workload on both Nodes.',
         'network.cluster.leave.v1' => 'The Node network cleanup stopped before completion. Check the network state on the Node.',
+        'sentinel.upgrade.v1' => 'The Sentinel upgrade stopped before completion. Check the Sentinel version on the Node.',
     ];
 
     /** @var array<int, bool> Whether a fresh inventory is available, by Node ID. */

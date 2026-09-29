@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Enums\NodeRole;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -129,6 +130,21 @@ class Node extends BaseModel
         if ($this->supportsCapability($capability) === false) {
             throw new RuntimeException("This Node does not support {$capability}. Upgrade Sentinel and try again.");
         }
+    }
+
+    public function runningSentinelVersion(): ?string
+    {
+        $version = $this->sentinel_version
+            ?? data_get(Cache::get($this->cacheKey()), 'sentinel_version')
+            ?? data_get($this->metadata, 'sentinel_version');
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    /** @param array{version: string}|null $release */
+    public function needsSentinelUpgrade(?array $release): bool
+    {
+        return FetchLatestSentinelRelease::isUpgradeAvailable($this->runningSentinelVersion(), $release);
     }
 
     public function restartSentinel(): ?string

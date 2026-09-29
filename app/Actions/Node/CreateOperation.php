@@ -17,7 +17,7 @@ class CreateOperation
     use AsAction;
 
     /** Operations that Coolify coordinates itself. They are never sent to Sentinel as one command. */
-    private const COORDINATED_COMMANDS = ['workload.move.v1'];
+    private const COORDINATED_COMMANDS = ['workload.move.v1', 'sentinel.upgrade.v1'];
 
     /** @param array<string, mixed> $request */
     public function handle(

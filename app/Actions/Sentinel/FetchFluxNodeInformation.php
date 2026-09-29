@@ -95,7 +95,7 @@ class FetchFluxNodeInformation
             'source' => 'flux',
         ];
 
-        $node->update(['metadata' => $metadata]);
+        $node->update(['metadata' => $metadata, 'sentinel_version' => mb_substr($information['sentinel_version'], 0, 100)]);
 
         return $information;
     }

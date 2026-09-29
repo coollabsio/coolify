@@ -6,7 +6,27 @@
     } catch (\Throwable) {
         $lastHeartbeatLabel = $lastHeartbeat;
     }
-    $sentinelVersion = data_get($node->metadata, 'sentinel_version') ?? data_get($fluxConnection, 'sentinel_version');
+    $sentinelVersion = $node->runningSentinelVersion();
+    $latestSentinelVersion = data_get($sentinelRelease, 'version');
+    $sentinelUpgradeAvailable = $node->needsSentinelUpgrade($sentinelRelease);
+    $sentinelUpgradeStatus = data_get($sentinelUpgrade, 'status');
+    $sentinelUpgradeActive = in_array($sentinelUpgradeStatus, ['queued', 'dispatched', 'running', 'verifying', 'uncertain'], true);
+    $sentinelUpgradeStatusLabel = match ($sentinelUpgradeStatus) {
+        'queued', 'dispatched' => 'Queued',
+        'running' => 'Installing',
+        'verifying' => 'Waiting for reconnect',
+        'succeeded' => 'Succeeded',
+        'failed', 'timed_out' => 'Failed',
+        'cancelled' => 'Cancelled',
+        'uncertain' => 'Uncertain',
+        default => null,
+    };
+    $sentinelUpgradeStatusType = match ($sentinelUpgradeStatus) {
+        'succeeded' => 'success',
+        'failed', 'timed_out' => 'error',
+        'cancelled' => 'neutral',
+        default => 'warning',
+    };
     $connectionDetails = [
         'Last heartbeat' => $lastHeartbeatLabel ?? 'Waiting for heartbeat',
         'Transport' => $fluxConnection ? strtoupper(data_get($fluxConnection, 'transport', 'unknown')) : 'Not connected',
@@ -47,6 +67,54 @@
 </x-application.settings-section>
 
 @can('manageSentinel', $node)
+    <x-application.settings-section id="node-sentinel-version-section" title="Version"
+        helper="Upgrades install the latest Sentinel release over SSH. If Sentinel does not reconnect within 60 seconds, the previous version is restored.">
+        <div @if ($sentinelUpgradeActive) wire:poll.5s="pollSentinelUpgrade" @endif
+            class="flex flex-wrap items-center justify-between gap-3">
+            <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+                <div class="min-w-0">
+                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Running version</dt>
+                    <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg">{{ $sentinelVersion ?? 'Unknown' }}</dd>
+                </div>
+                <div class="min-w-0">
+                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Latest version</dt>
+                    <dd class="mt-1 truncate text-sm font-medium text-neutral-950 dark:text-fg">{{ $latestSentinelVersion ?? 'Unavailable' }}</dd>
+                </div>
+                <div class="min-w-0">
+                    <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Status</dt>
+                    <dd class="mt-1">
+                        @if ($sentinelUpgradeActive)
+                            <x-status-badge :status="'Upgrade '.strtolower($sentinelUpgradeStatusLabel)" type="warning" />
+                        @elseif ($sentinelUpgradeAvailable)
+                            <x-status-badge status="Upgrade available" type="warning" />
+                        @elseif ($latestSentinelVersion !== null && $sentinelVersion !== null)
+                            <x-status-badge status="Up to date" type="success" />
+                        @else
+                            <x-status-badge status="Unknown" type="neutral" />
+                        @endif
+                    </dd>
+                </div>
+            </dl>
+            @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
+                <x-modal-confirmation title="Upgrade Sentinel?" buttonTitle="Upgrade Sentinel"
+                    submitAction="upgradeSentinel" :actions="[
+                        'Sentinel ' . $latestSentinelVersion . ' is installed on this Node over SSH and the service restarts.',
+                        'The control connection drops briefly while Sentinel restarts.',
+                        'If Sentinel does not reconnect within 60 seconds, the previous version is restored.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
+            @endif
+        </div>
+        @if ($sentinelUpgrade !== null)
+            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 text-[12px] text-neutral-600 dark:border-white/[0.07] dark:text-fg-dim">
+                <span>Last upgrade to {{ data_get($sentinelUpgrade, 'version') ?? 'unknown' }}</span>
+                <x-status-badge :status="$sentinelUpgradeStatusLabel" :type="$sentinelUpgradeStatusType" />
+                @if (filled(data_get($sentinelUpgrade, 'error')))
+                    <p class="w-full text-red-600 dark:text-red-400">{{ data_get($sentinelUpgrade, 'error') }}</p>
+                @endif
+            </div>
+        @endif
+    </x-application.settings-section>
+
     <x-application.settings-section id="node-sentinel-service-section" title="Sentinel service"
         helper="Install the latest Sentinel release on this Node or restart the service.">
         <div class="flex flex-wrap items-center justify-between gap-3">

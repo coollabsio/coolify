@@ -2,6 +2,7 @@
 
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RepairFluxTrust;
+use App\Actions\Node\RollbackSentinel;
 use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -83,6 +84,71 @@ it('restores an inactive enabled Sentinel and preserves its token and endpoint a
         ->toContain('TOKEN=previous-token')
         ->toContain('PUSH_ENDPOINT=https://previous.example/sentinel');
     expect(sentinelTrustCalls($sandbox))->toContain('stop sentinel.service');
+});
+
+it('keeps the replaced Sentinel binary as sentinel.previous after a successful update', function () {
+    $script = InstallSentinel::installationScript(
+        'sentinel-token',
+        'https://coolify.example/api/v1/sentinel',
+        'ghcr.io/coollabsio/sentinel-host@sha256:'.str_repeat('a', 64),
+        $this->authority->certificate_pem,
+        $this->authority->version,
+    );
+    $sandbox = sentinelTrustRollbackSandbox($this->directory, $script, active: true, enabled: true);
+    writeSentinelTrustCommand($sandbox['commands'], 'curl', "#!/bin/sh\nexit 0\n");
+    writeSentinelTrustFiles($sandbox['root']);
+
+    $result = runSentinelTrustFailure($sandbox);
+
+    expect($result->getExitCode())->toBe(0, $result->getErrorOutput())
+        ->and(file_get_contents($sandbox['root'].'/usr/local/bin/sentinel'))->toBe('sentinel-binary')
+        ->and(file_get_contents($sandbox['root'].'/usr/local/bin/sentinel.previous'))->toBe('previous-binary')
+        ->and(fileperms($sandbox['root'].'/usr/local/bin/sentinel.previous') & 0777)->toBe(0755)
+        ->and($sandbox['root'].'/usr/local/bin/sentinel.previous.new')->not->toBeFile();
+});
+
+it('does not create sentinel.previous on a fresh install', function () {
+    $script = InstallSentinel::installationScript(
+        'sentinel-token',
+        'https://coolify.example/api/v1/sentinel',
+        'ghcr.io/coollabsio/sentinel-host:main',
+        $this->authority->certificate_pem,
+        $this->authority->version,
+    );
+    $sandbox = sentinelTrustRollbackSandbox($this->directory, $script, active: false, enabled: false);
+    writeSentinelTrustCommand($sandbox['commands'], 'curl', "#!/bin/sh\nexit 0\n");
+
+    $result = runSentinelTrustFailure($sandbox);
+
+    expect($result->getExitCode())->toBe(0, $result->getErrorOutput())
+        ->and($sandbox['root'].'/usr/local/bin/sentinel')->toBeFile()
+        ->and($sandbox['root'].'/usr/local/bin/sentinel.previous')->not->toBeFile();
+});
+
+it('restores sentinel.previous over the current binary and restarts Sentinel', function () {
+    $sandbox = sentinelTrustRollbackSandbox($this->directory, RollbackSentinel::rollbackScript(), active: true, enabled: true);
+    File::put($sandbox['root'].'/usr/local/bin/sentinel', 'new-binary');
+    File::put($sandbox['root'].'/usr/local/bin/sentinel.previous', 'previous-binary');
+
+    $result = runSentinelTrustFailure($sandbox);
+
+    expect($result->getExitCode())->toBe(0, $result->getErrorOutput())
+        ->and(file_get_contents($sandbox['root'].'/usr/local/bin/sentinel'))->toBe('previous-binary')
+        ->and(fileperms($sandbox['root'].'/usr/local/bin/sentinel') & 0777)->toBe(0755)
+        ->and($sandbox['root'].'/usr/local/bin/sentinel.previous')->not->toBeFile()
+        ->and(sentinelTrustCalls($sandbox))->toContain('restart sentinel.service')
+        ->toContain('is-active --quiet sentinel.service');
+});
+
+it('fails the rollback without touching Sentinel when no previous binary exists', function () {
+    $sandbox = sentinelTrustRollbackSandbox($this->directory, RollbackSentinel::rollbackScript(), active: true, enabled: true);
+    File::put($sandbox['root'].'/usr/local/bin/sentinel', 'new-binary');
+
+    $result = runSentinelTrustFailure($sandbox);
+
+    expect($result->getExitCode())->toBe(1)
+        ->and(file_get_contents($sandbox['root'].'/usr/local/bin/sentinel'))->toBe('new-binary')
+        ->and(sentinelTrustCalls($sandbox))->not->toContain('restart sentinel.service');
 });
 
 /**

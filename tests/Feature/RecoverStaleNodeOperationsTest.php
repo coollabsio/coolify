@@ -198,6 +198,7 @@ it('fails stale coordinated operations for a user decision', function (string $c
 })->with([
     'move' => ['workload.move.v1', 'The move stopped before completion. Check the workload on both Nodes.'],
     'cluster leave' => ['network.cluster.leave.v1', 'The Node network cleanup stopped before completion. Check the network state on the Node.'],
+    'sentinel upgrade' => ['sentinel.upgrade.v1', 'The Sentinel upgrade stopped before completion. Check the Sentinel version on the Node.'],
 ]);
 
 it('schedules stale operation recovery every five minutes on one scheduler', function () {

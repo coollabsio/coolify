@@ -79,6 +79,8 @@ class FluxConnectionEventController extends Controller
             'connected_at' => $data['event'] === 'connected' && data_get($current, 'status') !== 'reconnecting'
                 ? now()->toIso8601String()
                 : data_get($current, 'connected_at'),
+            // connected_at survives a quick reconnect; this marks every new Sentinel connection.
+            'last_connected_at' => $data['event'] === 'connected' ? now()->toIso8601String() : data_get($current, 'last_connected_at'),
             'last_heartbeat_at' => $observedAt,
             'trust_bundle_version' => $data['trust_bundle_version'] ?? data_get($current, 'trust_bundle_version'),
             'transport' => $data['transport'] ?? data_get($current, 'transport'),
@@ -87,6 +89,9 @@ class FluxConnectionEventController extends Controller
         ], fn ($value) => $value !== null), now()->addMinutes(5));
         if (! $node->is_reachable) {
             $node->update(['is_reachable' => true]);
+        }
+        if ($data['event'] === 'connected' && filled($data['sentinel_version'] ?? null) && $node->sentinel_version !== $data['sentinel_version']) {
+            $node->update(['sentinel_version' => $data['sentinel_version']]);
         }
         if (isset($data['capabilities']) && $node->sentinel_capabilities !== $data['capabilities']) {
             $node->update(['sentinel_capabilities' => $data['capabilities']]);

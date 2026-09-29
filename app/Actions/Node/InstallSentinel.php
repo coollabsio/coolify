@@ -72,7 +72,7 @@ cleanup() {
         "\$runtime" container rm -f "\$container_id" >/dev/null 2>&1 || true
     fi
     rm -f "\$temporary_binary"
-    rm -f /usr/local/bin/sentinel.new /etc/coolify/sentinel.env.new /etc/systemd/system/sentinel.service.new
+    rm -f /usr/local/bin/sentinel.new /usr/local/bin/sentinel.previous.new /etc/coolify/sentinel.env.new /etc/systemd/system/sentinel.service.new
     rm -f /etc/coolify/sentinel-flux-ca.pem.new /etc/coolify/sentinel-flux-ca.version.new
     rm -rf "\$backup_directory"
 }
@@ -159,6 +159,11 @@ until curl --fail --silent http://127.0.0.1:8888/api/health >/dev/null; do
     sleep 1
 done
 
+if [ "\$had_binary" = true ]; then
+    install -m 0755 "\$backup_directory/sentinel" /usr/local/bin/sentinel.previous.new
+    mv -f /usr/local/bin/sentinel.previous.new /usr/local/bin/sentinel.previous
+fi
+
 completed=true
 trap - EXIT
 cleanup
@@ -217,7 +222,7 @@ UNIT;
         if (filter_var($endpoint, FILTER_VALIDATE_URL) === false || ! preg_match('/\Ahttps?:\/\//', $endpoint)) {
             throw new InvalidArgumentException('The Sentinel endpoint must be an HTTP or HTTPS URL.');
         }
-        if (! preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9._:\/-]*\z/', $image)) {
+        if (! preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9._:\/-]*(@sha256:[a-f0-9]{64})?\z/', $image)) {
             throw new InvalidArgumentException('The Sentinel host image is invalid.');
         }
         if (openssl_x509_parse($certificate) === false) {
