@@ -33,7 +33,7 @@ class Controller extends BaseController
         if (auth()->user()?->currentTeam()->id !== 0) {
             return redirect(RouteServiceProvider::HOME);
         }
-        TestEvent::dispatch();
+        TestEvent::dispatch(currentTeam()->id);
 
         return 'Look at your other tab.';
     }
