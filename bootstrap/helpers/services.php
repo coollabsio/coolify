@@ -201,7 +201,6 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $escapedWorkdir = escapeshellarg($workdir);
         $commands = collect([
             "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
-            "cd {$escapedWorkdir}",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {

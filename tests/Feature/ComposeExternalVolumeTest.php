@@ -683,7 +683,9 @@ describe('delete', function () {
         (new DeleteResourceJob($application))->handle();
 
         $all = implode("\n", $commands);
-        expect($all)->toContain('docker compose down -v')
+        // --project-directory, not cd: a non-root SSH user cannot enter the directory on the Coolify host.
+        expect($all)->toContain("docker compose --project-directory {$application->dirOnServer()} down -v")
+            ->not->toContain("cd {$application->dirOnServer()}")
             ->not->toContain('docker volume rm')
             ->and($application->docker_compose)->toContain("shared-data:\n    external: true");
     });

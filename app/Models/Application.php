@@ -551,7 +551,8 @@ class Application extends BaseModel
         $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
-            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
+            // --project-directory instead of cd: a non-root SSH user cannot enter the directory on the Coolify host.
+            instant_remote_process(["docker compose --project-directory {$this->dirOnServer()} down -v"], $server, false);
         } else {
             if ($persistentStorages->count() === 0) {
                 return;

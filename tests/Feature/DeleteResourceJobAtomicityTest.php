@@ -304,7 +304,7 @@ it('removes service containers with a command that works for non-root SSH users'
     // A leading variable assignment becomes "sudo container_ids=...", which sudo rejects.
     expect($commands->implode("\n"))
         ->not->toContain('sudo container_ids=')
-        ->toContain("sudo bash -c 'sh -c")
+        ->toContain("sudo sh -c '")
         ->toContain("label=coolify.service.subUuid={$application->uuid}")
         ->toContain('docker rm -f $container_ids');
 });
