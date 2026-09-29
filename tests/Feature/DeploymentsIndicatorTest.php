@@ -50,39 +50,27 @@ beforeEach(function () {
     ]);
 });
 
-it('hides the floating deployments indicator on the dashboard', function () {
-    $this->get(route('dashboard'))
-        ->assertSuccessful()
-        ->assertDontSee('1 deployment', false)
-        ->assertDontSee('aria-label="Active deployments"', false);
-});
-
-it('shows the floating deployments indicator on non-dashboard pages', function () {
-    $this->get(route('project.index'))
+it('shows the deployments indicator on every page, including the dashboard', function (string $routeName) {
+    $this->get(route($routeName))
         ->assertSuccessful()
         ->assertSee('1 deployment', false)
         ->assertSee('aria-label="Active deployments"', false);
-});
+})->with(['dashboard', 'project.index']);
 
-it('keeps the indicator hidden across polls after mounting on the dashboard', function () {
-    $component = Livewire::test(DeploymentsIndicator::class)
-        ->set('shouldShow', false)
-        ->assertDontSee('1 deployment');
+it('hides the indicator when no deployment is running', function () {
+    ApplicationDeploymentQueue::query()->update(['status' => ApplicationDeploymentStatus::FINISHED->value]);
 
-    // Polls call refresh methods without remounting; visibility must stay sticky.
-    $component
-        ->call('$refresh')
-        ->assertSet('shouldShow', false)
-        ->assertDontSee('1 deployment');
-});
-
-it('updates visibility from the browser path after navigation', function () {
     Livewire::test(DeploymentsIndicator::class)
-        ->assertSet('shouldShow', true)
-        ->call('updateShouldShowFromPath', '/')
-        ->assertSet('shouldShow', false)
-        ->assertDontSee('1 deployment')
-        ->call('updateShouldShowFromPath', '/projects')
-        ->assertSet('shouldShow', true)
-        ->assertSee('1 deployment');
+        ->assertDontSee('Active deployments');
+});
+
+it('does not show deployments of another team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+
+    ApplicationDeploymentQueue::query()->update(['server_id' => $otherServer->id]);
+
+    Livewire::test(DeploymentsIndicator::class)
+        ->assertDontSee('Indicator App')
+        ->assertDontSee('Active deployments');
 });
