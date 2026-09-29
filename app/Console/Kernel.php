@@ -12,6 +12,7 @@ use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
@@ -63,6 +64,7 @@ class Kernel extends ConsoleKernel
             ->runInBackground();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new CheckMissingDatabaseBackupsJob)->hourly()->onOneServer();
+        $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
