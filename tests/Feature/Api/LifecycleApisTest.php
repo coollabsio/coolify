@@ -7,6 +7,7 @@ use App\Models\CloudInitScript;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
+use App\Models\NotificationThrottle;
 use App\Models\Project;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -15,6 +16,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Database\BackupMissing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
@@ -144,10 +146,8 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             'frequency' => '0 0 * * *',
             'save_s3' => false,
         ]);
-        $backup->forceFill([
-            'last_execution_at' => now()->subDay(),
-            'missing_backup_notification_sent_at' => now(),
-        ])->save();
+        $backup->forceFill(['last_execution_at' => now()->subDay()])->save();
+        NotificationThrottle::record($backup, BackupMissing::class);
 
         $response = $this->withHeaders($this->headers)
             ->postJson("/api/v1/databases/{$database->uuid}/clone", [
@@ -166,7 +166,7 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             ->and($cloned->destination_id)->toBe($this->destination->id)
             ->and(str($cloned->status)->startsWith('exited'))->toBeTrue()
             ->and($clonedBackup->last_execution_at)->toBeNull()
-            ->and($clonedBackup->missing_backup_notification_sent_at)->toBeNull();
+            ->and(NotificationThrottle::wasSent($clonedBackup, BackupMissing::class))->toBeFalse();
     });
 
     test('creates renamed volumes when cloning a database with clone_volumes', function () {

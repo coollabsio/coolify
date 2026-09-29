@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\CheckMissingDatabaseBackupsJob;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Team;
@@ -49,7 +50,7 @@ it('notifies the team when an enabled backup has no executions for the configure
     (new CheckMissingDatabaseBackupsJob)->handle();
 
     Notification::assertSentTo($team, BackupMissing::class, fn (BackupMissing $notification) => $notification->backup->is($backup));
-    expect($backup->fresh()->missing_backup_notification_sent_at)->not->toBeNull();
+    expect(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeTrue();
 });
 
 it('does not notify for recent disabled or unconfigured backup schedules', function () {
@@ -114,7 +115,7 @@ it('waits to mark an incident sent until a notification channel is enabled', fun
     $backup = missingBackupSchedule($team);
 
     (new CheckMissingDatabaseBackupsJob)->handle();
-    expect($backup->fresh()->missing_backup_notification_sent_at)->toBeNull();
+    expect(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeFalse();
 
     $team->emailNotificationSettings->update([
         'smtp_enabled' => true,
