@@ -2693,7 +2693,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database->id);
+        $containers = getCurrentDatabaseContainerStatus($database->destination->server, $database);
 
         if ($containers->count() == 0) {
             return response()->json([

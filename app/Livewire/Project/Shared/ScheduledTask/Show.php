@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -85,6 +86,15 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Timezone of the server the task runs on, used to display its next run.
+     */
+    #[Computed]
+    public function serverTimezone(): ?string
+    {
+        return $this->task->scheduleTimezone();
     }
 
     private function syncData(bool $toModel = false): void

@@ -56,18 +56,19 @@ class DeleteService
 
     private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
     {
-        $serviceId = (int) $service->id;
-        $filters = "--filter label=coolify.serviceId={$serviceId}";
+        $filters = [];
+        $legacyFilters = [];
         if ($subresource !== null) {
-            // Applications and databases are separate tables, so an id alone can match the other type.
             $subType = $subresource instanceof ServiceDatabase ? 'database' : 'application';
-            $subId = (int) $subresource->id;
-            $filters .= " --filter label=coolify.service.subId={$subId} --filter label=coolify.service.subType={$subType}";
+            $filters = ["label=coolify.service.subUuid={$subresource->uuid}", "label=coolify.service.subType={$subType}"];
+            // Containers from before the UUID labels: the compose service key is the subresource name.
+            $legacyFilters = ["label=com.docker.compose.service={$subresource->name}", "label=coolify.service.subType={$subType}"];
         }
 
         // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
         // assignment would become "sudo container_ids=...", which sudo rejects.
-        $script = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
+        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters, legacyId: (int) $service->id)
+            .'; [ -z "$container_ids" ] || docker rm -f $container_ids';
         instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }
 

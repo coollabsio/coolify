@@ -56,6 +56,8 @@
 ## Make distributed schedules durable
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
 - Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
+- Store the next due time on each schedule and select only due rows; claim a run with `UPDATE ... WHERE next_run_at = :old`. Do not evaluate every cron expression each minute: on a remote database the per-row queries alone exceed the one-minute budget.
+- Run a per-minute dispatcher from the scheduler process, not as a queued job, so queue backlog cannot delay it.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
 - Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
 
@@ -78,3 +80,8 @@
 
 ## Format only your own files
 - `pint --dirty` also rewrites uncommitted files that belong to other work in the tree. When the tree has unrelated changes, pass your changed paths to Pint.
+
+## Match containers by UUID, never by numeric id
+- Container ownership labels are `coolify.applicationUuid`, `coolify.serviceUuid`, `coolify.service.subUuid`, and `coolify.databaseUuid`. Numeric ids change when a server moves to another instance.
+- Use `resolveContainerOwner()`, `resolveServiceContainerOwner()`, and `containersOwnedBy()` / `dockerPsByOwnerCommands()` from `bootstrap/helpers/docker.php`. Order: UUID label, then `com.docker.compose.project` (the UUID only since July 2024), then the local numeric id label of older containers.
+- Read owners from the flat label list. `Arr::undot()` breaks `com.docker.compose.project` because `com.docker.compose.project.config_files` is nested under it.

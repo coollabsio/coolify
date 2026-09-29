@@ -19,7 +19,7 @@ class StopApplicationOneServer
             return 'Server is not functional';
         }
         try {
-            $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            $containers = getCurrentApplicationContainerStatus($server, $application, 0);
             $timeout = $application->settings->stopGracePeriodSeconds();
 
             if ($containers->count() > 0) {

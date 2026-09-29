@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -10,6 +11,8 @@ use Livewire\Component;
 
 class Executions extends Component
 {
+    use ListensToTeamChannel;
+
     #[Locked]
     public ScheduledTask $task;
 
@@ -36,11 +39,9 @@ class Executions extends Component
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ScheduledTaskDone" => 'refreshExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'ScheduledTaskDone' => 'refreshExecutions',
+        ]);
     }
 
     public function mount($taskId)

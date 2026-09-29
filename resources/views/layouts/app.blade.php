@@ -54,8 +54,6 @@
         }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-on:livewire:navigated.window="applyCollapsed(true)"
             :style="{ '--sidebar-w': collapsed ? '4rem' : '14rem' }" x-cloak
             class="dark:text-inherit text-black">
-            <livewire:deployments-indicator />
-
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
                 x-data="{ resourceActionsOpen: false }"
@@ -145,7 +143,7 @@
             <div class="hidden lg:fixed lg:top-12 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col min-w-0"
                 :class="[collapsed ? 'lg:w-16' : 'lg:w-56', sidebarReady ? 'transition-[width] duration-200' : '']">
                 <div class="flex grow min-w-0 flex-col overflow-visible">
-                    <x-navbar />
+                    <x-navbar deployments-indicator />
                 </div>
             </div>
 
@@ -166,6 +164,7 @@
                     <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
                         class="hidden shrink-0 items-center"></div>
                     <div id="configuration-warning-hud-slot-mobile" class="relative shrink-0"></div>
+                    <livewire:deployments-indicator variant="mobile" />
                     @if (isInstanceAdmin() && !isCloud())
                         <livewire:upgrade key="mobile-upgrade" />
                     @endif

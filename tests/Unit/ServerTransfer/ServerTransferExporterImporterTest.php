@@ -352,7 +352,6 @@ test('import rolls back all created rows when a later resource fails', function 
         dryRun: false,
         preserveUuids: true,
         adoptMode: true,
-        claim: false,
     ))->toThrow(RuntimeException::class, 'Unsupported database type');
 
     expect(Server::where('uuid', $originalServerUuid)->exists())->toBeFalse()

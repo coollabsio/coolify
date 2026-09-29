@@ -9,6 +9,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ use Livewire\Component;
 class Storage extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $resource;
 
@@ -60,12 +62,12 @@ class Storage extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},FileStorageChanged" => 'refreshStoragesFromEvent',
             'storageCountsChanged' => 'refreshStorages',
             'addNewVolume',
+            ...$this->teamChannelListeners([
+                'FileStorageChanged' => 'refreshStoragesFromEvent',
+            ]),
         ];
     }
 

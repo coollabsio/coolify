@@ -145,7 +145,11 @@ it('removes service containers before its volumes and local metadata', function 
 
     $commandList = $commands->implode("\n");
     expect($commandList)
+        ->toContain("label=coolify.serviceUuid={$service->uuid}")
+        ->toContain("label=com.docker.compose.project={$service->uuid}")
+        // Containers from before mid-2024 may have another compose project; the local id still finds them.
         ->toContain("label=coolify.serviceId={$service->id}")
+        ->toContain('sort -u')
         ->toContain('docker rm -f $container_ids')
         ->toContain("docker volume rm -f '{$service->uuid}_web-data'")
         ->and(strpos($commandList, 'docker rm -f $container_ids'))
@@ -178,9 +182,12 @@ it('targets a service subresource container by its Docker labels', function () {
     app(DeleteService::class)->removeSubresourceContainer($application);
 
     expect($commands->implode("\n"))
-        ->toContain("label=coolify.serviceId={$service->id}")
-        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain("label=coolify.serviceUuid={$service->uuid}")
+        ->toContain("label=coolify.service.subUuid={$application->uuid}")
         ->toContain('label=coolify.service.subType=application')
+        // Containers from before the UUID labels are found by compose project and service key.
+        ->toContain("label=com.docker.compose.project={$service->uuid}")
+        ->toContain('label=com.docker.compose.service=web')
         ->toContain('docker rm -f $container_ids');
 });
 
@@ -208,8 +215,9 @@ it('removes only the database container when an application of the same service 
     app(DeleteService::class)->removeSubresourceContainer($database->fresh());
 
     expect($commands->implode("\n"))
-        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain("label=coolify.service.subUuid={$database->uuid}")
         ->toContain('label=coolify.service.subType=database')
+        ->not->toContain("label=coolify.service.subUuid={$application->uuid}")
         ->not->toContain('label=coolify.service.subType=application');
 });
 
@@ -297,6 +305,6 @@ it('removes service containers with a command that works for non-root SSH users'
     expect($commands->implode("\n"))
         ->not->toContain('sudo container_ids=')
         ->toContain("sudo bash -c 'sh -c")
-        ->toContain("label=coolify.service.subId={$application->id}")
+        ->toContain("label=coolify.service.subUuid={$application->uuid}")
         ->toContain('docker rm -f $container_ids');
 });

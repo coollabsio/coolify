@@ -4,8 +4,11 @@ use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -56,12 +59,188 @@ function caddyTrafficAppKey(string $uuid, ?string $serviceName = null): string
     return (string) preg_replace('/[^A-Za-z0-9-]+/', '-', $key);
 }
 
-function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
+/**
+ * UUID of the resource that owns a container.
+ *
+ * New containers carry `coolify.{type}Uuid`. Containers created before that label carry a
+ * numeric `coolify.{type}Id` instead. Ids change when a server moves to another instance, so
+ * for those containers the owner is read from the compose project (Swarm: stack namespace),
+ * which is the resource UUID for deployments since mid-2024. Use resolveContainerOwner() to
+ * also fall back to the numeric id for older containers.
+ *
+ * @param  'application'|'service'|'database'  $type
+ */
+function containerOwnerUuid(Collection|array|string $labels, string $type): ?string
+{
+    $labels = is_string($labels) ? format_docker_labels_to_json($labels) : collect($labels);
+
+    $uuid = $labels->get("coolify.{$type}Uuid");
+    if (filled($uuid)) {
+        return (string) $uuid;
+    }
+
+    if (! $labels->has("coolify.{$type}Id")) {
+        return null;
+    }
+
+    $legacyUuid = $labels->get('com.docker.compose.project') ?? $labels->get('com.docker.stack.namespace');
+
+    return filled($legacyUuid) ? (string) $legacyUuid : null;
+}
+
+/**
+ * Resource that owns a container, from the given candidates.
+ *
+ * Order: UUID label, compose project / stack namespace (see containerOwnerUuid()), then the
+ * numeric id label of containers without a UUID label. The id is only correct on the instance
+ * that created the container, so it is the last fallback.
+ *
+ * @template TResource of \Illuminate\Database\Eloquent\Model
+ *
+ * @param  Collection<int, TResource>  $resources
+ * @param  'application'|'service'|'database'  $type
+ * @return TResource|null
+ */
+function resolveContainerOwner(Collection $resources, Collection|array|string $labels, string $type): mixed
+{
+    $labels = is_string($labels) ? format_docker_labels_to_json($labels) : collect($labels);
+
+    $uuid = containerOwnerUuid($labels, $type);
+    $owner = $uuid ? $resources->firstWhere('uuid', $uuid) : null;
+    if ($owner || filled($labels->get("coolify.{$type}Uuid"))) {
+        return $owner;
+    }
+
+    $legacyId = $labels->get("coolify.{$type}Id");
+
+    return is_numeric($legacyId) ? $resources->first(fn ($resource) => (int) $resource->id === (int) $legacyId) : null;
+}
+
+/**
+ * Id of the application that owns a container, also for applications not in $applications
+ * (for example the parent of a preview). Same order as resolveContainerOwner().
+ */
+function resolveContainerApplicationId(Collection $applications, Collection|array|string $labels): ?int
+{
+    $labels = is_string($labels) ? format_docker_labels_to_json($labels) : collect($labels);
+
+    $owner = resolveContainerOwner($applications, $labels, 'application');
+    if ($owner) {
+        return (int) $owner->id;
+    }
+
+    $uuid = containerOwnerUuid($labels, 'application');
+    $id = $uuid ? Application::withTrashed()->where('uuid', $uuid)->value('id') : null;
+    if ($id !== null || filled($labels->get('coolify.applicationUuid'))) {
+        return $id !== null ? (int) $id : null;
+    }
+
+    $legacyId = $labels->get('coolify.applicationId');
+
+    return is_numeric($legacyId) ? (int) $legacyId : null;
+}
+
+/**
+ * Whether a container belongs to a resource of the given type (by UUID or older numeric id label).
+ *
+ * @param  'application'|'service'|'database'  $type
+ */
+function isContainerOfType(Collection|array|string $labels, string $type): bool
+{
+    $labels = is_string($labels) ? format_docker_labels_to_json($labels) : collect($labels);
+
+    return filled($labels->get("coolify.{$type}Uuid")) || filled($labels->get("coolify.{$type}Id"));
+}
+
+/**
+ * Service, sub type, and service application/database that own a service container.
+ *
+ * The part is matched by `coolify.service.subUuid`; containers from before that label are matched
+ * by their compose service key (the part name), then by the older numeric `coolify.service.subId`.
+ *
+ * @param  Collection<int, Service>  $services
+ * @return array{0: ?Service, 1: ?string, 2: ServiceApplication|ServiceDatabase|null}
+ */
+function resolveServiceContainerOwner(Collection $services, Collection|array $flatLabels): array
+{
+    $labels = collect($flatLabels);
+    $service = resolveContainerOwner($services, $labels, 'service');
+    if (! $service) {
+        return [null, null, null];
+    }
+
+    $subType = $labels->get('coolify.service.subType');
+    $parts = $subType === 'database' ? $service->databases : $service->applications;
+    $subUuid = $labels->get('coolify.service.subUuid');
+    if (filled($subUuid)) {
+        return [$service, $subType, $parts->firstWhere('uuid', $subUuid)];
+    }
+
+    $legacySubId = $labels->get('coolify.service.subId');
+    $part = $parts->firstWhere('name', $labels->get('com.docker.compose.service'))
+        ?? (is_numeric($legacySubId) ? $parts->first(fn ($part) => (int) $part->id === (int) $legacySubId) : null);
+
+    return [$service, $subType, $part];
+}
+
+/**
+ * Remote commands that list, as JSON lines, the containers owned by a resource (see containerOwnerUuid()).
+ *
+ * @param  'application'|'service'|'database'  $type
+ * @param  list<string>  $extraFilters  Additional `--filter` values, e.g. `label=coolify.pullRequestId=0`.
+ * @param  list<string>|null  $legacyExtraFilters  Filters for containers without the UUID label; defaults to $extraFilters.
+ * @param  int|null  $legacyId  Local numeric id: also match older containers by `coolify.{type}Id` (may repeat a container).
+ * @return list<string>
+ */
+function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters = [], string $format = '{{json .}}', bool $all = true, ?array $legacyExtraFilters = null, ?int $legacyId = null): array
+{
+    $filters = fn (array $values) => collect($values)->map(fn (string $filter) => '--filter '.escapeshellarg($filter))->implode(' ');
+    $base = 'docker ps'.($all ? ' -a' : '');
+    $formatArgument = '--format '.escapeshellarg($format);
+    $legacyFilters = $legacyExtraFilters ?? $extraFilters;
+
+    $commands = [
+        $base.' '.$filters(["label=coolify.{$type}Uuid={$uuid}", ...$extraFilters]).' '.$formatArgument,
+        $base.' '.$filters(["label=coolify.{$type}Id", "label=com.docker.compose.project={$uuid}", ...$legacyFilters]).' '.$formatArgument,
+    ];
+    if ($legacyId !== null) {
+        $commands[] = $base.' '.$filters(["label=coolify.{$type}Id={$legacyId}", ...$legacyFilters]).' '.$formatArgument;
+    }
+
+    return $commands;
+}
+
+/**
+ * Run dockerPsByOwnerCommands() for a resource and return each container once.
+ *
+ * @param  'application'|'service'|'database'  $type
+ */
+function containersOwnedBy(Server $server, string $type, Model $resource): Collection
+{
+    $output = instant_remote_process(dockerPsByOwnerCommands($type, $resource->uuid, legacyId: (int) $resource->id), $server);
+
+    return format_docker_command_output_to_json($output)->filter()->unique('ID')->values();
+}
+
+/**
+ * One shell line that sets $container_ids to the ids of the containers owned by a resource.
+ *
+ * @param  'application'|'service'|'database'  $type
+ * @param  list<string>  $extraFilters
+ * @param  list<string>|null  $legacyExtraFilters
+ */
+function containerIdsByOwnerScript(string $type, string $uuid, array $extraFilters = [], bool $all = true, ?array $legacyExtraFilters = null, ?int $legacyId = null): string
+{
+    $commands = dockerPsByOwnerCommands($type, $uuid, $extraFilters, '{{.ID}}', $all, $legacyExtraFilters, $legacyId);
+
+    return 'container_ids=$({ '.implode('; ', $commands).'; } | sort -u)';
+}
+
+function getCurrentApplicationContainerStatus(Server $server, Application $application, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
     if (! $server->isSwarm()) {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
-        $containers = format_docker_command_output_to_json($containers);
+        $containers = containersOwnedBy($server, 'application', $application);
 
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
@@ -105,35 +284,29 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     return $containers;
 }
 
-function getCurrentServiceContainerStatus(Server $server, int $id): Collection
+function getCurrentServiceContainerStatus(Server $server, Service $service): Collection
 {
     $containers = collect([]);
     if (! $server->isSwarm()) {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
-        $containers = format_docker_command_output_to_json($containers);
-
-        return $containers->filter();
+        return containersOwnedBy($server, 'service', $service);
     }
 
     return $containers;
 }
 
-function getCurrentDatabaseContainerStatus(Server $server, int $id): Collection
+function getCurrentDatabaseContainerStatus(Server $server, Model $database): Collection
 {
     $containers = collect([]);
     if (! $server->isSwarm()) {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.databaseId={$id}' --format '{{json .}}' "], $server);
-        $containers = format_docker_command_output_to_json($containers);
-
-        return $containers->filter();
+        return containersOwnedBy($server, 'database', $database);
     }
 
     return $containers;
 }
 
-function getCurrentServiceSubContainerStatus(Server $server, int $id, string $name): Collection
+function getCurrentServiceSubContainerStatus(Server $server, Service $service, string $name): Collection
 {
-    return filterServiceSubContainersByName(getCurrentServiceContainerStatus($server, $id), $name);
+    return filterServiceSubContainersByName(getCurrentServiceContainerStatus($server, $service), $name);
 }
 
 function filterServiceSubContainersByName(Collection $containers, string $name): Collection
@@ -411,7 +584,7 @@ function defaultDatabaseLabels($database)
     $labels = collect([]);
     $labels->push('coolify.managed=true');
     $labels->push('coolify.type=database');
-    $labels->push('coolify.databaseId='.$database->id);
+    $labels->push('coolify.databaseUuid='.$database->uuid);
     $labels->push('coolify.resourceName='.Str::slug($database->name));
     $labels->push('coolify.serviceName='.Str::slug($database->name));
     $labels->push('coolify.projectName='.Str::slug($database->project()->name));
@@ -421,12 +594,12 @@ function defaultDatabaseLabels($database)
     return $labels;
 }
 
-function defaultLabels($id, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
+function defaultLabels(string $uuid, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, ?string $subUuid = null, $subName = null)
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
     $labels->push('coolify.version='.config('constants.coolify.version'));
-    $labels->push('coolify.'.$type.'Id='.$id);
+    $labels->push('coolify.'.$type.'Uuid='.$uuid);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.Str::slug($name));
     $labels->push('coolify.resourceName='.Str::slug($resourceName));
@@ -436,7 +609,7 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
 
     $labels->push('coolify.pullRequestId='.$pull_request_id);
     if ($type === 'service') {
-        $subId && $labels->push('coolify.service.subId='.$subId);
+        $subUuid && $labels->push('coolify.service.subUuid='.$subUuid);
         $subType && $labels->push('coolify.service.subType='.$subType);
         $subName && $labels->push('coolify.service.subName='.Str::slug($subName));
     }

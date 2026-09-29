@@ -3792,7 +3792,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return escapeDollarSign($value);
             });
         }
-        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
+        $labels = $labels->merge(defaultLabels($this->application->uuid, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
@@ -4584,12 +4584,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled) {
-                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     $this->containerNamesToRemove($containers)->each(function (string $containerName) {
                         $this->graceful_shutdown_container($containerName);
                     });
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
                     if ($this->pull_request_id === 0) {
                         $containers = $containers->filter(function ($container) {
                             return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== addPreviewDeploymentSuffix($this->container_name, $this->pull_request_id);
@@ -5465,7 +5465,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->pre_deployment_command)) {
             return;
         }
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
         if ($containers->count() == 0) {
             $this->application_deployment_queue->addLogEntry('Pre-deployment command: No running containers found. Skipping.');
 
@@ -5510,7 +5510,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Executing post-deployment command (see debug log for output).');
 
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
         if ($containers->count() == 0) {
             $this->application_deployment_queue->addLogEntry('Post-deployment command: No running containers found. Skipping.');
 

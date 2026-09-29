@@ -7,6 +7,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class Import extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     #[Locked]
     public ?int $resourceId = null;
@@ -40,12 +42,10 @@ class Import extends Component
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refreshStatus';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refreshStatus';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refreshStatus']),
+        ];
     }
 
     public function mount(): void

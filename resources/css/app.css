@@ -2541,18 +2541,6 @@ input[type="search"]::-webkit-search-results-decoration {
     border: 1px solid var(--coollabs-fill);
 }
 
-.checkpoint-scroll-fade::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-    width: 2rem;
-    background: linear-gradient(to left, var(--coollabs-base), transparent);
-    pointer-events: none;
-}
-
 @media (max-width: 639px) {
     .process-dialog-mobile-fullscreen {
         height: 100dvh !important;

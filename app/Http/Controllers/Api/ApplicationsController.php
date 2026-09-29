@@ -2589,7 +2589,7 @@ class ApplicationsController extends Controller
             }
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([

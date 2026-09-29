@@ -7,12 +7,13 @@ it('refreshes backup executions from backup broadcasts on the current team chann
     $databaseBackupJob = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
 
     expect($serviceExecutions)
-        ->toContain('echo-private:team.{$teamId},BackupCreated')
-        ->toContain("=> '\$refresh'")
+        ->toContain('teamChannelListeners([')
+        ->toContain("'BackupCreated' => '\$refresh'")
         ->and($serviceBackups)
-        ->toContain('echo-private:team.{$teamId},BackupCreated')
+        ->toContain('teamChannelListeners([')
+        ->toContain("'BackupCreated' => '\$refresh'")
         ->and($databaseExecutions)
-        ->toContain('$teamId = currentTeam()->id')
+        ->toContain("'BackupCreated' => 'refreshBackupExecutions'")
         ->not->toContain('$userId = Auth::id()')
         ->and(strpos($databaseBackupJob, "'finished_at' => Carbon::now()->toImmutable()"))
         ->toBeLessThan(strrpos($databaseBackupJob, 'BackupCreated::dispatch($this->team->id)'));

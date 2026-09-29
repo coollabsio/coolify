@@ -37,8 +37,8 @@ class StopApplication
                 }
 
                 $containers = $previewDeployments
-                    ? getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true)
-                    : getCurrentApplicationContainerStatus($server, $application->id, 0);
+                    ? getCurrentApplicationContainerStatus($server, $application, includePullrequests: true)
+                    : getCurrentApplicationContainerStatus($server, $application, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
                 $timeout = $application->settings->stopGracePeriodSeconds();

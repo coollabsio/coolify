@@ -531,8 +531,8 @@ class Application extends BaseModel
     public function getContainersToStop(Server $server, bool $previewDeployments = false): array
     {
         $containers = $previewDeployments
-            ? getCurrentApplicationContainerStatus($server, $this->id, includePullrequests: true)
-            : getCurrentApplicationContainerStatus($server, $this->id, 0);
+            ? getCurrentApplicationContainerStatus($server, $this, includePullrequests: true)
+            : getCurrentApplicationContainerStatus($server, $this, 0);
 
         return $containers->pluck('Names')->toArray();
     }
@@ -2180,8 +2180,8 @@ class Application extends BaseModel
             if (! $labels->contains('coolify.managed')) {
                 $labels->push('coolify.managed=true');
             }
-            if (! $labels->contains('coolify.applicationId')) {
-                $labels->push('coolify.applicationId='.$this->id);
+            if (! $labels->contains('coolify.applicationUuid='.$this->uuid)) {
+                $labels->push('coolify.applicationUuid='.$this->uuid);
             }
             if (! $labels->contains('coolify.type')) {
                 $labels->push('coolify.type=application');
