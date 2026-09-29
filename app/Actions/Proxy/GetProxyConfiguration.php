@@ -113,7 +113,7 @@ class GetProxyConfiguration
         $readLimit = self::MAX_CONFIGURATION_SIZE_BYTES + 1;
         $result = instant_remote_process([
             "mkdir -p $proxy_path",
-            "if [ ! -f {$configurationPath} ]; then exit 0; elif [ \"$(wc -c < {$configurationPath})\" -gt ".self::MAX_CONFIGURATION_SIZE_BYTES." ]; then echo '__COOLIFY_PROXY_CONFIG_TOO_LARGE__'; else head -c {$readLimit} {$configurationPath}; fi",
+            "if [ ! -f {$configurationPath} ]; then exit 0; elif [ \"$(stat -c %s {$configurationPath})\" -gt ".self::MAX_CONFIGURATION_SIZE_BYTES." ]; then echo '__COOLIFY_PROXY_CONFIG_TOO_LARGE__'; else head -c {$readLimit} {$configurationPath}; fi",
         ], $server, false);
 
         if ($result === '__COOLIFY_PROXY_CONFIG_TOO_LARGE__' || strlen($result ?? '') > self::MAX_CONFIGURATION_SIZE_BYTES) {
