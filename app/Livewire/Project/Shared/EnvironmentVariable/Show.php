@@ -174,7 +174,7 @@ class Show extends Component
 
     public function copyValue(): ?string
     {
-        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
+        if ($this->env->is_shown_once || (auth()->user()?->cannot('update', $this->env) ?? true)) {
             return null;
         }
 

@@ -40,10 +40,6 @@ class ShowHardcoded extends Component
 
     public function copyValue(): ?string
     {
-        if (auth()->user()?->isMember() ?? true) {
-            return null;
-        }
-
         $environmentVariable = EnvironmentVariable::make([
             'value' => $this->value,
             'is_preview' => $this->isPreview,

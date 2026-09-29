@@ -1,11 +1,11 @@
 <?php
 
+use App\Auth\GitlabProvider;
 use App\Auth\Oidc\OidcConfig;
 use App\Models\OauthSetting;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\BitbucketProvider;
 use Laravel\Socialite\Two\GithubProvider;
-use Laravel\Socialite\Two\GitlabProvider;
 use SocialiteProviders\Discord\Provider;
 use SocialiteProviders\Manager\Config;
 
