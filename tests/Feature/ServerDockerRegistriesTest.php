@@ -737,3 +737,17 @@ it('does not open the overview login form for members', function () {
 
     Livewire::test(Login::class)->assertForbidden();
 });
+
+it('explains a missing login and hides SSH connection noise in docker errors', function () {
+    makeDockerRegistriesServerReachable($this->server);
+    $sshNoise = "Control socket connect(/var/www/html/storage/app/ssh/mux/mux_x): Permission denied\nControlSocket /var/www/html/storage/app/ssh/mux/mux_x already exists, disabling multiplexing\nWarning: Permanently added '203.0.113.7' (ED25519) to the list of known hosts.";
+    Process::fake(fn () => Process::result(errorOutput: $sshNoise."\nerror: cannot perform an interactive login from a non-TTY device", exitCode: 1));
+
+    expect(fn () => DockerRegistryLogins::checkLogin($this->server, 'ghcr.io'))
+        ->toThrow(RuntimeException::class, 'There is no saved login for ghcr.io on this server.');
+
+    Process::fake(fn () => Process::result(errorOutput: $sshNoise."\nError response from daemon: unauthorized", exitCode: 1));
+
+    expect(fn () => DockerRegistryLogins::login($this->server, 'ghcr.io', 'octocat', 'token'))
+        ->toThrow(fn (RuntimeException $exception) => expect($exception->getMessage())->toBe('Error response from daemon: unauthorized'));
+});

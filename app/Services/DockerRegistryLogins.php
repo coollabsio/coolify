@@ -230,7 +230,11 @@ class DockerRegistryLogins
      */
     public static function checkLogin(Server $server, string $registry): void
     {
-        self::run($server, 'docker --config "$HOME/.docker" login'.self::registryArgument($registry).' </dev/null');
+        self::run(
+            $server,
+            'docker --config "$HOME/.docker" login'.self::registryArgument($registry).' </dev/null',
+            emptyErrorMessage: "There is no saved login for {$registry} on this server.",
+        );
     }
 
     public static function logout(Server $server, string $registry): void
@@ -259,8 +263,9 @@ class DockerRegistryLogins
 
     /**
      * @param  array<int, string>  $secrets  values that must not appear in the error message
+     * @param  string|null  $emptyErrorMessage  message when docker gives no useful error line
      */
-    private static function run(Server $server, string $command, array $secrets = []): void
+    private static function run(Server $server, string $command, array $secrets = [], ?string $emptyErrorMessage = null): void
     {
         $commands = $server->isNonRoot() ? parseCommandsByLineForSudo(collect([$command]), $server) : [$command];
         $process = Process::timeout(60)->run(SshMultiplexingHelper::generateSshCommand($server, implode("\n", $commands)));
@@ -276,12 +281,15 @@ class DockerRegistryLogins
                 || str_contains($line, 'credential-stores')
                 || str_starts_with($line, 'Info ->')
                 || str_starts_with($line, 'Authenticating with existing credentials')
-                || str_contains($line, 'cannot perform an interactive login'));
+                || str_contains($line, 'cannot perform an interactive login')
+                || str_starts_with($line, 'Control socket connect')
+                || str_starts_with($line, 'ControlSocket ')
+                || str_starts_with($line, 'Warning: Permanently added'));
         $dockerErrors = $lines->filter(fn (string $line) => str_starts_with($line, 'Error'));
         $error = ($dockerErrors->isNotEmpty() ? $dockerErrors : $lines)->implode(' ');
         $secrets = array_filter($secrets, fn (string $secret) => $secret !== '');
         $error = str_replace($secrets, '***', $error);
 
-        throw new RuntimeException($error !== '' ? $error : "The command failed with exit code {$process->exitCode()}.");
+        throw new RuntimeException($error !== '' ? $error : ($emptyErrorMessage ?? "The command failed with exit code {$process->exitCode()}."));
     }
 }
