@@ -14,11 +14,29 @@ class SafeWebhookUrl implements ValidationRule
 {
     /**
      * @param  (Closure(string): array<int, string>)|null  $resolver
-     */
-    /**
      * @param  array<int, string>  $trustedInternalHosts
+     * @param  bool  $allowPrivateNetworks  Allow private, CGNAT, and unique local addresses and internal hostnames.
+     *                                      Loopback, link-local (cloud metadata), and reserved targets stay blocked.
      */
-    public function __construct(private ?Closure $resolver = null, private array $trustedInternalHosts = []) {}
+    public function __construct(
+        private ?Closure $resolver = null,
+        private array $trustedInternalHosts = [],
+        private bool $allowPrivateNetworks = false,
+    ) {}
+
+    /**
+     * Git sources such as GitHub Enterprise or GitLab often run on a private network.
+     * Self-hosted instances allow them. Coolify Cloud keeps them blocked.
+     */
+    public static function forGitSource(): static
+    {
+        return new static(allowPrivateNetworks: self::gitSourcesMayUsePrivateNetworks());
+    }
+
+    public static function gitSourcesMayUsePrivateNetworks(): bool
+    {
+        return ! isCloud();
+    }
 
     /**
      * Run the validation rule.
@@ -109,9 +127,10 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * Build HTTP client options that pin the validated host to the resolved IPs.
      *
+     * @param  (Closure(string): array<int, string>)|null  $resolver
      * @return array<string, mixed>
      */
-    public static function httpClientOptions(string $url, array $trustedInternalHosts = []): array
+    public static function httpClientOptions(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false): array
     {
         $options = ['allow_redirects' => false];
 
@@ -119,7 +138,7 @@ class SafeWebhookUrl implements ValidationRule
             throw new \RuntimeException('Webhook URL DNS pinning is unavailable.');
         }
 
-        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts, $resolver, $allowPrivateNetworks);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return $options;
@@ -186,9 +205,13 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = []): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = [], ?Closure $resolver = null, bool $allowPrivateNetworks = false): array
     {
-        $rule = new self(trustedInternalHosts: $trustedInternalHosts);
+        $rule = new self(resolver: $resolver, trustedInternalHosts: $trustedInternalHosts, allowPrivateNetworks: $allowPrivateNetworks);
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new \RuntimeException('Webhook URL is invalid.');
+        }
+
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || $host === '') {
             throw new \RuntimeException('Webhook URL host could not be resolved.');
@@ -199,6 +222,10 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?? '');
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            throw new \RuntimeException('Webhook URL scheme is unsafe.');
+        }
+
         $port = parse_url($url, PHP_URL_PORT) ?: ($scheme === 'https' ? 443 : 80);
         $hostForDns = rtrim($rule->normalizeHostForIpCheck(strtolower($host)), '.');
 
@@ -219,6 +246,10 @@ class SafeWebhookUrl implements ValidationRule
             if (! $rule->isAllowedIp($resolvedIp, $hostForDns)) {
                 throw new \RuntimeException('Webhook URL resolved to an unsafe IP address.');
             }
+        }
+
+        if ($rule->isBlockedHostname($hostForDns) && ! $rule->isAllowedHostname($hostForDns)) {
+            throw new \RuntimeException('Webhook URL host is unsafe.');
         }
 
         return ['host' => $hostForDns, 'port' => $port, 'ips' => $resolvedIps];
@@ -359,7 +390,11 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         if ($this->isPrivateIp($ip)) {
-            return $this->isAllowedHostname($host) || $this->isAllowlistedIp($ip);
+            return $this->allowPrivateNetworks || $this->isAllowedHostname($host) || $this->isAllowlistedIp($ip);
+        }
+
+        if ($this->allowPrivateNetworks && $this->ipv4InCidr($ip, '100.64.0.0/10')) {
+            return true;
         }
 
         return $this->isAllowlistedIp($ip);
@@ -456,6 +491,7 @@ class SafeWebhookUrl implements ValidationRule
             '::1/128',
             '::ffff:0:0/96',
             '64:ff9b::/96',
+            '64:ff9b:1::/48',
             '100::/64',
             '2001::/23',
             '2001:2::/48',
@@ -477,8 +513,16 @@ class SafeWebhookUrl implements ValidationRule
 
     private function isBlockedHostname(string $host): bool
     {
-        return in_array($host, ['localhost'], true)
-            || str_ends_with($host, '.local')
+        if ($host === 'localhost') {
+            return true;
+        }
+
+        // The resolved addresses of internal hostnames are still checked.
+        if ($this->allowPrivateNetworks) {
+            return false;
+        }
+
+        return str_ends_with($host, '.local')
             || str_ends_with($host, '.internal')
             || str_ends_with($host, '.cluster.local');
     }

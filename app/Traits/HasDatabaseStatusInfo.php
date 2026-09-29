@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
  */
 trait HasDatabaseStatusInfo
 {
+    use ListensToTeamChannel;
+
     public ?string $dbUrl = null;
 
     public ?string $dbUrlPublic = null;
@@ -65,12 +67,10 @@ trait HasDatabaseStatusInfo
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refresh';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refresh';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refresh']),
+        ];
     }
 
     public function mount(): void
@@ -82,6 +82,7 @@ trait HasDatabaseStatusInfo
     public function refresh(): void
     {
         $this->database->refresh();
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
         if ($this->isPasswordHiddenForMember) {
             $this->dbUrl = null;
             $this->dbUrlPublic = null;

@@ -23,6 +23,7 @@ use App\Models\SwarmDocker;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
@@ -1213,6 +1214,10 @@ class ApplicationsController extends Controller
 
         $this->authorize('create', Application::class);
 
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -1248,6 +1253,22 @@ class ApplicationsController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if ($request->filled('docker_compose_raw')) {
+            try {
+                if (! is_string($request->input('docker_compose_raw'))) {
+                    throw new \Exception('The docker_compose_raw field must be a string.');
+                }
+                validateDockerComposeForInjection($request->input('docker_compose_raw'));
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
+            }
         }
 
         $return = $this->validateTagsParameter($request);
@@ -2417,7 +2438,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get application logs.',
-        description: 'Get application logs by UUID.',
+        description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.',
         path: '/applications/{uuid}/logs',
         operationId: 'get-application-logs-by-uuid',
         security: [
@@ -2484,7 +2505,7 @@ class ApplicationsController extends Controller
     )]
     #[OA\Get(
         summary: 'Get preview application logs.',
-        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.',
+        description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.',
         path: '/applications/{uuid}/previews/{pull_request_id}/logs',
         operationId: 'get-preview-application-logs-by-pull-request-id',
         security: [
@@ -2568,7 +2589,7 @@ class ApplicationsController extends Controller
             }
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId);
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application, $pullRequestId);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -2821,12 +2842,15 @@ class ApplicationsController extends Controller
             ], 409);
         }
 
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($preview->fresh() ?? $preview);
         $preview->domain_port_overrides = $normalized['overrides'];
         $preview->fqdn = $portlessDomains;
         if ($isCompose) {
             $preview->docker_compose_domains = json_encode($dockerComposeDomains);
         }
         $preview->save();
+        $dnsCleanup->queueReleaseOfRemovedHostnames($preview, $previousDnsHostnames, (int) $teamId);
 
         auditLog('api.application.preview_updated', [
             'team_id' => $teamId,
@@ -3157,13 +3181,19 @@ class ApplicationsController extends Controller
 
         $this->authorize('update', $application);
 
+        if ($request->instant_deploy) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('deploy', $application);
+        }
+
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
         $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
             'description' => 'string|nullable',
-            'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_domains.*' => 'array:name,domain,redirect',
@@ -3497,6 +3527,7 @@ class ApplicationsController extends Controller
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->withoutAuditLogging(fn () => $application->save());
+        $dnsCleanup->queueReleaseOfRemovedHostnames($application, $previousDnsHostnames, (int) $teamId);
 
         auditLog('api.application.updated', [
             'team_id' => $teamId,
@@ -3645,7 +3676,7 @@ class ApplicationsController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -3863,7 +3894,7 @@ class ApplicationsController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -4084,7 +4115,7 @@ class ApplicationsController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),
@@ -5256,6 +5287,10 @@ class ApplicationsController extends Controller
                 ], 422);
             }
 
+            if ($reason = $application->persistentStorageUnavailableReason()) {
+                return response()->json(['message' => $reason], 422);
+            }
+
             $storage = LocalPersistentVolume::create([
                 'name' => $application->uuid.'-'.$request->name,
                 'mount_path' => $request->mount_path,
@@ -6145,6 +6180,10 @@ class ApplicationsController extends Controller
 
         if ($application->additional_servers?->pluck('id')->contains($destination->server_id)) {
             return response()->json(['message' => 'A destination on this server is already attached.'], 422);
+        }
+
+        if ($reason = $application->additionalServersUnavailableReason($destination->server)) {
+            return response()->json(['message' => $reason], 422);
         }
 
         $application->additional_networks()->attach($destination->id, ['server_id' => $destination->server_id]);

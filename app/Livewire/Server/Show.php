@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Rules\ValidServerIp;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -235,11 +236,7 @@ class Show extends Component
                 ->first();
             if ($foundServer) {
                 $this->ip = $this->server->ip;
-                if ($foundServer->team_id === currentTeam()->id) {
-                    throw new \Exception('A server with this IP/Domain already exists in your team.');
-                }
-
-                throw new \Exception('A server with this IP/Domain is already in use by another team.');
+                throw new \Exception('A server with this IP/Domain already exists.');
             }
 
             $this->server->name = $this->name;
@@ -286,11 +283,15 @@ class Show extends Component
             $this->isSwarmWorker = $this->server->settings->is_swarm_worker;
             $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
-            $this->sentinelToken = $this->server->settings->sentinel_token;
+            $this->sentinelToken = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->sentinel_token
+                : '';
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
             $this->sentinelPushIntervalSeconds = $this->server->settings->sentinel_push_interval_seconds;
-            $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+            $this->sentinelCustomUrl = auth()->user()->can('update', $this->server)
+                ? $this->server->settings->sentinel_custom_url
+                : null;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
@@ -350,6 +351,45 @@ class Show extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function toggleManagement(ServerTransferClaimer $claimer): void
+    {
+        abort_unless(isDev(), 404);
+        $this->authorize('update', $this->server);
+
+        if ($this->server->isLocalhost()) {
+            $this->dispatch('error', 'The Coolify host cannot be transferred.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway() && $this->server->team->serverOverflow()) {
+            $this->dispatch('error', 'Your team is over its server limit. Upgrade your subscription or remove a server first.');
+
+            return;
+        }
+
+        if ($this->server->isTransferredAway()) {
+            $claimer->claim($this->server);
+            $event = 'ui.server.management_enabled';
+            $message = 'This Coolify instance now manages the server.';
+        } else {
+            $claimer->markTransferred($this->server, managementDisabled: true);
+            $event = 'ui.server.management_disabled';
+            $message = 'Server automations are disabled on this Coolify instance.';
+        }
+
+        $this->server->refresh();
+        $this->syncData();
+
+        auditLog($event, [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ]);
+
+        $this->dispatch('success', $message);
     }
 
     public function checkLocalhostConnection()
@@ -425,7 +465,7 @@ class Show extends Component
 
             if ($newRole === ServerRole::DEPLOYMENT && ! Server::buildServers($this->server->team_id)->whereKeyNot($this->server->id)->exists()) {
                 $this->serverRole = $currentRole->value;
-                $this->dispatch('error', 'Add another build-capable server before you set this server to deployments only.');
+                $this->dispatch('error', 'Add a usable build server before you set this server to deployments only.');
 
                 return;
             }

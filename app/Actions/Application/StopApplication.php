@@ -20,30 +20,34 @@ class StopApplication
         if ($application?->additional_servers?->count() > 0) {
             $servers = $servers->merge($application->additional_servers);
         }
+        $errors = [];
         foreach ($servers as $server) {
             try {
                 if (! $server->isFunctional()) {
-                    return 'Server is not functional';
+                    $errors[] = "Server {$server->name} is not functional.";
+
+                    continue;
                 }
 
                 if ($server->isSwarm()) {
                     $containerPresent = false;
-                    instant_remote_process(["docker stack rm {$application->uuid}"], $server);
+                    instant_remote_process(['docker stack rm '.escapeshellarg($application->uuid)], $server);
 
                     continue;
                 }
 
                 $containers = $previewDeployments
-                    ? getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true)
-                    : getCurrentApplicationContainerStatus($server, $application->id, 0);
+                    ? getCurrentApplicationContainerStatus($server, $application, includePullrequests: true)
+                    : getCurrentApplicationContainerStatus($server, $application, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
                 $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
-                    $commands = [dockerStopCommand($timeout, $containerName, $server)];
+                    $escapedContainerName = escapeshellarg($containerName);
+                    $commands = [dockerStopCommand($timeout, $escapedContainerName, $server)];
                     if ($removeContainers) {
-                        $commands[] = "docker rm -f $containerName";
+                        $commands[] = "docker rm -f {$escapedContainerName}";
                     }
 
                     instant_remote_process(command: $commands, server: $server, throwError: false);
@@ -57,8 +61,11 @@ class StopApplication
                     CleanupDocker::dispatch($server, false, false);
                 }
             } catch (\Exception $e) {
-                return $e->getMessage();
+                $errors[] = $e->getMessage();
             }
+        }
+        if ($errors !== []) {
+            return implode(' ', $errors);
         }
 
         $status = [

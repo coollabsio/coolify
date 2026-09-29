@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Models\ServiceApplication;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ServiceComposeUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ class UpdateServiceApplicationFromApi
     public function execute(ServiceApplication $serviceApplication, Request $request, string $teamId, array $payload): ?JsonResponse
     {
         $forceDomainOverride = $request->boolean('force_domain_override');
+        $dnsCleanup = app(ManagedDnsRecordCleanup::class);
+        $previousDnsHostnames = $dnsCleanup->hostnamesOf($serviceApplication->fresh() ?? $serviceApplication);
 
         if (array_key_exists('url', $payload)) {
             $urlRaw = $payload['url'];
@@ -113,6 +116,7 @@ class UpdateServiceApplicationFromApi
 
         $serviceApplication->save();
         $serviceApplication->refresh();
+        $dnsCleanup->queueReleaseOfRemovedHostnames($serviceApplication, $previousDnsHostnames, (int) $teamId);
 
         updateCompose($serviceApplication);
 

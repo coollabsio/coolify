@@ -71,6 +71,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 function dockerPsLine(string $name, string $createdAt, string $status): string
 {
     return json_encode([
+        'ID' => $name,
         'Names' => $name,
         'CreatedAt' => "{$createdAt} +0000 UTC",
         'State' => 'running',
@@ -90,8 +91,8 @@ it('runs the task in the serving container while a rolling update has two runnin
 
     (new ScheduledTaskJob($task))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'docker exec app-old '));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'docker exec app-new '));
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'app-old' "));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, "docker exec 'app-new' "));
     expect($task->executions()->latest('id')->first()->status)->toBe('success');
 });
 
@@ -108,6 +109,6 @@ it('keeps running the task in the named service of a docker compose application'
 
     (new ScheduledTaskJob($task))->handle();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec worker-{$uuid} "));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, "docker exec web-{$uuid} "));
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker exec 'worker-{$uuid}' "));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, "docker exec 'web-{$uuid}' "));
 });

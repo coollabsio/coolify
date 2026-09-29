@@ -46,7 +46,7 @@
             ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
 
-    // Group that holds the current page — the only one expanded by default.
+    // Group that holds the current page — always kept open, even if collapsed before.
     $activeGroup = (string) $groupedItems->search(fn ($items) => $items->contains(fn ($item) => $item['active'] ?? false));
 
     $pageSections = $database->type() === 'standalone-postgresql'

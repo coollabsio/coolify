@@ -13,9 +13,11 @@ function backupDownloadServer(): Server
         'ip' => '192.0.2.10',
         'port' => 2222,
         'user' => 'root',
+        'team_id' => 5,
     ]);
 
-    $privateKey = Mockery::mock(PrivateKey::class);
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->forceFill(['team_id' => 5]);
     $privateKey->shouldReceive('getKeyLocation')->andReturn('/tmp/private-key');
     $server->setRelation('privateKey', $privateKey);
 
@@ -43,6 +45,15 @@ it('throws when the backup file does not exist on the server', function () {
 
     streamBackupFromServer(backupDownloadServer(), '/backups/archive.tar.gz', 'application/gzip');
 })->throws(FileNotFoundException::class);
+
+it('refuses a private key from another team', function () {
+    $server = backupDownloadServer();
+    $server->privateKey->forceFill(['team_id' => 6]);
+
+    Storage::shouldReceive('build')->never();
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->throws(RuntimeException::class);
 
 it('streams a backup file with the requested content type', function () {
     $stream = fopen('php://memory', 'r+');

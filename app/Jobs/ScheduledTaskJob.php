@@ -127,7 +127,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             $this->executionId = $this->task_log->id;
 
             if ($this->resource->type() === 'application') {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource, 0);
                 if ($this->resource->build_pack !== 'dockercompose') {
                     // Compose runs one container per service and the task names which one; any other build pack
                     // serves from a single container, even while a rolling update or a stopped leftover adds another.
@@ -160,7 +160,7 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
-                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
+                    $execCommand = "{$dockerCommand} exec ".escapeshellarg($containerName)." {$cmd}";
                     $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736

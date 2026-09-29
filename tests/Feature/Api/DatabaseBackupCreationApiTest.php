@@ -9,6 +9,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -129,6 +130,22 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
             ->and($backup->database_type)->toBe(StandaloneClickhouse::class);
     });
 
+    test('defaults sqlite backups to every configured database file', function () {
+        $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('app.db,jobs.db')
+            ->and($backup->database_type)->toBe(StandaloneSqlite::class);
+    });
+
     test('creates backup configuration with valid frequency', function () {
         $response = $this->withHeaders(backupHeaders())
             ->postJson("/api/v1/databases/{$this->database->uuid}/backups", [
@@ -245,7 +262,7 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
         $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->first();
         expect($backup)->not->toBeNull();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
         expect($backup->team_id)->toBe($this->team->id);
     });
 
@@ -293,7 +310,7 @@ describe('PATCH /api/v1/databases/{uuid}/backups/{scheduled_backup_uuid}', funct
         $response->assertStatus(200);
         $backup->refresh();
         expect($backup->s3_storage_id)->toBe($this->s3Storage->id);
-        expect($backup->save_s3)->toBeTrue();
+        expect($backup->save_s3)->toBeTruthy();
     });
 
     test('rejects s3_storage_uuid from another team on update', function () {

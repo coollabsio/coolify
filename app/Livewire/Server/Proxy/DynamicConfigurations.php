@@ -3,6 +3,7 @@
 namespace App\Livewire\Server\Proxy;
 
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -10,6 +11,7 @@ use Livewire\Component;
 class DynamicConfigurations extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public const MAX_CONFIGURATION_FILE_SIZE_BYTES = 1024 * 1024;
 
@@ -25,11 +27,11 @@ class DynamicConfigurations extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'loadDynamicConfigurations',
             'loadDynamicConfigurations',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'loadDynamicConfigurations',
+            ]),
         ];
     }
 

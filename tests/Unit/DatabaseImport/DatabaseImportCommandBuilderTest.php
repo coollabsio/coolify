@@ -6,6 +6,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 
 function importResource(string $class, ?string $databaseType = null): object
@@ -14,6 +15,9 @@ function importResource(string $class, ?string $databaseType = null): object
     $resource->shouldReceive('getMorphClass')->andReturn($class);
     if ($class === ServiceDatabase::class) {
         $resource->shouldReceive('databaseType')->andReturn($databaseType);
+    }
+    if ($class === StandaloneSqlite::class) {
+        $resource->shouldReceive('databaseFilePath')->andReturn('/var/lib/sqlite/database.sqlite');
     }
 
     return $resource;
@@ -30,6 +34,7 @@ test('builds database-specific restore commands', function (string $class, ?stri
     'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER'],
     'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER'],
     'mongodb' => [StandaloneMongodb::class, null, 'mongorestore'],
+    'sqlite' => [StandaloneSqlite::class, null, '.restore'],
     'service postgres' => [ServiceDatabase::class, 'postgresql', 'pg_restore'],
     'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER'],
     'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER'],
@@ -41,9 +46,10 @@ test('decompresses gzip backups for single-database mysql and mariadb restores',
 
     $command = $builder->buildRestoreCommand(importResource($class, $type), '/tmp/restore file.sql.gz', false);
 
-    expect($command)->toBe(
-        "(gunzip -cf '/tmp/restore file.sql.gz' 2>/dev/null || cat '/tmp/restore file.sql.gz') | {$client}"
-    );
+    expect($command)
+        ->toStartWith("backup='/tmp/restore file.sql.gz'\n")
+        ->toContain('is_gzip() { [ "$(head -c 2 "$backup" | od -An -tx1 | tr -d \' \n\')" = 1f8b ]; }')
+        ->toEndWith("stream | {$client}");
 })->with([
     'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
     'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
@@ -60,7 +66,7 @@ test('builds dump-all commands and postgres safety scan', function () {
 
     expect($builder->buildRestoreCommand($postgres, '/tmp/dump.sql.gz', true))
         ->toContain('pg_terminate_backend')
-        ->toContain("gunzip -cf '/tmp/dump.sql.gz'")
+        ->toStartWith("backup='/tmp/dump.sql.gz'\n")
         ->and($safety)
         ->toContain('COPY ... PROGRAM')
         ->toContain('docker exec postgres-safe')
@@ -70,6 +76,16 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->not->toContain('then exit 0')
         ->and($script)
         ->toContain("tr '\\n\\r\\t'");
+});
+
+test('restores dump-all PostgreSQL custom archives with pg_restore from the decompressed stream', function () {
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump.gz', true);
+
+    // pg_restore cannot read gzip files, so it must receive the decompressed archive on stdin.
+    expect($command)
+        ->toContain('stream | pg_restore -U ${POSTGRES_USER} -d "$db"')
+        ->toContain('stream | psql -U ${POSTGRES_USER} -d "$db"')
+        ->not->toContain("-d \"\$db\" '/tmp/backup.dump.gz'");
 });
 
 test('postgres safety command is null for non-postgres databases', function () {
@@ -89,7 +105,7 @@ test('dump-all mysql and mariadb commands use valid shell parameter expansions',
 
     expect($command)
         ->toContain($binary)
-        ->toContain("gunzip -cf '/tmp/dump.sql.gz'")
+        ->toStartWith("backup='/tmp/dump.sql.gz'\n")
         ->toContain('-p'.$rootPassword)
         ->toContain('CREATE DATABASE IF NOT EXISTS \`'.$database.'\`')
         ->and(substr_count($command, $rootPassword))->toBe(6)

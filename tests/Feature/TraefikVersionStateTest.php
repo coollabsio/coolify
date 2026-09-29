@@ -7,12 +7,93 @@ use App\Jobs\CheckTraefikVersionJob;
 use App\Livewire\Server\Proxy;
 use App\Models\Server;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+it('shows patch and minor upgrade warnings on the first proxy render', function () {
+    Cache::put('coolify:versions:all', [
+        'traefik' => [
+            'v3.7' => '3.7.13',
+            'v3.6' => '3.6.25',
+        ],
+    ]);
+
+    $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    session(['currentTeam' => $team]);
+    $this->actingAs($user);
+
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => ['type' => ProxyTypes::TRAEFIK->value, 'status' => 'running'],
+        'detected_traefik_version' => '3.6.1',
+        'traefik_outdated_info' => [
+            'current' => '3.6.1',
+            'latest' => '3.7.13',
+            'type' => 'minor_upgrade',
+            'upgrade_target' => 'v3.7',
+        ],
+    ]);
+
+    Livewire::test(Proxy::class, ['server' => $server])
+        ->assertSee('Traefik patch update available')
+        ->assertSee('v3.6.25')
+        ->assertSee('New Traefik minor version available')
+        ->assertSee('v3.7.13');
+});
+
+it('shows a warning from the saved image before version detection finishes', function () {
+    Cache::put('coolify:versions:all', [
+        'traefik' => ['v3.7' => '3.7.13', 'v3.6' => '3.6.25'],
+    ]);
+
+    $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    session(['currentTeam' => $team]);
+    $this->actingAs($user);
+
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'proxy' => [
+            'type' => ProxyTypes::TRAEFIK->value,
+            'status' => 'running',
+            'last_saved_proxy_configuration' => "services:\n  traefik:\n    image: 'traefik:v3.6.5'",
+        ],
+        'detected_traefik_version' => null,
+    ]);
+
+    Livewire::test(Proxy::class, ['server' => $server])
+        ->assertSee('Configured image')
+        ->assertSee('v3.6.5')
+        ->assertSee('v3.6.25')
+        ->assertSee('v3.7.13');
+});
+
+it('does not treat an unapplied image as the running Traefik version', function () {
+    $server = Server::factory()->make([
+        'proxy' => [
+            'type' => ProxyTypes::TRAEFIK->value,
+            'status' => 'running',
+            'last_saved_settings' => 'new',
+            'last_applied_settings' => 'old',
+            'last_saved_proxy_configuration' => "services:\n  traefik:\n    image: traefik:v3.6.5",
+        ],
+        'detected_traefik_version' => null,
+    ]);
+
+    $component = new Proxy;
+    $component->server = $server;
+
+    expect($component->getTraefikVersionForWarningProperty())->toBeNull();
+});
 
 it('ignores stale minor upgrade information for the detected Traefik version', function () {
     Cache::put('coolify:versions:all', [
@@ -120,6 +201,7 @@ YAML,
     $component = new Proxy;
     $component->server = $server;
     $component->mount();
+    $component->loadProxyConfiguration();
 
     expect($server->refresh()->traefik_outdated_info)->toBeNull();
 });

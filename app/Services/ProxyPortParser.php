@@ -8,6 +8,10 @@ use Symfony\Component\Yaml\Yaml;
 class ProxyPortParser
 {
     /**
+     * Validates the proxy ports like Docker Compose does and returns the fixed host ports.
+     * Ports that Docker publishes to a random host port or to a port range are validated
+     * but not returned: the caller checks each returned port over its own SSH connection.
+     *
      * @return list<int>
      */
     public static function fromConfiguration(string $configuration): array
@@ -37,14 +41,17 @@ class ProxyPortParser
             }
 
             foreach ($configuredPorts as $configuredPort) {
-                $ports[] = self::publishedPort($configuredPort);
+                $publishedPort = self::publishedPort($configuredPort);
+                if ($publishedPort !== null) {
+                    $ports[] = $publishedPort;
+                }
             }
         }
 
         return array_values(array_unique($ports));
     }
 
-    private static function publishedPort(mixed $configuredPort): int
+    private static function publishedPort(mixed $configuredPort): ?int
     {
         if (is_array($configuredPort)) {
             if (array_is_list($configuredPort) || ! array_key_exists('target', $configuredPort)) {
@@ -58,7 +65,7 @@ class ProxyPortParser
             $target = self::portNumber($configuredPort['target']);
 
             return array_key_exists('published', $configuredPort)
-                ? self::portNumber($configuredPort['published'])
+                ? self::portOrRange($configuredPort['published'])
                 : $target;
         }
 
@@ -77,36 +84,54 @@ class ProxyPortParser
             $portDefinition = substr($portDefinition, 0, $protocolSeparator);
         }
 
+        // [HOST_IP:][HOST_PORT:]CONTAINER_PORT, where each port may be a range and an
+        // empty HOST_PORT after a host IP means a random host port.
         if (str_starts_with($portDefinition, '[')) {
-            if (! preg_match('/^\[([^]]+)]:(\d+):(\d+)$/D', $portDefinition, $matches)) {
+            if (! preg_match('/^\[([^]]+)]:([^:]*):([^:]+)$/D', $portDefinition, $matches)) {
                 self::invalid();
             }
-
             self::validateHostIp($matches[1]);
-            self::portNumber($matches[3]);
 
-            return self::portNumber($matches[2]);
+            return self::hostPort($matches[2], $matches[3]);
         }
 
         $parts = explode(':', $portDefinition);
-        if (count($parts) < 1 || count($parts) > 3) {
+        if (count($parts) > 3 || (count($parts) > 1 && $parts[0] === '')) {
             self::invalid();
         }
-
-        if (count($parts) === 3 && $parts[0] === '') {
-            self::invalid();
-        }
-
         if (count($parts) === 3) {
-            self::validateHostIp($parts[0]);
+            self::validateHostIp(array_shift($parts));
         }
 
-        $portParts = count($parts) === 3 ? array_slice($parts, 1) : $parts;
-        foreach ($portParts as $part) {
-            self::portNumber($part);
+        return count($parts) === 1
+            ? self::portOrRange($parts[0])
+            : self::hostPort($parts[0], $parts[1]);
+    }
+
+    /**
+     * Returns the fixed host port, or null for a random host port or a port range.
+     */
+    private static function hostPort(string $hostPort, string $containerPort): ?int
+    {
+        self::portOrRange($containerPort);
+
+        return $hostPort === '' ? null : self::portOrRange($hostPort);
+    }
+
+    /**
+     * Returns the port, or null for a valid port range such as 10000-10100.
+     */
+    private static function portOrRange(mixed $value): ?int
+    {
+        if (is_string($value) && preg_match('/^(\d+)-(\d+)$/D', $value, $range)) {
+            if (self::portNumber($range[1]) > self::portNumber($range[2])) {
+                self::invalid();
+            }
+
+            return null;
         }
 
-        return self::portNumber($portParts[0]);
+        return self::portNumber($value);
     }
 
     private static function portNumber(mixed $port): int
@@ -133,7 +158,8 @@ class ProxyPortParser
 
     private static function validateProtocol(mixed $protocol): void
     {
-        if ($protocol !== null && (! is_string($protocol) || ! in_array($protocol, ['tcp', 'udp'], true))) {
+        // Docker Compose accepts the protocol in any letter case.
+        if ($protocol !== null && (! is_string($protocol) || ! in_array(strtolower($protocol), ['tcp', 'udp', 'sctp'], true))) {
             self::invalid();
         }
     }
@@ -147,6 +173,6 @@ class ProxyPortParser
 
     private static function invalid(): never
     {
-        throw new \InvalidArgumentException('Proxy ports must be integers from 1 through 65535.');
+        throw new \InvalidArgumentException('Proxy ports must use Docker Compose port syntax with ports from 1 through 65535.');
     }
 }

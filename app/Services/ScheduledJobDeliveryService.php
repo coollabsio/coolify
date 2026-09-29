@@ -8,106 +8,28 @@ use App\Jobs\ScheduledTaskJob;
 use App\Jobs\VolumeBackupJob;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
-use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
-use Cron\CronExpression;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Log;
 
 class ScheduledJobDeliveryService
 {
-    public const CATCH_UP_WINDOW_MINUTES = 10;
+    /**
+     * Record a pending delivery for one occurrence of a schedule. Returns null when the
+     * occurrence already has a delivery.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function create(string $scheduleKey, CarbonInterface $scheduledFor, string $jobType, int $resourceId, array $payload = []): ?ScheduledJobDelivery
+    {
+        $delivery = ScheduledJobDelivery::createOrFirst(
+            ['schedule_key' => $scheduleKey, 'scheduled_for' => $scheduledFor->utc()],
+            ['job_type' => $jobType, 'resource_id' => $resourceId, 'payload' => $payload, 'status' => 'pending'],
+        );
 
-    public function recordAndPublish(
-        string $scheduleKey,
-        string $frequency,
-        string $timezone,
-        string $jobType,
-        int $resourceId,
-        array $payload = [],
-        ?Carbon $executionTime = null,
-    ): bool {
-        $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
-        $cron = new CronExpression(VALID_CRON_STRINGS[$frequency] ?? $frequency);
-        $scheduledFor = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
-
-        if (! $scheduledFor->gte($executionTime->copy()->subMinutes(self::CATCH_UP_WINDOW_MINUTES))) {
-            return false;
-        }
-
-        $delivery = DB::transaction(function () use ($scheduleKey, $scheduledFor, $jobType, $resourceId, $payload): ?ScheduledJobDelivery {
-            ScheduledJobState::query()->insertOrIgnore([
-                'uuid' => new_public_id(),
-                'schedule_key' => $scheduleKey,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $state = ScheduledJobState::query()
-                ->where('schedule_key', $scheduleKey)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
-                return null;
-            }
-
-            $state->update(['last_scheduled_for' => $scheduledFor->utc()]);
-
-            return ScheduledJobDelivery::create([
-                'schedule_key' => $scheduleKey,
-                'scheduled_for' => $scheduledFor->utc(),
-                'job_type' => $jobType,
-                'resource_id' => $resourceId,
-                'payload' => $payload,
-                'status' => 'pending',
-            ]);
-        });
-
-        if ($delivery === null) {
-            return false;
-        }
-
-        return $this->publish($delivery);
-    }
-
-    public function recordSkipped(
-        string $scheduleKey,
-        string $frequency,
-        string $timezone,
-        ?Carbon $executionTime = null,
-    ): bool {
-        $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
-        $cron = new CronExpression(VALID_CRON_STRINGS[$frequency] ?? $frequency);
-        $scheduledFor = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
-
-        if (! $scheduledFor->gte($executionTime->copy()->subMinutes(self::CATCH_UP_WINDOW_MINUTES))) {
-            return false;
-        }
-
-        return DB::transaction(function () use ($scheduleKey, $scheduledFor): bool {
-            ScheduledJobState::query()->insertOrIgnore([
-                'uuid' => new_public_id(),
-                'schedule_key' => $scheduleKey,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $state = ScheduledJobState::query()
-                ->where('schedule_key', $scheduleKey)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($state->last_scheduled_for?->gte($scheduledFor)) {
-                return false;
-            }
-
-            $state->update(['last_scheduled_for' => $scheduledFor->utc()]);
-
-            return true;
-        });
+        return $delivery->wasRecentlyCreated ? $delivery : null;
     }
 
     public function publishPending(): void
@@ -117,7 +39,16 @@ class ScheduledJobDeliveryService
             ->orderBy('id')
             ->chunkById(100, function ($occurrences): void {
                 foreach ($occurrences as $occurrence) {
-                    $this->publish($occurrence);
+                    try {
+                        $this->logOccurrence($occurrence, 'Scheduled occurrence publishing again', 'warning');
+                        $this->publish($occurrence);
+                    } catch (\Throwable $e) {
+                        Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
+                            'occurrence_uuid' => $occurrence->uuid,
+                            'schedule_key' => $occurrence->schedule_key,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
     }
@@ -150,21 +81,22 @@ class ScheduledJobDeliveryService
                 'claim_token' => $claimToken,
                 'started_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ]) === 1
+            || ScheduledJobDelivery::query()
+                ->where('uuid', $uuid)
+                ->where('status', 'claimed')
+                ->where('claim_token', $claimToken)
+                ->exists();
 
-        if ($claimed === 1) {
-            return true;
-        }
+        $this->logOccurrence($uuid, $claimed ? 'Scheduled occurrence claimed' : 'Scheduled occurrence claim rejected', $claimed ? 'info' : 'warning');
 
-        return ScheduledJobDelivery::query()
-            ->where('uuid', $uuid)
-            ->where('status', 'claimed')
-            ->where('claim_token', $claimToken)
-            ->exists();
+        return $claimed;
     }
 
     public function complete(string $uuid, string $claimToken): void
     {
+        $this->logOccurrence($uuid, 'Scheduled occurrence completed', context: ['status' => 'completed']);
+
         ScheduledJobDelivery::query()
             ->where('uuid', $uuid)
             ->where('claim_token', $claimToken)
@@ -180,9 +112,42 @@ class ScheduledJobDeliveryService
                 'status' => 'failed',
                 'updated_at' => now(),
             ]);
+
+        $this->logOccurrence($uuid, 'Scheduled occurrence failed', 'warning');
     }
 
-    private function publish(ScheduledJobDelivery $occurrence): bool
+    /**
+     * Log one step of an occurrence. Search scheduled.log for its schedule_key to see when it
+     * was due, when a worker started it, and how it ended.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logOccurrence(ScheduledJobDelivery|string $occurrence, string $message, string $level = 'info', array $context = []): void
+    {
+        try {
+            $uuid = is_string($occurrence) ? $occurrence : $occurrence->uuid;
+            if (is_string($occurrence)) {
+                $occurrence = ScheduledJobDelivery::query()->where('uuid', $uuid)->first();
+            }
+
+            Log::channel('scheduled')->log($level, $message, [
+                'occurrence_uuid' => $uuid,
+                'schedule_key' => $occurrence?->schedule_key,
+                'status' => $occurrence?->status,
+                'scheduled_for' => $occurrence?->scheduled_for?->toIso8601String(),
+                'enqueued_at' => $occurrence?->enqueued_at?->toIso8601String(),
+                'started_at' => $occurrence?->started_at?->toIso8601String(),
+                'seconds_since_due' => $occurrence ? (int) $occurrence->scheduled_for->diffInSeconds(now()) : null,
+                'host' => gethostname(),
+                'pid' => getmypid(),
+                ...$context,
+            ]);
+        } catch (\Throwable) {
+            // Debug logging must never change the job result.
+        }
+    }
+
+    public function publish(ScheduledJobDelivery $occurrence): bool
     {
         if ($occurrence->status !== 'pending') {
             return false;
@@ -212,6 +177,11 @@ class ScheduledJobDeliveryService
 
         if ($job === null) {
             ScheduledJobDelivery::query()->whereKey($occurrence->id)->update(['status' => 'skipped']);
+            Log::channel('scheduled')->warning('Scheduled occurrence skipped: resource not found', [
+                'occurrence_uuid' => $occurrence->uuid,
+                'schedule_key' => $occurrence->schedule_key,
+                'scheduled_for' => $occurrence->scheduled_for->toIso8601String(),
+            ]);
 
             return false;
         }
@@ -226,6 +196,9 @@ class ScheduledJobDeliveryService
                 'enqueued_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        // Log from the loaded row: a fast worker can complete and delete the occurrence already.
+        $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued', context: ['status' => 'enqueued', 'enqueued_at' => now()->toIso8601String()]);
 
         return true;
     }

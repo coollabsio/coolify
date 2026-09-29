@@ -52,7 +52,7 @@
                 <div class="flex flex-wrap gap-2">
                     @foreach ($filteredTags as $tag)
                         <x-forms.button wire:key="available-tag-{{ $tag->id }}"
-                            wire:click="addTag('{{ $tag->id }}', '{{ $tag->name }}')">
+                            wire:click="addTag('{{ $tag->id }}')">
                             <x-reicon name="plus" class="size-3.5 text-coollabs dark:text-warning" />
                             {{ $tag->name }}
                         </x-forms.button>

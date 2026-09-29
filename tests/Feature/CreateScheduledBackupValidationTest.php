@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\CreateScheduledBackup;
 use App\Models\Environment;
 use App\Models\Project;
@@ -11,6 +12,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -93,6 +95,32 @@ it('creates a service database backup without S3 and opens its configuration', f
         ->and($backup->s3_storage_id)->toBeNull();
 });
 
+it('rejects an unsupported service database name during backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgres test',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+        'status' => 'running',
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => false,
+        'database_type' => ServiceDatabase::class,
+        'database_id' => $database->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    expect(fn () => (new DatabaseBackupJob($backup))->handle())
+        ->toThrow(Exception::class, 'Invalid database container name.');
+});
+
 it('selects a service database when creating a backup from the unified backups page', function () {
     $service = Service::factory()->create([
         'server_id' => $this->server->id,
@@ -161,6 +189,19 @@ it('creates a clickhouse backup for its configured database', function () {
 
     expect($backup->database_type)->toBe(StandaloneClickhouse::class)
         ->and($backup->databases_to_backup)->toBe('analytics');
+});
+
+it('creates a sqlite backup for its configured database files', function () {
+    $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    expect($backup->database_type)->toBe(StandaloneSqlite::class)
+        ->and($backup->databases_to_backup)->toBe('app.db,jobs.db');
 });
 
 it('rejects scheduled backups for unsupported database types', function () {

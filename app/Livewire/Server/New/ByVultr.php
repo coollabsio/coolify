@@ -375,7 +375,9 @@ class ByVultr extends Component
             $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
         }
 
-        return "{$providerName} API error: {$details}";
+        $prefix = "{$providerName} API error: ";
+
+        return str_starts_with($details, $prefix) ? $details : $prefix.$details;
     }
 
     private function createVultrServer(VultrService $vultrService): array
@@ -446,7 +448,7 @@ class ByVultr extends Component
             $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? Server::PLACEHOLDER_IP;
 
             $server = DB::transaction(function () use ($ipAddress, $vultrInstanceId, $vultrInstance): Server {
-                $server = Server::create([
+                $server = Team::createServerWithinLimit(currentTeam()->id, [
                     'name' => strtolower(trim($this->server_name)),
                     'ip' => $ipAddress,
                     'user' => 'root',

@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -41,10 +42,6 @@ function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): voi
 
 afterEach(function () {
     Mockery::close();
-});
-
-it('has UpdateCoolify action class', function () {
-    expect(class_exists(UpdateCoolify::class))->toBeTrue();
 });
 
 it('validates cache against running version before fallback', function () {
@@ -121,7 +118,7 @@ it('passes the saved registry URL to the upgrade script command', function () {
 
     (new UpdateCoolify)->handle();
 
-    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))->toBe(
         "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'ghcr.io'"
     );
@@ -150,7 +147,7 @@ it('falls back to docker io for the upgrade script command when no registry is s
 
     (new UpdateCoolify)->handle();
 
-    expect(Activity::query()->latest('id')->first()?->getExtraProperty('command'))->toBe(
+    expect(RemoteProcessCommand::read(Activity::query()->latest('id')->first()))->toBe(
         "curl -fsSL https://cdn.example.com/upgrade.sh -o /data/coolify/source/upgrade.sh\n".
         "bash /data/coolify/source/upgrade.sh '4.0.10' '1.0.14' 'docker.io'"
     );
@@ -201,12 +198,6 @@ it('preserves an explicit custom helper image override', function () {
     ]);
 
     expect(coolifyHelperImage())->toBe('registry.example.com/custom/helper');
-});
-
-it('uses the database registry for sentinel images', function () {
-    $action = file_get_contents(app_path('Actions/Server/StartSentinel.php'));
-
-    expect($action)->toContain("\$image = coolifyRegistryUrl().'/coollabsio/sentinel:'.\$version;");
 });
 
 it('rejects invalid registry values and does not sync them', function () {

@@ -13,6 +13,13 @@
                                 :type="$server->isFunctional() ? 'success' : 'warning'" />
                         </x-slot:actions>
 
+                        @if ($this->limaStartCommand)
+                            <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
+                                <code
+                                    class="mt-2 block overflow-x-auto rounded-lg bg-neutral-950 px-3 py-2 font-mono text-[11px] text-neutral-200">{{ $this->limaStartCommand }}</code>
+                            </x-callout>
+                        @endif
+
                         <div class="flex items-start gap-3">
                             <div
                                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">

@@ -556,6 +556,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -1141,6 +1146,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Custom internal container name."
+                                    },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
                                     },
                                     "preview_url_template": {
                                         "type": "string",
@@ -1728,6 +1738,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -2209,6 +2224,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -2669,6 +2689,11 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Custom internal container name."
+                                    },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
                                     },
                                     "preview_url_template": {
                                         "type": "string",
@@ -3376,6 +3401,11 @@
                                         "nullable": true,
                                         "description": "Custom internal container name."
                                     },
+                                    "custom_container_name_prefix": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance."
+                                    },
                                     "preview_url_template": {
                                         "type": "string",
                                         "description": "Preview URL template."
@@ -3501,7 +3531,7 @@
                     "Applications"
                 ],
                 "summary": "Get application logs.",
-                "description": "Get application logs by UUID.",
+                "description": "Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-application-logs-by-uuid",
                 "parameters": [
                     {
@@ -3516,12 +3546,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -3574,7 +3616,7 @@
                     "Applications"
                 ],
                 "summary": "Get preview application logs.",
-                "description": "Get runtime container logs for a preview deployment by application UUID and pull request ID.",
+                "description": "Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-preview-application-logs-by-pull-request-id",
                 "parameters": [
                     {
@@ -3931,7 +3973,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4023,7 +4065,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -4114,7 +4156,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -6097,7 +6139,7 @@
                         "description": "Import queued"
                     },
                     "409": {
-                        "description": "Import already active"
+                        "description": "Another start, restart or import of this database is already in progress."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -6705,6 +6747,10 @@
                                     "mysql_conf": {
                                         "type": "string",
                                         "description": "MySQL conf"
+                                    },
+                                    "sqlite_databases": {
+                                        "type": "string",
+                                        "description": "Comma-separated SQLite database file names"
                                     },
                                     "health_check_enabled": {
                                         "type": "boolean",
@@ -8118,13 +8164,136 @@
                 ]
             }
         },
+        "\/databases\/sqlite": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Create (SQLite)",
+                "description": "Create a new SQLite database.",
+                "operationId": "create-database-sqlite",
+                "requestBody": {
+                    "description": "Database data",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "server_uuid",
+                                    "project_uuid",
+                                    "environment_name",
+                                    "environment_uuid"
+                                ],
+                                "properties": {
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the server"
+                                    },
+                                    "project_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the project"
+                                    },
+                                    "environment_name": {
+                                        "type": "string",
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the destination if the server has multiple destinations"
+                                    },
+                                    "sqlite_databases": {
+                                        "type": "string",
+                                        "description": "Comma-separated SQLite database file names"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Name of the database"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Description of the database"
+                                    },
+                                    "image": {
+                                        "type": "string",
+                                        "description": "Docker Image of the database"
+                                    },
+                                    "limits_memory": {
+                                        "type": "string",
+                                        "description": "Memory limit of the database"
+                                    },
+                                    "limits_memory_swap": {
+                                        "type": "string",
+                                        "description": "Memory swap limit of the database"
+                                    },
+                                    "limits_memory_swappiness": {
+                                        "type": "integer",
+                                        "description": "Memory swappiness of the database"
+                                    },
+                                    "limits_memory_reservation": {
+                                        "type": "string",
+                                        "description": "Memory reservation of the database"
+                                    },
+                                    "limits_cpus": {
+                                        "type": "string",
+                                        "description": "CPU limit of the database"
+                                    },
+                                    "limits_cpuset": {
+                                        "type": "string",
+                                        "description": "CPU set of the database"
+                                    },
+                                    "limits_cpu_shares": {
+                                        "type": "integer",
+                                        "description": "CPU shares of the database"
+                                    },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Database updated"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/databases\/{uuid}\/logs": {
             "get": {
                 "tags": [
                     "Databases"
                 ],
                 "summary": "Get database logs.",
-                "description": "Get database logs by UUID.",
+                "description": "Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-database-logs-by-uuid",
                 "parameters": [
                     {
@@ -8140,12 +8309,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -8554,6 +8735,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another start, restart or import of this database is already in progress."
                     }
                 },
                 "security": [
@@ -8669,6 +8853,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Another start, restart or import of this database is already in progress."
                     }
                 },
                 "security": [
@@ -8770,7 +8957,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -8861,7 +9048,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -8951,7 +9138,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -16033,7 +16220,9 @@
                                 "schema": {
                                     "properties": {
                                         "is_sentinel_enabled": {
-                                            "type": "boolean"
+                                            "description": "Sentinel is mandatory on regular managed servers.",
+                                            "type": "boolean",
+                                            "readOnly": true
                                         },
                                         "is_metrics_enabled": {
                                             "type": "boolean"
@@ -16132,9 +16321,6 @@
                         "application\/json": {
                             "schema": {
                                 "properties": {
-                                    "is_sentinel_enabled": {
-                                        "type": "boolean"
-                                    },
                                     "is_metrics_enabled": {
                                         "type": "boolean"
                                     },
@@ -16212,382 +16398,6 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/{uuid}\/migrate": {
-            "post": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Migrate server to another Coolify instance",
-                "description": "One-shot handoff: export this server, import+claim on the target instance (using the provided token), then disable automations here. Requires read:sensitive and write.",
-                "operationId": "migrate-server-between-instances",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "required": [
-                                    "target_url",
-                                    "target_token"
-                                ],
-                                "properties": {
-                                    "target_url": {
-                                        "type": "string",
-                                        "example": "https:\/\/coolify-b.example.com"
-                                    },
-                                    "target_token": {
-                                        "description": "API token on the target instance (root or write)",
-                                        "type": "string"
-                                    },
-                                    "write_remote": {
-                                        "type": "boolean",
-                                        "default": false
-                                    },
-                                    "rebind_sentinel": {
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "preserve_uuids": {
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "adopt_mode": {
-                                        "type": "boolean",
-                                        "default": true
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Migrated"
-                    },
-                    "403": {
-                        "description": "Missing sensitive permission"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "description": "Validation or remote import failed"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/{uuid}\/export": {
-            "get": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Export server transfer bundle",
-                "description": "Export a server and all resources hosted on it as a versioned transfer bundle for moving between Coolify instances. Requires read:sensitive.",
-                "operationId": "export-server-transfer-bundle",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "encrypt",
-                        "in": "query",
-                        "description": "If true and passphrase is provided, return an encrypted envelope.",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "name": "passphrase",
-                        "in": "query",
-                        "description": "Passphrase used when encrypt=true.",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Transfer bundle"
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "403": {
-                        "description": "Missing sensitive permission"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/import": {
-            "post": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Import server transfer bundle",
-                "description": "Import a server transfer bundle into this Coolify instance (adopt mode by default).",
-                "operationId": "import-server-transfer-bundle",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "bundle": {
-                                        "description": "Plain or encrypted transfer bundle",
-                                        "type": "object"
-                                    },
-                                    "passphrase": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "dry_run": {
-                                        "type": "boolean",
-                                        "default": false
-                                    },
-                                    "preserve_uuids": {
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "adopt_mode": {
-                                        "description": "Import without forcing redeploy; keep statuses for adoption",
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "claim": {
-                                        "description": "Automatically claim the host for this instance after import",
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "write_remote": {
-                                        "description": "When claiming, write ownership file on the host via SSH",
-                                        "type": "boolean",
-                                        "default": false
-                                    },
-                                    "rebind_sentinel": {
-                                        "description": "When claiming, rebind Sentinel to this instance",
-                                        "type": "boolean",
-                                        "default": true
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Dry-run result"
-                    },
-                    "201": {
-                        "description": "Imported"
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "422": {
-                        "description": "Validation failed"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/{uuid}\/claim": {
-            "post": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Claim imported server",
-                "description": "Claim a managed host for this instance: write ownership file and rebind Sentinel.",
-                "operationId": "claim-server",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "write_remote": {
-                                        "type": "boolean",
-                                        "default": true
-                                    },
-                                    "rebind_sentinel": {
-                                        "type": "boolean",
-                                        "default": true
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Claim result"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/{uuid}\/transfer\/complete": {
-            "post": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Mark server transferred",
-                "description": "Source-instance step: disable automations after a successful export\/import handoff.",
-                "operationId": "complete-server-transfer",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "export_id": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "target_instance_url": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Marked transferred"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/servers\/{uuid}\/export\/mailbox": {
-            "post": {
-                "tags": [
-                    "Servers"
-                ],
-                "summary": "Write transfer bundle to server mailbox",
-                "description": "Write an export bundle to \/data\/coolify\/exports on the managed host for air-gapped import.",
-                "operationId": "export-server-transfer-mailbox",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "passphrase": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Mailbox write result"
-                    },
-                    "403": {
-                        "description": "Missing sensitive permission"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
                     }
                 },
                 "security": [
@@ -16676,10 +16486,15 @@
                                         "example": "og888os",
                                         "description": "The UUID of the private key."
                                     },
-                                    "is_build_server": {
-                                        "type": "boolean",
-                                        "example": false,
-                                        "description": "Is build server."
+                                    "server_role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "deployment",
+                                            "build",
+                                            "both"
+                                        ],
+                                        "example": "both",
+                                        "description": "Server role."
                                     },
                                     "instant_validate": {
                                         "type": "boolean",
@@ -16802,6 +16617,26 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "description": "Also delete all resources on the server.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
+                        "name": "delete_from_provider",
+                        "in": "query",
+                        "description": "Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -16889,9 +16724,14 @@
                                         "type": "string",
                                         "description": "The UUID of the private key."
                                     },
-                                    "is_build_server": {
-                                        "type": "boolean",
-                                        "description": "Is build server."
+                                    "server_role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "deployment",
+                                            "build",
+                                            "both"
+                                        ],
+                                        "description": "Server role."
                                     },
                                     "instant_validate": {
                                         "type": "boolean",
@@ -16925,6 +16765,10 @@
                                     "server_disk_usage_check_frequency": {
                                         "type": "string",
                                         "description": "Cron expression for disk usage check frequency."
+                                    },
+                                    "server_disk_usage_notification_interval_hours": {
+                                        "type": "integer",
+                                        "description": "Minimum hours between high disk usage notifications (1-720). Default: 24."
                                     },
                                     "connection_timeout": {
                                         "type": "integer",
@@ -17368,6 +17212,12 @@
                                             "null"
                                         ]
                                     },
+                                    "is_force_https_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
                                     "max_restart_count": {
                                         "description": "Maximum Docker restart count before Coolify stops the container. Set to 0 to disable the limit.",
                                         "type": [
@@ -17375,12 +17225,6 @@
                                             "null"
                                         ],
                                         "minimum": 0
-                                    },
-                                    "is_force_https_enabled": {
-                                        "type": [
-                                            "boolean",
-                                            "null"
-                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -17425,7 +17269,7 @@
                     "Service applications"
                 ],
                 "summary": "Get service application logs",
-                "description": "Get Docker logs for a single compose service container.",
+                "description": "Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-service-application-logs-by-service-and-app-uuid",
                 "parameters": [
                     {
@@ -17449,12 +17293,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -17498,7 +17354,7 @@
                     "Service applications"
                 ],
                 "summary": "Get service application logs",
-                "description": "Get Docker logs for a single compose service container.",
+                "description": "Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "post-service-application-logs-by-service-and-app-uuid",
                 "parameters": [
                     {
@@ -17520,11 +17376,24 @@
                     {
                         "name": "lines",
                         "in": "query",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -17852,7 +17721,7 @@
                         "description": "Import queued"
                     },
                     "409": {
-                        "description": "Import already active"
+                        "description": "Another start, restart or import of this database is already in progress."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -18137,7 +18006,7 @@
                     "Service databases"
                 ],
                 "summary": "Get service database logs",
-                "description": "Get Docker logs for a compose database container.",
+                "description": "Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-service-database-logs-by-service-and-database-uuid",
                 "parameters": [
                     {
@@ -18159,11 +18028,24 @@
                     {
                         "name": "lines",
                         "in": "query",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     }
                 ],
@@ -18741,6 +18623,16 @@
                             "type": "boolean",
                             "default": true
                         }
+                    },
+                    {
+                        "name": "delete_from_coolify_only",
+                        "in": "query",
+                        "description": "Remove only Coolify metadata without deleting Docker resources.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -18959,7 +18851,7 @@
                     "Services"
                 ],
                 "summary": "Get service logs.",
-                "description": "Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET \/services\/{uuid}`.",
+                "description": "Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET \/services\/{uuid}`. Requires the `read:sensitive` or `root` token ability.",
                 "operationId": "get-service-logs-by-uuid",
                 "parameters": [
                     {
@@ -18985,12 +18877,24 @@
                     {
                         "name": "lines",
                         "in": "query",
-                        "description": "Number of lines to show from the end of the logs.",
+                        "description": "Number of lines to show from the end of the logs. Use `all` to return all logs. `-1` remains available as a compatibility alias.",
                         "required": false,
                         "schema": {
-                            "type": "integer",
-                            "format": "int32",
-                            "default": 100
+                            "oneOf": [
+                                {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "default": 100,
+                                    "maximum": 10000,
+                                    "minimum": -1
+                                },
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "all"
+                                    ]
+                                }
+                            ]
                         }
                     },
                     {
@@ -19133,7 +19037,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -19228,7 +19132,7 @@
                                     },
                                     "is_shown_once": {
                                         "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                     }
                                 },
                                 "type": "object"
@@ -19322,7 +19226,7 @@
                                                 },
                                                 "is_shown_once": {
                                                     "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable's value is shown on the UI."
+                                                    "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                                                 }
                                             },
                                             "type": "object"
@@ -20379,6 +20283,7 @@
                                         "type": "boolean"
                                     },
                                     "is_shown_once": {
+                                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.",
                                         "type": "boolean"
                                     },
                                     "comment": {
@@ -21409,6 +21314,62 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Teams"
+                ],
+                "summary": "Update authenticated team",
+                "description": "Update settings for the team bound to the API token.",
+                "operationId": "update-token-team",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "is_build_server_fallback_enabled"
+                                ],
+                                "properties": {
+                                    "is_build_server_fallback_enabled": {
+                                        "type": "boolean",
+                                        "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated team.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/Team"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -22908,6 +22869,10 @@
                     "only_this_server": {
                         "type": "boolean"
                     },
+                    "parent_deployment_uuid": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "rollback": {
                         "type": "boolean"
                     },
@@ -22988,6 +22953,10 @@
                         "type": "boolean"
                     },
                     "custom_internal_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "custom_container_name_prefix": {
                         "type": "string",
                         "nullable": true
                     },
@@ -23092,7 +23061,8 @@
                         "type": "boolean"
                     },
                     "is_shown_once": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values."
                     },
                     "key": {
                         "type": "string"
@@ -23214,6 +23184,12 @@
                     "timeout": {
                         "type": "integer",
                         "description": "The timeout of the scheduled task in seconds."
+                    },
+                    "next_run_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "The next time the scheduled task runs, in UTC. Null when it is disabled or not calculated yet."
                     },
                     "created_at": {
                         "type": "string",
@@ -23381,8 +23357,13 @@
                     "force_server_cleanup": {
                         "type": "boolean"
                     },
-                    "is_build_server": {
-                        "type": "boolean"
+                    "server_role": {
+                        "type": "string",
+                        "enum": [
+                            "deployment",
+                            "build",
+                            "both"
+                        ]
                     },
                     "is_cloudflare_tunnel": {
                         "type": "boolean"
@@ -23690,6 +23671,10 @@
                     "custom_server_limit": {
                         "type": "string",
                         "description": "The custom server limit."
+                    },
+                    "is_build_server_fallback_enabled": {
+                        "type": "boolean",
+                        "description": "Whether deployments can fall back to the deployment server when no usable dedicated build server is available."
                     },
                     "members": {
                         "description": "The members of the team.",

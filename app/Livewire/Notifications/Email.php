@@ -437,6 +437,7 @@ class Email extends Component
     {
         $this->authorize('update', $this->settings);
         $settings = instanceSettings();
+        $this->authorize('view', $settings);
         $this->smtpFromAddress = $settings->smtp_from_address;
         $this->smtpFromName = $settings->smtp_from_name;
 

@@ -1,4 +1,5 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
@@ -21,6 +22,7 @@ document.addEventListener('livewire:navigated', () => {
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
 document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
 
 /**

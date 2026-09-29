@@ -88,22 +88,11 @@
             <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
                 <h3 class="text-[13px] font-medium text-neutral-600 dark:text-fg-dim">Validation checkpoints</h3>
             </div>
-            <div class="checkpoint-scroll-fade relative min-w-0" x-data="{
-                observer: null,
-                scrollToRunning() {
-                    this.$refs.track.querySelector('[data-checkpoint-status=running]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-                }
-            }"
-                x-init="$nextTick(() => scrollToRunning()); observer = new MutationObserver(() => $nextTick(() => scrollToRunning())); observer.observe($refs.track, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-checkpoint-status'] })"
-                x-destroy="observer?.disconnect()">
-                <div class="flex min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar divide-x divide-neutral-200 dark:divide-white/[0.07]"
-                    x-ref="track">
-                    @foreach ($checkpoints as $checkpoint)
-                        <x-checkpoint-item :title="$checkpoint['title']" :description="$checkpoint['description']"
-                            :status="$checkpoint['status']" data-checkpoint-status="{{ $checkpoint['status'] }}"
-                            class="basis-[88%] shrink-0 snap-start sm:basis-72 lg:basis-80" />
-                    @endforeach
-                </div>
+            <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
+                @foreach ($checkpoints as $checkpoint)
+                    <x-checkpoint-item :title="$checkpoint['title']" :description="$checkpoint['description']"
+                        :status="$checkpoint['status']" />
+                @endforeach
             </div>
         </div>
 

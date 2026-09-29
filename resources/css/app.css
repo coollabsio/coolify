@@ -1704,7 +1704,7 @@ html[data-theme="custom"] textarea:disabled {
     /* crisp ring + a restrained lift so the card separates from the canvas
        (shadcn-style), not a heavy floating shadow */
     box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar + layer-2 nav */
+    /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar and page padding */
     scroll-margin-top: 7rem;
 }
 
@@ -2118,44 +2118,6 @@ html[data-theme="custom"] textarea:disabled {
 .resource-heading-menus,
 .resource-heading-actions {
     overflow: visible;
-}
-
-.resource-heading-overflow {
-    display: inline-flex;
-    align-items: center;
-}
-
-.resource-heading-overflow-items {
-    display: flex;
-    align-items: center;
-    gap: 0.125rem;
-}
-
-.resource-heading-overflow-items.is-measuring {
-    display: flex !important;
-    visibility: hidden !important;
-    position: absolute !important;
-    inset: auto auto 0 0 !important;
-    flex-direction: row !important;
-    width: max-content !important;
-    height: auto !important;
-    max-width: none !important;
-    max-height: none !important;
-    overflow: visible !important;
-    pointer-events: none !important;
-    padding: 0 !important;
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-}
-
-.resource-heading-overflow.is-collapsed .resource-heading-overflow-items > .button,
-.resource-heading-overflow.is-collapsed .resource-heading-overflow-items > a.button {
-    width: 100%;
-    justify-content: flex-start;
-    height: auto;
-    min-height: 2rem;
-    padding: 0.375rem 0.625rem;
 }
 
 /* Heading action group: buttons + dropdown triggers styled like the tabs */
@@ -2579,18 +2541,6 @@ input[type="search"]::-webkit-search-results-decoration {
     border: 1px solid var(--coollabs-fill);
 }
 
-.checkpoint-scroll-fade::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-    width: 2rem;
-    background: linear-gradient(to left, var(--coollabs-base), transparent);
-    pointer-events: none;
-}
-
 @media (max-width: 639px) {
     .process-dialog-mobile-fullscreen {
         height: 100dvh !important;
@@ -2996,7 +2946,7 @@ input[type="search"]::-webkit-search-results-decoration {
     background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
-/* Persistent storage volumes: Name | Destination | [PR suffix] | Backup | [Actions] */
+/* Persistent storage volumes: Name | [Source] | Destination | [PR suffix] | Backup | [Actions] */
 .volumes-table-grid-readonly {
     grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 5rem;
 }
@@ -3009,8 +2959,25 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
 }
 
+.volumes-table-grid-readonly.has-source {
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(10rem, 1.2fr) minmax(8rem, 1fr) 5rem;
+}
+
+.volumes-table-grid.has-source {
+    grid-template-columns: minmax(9rem, 1.1fr) minmax(14rem, 1.5fr) minmax(6rem, 1fr) 5rem 15rem;
+}
+
+.volumes-table-grid-with-pr.has-source {
+    grid-template-columns: minmax(9rem, 1fr) minmax(14rem, 1.4fr) minmax(6rem, 1fr) 8.5rem 5rem 15rem;
+}
+
 .volumes-mobile-label {
     display: none;
+}
+
+/* External Compose volumes (read-only): Volume | Docker volume | Mount path | Service */
+.external-volumes-table-grid {
+    grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1.2fr) minmax(8rem, 1fr) minmax(6rem, 0.8fr);
 }
 
 /*
@@ -3044,13 +3011,15 @@ input[type="search"]::-webkit-search-results-decoration {
 @media (max-width: 768px) {
     .data-table-header.volumes-table-grid,
     .data-table-header.volumes-table-grid-with-pr,
-    .data-table-header.volumes-table-grid-readonly {
+    .data-table-header.volumes-table-grid-readonly,
+    .data-table-header.external-volumes-table-grid {
         display: none;
     }
 
     .data-table-row.volumes-table-grid,
     .data-table-row.volumes-table-grid-with-pr,
-    .data-table-row.volumes-table-grid-readonly {
+    .data-table-row.volumes-table-grid-readonly,
+    .data-table-row.external-volumes-table-grid {
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -3069,7 +3038,8 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .data-table-row.volumes-table-grid > *,
     .data-table-row.volumes-table-grid-with-pr > *,
-    .data-table-row.volumes-table-grid-readonly > * {
+    .data-table-row.volumes-table-grid-readonly > *,
+    .data-table-row.external-volumes-table-grid > * {
         width: 100%;
         min-width: 0;
     }
@@ -3084,6 +3054,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-cell-name,
+    .volumes-cell-source,
     .volumes-col-backup,
     .volumes-cell-dest,
     .volumes-cell-actions {
@@ -3167,6 +3138,11 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .server-resources-unmanaged-table-grid {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
+}
+
+.server-images-table-grid {
+    grid-template-columns: minmax(10rem, 1.6fr) minmax(5rem, 0.8fr) 7.5rem 6.5rem 4.5rem minmax(8rem, 1fr) 6.5rem;
+    min-width: 55rem;
 }
 
 .package-updates-table-grid {
@@ -3492,6 +3468,81 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 .logs-viewer-lines-input::-webkit-inner-spin-button {
     margin: 0;
     -webkit-appearance: none;
+}
+
+/* Runtime logs: "Lines", the number field and "All" as one control, styled like the search field. */
+.runtime-log-lines-group {
+    height: 2rem;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.dark .runtime-log-lines-group {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.runtime-log-lines-group:has(.logs-viewer-lines-input:focus) {
+    border-color: var(--color-coollabs);
+}
+
+.runtime-log-lines-group .logs-viewer-lines-label {
+    padding: 0 0.5rem 0 0.625rem;
+}
+
+.runtime-log-lines-group .logs-viewer-lines-input {
+    width: 3.75rem !important;
+    min-width: 3.75rem !important;
+    height: 100% !important;
+    border: 0 !important;
+    border-left: 1px solid var(--color-neutral-200) !important;
+    border-right: 1px solid var(--color-neutral-200) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.dark .runtime-log-lines-group .logs-viewer-lines-input {
+    border-left-color: rgba(255, 255, 255, 0.08) !important;
+    border-right-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.runtime-log-lines-all {
+    height: 100%;
+    padding: 0 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #737373;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.runtime-log-lines-all:hover:not(:disabled, .runtime-log-lines-all-active) {
+    background: rgba(0, 0, 0, 0.05);
+    color: #171717;
+}
+
+.dark .runtime-log-lines-all {
+    color: var(--color-fg-faint);
+}
+
+.dark .runtime-log-lines-all:hover:not(:disabled, .runtime-log-lines-all-active) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-fg);
+}
+
+.runtime-log-lines-all.runtime-log-lines-all-active,
+.dark .runtime-log-lines-all.runtime-log-lines-all-active {
+    background: var(--color-coollabs);
+    color: #fff;
+}
+
+.runtime-log-lines-all:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 /* Compact badge that fits the dark logs chrome */
@@ -4041,8 +4092,16 @@ html[data-theme="custom"] .runtime-log-columns {
     color: #adbdc9;
 }
 
-.runtime-log-viewport [data-log-line].hidden + .runtime-log-detail {
-    display: none !important;
+.runtime-log-virtual-list {
+    position: relative;
+    width: 100%;
+}
+
+.runtime-log-virtual-row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
 }
 
 .runtime-log-without-time {

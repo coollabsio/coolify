@@ -15,6 +15,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
@@ -26,7 +27,7 @@ class FileStorage extends Component
 
     public LocalFileVolume $fileStorage;
 
-    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase|Application $resource;
 
     public string $fs_path;
 
@@ -136,7 +137,7 @@ class FileStorage extends Component
             $this->fileStorage->save();
         } else {
             // Sync from model
-            $this->content = $this->fileStorage->content;
+            $this->content = auth()->user()?->can('update', $this->resource) ? $this->fileStorage->content : null;
             $this->isBasedOnGit = $this->fileStorage->is_based_on_git;
             $this->isPreviewSuffixEnabled = $this->fileStorage->is_preview_suffix_enabled ?? true;
         }

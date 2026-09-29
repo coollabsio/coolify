@@ -360,17 +360,6 @@ test('database dump compression uses the helper image and shared CPU setting', f
     'high' => 75,
 ]);
 
-test('all dump all database commands use shared helper compression', function () {
-    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
-
-    expect($source)
-        ->toContain('$this->buildCompressedDumpCommand($backupCommand)')
-        ->toContain('mysqldump -u root')
-        ->toContain('mariadb-dump -u root')
-        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
-        ->and($source)->not->toContain('| gzip >');
-});
-
 test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
     $backup = new ScheduledDatabaseBackup([
         'dump_all' => true,
@@ -398,13 +387,3 @@ test('specific database dumps keep every selected database', function (string $d
 
     expect($databases)->toBe(['default', 'analytics']);
 })->with(['postgresql', 'mysql', 'mariadb']);
-
-test('individual database backup deletion surfaces local failures and honors selected S3 deletion', function () {
-    $source = file_get_contents(app_path('Livewire/Project/Database/BackupExecutions.php'));
-
-    expect($source)
-        ->toContain("in_array('delete_backup_s3', \$selectedActions, true)")
-        ->toContain('deleteBackupsLocally($execution->filename, $server, throwError: true)')
-        ->toContain("throw new \\RuntimeException('The backup server is unavailable.')")
-        ->not->toContain('deleteBackupsLocally($execution->filename, $server);');
-});

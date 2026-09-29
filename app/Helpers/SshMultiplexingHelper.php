@@ -15,7 +15,7 @@ class SshMultiplexingHelper
 {
     public static function serverSshConfiguration(Server $server): array
     {
-        $privateKey = PrivateKey::findOrFail($server->private_key_id);
+        $privateKey = PrivateKey::where('team_id', $server->team_id)->findOrFail($server->private_key_id);
 
         return [
             'sshKeyLocation' => $privateKey->getKeyLocation(),

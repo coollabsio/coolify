@@ -4,6 +4,9 @@ import pty from 'node-pty';
 import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
+    TERMINAL_CLOSE_CODES,
+    authenticateTerminalUpgrade,
+    createTerminalUpgradeHandler,
     extractHereDocContent,
     extractSshArgs,
     extractTargetHost,
@@ -11,6 +14,7 @@ import {
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAuthorizedTargetHost,
+    rejectTerminalSocket,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
@@ -117,54 +121,44 @@ const getSessionCookie = (req) => {
     }
 }
 
-const verifyClient = async (info, callback) => {
-    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(info.req);
+const verifyClient = async (req) => {
+    const sessionCookie = getSessionCookie(req);
     const requestContext = {
-        remoteAddress: info.req.socket?.remoteAddress,
-        origin: info.origin,
-        sessionCookieName,
-        hasXsrfToken: Boolean(xsrfToken),
-        hasLaravelSession: Boolean(laravelSession),
+        remoteAddress: req.socket?.remoteAddress,
+        origin: req.headers.origin,
+        sessionCookieName: sessionCookie.sessionCookieName,
+        hasXsrfToken: Boolean(sessionCookie.xsrfToken),
+        hasLaravelSession: Boolean(sessionCookie.laravelSession),
     };
 
     logTerminal('log', 'Verifying websocket client.', requestContext);
 
-    // Verify presence of required tokens
-    if (!laravelSession || !xsrfToken) {
-        logTerminal('warn', 'Rejecting websocket client because required auth tokens are missing.', requestContext);
-        return callback(false, 401, 'Unauthorized: Missing required tokens');
-    }
+    // Authenticate with Laravel backend
+    const result = await authenticateTerminalUpgrade(sessionCookie, postToCoolify);
 
-    try {
-        // Authenticate with Laravel backend
-        const response = await postToCoolify('/terminal/auth', {
-            'Cookie': `${sessionCookieName}=${laravelSession}`,
-            'X-XSRF-TOKEN': xsrfToken
-        });
-
-        if (response.status === 200) {
-            logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
-            callback(true);
-        } else {
-            logTerminal('warn', 'Websocket client authentication returned a non-success status.', {
-                ...requestContext,
-                status: response.status,
-            });
-            callback(false, 401, 'Unauthorized: Invalid credentials');
-        }
-    } catch (error) {
+    if (result.authenticated) {
+        logTerminal('log', 'Websocket client authentication succeeded.', requestContext);
+    } else if (result.error) {
         logTerminal('error', 'Websocket client authentication failed.', {
             ...requestContext,
-            error: error.message,
-            responseStatus: error.response?.status,
-            responseData: error.response?.data,
+            error: result.error.message,
         });
-        callback(false, 500, 'Internal Server Error');
+    } else {
+        logTerminal('warn', 'Rejecting websocket client.', {
+            ...requestContext,
+            reason: result.reason,
+            status: result.status,
+            closeCode: result.closeCode,
+        });
     }
+
+    return result;
 };
 
-
-const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
+// Upgrades are authenticated manually (instead of ws `verifyClient`) so a
+// rejected browser receives a readable close code rather than an opaque 1006.
+const wss = new WebSocketServer({ noServer: true, path: '/terminal/ws' });
+server.on('upgrade', createTerminalUpgradeHandler({ wss, authenticate: verifyClient }));
 
 const HEARTBEAT_INTERVAL_MS = 30000;
 
@@ -220,7 +214,7 @@ wss.on('connection', async (ws, req) => {
     // Verify presence of required tokens
     if (!laravelSession || !xsrfToken) {
         logTerminal('warn', 'Closing websocket connection because required auth tokens are missing.', connectionContext);
-        ws.close(401, 'Unauthorized: Missing required tokens');
+        rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.AUTH_REJECTED, 'Unauthorized: Missing required tokens');
         return;
     }
 
@@ -457,16 +451,25 @@ async function handleCommand(ws, command, userId) {
     }, terminalSessionTimeout * 1000);
 }
 
+// The text message is kept for clients that predate the close code.
+function rejectTerminalToken(userSession, message) {
+    logTerminal('warn', 'Closing websocket connection because the terminal token was rejected.', {
+        userId: userSession.userId,
+        reason: message,
+    });
+    rejectTerminalSocket(userSession.ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, message, { message });
+}
+
 async function handleTerminalToken(userSession, token) {
     if (typeof token !== 'string' || !/^[a-zA-Z0-9]{64}$/.test(token)) {
-        userSession.ws.send('Unauthorized: Invalid terminal token');
+        rejectTerminalToken(userSession, 'Unauthorized: Invalid terminal token');
         return;
     }
 
     try {
         const response = await postToCoolify('/terminal/session', userSession.authHeaders, { token });
         if (response.status !== 200 || typeof response.data?.command !== 'string') {
-            userSession.ws.send('Unauthorized: Terminal token was rejected');
+            rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
             return;
         }
 
@@ -476,7 +479,7 @@ async function handleTerminalToken(userSession, token) {
             userId: userSession.userId,
             error: error.message,
         });
-        userSession.ws.send('Unauthorized: Terminal token was rejected');
+        rejectTerminalToken(userSession, 'Unauthorized: Terminal token was rejected');
     }
 }
 

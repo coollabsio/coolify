@@ -29,7 +29,7 @@ class OauthLoginService
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
         $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
-        session(['currentTeam' => $user->currentTeam = $team]);
+        session(['currentTeam' => $team]);
 
         if ($this->requiresTwoFactorChallenge($user)) {
             Auth::logout();
@@ -73,6 +73,10 @@ class OauthLoginService
         }
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
+
+        if ($provider === 'google' && filled($oauthSetting->tenant) && data_get($rawClaims, 'hd') !== $oauthSetting->tenant) {
+            throw new HttpException(403, 'Google account is not in the configured Workspace');
+        }
 
         $identityKey = [
             'provider' => $provider,
@@ -225,9 +229,17 @@ class OauthLoginService
         }
     }
 
+    /**
+     * Only OIDC exposes a provider-level user creation setting. Other providers
+     * follow the instance registration setting, as before OIDC support.
+     */
     private function canCreateUser(OauthSetting $oauthSetting): bool
     {
-        return instanceSettings()->is_registration_enabled || $oauthSetting->allow_registration;
+        if (instanceSettings()->is_registration_enabled) {
+            return true;
+        }
+
+        return $oauthSetting->provider === 'oidc' && $oauthSetting->allow_registration;
     }
 
     private function createUser(string $name, string $email, OauthSetting $oauthSetting): User

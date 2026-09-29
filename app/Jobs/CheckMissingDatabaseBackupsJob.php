@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\Database\BackupMissing;
 use Illuminate\Bus\Queueable;
@@ -39,10 +40,6 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
-        if ($backup->missing_backup_notification_sent_at?->greaterThanOrEqualTo($lastActivityAt)) {
-            return;
-        }
-
         if (! $backup->team) {
             Log::warning("Cannot send missing backup notification for backup {$backup->id}: team not found");
 
@@ -53,7 +50,11 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
             return;
         }
 
+        // Send once for each period without backup activity.
+        if (! NotificationThrottle::claim($backup, BackupMissing::class, $lastActivityAt)) {
+            return;
+        }
+
         $backup->team->notify(new BackupMissing($backup, $lastExecutionAt));
-        $backup->forceFill(['missing_backup_notification_sent_at' => now()])->save();
     }
 }

@@ -8,6 +8,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -18,6 +19,7 @@ use Livewire\WithPagination;
 class BackupExecutions extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
     use WithPagination;
 
     public Service $service;
@@ -30,11 +32,11 @@ class BackupExecutions extends Component
 
     public function getListeners(): array
     {
-        $teamId = currentTeam()->id;
-
         return [
             'modalClosed' => 'closeExecutionModal',
-            "echo-private:team.{$teamId},BackupCreated" => '$refresh',
+            ...$this->teamChannelListeners([
+                'BackupCreated' => '$refresh',
+            ]),
         ];
     }
 

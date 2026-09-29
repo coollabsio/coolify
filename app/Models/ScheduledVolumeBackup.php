@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasNextRunAt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledVolumeBackup extends BaseModel
 {
+    use HasNextRunAt;
+
     public const int DEFAULT_TIMEOUT = 36000;
 
     protected $fillable = [
@@ -47,6 +50,7 @@ class ScheduledVolumeBackup extends BaseModel
             'retention_days_s3' => 'integer',
             'retention_max_storage_s3' => 'float',
             'timeout' => 'integer',
+            'next_run_at' => 'datetime',
         ];
     }
 

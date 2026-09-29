@@ -25,6 +25,7 @@ class ServiceApplicationsController extends Controller
             'resourceable',
             'resourceable_id',
             'resourceable_type',
+            'service',
         ]);
 
         $serialized = serializeApiResponse($serviceApplication);
@@ -377,7 +378,7 @@ class ServiceApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'get-service-application-logs-by-service-and-app-uuid',
         security: [
@@ -446,7 +447,7 @@ class ServiceApplicationsController extends Controller
     )]
     #[OA\Post(
         summary: 'Get service application logs',
-        description: 'Get Docker logs for a single compose service container.',
+        description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/applications/{app_uuid}/logs',
         operationId: 'post-service-application-logs-by-service-and-app-uuid',
         security: [['bearerAuth' => []]],

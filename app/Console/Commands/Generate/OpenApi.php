@@ -20,6 +20,9 @@ class OpenApi extends Command
         $process = Process::run([
             './vendor/bin/openapi',
             'app',
+            // Server transfer endpoints are development-only (isDev()), so they stay out of the public docs.
+            '--exclude',
+            'Http/Controllers/Api/ServerTransferController.php',
             '-o',
             'openapi.yaml',
             '--version',
@@ -32,7 +35,7 @@ class OpenApi extends Command
         echo $process->output();
 
         $yaml = file_get_contents('openapi.yaml');
-        
+
         $json = json_encode(Yaml::parse($yaml), JSON_PRETTY_PRINT)."\n";
         file_put_contents('openapi.json', $json);
         echo "Converted OpenAPI YAML to JSON.\n";

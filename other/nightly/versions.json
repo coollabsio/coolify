@@ -1,7 +1,7 @@
 {
     "coolify": {
         "v4": {
-            "version": "4.4"
+            "version": "sha-1e9add3"
         },
         "nightly": {
             "version": "4.5-rc.1"

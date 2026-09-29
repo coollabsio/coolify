@@ -11,6 +11,7 @@ use App\Services\ConfigurationRepository;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -132,12 +133,10 @@ class Index extends Component
             }
 
             if ($this->selectedExistingPrivateKey) {
-                $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)
-                    ->where('id', $this->selectedExistingPrivateKey)
-                    ->first();
+                $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])
+                    ->find($this->selectedExistingPrivateKey);
                 if ($this->createdPrivateKey) {
-                    $this->privateKey = $this->createdPrivateKey->private_key;
-                    $this->publicKey = $this->createdPrivateKey->getPublicKey();
+                    $this->authorize('update', $this->createdPrivateKey);
                 }
             }
 
@@ -248,9 +247,9 @@ class Index extends Component
 
             return;
         }
-        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->selectedExistingPrivateKey);
-        $this->authorize('view', $this->createdPrivateKey);
-        $this->privateKey = $this->createdPrivateKey->private_key;
+        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($this->selectedExistingPrivateKey);
+        $this->authorize('update', $this->createdPrivateKey);
+        $this->privateKey = null;
         $this->currentState = 'create-server';
     }
 
@@ -304,28 +303,27 @@ class Index extends Component
 
         $this->validate();
 
-        $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
-            if ($foundServer->team_id === currentTeam()->id) {
-                return $this->dispatch('error', 'A server with this IP/Domain already exists in your team.');
-            }
-
-            return $this->dispatch('error', 'A server with this IP/Domain is already in use by another team.');
+            return $this->dispatch('error', 'A server with this IP/Domain already exists.');
         }
         $privateKeyId = $this->createdPrivateKey?->id ?? $this->selectedExistingPrivateKey;
-        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
-        $this->authorize('view', $this->createdPrivateKey);
+        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($privateKeyId);
+        $this->authorize('update', $this->createdPrivateKey);
 
-        $this->createdServer = Server::create([
-            'name' => $this->remoteServerName,
-            'ip' => $this->remoteServerHost,
-            'port' => $this->remoteServerPort,
-            'user' => $this->remoteServerUser,
-            'description' => $this->remoteServerDescription,
-            'private_key_id' => $this->createdPrivateKey->id,
-            'team_id' => currentTeam()->id,
-        ]);
+        try {
+            $this->createdServer = Team::createServerWithinLimit(currentTeam()->id, [
+                'name' => $this->remoteServerName,
+                'ip' => $this->remoteServerHost,
+                'port' => $this->remoteServerPort,
+                'user' => $this->remoteServerUser,
+                'description' => $this->remoteServerDescription,
+                'private_key_id' => $this->createdPrivateKey->id,
+                'team_id' => currentTeam()->id,
+            ]);
+        } catch (ValidationException) {
+            return $this->dispatch('error', 'You have reached the server limit for your subscription.');
+        }
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->selectedExistingServer = $this->createdServer->id;

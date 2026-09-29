@@ -111,11 +111,6 @@ class InstanceSettings extends Model
         static::updated(function ($settings) {
             // Clear once() cache so subsequent calls get fresh data
             Once::flush();
-
-            // Clear trusted hosts cache when FQDN changes
-            if ($settings->wasChanged('fqdn')) {
-                \Cache::forget('instance_settings_fqdn_host');
-            }
         });
     }
 

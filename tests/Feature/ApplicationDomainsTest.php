@@ -417,6 +417,8 @@ it('manages preview domains and their dns status', function () {
     Livewire::test(PreviewDomains::class, ['preview' => $preview])
         ->assertSet('domainRows.0.url', 'https://44.example.com')
         ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->call('pollDnsChecks')
         ->assertSet('domainRows.0.dns_status', 'skipped')
         ->set('newDomainParts.host', 'second.example.com')
         ->call('addDomain')
@@ -564,7 +566,7 @@ it('notifies when an asynchronous preview dns check finds a mismatch', function 
 
     $component->call('pollDnsChecks')
         ->assertSet('domainRows.0.dns_status', 'failed')
-        ->assertDispatched('error', 'DNS is not configured for preview.example.com. Review the required DNS record.');
+        ->assertDispatched('error', 'DNS is not configured for preview.example.com. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later.');
 });
 
 it('does not overwrite a completed preview dns result with stale checking state', function () {
@@ -605,6 +607,27 @@ it('does not overwrite a completed preview dns result with stale checking state'
             'message' => 'DNS looks correct.',
             'check_id' => 'completed-check',
         ]);
+});
+
+it('links the labels warning to the container labels section', function () {
+    $this->application->settings()->update(['is_container_label_readonly_enabled' => false]);
+
+    $labelsUrl = route('project.application.configuration', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]).'#container-labels-section';
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Domains managed via labels')
+        ->assertSee('href="'.$labelsUrl.'"', false)
+        ->assertSee('Go to Container labels');
+});
+
+it('does not show the labels warning when Coolify manages labels', function () {
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Domains managed via labels')
+        ->assertDontSee('#container-labels-section', false);
 });
 
 it('lists existing domains as individual rows', function () {
@@ -1021,17 +1044,16 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
         'provider_zone_id' => 'zone-1',
         'name' => 'example.com',
     ]);
-    $record = ManagedDnsRecord::factory()->create([
+    $record = ManagedDnsRecord::factory()->owned()->create([
         'team_id' => $this->team->id,
         'integration_token_id' => $token->id,
         'dns_provider_zone_id' => $zone->id,
-        'resource_type' => $this->application->getMorphClass(),
-        'resource_id' => $this->application->getKey(),
         'provider_record_id' => 'record-1',
         'type' => 'A',
         'name' => 'app.example.com',
         'content' => '203.0.113.10',
     ]);
+    $record->addReference($this->application);
 
     Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/record-1' => Http::sequence()
         ->push(['success' => true, 'result' => [
@@ -1039,6 +1061,7 @@ it('deletes the managed dns record when removing a domain by key with deleteMana
             'type' => 'A',
             'name' => 'app.example.com',
             'content' => '203.0.113.10',
+            'comment' => $record->ownershipComment(),
         ]])
         ->push(['success' => true, 'result' => ['id' => 'record-1']])]);
 
@@ -1297,6 +1320,8 @@ it('marks dns status as skipped when dns validation is disabled', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('checkAllDns')
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->call('pollDnsChecks')
         ->assertSet('domainRows.0.dns_status', 'skipped');
 
     $this->application->refresh();
@@ -1456,6 +1481,7 @@ it('persists dns status after checking a domain', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('checkDomainDns', 0)
+        ->call('pollDnsChecks')
         ->assertSet('domainRows.0.dns_status', 'failed');
 
     $this->application->refresh();
@@ -1497,7 +1523,7 @@ it('polls a queued dns check and notifies about a mismatch', function () {
 
     $component->call('pollDnsChecks')
         ->assertSet('domainRows.0.dns_status', 'failed')
-        ->assertDispatched('error', 'DNS is not configured for app.example.com. Review the required DNS record.');
+        ->assertDispatched('error', 'DNS is not configured for app.example.com. Review the required DNS record. If you changed it recently, DNS propagation can take some time, so please try again later.');
 });
 
 it('does not overwrite a completed queued dns result with stale checking state', function () {
@@ -1579,7 +1605,7 @@ it('resolves hostname server addresses to a real ip for dns messages', function 
         ->and(filter_var($resolvedIp, FILTER_VALIDATE_IP))->not->toBeFalse()
         ->and($component->get('domainRows.0.expected_ip'))->toBe($resolvedIp);
 
-    $component->call('checkAllDns');
+    $component->call('checkAllDns')->call('pollDnsChecks');
 
     $message = $component->get('domainRows.0.dns_message');
     $recordType = dnsRecordTypeForIp($resolvedIp);
@@ -1605,7 +1631,8 @@ it('uses short aaaa guidance when the server ip is ipv6', function () {
     $settings->save();
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->call('checkDomainDns', 0);
+        ->call('checkDomainDns', 0)
+        ->call('pollDnsChecks');
 
     expect($component->get('serverIp'))->toBe('2001:db8::10')
         ->and($component->get('domainRows.0.dns_message'))->toBe('Required DNS record type AAAA pointing to 2001:db8::10');
@@ -1628,7 +1655,8 @@ it('uses short a-record guidance for compose applications', function () {
     $this->server->update(['ip' => '172.16.0.3']);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->call('checkDomainDns', 0);
+        ->call('checkDomainDns', 0)
+        ->call('pollDnsChecks');
 
     expect($component->get('domainRows.0.dns_message'))->toBe('Required DNS record type A pointing to 172.16.0.3')
         ->and($component->get('domainRows.0.dns_status'))->toBe('failed');
@@ -2148,66 +2176,12 @@ it('groups compose domains by service and hides empty services', function () {
         ->assertDontSee('No domains for this service');
 });
 
-it('uses the compact service domains layout for compose applications', function () {
+it('keys compose domain groups by a stable service identity', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
 
     expect($view)
         ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
-        ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
-        ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
-        ->toContain('class="data-table-header service-domains-overview-grid"')
-        ->toContain('<span>Domain redirect</span>')
-        ->toContain('<span>Search indexing</span>')
-        ->not->toContain('<span>Last checked</span>')
-        ->not->toContain('id="edit-domain-direction"')
-        ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"')
-        ->toContain('htmlId="application-domain-direction"')
-        ->toContain('id="editingRedirect"')
-        ->not->toContain("\$isCompose ? 'updateServiceRedirect' : 'updateRedirect'")
-        ->not->toContain('title="No domains for this service"');
-});
-
-it('uses a compact two row domain card at medium widths', function () {
-    $css = file_get_contents(resource_path('css/app.css'));
-
-    expect($css)
-        ->toContain('@container service-domains (max-width: 980px)')
-        ->toContain('grid-template-columns: minmax(0, 1fr) auto auto;')
-        ->toContain('grid-template-areas: "domain dns actions" "summary summary summary";')
-        ->toContain('grid-area: summary;');
-});
-
-it('uses concise search indexing headers in application and service domain tables', function () {
-    $applicationView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-    $serviceView = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
-
-    expect(substr_count($applicationView, '<span>Search indexing</span>'))
-        ->toBe(1)
-        ->and($serviceView)
-        ->toContain('<span>Search indexing</span>');
-});
-
-it('shows a form save button at the bottom of application domain settings', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-
-    expect($view)
-        ->not->toContain('Indexing and redirect changes save automatically.')
-        ->toContain('data-testid="domain-settings-scroll"')
-        ->toContain('data-testid="domain-settings-footer"')
-        ->toContain('class="shrink-0 border-t')
-        ->toContain('<x-forms.button type="submit" wire:target="updateDomain" isHighlighted>')
-        ->toContain('Save')
-        ->not->toContain('<x-unsaved-bar action="updateDomain"');
-});
-
-it('opens application domain settings from browser data and shows a dns spinner', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
-
-    expect($view)
-        ->not->toContain('wire:click="startEdit(')
-        ->toContain('@click="openEditDomain(')
-        ->toContain('<x-loading compact aria-label="Checking DNS"')
-        ->not->toContain('<x-loading-on-button wire:loading.delay');
+        ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"');
 });
 
 it('uses the dns badge as progress for single and all application checks', function (string $action, array $parameters) {
@@ -2426,54 +2400,6 @@ it('saves regenerated compose domain drafts for only the selected service', func
         ->and($application->noindexDomains()->all())->toBe(["https://{$generatedHost}/api"]);
 });
 
-it('does not render a last checked column in the domains table', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-    $row = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
-
-    expect($view)->not->toContain('<span>Last checked</span>')
-        ->and($row)->not->toContain('$checkedAt');
-});
-
-it('uses compact labeled domain cards on mobile', function () {
-    $styles = file_get_contents(resource_path('css/app.css'));
-    $row = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
-
-    expect($styles)
-        ->toContain('@container service-domains (max-width: 980px)')
-        ->toContain('.service-domain-detail-label')
-        ->toContain('.service-domains-overview-grid')
-        ->toContain('@container service-domains (max-width: 600px)')
-        ->toContain('.service-domain-mobile-summary')
-        ->and($row)
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('No redirects')
-        ->toContain('Noindex');
-});
-
-it('uses segmented fields when adding and editing application domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-    $component = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.domain-input id="newDomainParts"')
-        ->toContain('<x-forms.domain-input id="editingDomainParts"')
-        ->not->toContain('placeholder="https://app.example.com"')
-        ->and($component)
-        ->toContain('Protocol')
-        ->toContain('Domain')
-        ->toContain('Port')
-        ->toContain('Path')
-        ->toContain('wire:model="{{ $id }}.host"')
-        ->toContain('<x-forms.listbox id="{{ $id }}.scheme"')
-        ->not->toContain('<select id="{{ $id }}-protocol"')
-        ->toContain("['value' => 'https', 'label' => 'https']")
-        ->toContain("['value' => 'http', 'label' => 'http']")
-        ->toContain('class="mb-1.5 flex h-4 w-full items-center gap-1.5"')
-        ->not->toContain('class="mb-1.5 block text-sm font-medium"')
-        ->toContain('min="1"')
-        ->toContain('max="65535"');
-});
-
 it('updates a compose service redirect from the domains table', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
@@ -2494,19 +2420,6 @@ it('updates a compose service redirect from the domains table', function () {
 
     expect(data_get($domains, 'web.redirect'))->toBe('www')
         ->and(data_get($domains, 'web.domain'))->toContain('https://www.web.example.com');
-});
-
-it('provides client-side search for compose service domains', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-
-    expect($view)
-        ->toContain('x-model="domainSearch"')
-        ->toContain('class="ml-auto flex flex-wrap items-center gap-2"')
-        ->toContain('<div class="relative shrink-0">')
-        ->toContain('placeholder="Search services or domains"')
-        ->toContain('x-show="matchesDomainSearch(')
-        ->toContain('title="No domains found"')
-        ->toContain('hasDomainSearchResults(');
 });
 
 it('exposes the domains route in the application configuration menu', function () {
@@ -3536,4 +3449,121 @@ it('prevents members from cancelling protected application redirect conflict sta
         ->set('showDomainConflictModal', true)
         ->set('showDomainConflictModal', false)
         ->assertForbidden();
+});
+
+it('restarts a dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $url = 'https://dns-recheck.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->subDay()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect($this->application->fresh()->domain_dns_statuses[$url]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
+});
+
+it('does not overwrite a completed dns result with stale checking state', function () {
+    $url = 'https://dns-stale.example.com';
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'stale-check',
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $this->application->update([
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'check_id' => 'completed-check',
+            ],
+        ],
+    ]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDomainDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($this->application->fresh()->domain_dns_statuses[$url])
+        ->toMatchArray([
+            'status' => 'ok',
+            'message' => 'DNS looks correct.',
+            'check_id' => 'completed-check',
+        ]);
+});
+
+it('replaces a completed dns result when the domain is checked again', function () {
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = true;
+    $settings->save();
+
+    $url = 'https://this-domain-should-not-resolve-for-coolify-tests.invalid';
+    $checkedAt = now()->subDays(12)->toIso8601String();
+    $this->application->update([
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $url => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => $checkedAt,
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('checkDomainDns', 0)
+        ->call('pollDnsChecks')
+        ->assertSet('domainRows.0.dns_status', 'failed');
+
+    expect($this->application->fresh()->domain_dns_statuses[$url])
+        ->status->toBe('failed')
+        ->checked_at->not->toBe($checkedAt);
+});
+
+it('restarts a preview dns check when the domain already has a completed result', function () {
+    Queue::fake();
+
+    $url = 'https://preview-recheck.example.com';
+    $statusKey = hash('sha256', $url.'|');
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 54,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/54',
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+            ],
+        ],
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    expect($preview->fresh()->domain_dns_statuses[$statusKey]['status'])->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class);
 });

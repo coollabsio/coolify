@@ -10,6 +10,11 @@ it('extracts normalized published proxy ports from valid compose syntax', functi
     'caddy long syntax' => ["services:\n  caddy:\n    ports:\n      - target: 80\n        published: '8080'\n        protocol: tcp\n      - target: 443\n", [8080, 443]],
     'both supported proxies' => ["services:\n  traefik:\n    ports: ['80:80']\n  caddy:\n    ports: ['443:443/udp']\n", [80, 443]],
     'range boundaries' => ["services:\n  traefik:\n    ports: ['1:1', '65535:65535']\n", [1, 65535]],
+    'port ranges are accepted but not checked one by one' => ["services:\n  traefik:\n    ports: ['80:80', '10000-10100:10000-10100/udp', '127.0.0.1:5000-5010:5000-5010', '3000-3005', '8000-8010:80']\n", [80]],
+    'protocols in any letter case' => ["services:\n  traefik:\n    ports: ['53:53/UDP', '9000:9000/TCP', '5432:5432/sctp']\n", [53, 9000, 5432]],
+    'random host port' => ["services:\n  traefik:\n    ports: ['127.0.0.1::5000', '[::1]::6000']\n", []],
+    'IPv6 host with a range' => ["services:\n  traefik:\n    ports: ['[::1]:6000-6001:6000-6001']\n", []],
+    'long syntax with a published range' => ["services:\n  caddy:\n    ports:\n      - target: 443\n        published: '8443-8444'\n        protocol: UDP\n", []],
 ]);
 
 it('rejects malformed proxy port values', function (mixed $port) {
@@ -41,7 +46,13 @@ it('rejects malformed proxy port values', function (mixed $port) {
     'nested sequence' => [['80']],
     'nested map' => [['target' => ['80']]],
     'invalid protocol' => '80:80/http',
+    'empty protocol' => '80:80/',
     'host injection' => '`id`:8080:80',
+    'reversed range' => '10-5:10-5',
+    'range above the limit' => '65535-65536:1-2',
+    'range with command substitution' => '80-$(id):80',
+    'open range' => '80-:80',
+    'empty host port without a host IP' => ':80',
 ]);
 
 it('rejects malformed proxy ports in long compose syntax', function (array $port) {
@@ -55,6 +66,7 @@ it('rejects malformed proxy ports in long compose syntax', function (array $port
     'invalid published type' => [['target' => 80, 'published' => true]],
     'missing target' => [['published' => 8080]],
     'invalid protocol' => [['target' => 80, 'published' => 8080, 'protocol' => 'http']],
+    'reversed published range' => [['target' => 80, 'published' => '90-80']],
     'host injection' => [['target' => 80, 'published' => 8080, 'host_ip' => '$(id)']],
 ]);
 

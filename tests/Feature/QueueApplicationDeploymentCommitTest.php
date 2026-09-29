@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -12,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -45,6 +47,88 @@ function makeApplication(int $environmentId, int $destinationId, ?string $gitCom
 }
 
 describe('queue_application_deployment commit resolution', function () {
+    test('inserts only while an admission transaction is open', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        $initialLevel = DB::transactionLevel();
+        $creationLevel = null;
+
+        ApplicationDeploymentQueue::created(function () use (&$creationLevel): void {
+            $creationLevel = DB::transactionLevel();
+        });
+
+        queue_application_deployment($application, 'atomic-admission');
+
+        expect($creationLevel)->toBeGreaterThan($initialLevel);
+    });
+
+    test('skips a matching commit without creating or dispatching a second deployment', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        $first = queue_application_deployment($application, 'first-admission');
+        $second = queue_application_deployment($application, 'second-admission');
+
+        expect($first['status'])->toBe('queued')
+            ->and($second['status'])->toBe('skipped')
+            ->and($second['deployment_uuid'])->toBe('first-admission')
+            ->and($second['existing_deployment']->deployment_uuid)->toBe('first-admission')
+            ->and(ApplicationDeploymentQueue::query()->count())->toBe(1);
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
+    });
+
+    test('allows explicit duplicate bypasses while queue capacity remains available', function (string $flag) {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        queue_application_deployment($application, 'first-admission');
+        $result = queue_application_deployment($application, 'bypass-admission', ...[$flag => true]);
+
+        expect($result['status'])->toBe('queued')
+            ->and(ApplicationDeploymentQueue::query()->count())->toBe(2);
+    })->with(['force_rebuild', 'rollback', 'no_questions_asked']);
+
+    test('checks duplicate commits across servers but uses the target server queue', function () {
+        $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+        $otherDestination = StandaloneDocker::factory()->create([
+            'server_id' => $otherServer->id,
+            'network' => 'test-network-'.fake()->unique()->word(),
+        ]);
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        queue_application_deployment($application, 'first-server-admission');
+        $skipped = queue_application_deployment($application, 'second-server-admission', server: $otherServer, destination: $otherDestination);
+        $forced = queue_application_deployment($application, 'forced-second-server-admission', force_rebuild: true, server: $otherServer, destination: $otherDestination);
+
+        expect($skipped['status'])->toBe('skipped')
+            ->and($skipped['deployment_uuid'])->toBe('first-server-admission')
+            ->and($forced['status'])->toBe('queued')
+            ->and(ApplicationDeploymentQueue::query()->where('server_id', $otherServer->id)->sole()->deployment_uuid)->toBe('forced-second-server-admission');
+    });
+
+    test('rejects a full server queue before a different commit is inserted', function () {
+        $this->server->settings->update(['concurrent_builds' => 0, 'deployment_queue_limit' => 1]);
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        queue_application_deployment($application, 'first-admission');
+        $result = queue_application_deployment($application, 'full-admission', commit: 'another-commit');
+
+        expect($result)->toBe([
+            'status' => 'queue_full',
+            'message' => 'Deployment queue is full. Please wait for existing deployments to complete.',
+        ])->and(ApplicationDeploymentQueue::query()->where('status', ApplicationDeploymentStatus::QUEUED->value)->count())->toBe(1);
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+    });
+
+    test('does not let a forced deployment exceed the queued limit', function () {
+        $this->server->settings->update(['concurrent_builds' => 0, 'deployment_queue_limit' => 1]);
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        queue_application_deployment($application, 'first-admission');
+        $result = queue_application_deployment($application, 'forced-full-admission', force_rebuild: true);
+
+        expect($result['status'])->toBe('queue_full')
+            ->and(ApplicationDeploymentQueue::query()->count())->toBe(1);
+        Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+    });
+
     test('rejects a commit with disallowed characters before creating a deployment', function () {
         $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
 
@@ -55,7 +139,7 @@ describe('queue_application_deployment commit resolution', function () {
             is_webhook: true,
         ))->toThrow(Exception::class, 'Invalid deployment commit');
 
-        $this->assertDatabaseMissing('application_deployment_queue', [
+        $this->assertDatabaseMissing((new ApplicationDeploymentQueue)->getTable(), [
             'deployment_uuid' => 'invalid-queued-commit',
         ]);
         Bus::assertNotDispatched(ApplicationDeploymentJob::class);
@@ -73,7 +157,7 @@ describe('queue_application_deployment commit resolution', function () {
             deployment_uuid: 'invalid-fallback-commit',
         ))->toThrow(Exception::class, 'Invalid deployment commit');
 
-        $this->assertDatabaseMissing('application_deployment_queue', [
+        $this->assertDatabaseMissing((new ApplicationDeploymentQueue)->getTable(), [
             'deployment_uuid' => 'invalid-fallback-commit',
         ]);
         Bus::assertNotDispatched(ApplicationDeploymentJob::class);

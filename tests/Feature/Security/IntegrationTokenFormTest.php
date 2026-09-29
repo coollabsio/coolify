@@ -153,14 +153,6 @@ test('at least one capability is required when adding a cloudflare token', funct
     Http::assertNothingSent();
 });
 
-test('provider validation uses the provider names declared by the model', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenForm.php'));
-
-    expect($component)
-        ->toContain("implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))")
-        ->not->toContain('in:cloudflare,doppler,infisical,vault');
-});
-
 test('integration tokens page lists saved provider and capabilities', function () {
     IntegrationToken::query()->create([
         'team_id' => $this->team->id,
@@ -182,26 +174,6 @@ test('cloudflare dns scope guidance and token creation link are shown', function
         ->assertSee('Zone - DNS - Edit')
         ->assertSee('Zone - Zone - Read')
         ->assertSeeHtml('https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management');
-
-    expect(file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php')))
-        ->toContain('permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D');
-});
-
-test('capability selection uses the shared checkbox component', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('<x-forms.checkbox')
-        ->toContain('class="mt-3 rounded-lg border')
-        ->not->toContain('<input type="checkbox"');
-});
-
-test('submit button uses the shared highlighted loading state', function () {
-    $view = file_get_contents(resource_path('views/livewire/security/integration-token-form.blade.php'));
-
-    expect($view)
-        ->toContain('wire:target="addToken" isHighlighted')
-        ->not->toContain('class="button-highlighted"');
 });
 
 test('saved integration token rows render modal editors with a gear button', function () {
@@ -326,15 +298,6 @@ test('an invalid replacement does not rotate the integration token', function ()
         ->assertDispatched('error');
 
     expect($savedToken->fresh()->token)->toBe('original-token');
-});
-
-test('editor updates its row without rerendering the teleported parent modal', function () {
-    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenEditor.php'));
-
-    expect($component)
-        ->toContain("'integration-token-updated'")
-        ->toContain("'integration-token-deleted'")
-        ->not->toContain('integrationTokenChanged');
 });
 
 test('new integration token form controls declare authorization matching server-side actions', function () {

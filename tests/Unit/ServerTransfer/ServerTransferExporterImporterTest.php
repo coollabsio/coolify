@@ -352,7 +352,6 @@ test('import rolls back all created rows when a later resource fails', function 
         dryRun: false,
         preserveUuids: true,
         adoptMode: true,
-        claim: false,
     ))->toThrow(RuntimeException::class, 'Unsupported database type');
 
     expect(Server::where('uuid', $originalServerUuid)->exists())->toBeFalse()
@@ -377,6 +376,26 @@ test('import reuses existing private key fingerprint on same team', function () 
 
     $server = Server::where('uuid', $result['server_uuid'])->first();
     expect($server->private_key_id)->toBe($originalKeyId);
+});
+
+test('import into another team creates its own key when the same key exists in a different team', function () {
+    $bundle = $this->exporter->export($this->server);
+    $sourceKeyId = $this->privateKey->id;
+    $targetTeam = Team::factory()->create();
+
+    // Free the IP without deleting the source team's key.
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $targetTeam->id);
+
+    $server = Server::where('uuid', $result['server_uuid'])->first();
+    expect($server->team_id)->toBe($targetTeam->id)
+        ->and($server->private_key_id)->not->toBe($sourceKeyId)
+        ->and($server->privateKey->team_id)->toBe($targetTeam->id)
+        ->and($server->privateKey->fingerprint)->toBe($this->privateKey->fingerprint)
+        ->and(PrivateKey::whereKey($sourceKeyId)->where('team_id', $this->team->id)->exists())->toBeTrue();
 });
 
 test('encrypted export decrypts for import', function () {
@@ -861,3 +880,33 @@ test('system-wide gitlab apps are not exported and re-link on import by uuid', f
         ->and($importedGlTeam->is_system_wide)->toBeFalse()
         ->and(GitlabApp::where('is_system_wide', true)->where('uuid', 'system-gitlab-public')->count())->toBe(1);
 });
+
+test('import rejects unsafe host file paths before saving storage', function () {
+    $importFileStorages = new ReflectionMethod(ServerTransferImporter::class, 'importFileStorages');
+    $storage = [
+        'fs_path' => '/etc/../passwd',
+        'mount_path' => '/app/passwd',
+        'is_host_file' => true,
+    ];
+
+    expect(fn () => $importFileStorages->invoke($this->importer, [$storage], $this->application))
+        ->toThrow(Exception::class);
+    expect(LocalFileVolume::count())->toBe(0);
+});
+
+test('import rejects shell-like file ownership and mode metadata', function (string $field, string $value) {
+    $importFileStorages = new ReflectionMethod(ServerTransferImporter::class, 'importFileStorages');
+    $storage = [
+        'fs_path' => './config.json',
+        'mount_path' => '/app/config.json',
+        $field => $value,
+    ];
+
+    expect(fn () => $importFileStorages->invoke($this->importer, [$storage], $this->application))
+        ->toThrow(RuntimeException::class);
+    expect(LocalFileVolume::count())->toBe(0);
+})->with([
+    'owner command' => ['chown', '0:0; id'],
+    'mode command' => ['chmod', '600; id'],
+    'option mode' => ['chmod', '--reference=/etc/passwd'],
+]);

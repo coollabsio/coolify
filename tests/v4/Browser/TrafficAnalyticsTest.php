@@ -8,7 +8,7 @@ beforeEach(function () {
     // seedBrowserResourceStack() creates a "localhost" server with traffic
     // analytics disabled by default (is_traffic_analytics_enabled defaults
     // to false), so these smoke tests exercise the deterministic, Sentinel-free
-    // "disabled" empty-state path across the three analytics surfaces.
+    // "disabled" empty-state path on the application and global analytics pages.
     $this->stack = seedBrowserResourceStack();
     $this->application = createBrowserApplication($this->stack, [
         'uuid' => 'app-traffic-analytics',
@@ -40,15 +40,25 @@ it('shows the disabled empty state on the global analytics page', function () {
 
     $page->assertSee('Analytics')
         ->assertSee('Traffic analytics is not enabled')
-        ->assertSee('Enable Sentinel traffic analytics on a server to see request analytics here.')
+        ->assertSee('Enable traffic analytics on a server to see request analytics here.')
         ->screenshot(filename: 'global-analytics-disabled-empty-state');
 });
 
-it('shows the disabled empty state on the dashboard traffic widget', function () {
-    $page = loginAndSkipBoarding();
+it('dismisses the global analytics enable prompt', function () {
+    loginAndSkipBoarding();
 
-    $page->assertSee('Traffic analytics')
+    $page = visit('/analytics');
+
+    $page->assertVisible('[title="Dismiss"]')
+        ->assertSee('Set up on localhost');
+
+    expect($page->attribute('Set up on localhost', 'href'))
+        ->toContain('/server/'.$this->stack['server']->uuid.'/analytics');
+
+    $page->click('[title="Dismiss"]')
+        ->assertMissing('[title="Dismiss"]')
+        ->refresh()
         ->assertSee('Traffic analytics is not enabled')
-        ->assertSee('Enable Sentinel traffic analytics on a server to see a team-wide summary here.')
-        ->screenshot(filename: 'dashboard-traffic-analytics-disabled-empty-state');
+        ->assertMissing('[title="Dismiss"]')
+        ->screenshot(filename: 'global-analytics-prompt-dismissed');
 });
