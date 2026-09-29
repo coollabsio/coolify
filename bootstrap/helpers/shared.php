@@ -3174,11 +3174,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $key = $value->before('-');
                                 $defaultValue = $value->after('-');
                             } elseif ($value->contains(':?')) {
-                                $key = $value->before(':');
-                                $defaultValue = $value->after(':?');
+                                // ${VAR:?error} is a required-variable check per the
+                                // Compose spec: abort when unset or empty instead of
+                                // storing the error text as the value.
+                                throw new Exception("Required environment variable \${$value->before(':')} is not set or empty: {$value->after(':?')}");
                             } elseif ($value->contains('?')) {
-                                $key = $value->before('?');
-                                $defaultValue = $value->after('?');
+                                // ${VAR?error} aborts when unset.
+                                throw new Exception("Required environment variable \${$value->before('?')} is not set: {$value->after('?')}");
                             } else {
                                 $key = $value;
                                 $defaultValue = null;
@@ -3969,11 +3971,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $key = $value->before('-');
                             $defaultValue = $value->after('-');
                         } elseif ($value->contains(':?')) {
-                            $key = $value->before(':');
-                            $defaultValue = $value->after(':?');
+                            // ${VAR:?error} is a required-variable check per the
+                            // Compose spec: abort when unset or empty instead of
+                            // storing the error text as the value.
+                            throw new Exception("Required environment variable \${$value->before(':')} is not set or empty: {$value->after(':?')}");
                         } elseif ($value->contains('?')) {
-                            $key = $value->before('?');
-                            $defaultValue = $value->after('?');
+                            // ${VAR?error} aborts when unset.
+                            throw new Exception("Required environment variable \${$value->before('?')} is not set: {$value->after('?')}");
                         } else {
                             $key = $value;
                             $defaultValue = null;
