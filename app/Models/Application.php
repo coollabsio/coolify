@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
+use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
@@ -599,8 +600,9 @@ class Application extends BaseModel
 
     /**
      * The reason why this application cannot deploy to additional servers, or null if it can.
+     * When a server is given, also check that the server can route the application like the primary server.
      */
-    public function additionalServersUnavailableReason(): ?string
+    public function additionalServersUnavailableReason(?Server $server = null): ?string
     {
         if ($this->build_pack === 'dockercompose') {
             return 'Docker Compose applications cannot use multiple servers.';
@@ -608,8 +610,27 @@ class Application extends BaseModel
         if ($this->persistentStorages()->exists()) {
             return 'Applications with persistent storage cannot use multiple servers because volumes are not shared between servers.';
         }
+        if ($server) {
+            return $this->proxyMismatchReason($server);
+        }
 
         return null;
+    }
+
+    /**
+     * The reason why the server cannot route this application, or null if it can.
+     * Proxy labels are generated for the primary server, so Traefik labels do not work on a Caddy server and the reverse.
+     */
+    public function proxyMismatchReason(Server $server): ?string
+    {
+        $routingProxies = [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value];
+        $primaryProxy = $this->destination?->server?->proxyType();
+        $serverProxy = $server->proxyType();
+        if (! in_array($primaryProxy, $routingProxies, true) || ! in_array($serverProxy, $routingProxies, true) || $primaryProxy === $serverProxy) {
+            return null;
+        }
+
+        return "The primary server uses {$primaryProxy} and {$server->name} uses {$serverProxy}. All servers of an application must use the same proxy, because they share the same proxy labels.";
     }
 
     public function is_public_repository(): bool
