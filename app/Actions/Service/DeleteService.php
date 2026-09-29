@@ -67,7 +67,7 @@ class DeleteService
 
         // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
         // assignment would become "sudo container_ids=...", which sudo rejects.
-        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters, legacyId: (int) $service->id)
+        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters)
             .'; [ -z "$container_ids" ] || docker rm -f $container_ids';
         instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }

@@ -147,8 +147,8 @@ it('removes service containers before its volumes and local metadata', function 
     expect($commandList)
         ->toContain("label=coolify.serviceUuid={$service->uuid}")
         ->toContain("label=com.docker.compose.project={$service->uuid}")
-        // Containers from before mid-2024 may have another compose project; the local id still finds them.
-        ->toContain("label=coolify.serviceId={$service->id}")
+        // A numeric id can belong to another Coolify instance on the same server, so it never selects containers.
+        ->not->toContain("label=coolify.serviceId={$service->id}")
         ->toContain('sort -u')
         ->toContain('docker rm -f $container_ids')
         ->toContain("docker volume rm -f '{$service->uuid}_web-data'")
