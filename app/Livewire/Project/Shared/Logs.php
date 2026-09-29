@@ -13,11 +13,14 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Logs extends Component
 {
+    use ListensToTeamChannel;
+
     public ?string $type = null;
 
     public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource;
@@ -47,11 +50,9 @@ class Logs extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},ServiceChecked" => 'loadAllContainers',
-        ];
+        return $this->teamChannelListeners([
+            'ServiceChecked' => 'loadAllContainers',
+        ]);
     }
 
     public function loadAllContainers()

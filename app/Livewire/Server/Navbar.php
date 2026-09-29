@@ -9,6 +9,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class Navbar extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -39,14 +41,14 @@ class Navbar extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'refreshServerShow' => 'refreshServer',
             'sentinel-restart-requested' => 'hideSentinelWarning',
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
-            "echo-private:team.{$teamId},SentinelRestarted" => 'refreshSentinelStatus',
-            "echo-private:team.{$teamId},SentinelSynchronized" => 'refreshSentinelStatus',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'showNotification',
+                'SentinelRestarted' => 'refreshSentinelStatus',
+                'SentinelSynchronized' => 'refreshSentinelStatus',
+            ]),
         ];
     }
 

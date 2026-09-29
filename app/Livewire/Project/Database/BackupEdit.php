@@ -6,6 +6,7 @@ use App\Jobs\DatabaseBackupJob;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -17,6 +18,7 @@ use Livewire\Component;
 class BackupEdit extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public ScheduledDatabaseBackup $backup;
 
@@ -100,12 +102,10 @@ class BackupEdit extends Component
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refreshStatus';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refreshStatus';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refreshStatus']),
+        ];
     }
 
     public function mount()
