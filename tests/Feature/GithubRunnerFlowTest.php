@@ -304,6 +304,22 @@ describe('provisioning', function () {
         Process::assertNothingRan();
     });
 
+    it('skips configs whose server is being deleted', function () {
+        Queue::fake();
+        fakeRunnerGithubApi($this->githubApp);
+        Process::fake(['*' => Process::result(output: '29.8.0')]);
+        $deletedServer = runnerTestServer($this->team);
+        runnerTestConfig($deletedServer, $this->githubApp);
+        $deletedServer->delete();
+        $server = runnerTestServer($this->team);
+        runnerTestConfig($server, $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->server_id)->toBe($server->id);
+    });
+
     it('does not start runners on the Coolify host', function () {
         Queue::fake();
         Process::fake();

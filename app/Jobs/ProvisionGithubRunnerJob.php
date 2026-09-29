@@ -137,7 +137,8 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 ->lockForUpdate()
                 ->with('server.settings')
                 ->get()
-                ->filter(fn (GithubRunnerConfig $config) => $config->matchesLabels($execution->labels ?? [])
+                ->filter(fn (GithubRunnerConfig $config) => $config->server !== null
+                    && $config->matchesLabels($execution->labels ?? [])
                     && $config->server->isBuildServer()
                     && ! $config->server->isLocalhost()
                     && $config->server->isFunctional())
