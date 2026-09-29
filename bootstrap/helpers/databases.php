@@ -199,6 +199,16 @@ function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker 
     return $database;
 }
 
+/**
+ * Shell line that pipes $source into $sink and writes the output to $escapedFile. It fails when
+ * either command fails: a plain pipe only reports the exit status of $sink, so a failed dump
+ * would still leave a small, valid archive. POSIX sh (dash, BusyBox ash); no pipefail needed.
+ */
+function pipeToFileKeepingExitStatus(string $source, string $sink, string $escapedFile): string
+{
+    return 'status=$( { { '.$source.'; echo $? >&3; } | '.$sink.' > '.$escapedFile.'; } 3>&1 ) && [ "$status" -eq 0 ]';
+}
+
 function deleteBackupsLocally(string|array|null $filenames, Server $server, bool $throwError = false): void
 {
     if (empty($filenames)) {
