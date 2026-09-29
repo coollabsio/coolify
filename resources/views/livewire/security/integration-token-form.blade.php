@@ -76,8 +76,9 @@
                 <p>Limit zone resources to the zones Coolify should manage.</p>
                 <a href="https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%5D&amp;accountId=%2A&amp;zoneId=all&amp;name=Coolify%20DNS%20Management"
                     target="_blank" rel="noopener noreferrer"
-                    class="font-medium text-coollabs hover:underline dark:text-warning">
-                    Create this token in Cloudflare
+                    class="button mt-2">
+                    Create token at Cloudflare
+                    <x-external-link />
                 </a>
             </div>
         @elseif ($provider === 'doppler')
