@@ -29,6 +29,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -235,6 +236,7 @@ class Server extends BaseModel
             });
             $server->settings()->delete();
             $server->sslCertificates()->delete();
+            $server->notificationThrottles()->delete();
         });
 
         static::updated(function () {
@@ -280,7 +282,6 @@ class Server extends BaseModel
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
-        'unreachable_notification_sent' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
     ];
@@ -1543,6 +1544,19 @@ $siteAddress {
         return $this->belongsTo(CloudProviderToken::class);
     }
 
+    public function notificationThrottles(): MorphMany
+    {
+        return $this->morphMany(NotificationThrottle::class, 'notifiable');
+    }
+
+    /**
+     * True while an Unreachable notification was sent and no Reachable notification followed.
+     */
+    protected function unreachableNotificationSent(): Attribute
+    {
+        return Attribute::get(fn (): bool => NotificationThrottle::wasSent($this, Unreachable::class));
+    }
+
     public function sslCertificates()
     {
         return $this->hasMany(SslCertificate::class);
@@ -1794,18 +1808,16 @@ $siteAddress {
 
     public function sendReachableNotification()
     {
-        $this->unreachable_notification_sent = false;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Reachable($this));
+        if (NotificationThrottle::release($this, Unreachable::class)) {
+            $this->team->notify(new Reachable($this));
+        }
     }
 
     public function sendUnreachableNotification()
     {
-        $this->unreachable_notification_sent = true;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Unreachable($this));
+        if (NotificationThrottle::claim($this, Unreachable::class)) {
+            $this->team->notify(new Unreachable($this));
+        }
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)

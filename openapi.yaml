@@ -2325,7 +2325,7 @@ paths:
       tags:
         - Applications
       summary: 'Get application logs.'
-      description: 'Get application logs by UUID.'
+      description: 'Get application logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-application-logs-by-uuid
       parameters:
         -
@@ -2383,7 +2383,7 @@ paths:
       tags:
         - Applications
       summary: 'Get preview application logs.'
-      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID.'
+      description: 'Get runtime container logs for a preview deployment by application UUID and pull request ID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-preview-application-logs-by-pull-request-id
       parameters:
         -
@@ -5469,7 +5469,7 @@ paths:
       tags:
         - Databases
       summary: 'Get database logs.'
-      description: 'Get database logs by UUID.'
+      description: 'Get database logs by UUID. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-database-logs-by-uuid
       parameters:
         -
@@ -10647,6 +10647,9 @@ paths:
                 server_disk_usage_check_frequency:
                   type: string
                   description: 'Cron expression for disk usage check frequency.'
+                server_disk_usage_notification_interval_hours:
+                  type: integer
+                  description: 'Minimum hours between high disk usage notifications (1-720). Default: 24.'
                 connection_timeout:
                   type: integer
                   description: 'SSH connection timeout in seconds (1-300). Default: 10.'
@@ -10931,7 +10934,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -10989,7 +10992,7 @@ paths:
       tags:
         - 'Service applications'
       summary: 'Get service application logs'
-      description: 'Get Docker logs for a single compose service container.'
+      description: 'Get Docker logs for a single compose service container. Requires the `read:sensitive` or `root` token ability.'
       operationId: post-service-application-logs-by-service-and-app-uuid
       parameters:
         -
@@ -11418,7 +11421,7 @@ paths:
       tags:
         - 'Service databases'
       summary: 'Get service database logs'
-      description: 'Get Docker logs for a compose database container.'
+      description: 'Get Docker logs for a compose database container. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-database-logs-by-service-and-database-uuid
       parameters:
         -
@@ -11912,7 +11915,7 @@ paths:
       tags:
         - Services
       summary: 'Get service logs.'
-      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.'
+      description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`. Requires the `read:sensitive` or `root` token ability.'
       operationId: get-service-logs-by-uuid
       parameters:
         -

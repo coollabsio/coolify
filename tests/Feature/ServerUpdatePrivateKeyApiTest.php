@@ -227,3 +227,20 @@ it('rejects an invalid disk usage check frequency without partially updating the
         ->and($server->settings->server_role->value)->toBe('both')
         ->and($server->proxy->get('type'))->toBe('TRAEFIK');
 });
+
+it('updates the disk usage notification interval', function () {
+    patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
+        'server_disk_usage_notification_interval_hours' => 48,
+    ])->assertCreated();
+
+    expect($this->server->settings->fresh()->server_disk_usage_notification_interval_hours)->toBe(48);
+});
+
+it('rejects an out of range disk usage notification interval', function () {
+    patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
+        'server_disk_usage_notification_interval_hours' => 0,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('server_disk_usage_notification_interval_hours');
+
+    expect($this->server->settings->fresh()->server_disk_usage_notification_interval_hours)->toBe(24);
+});

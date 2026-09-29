@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
+use App\Contracts\ThrottledNotification;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
+use App\Notifications\Server\Unreachable;
 use App\Traits\Auditable;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
@@ -43,7 +45,10 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
+    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute;
+    use Notifiable {
+        notify as sendNotification;
+    }
 
     protected $fillable = [
         'name',
@@ -273,9 +278,21 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             ]);
             ServerReachabilityChanged::dispatch($server);
             $server->unreachable_count = 3;
-            $server->unreachable_notification_sent = true;
             $server->save();
+            NotificationThrottle::record($server, Unreachable::class);
         }
+    }
+
+    /**
+     * Send a notification, unless it is throttled and was already sent within its interval.
+     */
+    public function notify($instance): void
+    {
+        if ($instance instanceof ThrottledNotification && ! NotificationThrottle::claimFor($instance)) {
+            return;
+        }
+
+        $this->sendNotification($instance);
     }
 
     public function environment_variables()
