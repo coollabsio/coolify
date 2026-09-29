@@ -3193,13 +3193,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     ? $savedService->noindexDomains()
                     : collect([]);
                 $defaultLabels = defaultLabels(
-                    id: $resource->id,
+                    uuid: $resource->uuid,
                     name: $containerName,
                     projectName: $resource->project()->name,
                     resourceName: $resource->name,
                     type: 'service',
                     subType: $isDatabase ? 'database' : 'application',
-                    subId: $savedService->id,
+                    subUuid: $savedService->uuid,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
                 );
@@ -4122,7 +4122,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
 
             $defaultLabels = defaultLabels(
-                id: $resource->id,
+                uuid: $resource->uuid,
                 name: $containerName,
                 projectName: $resource->project()->name,
                 resourceName: $resource->name,

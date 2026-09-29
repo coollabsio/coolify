@@ -307,7 +307,7 @@ class Previews extends Component
             if ($this->application->destination->server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
+                $containers = getCurrentApplicationContainerStatus($server, $this->application, $pull_request_id)->toArray();
                 $this->stopContainers($containers, $server);
             }
 

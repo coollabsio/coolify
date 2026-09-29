@@ -88,20 +88,20 @@ class Logs extends Component
             }
 
             // Docker labels differ by resource type:
-            // applications → coolify.applicationId, services → coolify.serviceId, databases → coolify.databaseId
+            // applications → coolify.applicationUuid, services → coolify.serviceUuid, databases → coolify.databaseUuid
             $containers = match (true) {
                 $this->resource instanceof Application => getCurrentApplicationContainerStatus(
                     $server,
-                    $this->resource->id,
+                    $this->resource,
                     includePullrequests: true
                 ),
                 $this->resource instanceof Service => getCurrentServiceContainerStatus(
                     $server,
-                    $this->resource->id
+                    $this->resource
                 ),
                 default => getCurrentDatabaseContainerStatus(
                     $server,
-                    $this->resource->id
+                    $this->resource
                 ),
             };
 

@@ -966,7 +966,7 @@ class ServicesController extends Controller
         }
 
         $name = "{$subServiceName}-{$service->uuid}";
-        $containers = getCurrentServiceSubContainerStatus($service->destination->server, $service->id, $name);
+        $containers = getCurrentServiceSubContainerStatus($service->destination->server, $service, $name);
         $container = $containers->first();
 
         if (! $container) {
