@@ -29,12 +29,24 @@ if [ $EUID != 0 ]; then
     exit 1
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,sentinel}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+# Resource directories hold data whose owner and mode the resource images or a non-root SSH user need.
+# Set their owner and mode only when they are created, never on an upgrade (#11945).
+for COOLIFY_DIRECTORY in /data/coolify /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
+    if [ ! -d "$COOLIFY_DIRECTORY" ]; then
+        mkdir -p "$COOLIFY_DIRECTORY"
+        chown 9999:root "$COOLIFY_DIRECTORY"
+        chmod 700 "$COOLIFY_DIRECTORY"
+    fi
+done
+mkdir -p /data/coolify/source /data/coolify/ssh/{keys,mux}
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+# Coolify's own directories, used by the coolify container (UID 9999)
+set_coolify_directory_permissions() {
+    chown -R 9999:root /data/coolify/{source,ssh}
+    chmod -R 700 /data/coolify/{source,ssh}
+}
+
+set_coolify_directory_permissions
 
 INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
 
@@ -1071,8 +1083,7 @@ if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+set_coolify_directory_permissions
 log "SSH key check completed"
 step_done "$SSH_KEY_DETAIL"
 
