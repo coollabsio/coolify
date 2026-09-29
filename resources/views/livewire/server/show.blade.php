@@ -111,18 +111,20 @@
                                 </div>
                             @endif
 
-                            <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
-                                <x-slot:title>Validate and configure</x-slot:title>
-                                <x-slot:content>
-                                    <livewire:server.validate-and-install :server="$server"
-                                        :ask="$server->isFunctional() && ! $isValidating" />
-                                </x-slot:content>
-                                <x-forms.button type="button" :isHighlighted="! $server->isFunctional()"
-                                    @click="processDialogOpen = true" wire:click.prevent="validateServer">
-                                    <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
-                                    {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
-                                </x-forms.button>
-                            </x-process-dialog>
+                            @if ($server->canBeValidated())
+                                <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
+                                    <x-slot:title>Validate and configure</x-slot:title>
+                                    <x-slot:content>
+                                        <livewire:server.validate-and-install :server="$server"
+                                            :ask="$server->isFunctional() && ! $isValidating" />
+                                    </x-slot:content>
+                                    <x-forms.button type="button" :isHighlighted="! $server->isFunctional()"
+                                        @click="processDialogOpen = true" wire:click.prevent="validateServer">
+                                        <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
+                                        {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
+                                    </x-forms.button>
+                                </x-process-dialog>
+                            @endif
                             @if (isDev())
                                 <div wire:key="server-management-{{ $server->isTransferredAway() ? 'enable' : 'disable' }}">
                                     @if ($server->isTransferredAway())
@@ -156,15 +158,24 @@
                                     @endif
                                 </div>
                             @endif
-                            @if ($server->isTransferredAway())
-                                <x-status-badge label="Transferred away" type="warning" />
+                            @if (isDev() && $server->isTransferredAway())
+                                @unless ($server->isManagementDisabled())
+                                    <x-status-badge label="Transferred away" type="warning" />
+                                @endunless
                             @else
                                 <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
                                     :type="$server->isFunctional() ? 'success' : 'warning'" />
                             @endif
                         </x-slot:actions>
 
-                        @if ($server->isTransferredAway())
+                        @if (isDev() && $server->isManagementDisabled())
+                            <x-callout type="warning" title="Transferable to another instance" class="mb-4">
+                                Management of this server is disabled on this Coolify instance. You can now
+                                <a href="{{ route('server.transfer', ['server_uuid' => $server->uuid]) }}"
+                                    {{ wireNavigate() }} class="underline">transfer it to another instance</a>, or enable
+                                management again to manage it here.
+                            </x-callout>
+                        @elseif (isDev() && $server->isTransferredAway())
                             <x-callout type="warning" title="Transferred to another instance" class="mb-4">
                                 This server was migrated away from this Coolify instance. It cannot be revalidated or
                                 managed here. Use the target instance, or delete this server when you no longer need the
@@ -299,7 +310,9 @@
                                     {{ $server->name }}
                                 </p>
                                 <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                                    @if ($server->isTransferredAway())
+                                    @if (isDev() && $server->isManagementDisabled())
+                                        Management is disabled on this Coolify instance. You can transfer this server to another instance.
+                                    @elseif (isDev() && $server->isTransferredAway())
                                         This server was migrated away from this Coolify instance and cannot be managed here.
                                     @elseif ($server->isFunctional())
                                         The server is reachable, validated, and ready to host resources.

@@ -108,9 +108,6 @@ class ServerTransferImporter
         bool $dryRun = false,
         bool $preserveUuids = true,
         bool $adoptMode = true,
-        bool $claim = true,
-        bool $writeRemote = false,
-        bool $rebindSentinel = true,
     ): array {
         ServerTransferBundle::assertValid($bundle);
 
@@ -344,21 +341,13 @@ class ServerTransferImporter
             ];
         });
 
-        // Claim after the import transaction commits so host/SSH work cannot roll back DB rows.
-        if ($claim && filled(data_get($result, 'server_uuid'))) {
+        // Claim after the import transaction commits so a claim failure cannot roll back DB rows.
+        if (filled(data_get($result, 'server_uuid'))) {
             $server = Server::where('uuid', $result['server_uuid'])->where('team_id', $teamId)->first();
             if ($server) {
                 try {
-                    $claimResult = app(ServerTransferClaimer::class)->claim(
-                        $server,
-                        writeRemote: $writeRemote,
-                        rebindSentinel: $rebindSentinel,
-                    );
+                    $result['claim'] = app(ServerTransferClaimer::class)->claim($server);
                     $result['claimed'] = true;
-                    $result['claim'] = $claimResult;
-                    if (! data_get($claimResult, 'claim_written') && $writeRemote) {
-                        $result['warnings'][] = 'Server imported and claimed in Coolify, but the remote ownership file was not written (SSH unavailable).';
-                    }
                 } catch (Throwable $e) {
                     $result['claimed'] = false;
                     $result['claim'] = null;

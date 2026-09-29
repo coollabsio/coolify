@@ -46,21 +46,16 @@ test('markTransferred writes force_disabled and transfer status together', funct
         ->and((bool) $this->server->settings->is_sentinel_enabled)->toBeFalse();
 });
 
-test('claim persists ownership metadata transactionally without remote write', function () {
-    $result = app(ServerTransferClaimer::class)->claim(
-        $this->server,
-        writeRemote: false,
-        rebindSentinel: true,
-    );
+test('claim persists ownership metadata and always rebinds Sentinel', function () {
+    $result = app(ServerTransferClaimer::class)->claim($this->server);
 
     expect($result['server_uuid'])->toBe($this->server->uuid)
-        ->and($result['claim_written'])->toBeFalse()
-        ->and($result['sentinel_rebound'])->toBeTrue()
+        ->and($result)->not->toHaveKey('claim_written')
         ->and(data_get($result, 'claim.instance_url'))->toBe('https://coolify-a.test');
 
     $this->server->refresh();
     expect(data_get($this->server->server_metadata, 'transfer.status'))->toBe('claimed')
-        ->and(data_get($this->server->server_metadata, 'transfer.claim_written'))->toBeFalse()
         ->and(data_get($this->server->server_metadata, 'transfer.export_id'))->toBe('export-xyz')
+        ->and((bool) $this->server->settings->is_sentinel_enabled)->toBeTrue()
         ->and((string) $this->server->settings->sentinel_custom_url)->toBe('https://coolify-a.test');
 });

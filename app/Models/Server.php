@@ -1014,6 +1014,15 @@ $siteAddress {
     }
 
     /**
+     * Management was disabled manually on this instance; the server is ready to be transferred.
+     */
+    public function isManagementDisabled(): bool
+    {
+        return $this->isTransferredAway()
+            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
+    }
+
+    /**
      * Whether this server may be validated / installed against from this instance.
      */
     public function canBeValidated(): bool

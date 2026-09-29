@@ -371,11 +371,11 @@ class Show extends Component
         }
 
         if ($this->server->isTransferredAway()) {
-            $claimer->claim($this->server, writeRemote: false, rebindSentinel: true);
+            $claimer->claim($this->server);
             $event = 'ui.server.management_enabled';
             $message = 'This Coolify instance now manages the server.';
         } else {
-            $claimer->markTransferred($this->server);
+            $claimer->markTransferred($this->server, managementDisabled: true);
             $event = 'ui.server.management_disabled';
             $message = 'Server automations are disabled on this Coolify instance.';
         }

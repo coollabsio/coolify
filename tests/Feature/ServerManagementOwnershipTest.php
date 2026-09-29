@@ -40,8 +40,32 @@ test('owner can stop managing a server from this instance', function () {
     $this->server->refresh();
 
     expect($this->server->isTransferredAway())->toBeTrue()
+        ->and($this->server->isManagementDisabled())->toBeTrue()
         ->and((bool) $this->server->settings->force_disabled)->toBeTrue()
         ->and((bool) $this->server->settings->is_sentinel_enabled)->toBeFalse();
+});
+
+test('server with disabled management shows it is transferable, not transferred away', function () {
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('toggleManagement')
+        ->assertSee('Transferable to another instance')
+        ->assertSee(route('server.transfer', ['server_uuid' => $this->server->uuid]))
+        ->assertDontSee('Transferred to another instance')
+        ->assertDontSee('Transferred away')
+        ->assertDontSeeHtml('>Transferable<');
+});
+
+test('server transferred to another instance is not reported as management disabled', function () {
+    app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
+
+    $this->server->refresh();
+
+    expect($this->server->isTransferredAway())->toBeTrue()
+        ->and($this->server->isManagementDisabled())->toBeFalse();
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSee('Transferred to another instance')
+        ->assertDontSee('Transferable to another instance');
 });
 
 test('owner can take management of a transferred server', function () {
@@ -122,7 +146,7 @@ test('claiming a server keeps it force disabled when the cloud team is over its 
     ]);
     markServerTransferredAway($this->server);
 
-    app(ServerTransferClaimer::class)->claim($this->server, writeRemote: false);
+    app(ServerTransferClaimer::class)->claim($this->server);
 
     $this->server->refresh();
 
@@ -152,6 +176,18 @@ test('server overview shows a management button that matches the ownership state
         ->call('toggleManagement', '')
         ->assertSee('Enable management')
         ->assertDontSee('Disable management');
+});
+
+test('server validation button is hidden while management is disabled or transferred away', function () {
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertSeeHtml('wire:click.prevent="validateServer"')
+        ->call('toggleManagement')
+        ->assertDontSeeHtml('wire:click.prevent="validateServer"');
+
+    app(ServerTransferClaimer::class)->markTransferred($this->server->fresh(), targetInstanceUrl: 'https://coolify-b.test');
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->assertDontSeeHtml('wire:click.prevent="validateServer"');
 });
 
 test('management ownership is not available outside development', function () {
