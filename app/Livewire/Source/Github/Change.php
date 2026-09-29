@@ -36,6 +36,8 @@ class Change extends Component
 
     public ?bool $administration = false;
 
+    public ?bool $github_runners = false;
+
     public $parameters;
 
     public ?GithubApp $github_app = null;
@@ -308,6 +310,10 @@ class Change extends Component
 
             // Sync data from model to properties
             $this->syncData(false);
+            if (! $this->github_app->app_id) {
+                $this->preview_deployment_permissions = request()->boolean('previews', true);
+                $this->github_runners = filled($this->github_app->organization) && request()->boolean('runners');
+            }
             $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
@@ -480,5 +486,17 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * After a delete, the confirmation modal refreshes the component before the redirect runs.
+     */
+    public function render()
+    {
+        if (! $this->github_app) {
+            return '<div></div>';
+        }
+
+        return view('livewire.source.github.change');
     }
 }

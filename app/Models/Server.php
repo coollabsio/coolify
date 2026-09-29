@@ -986,7 +986,8 @@ $siteAddress {
 
     /**
      * Usable dedicated (build-only) servers of a team. Servers with the combined role
-     * host deployments, so they are never picked as build servers.
+     * host deployments, so they are never picked as build servers. Servers dedicated to
+     * GitHub Actions runners are also left out.
      */
     public static function buildServers($teamId): Builder
     {
@@ -994,7 +995,8 @@ $siteAddress {
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'force_disabled', false);
+            ->whereRelation('settings', 'force_disabled', false)
+            ->whereDoesntHave('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true)->where('is_dedicated', true));
 
         return self::whereServerRole($query, ServerRole::BUILD);
     }
@@ -1504,6 +1506,21 @@ $siteAddress {
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
 
         return $standalone_docker->concat($swarm_docker);
+    }
+
+    public function githubRunnerConfig()
+    {
+        return $this->hasOne(GithubRunnerConfig::class);
+    }
+
+    public function githubRunnerExecutions()
+    {
+        return $this->hasMany(GithubRunnerExecution::class);
+    }
+
+    public function hasEnabledGithubRunners(): bool
+    {
+        return $this->githubRunnerConfig()->where('is_enabled', true)->exists();
     }
 
     public function standaloneDockers()

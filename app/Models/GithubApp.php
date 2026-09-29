@@ -35,6 +35,10 @@ class GithubApp extends BaseModel
         'metadata',
         'pull_requests',
         'administration',
+        'organization_self_hosted_runners',
+        'actions',
+        'webhook_events',
+        'runner_group_id',
     ];
 
     protected $appends = ['type'];
@@ -43,6 +47,8 @@ class GithubApp extends BaseModel
         'is_public' => 'boolean',
         'is_system_wide' => 'boolean',
         'type' => 'string',
+        'webhook_events' => 'array',
+        'runner_group_id' => 'integer',
     ];
 
     protected $hidden = [
@@ -95,6 +101,35 @@ class GithubApp extends BaseModel
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function runnerConfigs()
+    {
+        return $this->hasMany(GithubRunnerConfig::class);
+    }
+
+    /**
+     * Permissions and webhook events that GitHub Actions runners need but the App does not have.
+     *
+     * @return array<int, string>
+     */
+    public function missingRunnerRequirements(): array
+    {
+        $missing = [];
+        if (blank($this->organization)) {
+            $missing[] = 'An organization (runners are registered at organization level)';
+        }
+        if ($this->organization_self_hosted_runners !== 'write') {
+            $missing[] = 'Organization permission "Self-hosted runners": write';
+        }
+        if (! in_array($this->actions, ['read', 'write'], true)) {
+            $missing[] = 'Repository permission "Actions": read';
+        }
+        if (! in_array('workflow_job', $this->webhook_events ?? [], true)) {
+            $missing[] = 'Webhook event "Workflow job"';
+        }
+
+        return $missing;
     }
 
     public function type(): Attribute

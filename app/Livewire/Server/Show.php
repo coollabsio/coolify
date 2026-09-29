@@ -284,7 +284,7 @@ class Show extends Component
             $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
             $this->sentinelToken = auth()->user()->can('update', $this->server)
-                ? $this->server->settings->sentinel_token
+                ? $this->server->settings->ensureValidSentinelToken()
                 : '';
             $this->sentinelMetricsRefreshRateSeconds = $this->server->settings->sentinel_metrics_refresh_rate_seconds;
             $this->sentinelMetricsHistoryDays = $this->server->settings->sentinel_metrics_history_days;
@@ -455,6 +455,13 @@ class Show extends Component
             $this->authorize('update', $this->server);
             $newRole = ServerRole::from($this->serverRole);
             $currentRole = $this->server->settings()->firstOrFail()->effectiveServerRole();
+
+            if ($newRole !== ServerRole::BUILD && $this->server->hasEnabledGithubRunners()) {
+                $this->serverRole = $currentRole->value;
+                $this->dispatch('error', 'Disable the GitHub runners before you change the role of this server.');
+
+                return;
+            }
 
             if ($newRole === ServerRole::BUILD && ! $this->server->isEmpty()) {
                 $this->serverRole = $currentRole->value;

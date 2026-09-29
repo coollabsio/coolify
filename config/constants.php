@@ -117,6 +117,20 @@ return [
         'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
     ],
 
+    'github_runner' => [
+        // GitHub stops sending jobs to runners that are more than 30 days behind, so the default follows
+        // "latest" and is pulled for every runner. Users can pin a tag in the runner settings.
+        'image' => env('GITHUB_RUNNER_IMAGE', 'ghcr.io/actions/actions-runner:latest'),
+        'dind_image' => env('GITHUB_RUNNER_DIND_IMAGE', 'docker:29.8-dind'),
+        'sysbox' => [
+            'version' => '0.7.1',
+            'checksums' => [
+                'amd64' => '9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5',
+                'arm64' => '04ca894ae0b53f0fa54eaacc173ce40363c9a95ea5450f773716a84ef650a69b',
+            ],
+        ],
+    ],
+
     'webhooks' => [
         'feedback_discord_webhook' => env('FEEDBACK_DISCORD_WEBHOOK'),
         'dev_webhook' => env('SERVEO_URL'),

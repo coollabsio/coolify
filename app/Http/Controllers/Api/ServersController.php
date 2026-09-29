@@ -769,6 +769,13 @@ class ServersController extends Controller
             ], 422);
         }
 
+        if ($serverRole !== null && $serverRole !== ServerRole::BUILD && $server->hasEnabledGithubRunners()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_role' => ['Disable the GitHub runners before you change the role of this server.']],
+            ], 422);
+        }
+
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->whereKeyNot($server->id)->exists()) {
             return response()->json([
                 'message' => 'Validation failed.',
