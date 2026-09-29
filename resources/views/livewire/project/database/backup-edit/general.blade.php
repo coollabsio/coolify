@@ -96,6 +96,7 @@
                     min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
+            <x-next-run :at="$backup->next_run_at" :timezone="$timezone" :enabled="$backup->enabled" :frequency="$backup->frequency" />
         </div>
     </x-application.settings-section>
 </form>

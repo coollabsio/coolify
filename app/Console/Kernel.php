@@ -12,7 +12,6 @@ use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RegenerateSslCertJob;
-use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
@@ -75,7 +74,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobs();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
@@ -96,7 +95,7 @@ class Kernel extends ConsoleKernel
             $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleInstance->job(new ScheduledJobManager)->everyMinute()->onOneServer();
+            $this->scheduleScheduledJobs();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
@@ -114,6 +113,18 @@ class Kernel extends ConsoleKernel
             ->cron($this->updateCheckFrequency)
             ->timezone($this->instanceTimezone)
             ->onOneServer();
+    }
+
+    /**
+     * Run the dispatcher in the scheduler process, so a busy queue cannot delay it. Parallel runs
+     * are safe because each occurrence is claimed with an atomic update of next_run_at.
+     */
+    private function scheduleScheduledJobs(): void
+    {
+        $this->scheduleInstance->command('scheduled:dispatch')
+            ->everyMinute()
+            ->onOneServer()
+            ->runInBackground();
     }
 
     private function scheduleUpdates(): void

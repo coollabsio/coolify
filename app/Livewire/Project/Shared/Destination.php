@@ -8,6 +8,7 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Services\ScheduleNextRunRecalculator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -136,6 +137,7 @@ class Destination extends Component
                     ->wherePivot('server_id', $server->id)
                     ->detach($network->id);
                 $this->resource->additional_networks()->attach($mainDestination->id, ['server_id' => $mainDestination->server->id]);
+                app(ScheduleNextRunRecalculator::class)->forResource($this->resource);
             });
             $this->resource->refresh();
             $this->refreshServers();

@@ -4,7 +4,6 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Service\StartService;
 use App\Jobs\DatabaseBackupJob;
-use App\Jobs\ScheduledJobManager;
 use App\Models\ScheduledDatabaseBackup;
 
 describe('deployment_queue helper', function () {
@@ -61,14 +60,12 @@ describe('scheduled job routing', function () {
     test('scheduled jobs use the crons queue on cloud', function () {
         config(['constants.coolify.self_hosted' => false]);
 
-        expect((new ScheduledJobManager)->queue)->toBe('crons');
         expect((new DatabaseBackupJob(new ScheduledDatabaseBackup))->queue)->toBe('crons');
     });
 
     test('scheduled jobs use the high queue on self-hosted', function () {
         config(['constants.coolify.self_hosted' => true]);
 
-        expect((new ScheduledJobManager)->queue)->toBe('high');
         expect((new DatabaseBackupJob(new ScheduledDatabaseBackup))->queue)->toBe('high');
     });
 });
