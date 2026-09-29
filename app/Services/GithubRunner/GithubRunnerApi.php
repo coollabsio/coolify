@@ -17,7 +17,8 @@ class GithubRunnerApi
 
     /**
      * Finds or creates the runner group of the App. The group is limited to private repositories.
-     * Organizations without custom runner groups (GitHub Free) fall back to the Default group.
+     * All GitHub plans can create runner groups, so a failed creation is an error. Coolify never falls back
+     * to the Default group, because that group can give the runners access to more repositories.
      *
      * @return array{id: int, is_default: bool}
      */
@@ -40,16 +41,10 @@ class GithubRunnerApi
             'visibility' => 'private',
             'allows_public_repositories' => false,
         ]);
-        $group = ['id' => (int) $response->json('id'), 'is_default' => false];
-
-        if (! $response->successful()) {
-            $groups = $this->client()->get("/orgs/{$org}/actions/runner-groups");
-            $default = collect($groups->json('runner_groups', []))->firstWhere('default', true);
-            if (! $groups->successful() || ! $default) {
-                throw new RuntimeException('Could not create a runner group: '.$this->errorMessage($response));
-            }
-            $group = ['id' => (int) $default['id'], 'is_default' => true];
+        if (! $response->successful() || ! $response->json('id')) {
+            throw new RuntimeException('Could not create a runner group: '.$this->errorMessage($response));
         }
+        $group = ['id' => (int) $response->json('id'), 'is_default' => false];
 
         $this->githubApp->update(['runner_group_id' => $group['id']]);
 

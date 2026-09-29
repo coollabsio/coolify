@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GithubRunnerDockerMode;
 use App\Enums\GithubRunnerStatus;
 use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
@@ -123,6 +124,7 @@ describe('runner settings page', function () {
         expect($config->server_id)->toBe($this->server->id)
             ->and($config->labels)->toBe(['coolify', 'gpu'])
             ->and($config->memory_limit)->toBe('4g')
+            ->and($config->docker_mode)->toBe(GithubRunnerDockerMode::None)
             ->and($this->githubApp->fresh()->runner_group_id)->toBe(55);
         Http::assertSent(fn ($request) => $request->method() === 'POST'
             && str_ends_with($request->url(), '/orgs/acme/actions/runner-groups')
@@ -130,18 +132,20 @@ describe('runner settings page', function () {
             && $request['visibility'] === 'private');
     });
 
-    it('uses the Default runner group when the organization cannot create groups', function () {
-        fakeRunnerGroupApi($this->githubApp, 403);
+    it('does not fall back to the Default runner group when group creation fails', function (int $status) {
+        fakeRunnerGroupApi($this->githubApp, $status);
 
         Livewire::actingAs($this->owner)
             ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
             ->set('githubAppId', $this->githubApp->id)
             ->call('submit')
-            ->assertDispatched('warning')
-            ->assertDispatched('success');
+            ->assertNotDispatched('success');
 
-        expect($this->githubApp->fresh()->runner_group_id)->toBe(1);
-    });
+        expect($this->githubApp->fresh()->runner_group_id)->toBeNull()
+            ->and(GithubRunnerConfig::count())->toBe(0);
+        Http::assertNotSent(fn ($request) => $request->method() === 'GET'
+            && str_ends_with($request->url(), '/orgs/acme/actions/runner-groups'));
+    })->with([403, 401, 422, 429, 500]);
 
     it('requires a custom label with safe characters', function (string $labels) {
         Http::fake();
@@ -591,6 +595,32 @@ describe('GitHub App runner permissions', function () {
             ->assertOk();
 
         expect(GithubApp::find($unregistered->id))->toBeNull();
+    });
+
+    it('blocks deleting an App while servers have enabled runners', function () {
+        GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify']]);
+
+        expect(fn () => $this->githubApp->delete())->toThrow(Exception::class, 'GitHub Actions runners');
+        expect(GithubApp::find($this->githubApp->id))->not->toBeNull()
+            ->and(GithubRunnerConfig::count())->toBe(1);
+    });
+
+    it('blocks deleting an App while disabled runners still run jobs', function () {
+        $config = GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify'], 'is_enabled' => false]);
+        GithubRunnerExecution::create(['github_app_id' => $this->githubApp->id, 'github_runner_config_id' => $config->id, 'server_id' => $this->server->id, 'trigger_workflow_job_id' => 1, 'status' => GithubRunnerStatus::Running]);
+
+        expect(fn () => $this->githubApp->delete())->toThrow(Exception::class, 'GitHub Actions runners');
+        expect(GithubApp::find($this->githubApp->id))->not->toBeNull();
+    });
+
+    it('deletes an App after its runners are disabled and finished', function () {
+        $config = GithubRunnerConfig::create(['server_id' => $this->server->id, 'github_app_id' => $this->githubApp->id, 'labels' => ['coolify'], 'is_enabled' => false]);
+        GithubRunnerExecution::create(['github_app_id' => $this->githubApp->id, 'github_runner_config_id' => $config->id, 'server_id' => $this->server->id, 'trigger_workflow_job_id' => 1, 'status' => GithubRunnerStatus::Completed]);
+
+        $this->githubApp->delete();
+
+        expect(GithubApp::find($this->githubApp->id))->toBeNull()
+            ->and(GithubRunnerConfig::count())->toBe(0);
     });
 });
 

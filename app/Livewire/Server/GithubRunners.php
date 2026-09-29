@@ -37,7 +37,7 @@ class GithubRunners extends Component
 
     public int $maxRunners = 2;
 
-    public string $dockerMode = 'dind';
+    public string $dockerMode = 'none';
 
     public ?string $runnerImage = null;
 
@@ -280,7 +280,7 @@ class GithubRunners extends Component
 
         $group = (new GithubRunnerApi($githubApp))->ensureRunnerGroup();
         if ($group['is_default']) {
-            $this->dispatch('warning', 'The organization cannot create runner groups (GitHub Free plan), so runners use the Default runner group. Check which repositories can use that group on GitHub.');
+            $this->dispatch('warning', 'Runners use the Default runner group of the organization. Check which repositories can use that group on GitHub.');
         }
     }
 

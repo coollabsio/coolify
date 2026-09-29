@@ -20,7 +20,7 @@ return new class extends Migration
             $table->boolean('is_enabled')->default(true);
             $table->boolean('is_dedicated')->default(false);
             $table->unsignedSmallInteger('max_runners')->default(2);
-            $table->string('docker_mode')->default('dind');
+            $table->string('docker_mode')->default('none');
             $table->string('runner_image')->nullable();
             $table->string('cpu_limit')->nullable();
             $table->string('memory_limit')->nullable();

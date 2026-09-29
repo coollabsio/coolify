@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GithubRunnerStatus;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,15 @@ class GithubApp extends BaseModel
             $applications_count = Application::where('source_id', $github_app->id)->count();
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
+            }
+
+            // Runner rows cascade with the App, so live runner containers would lose their cleanup and keep taking jobs.
+            $hasLiveRunners = $github_app->runnerConfigs()->where('is_enabled', true)->exists()
+                || GithubRunnerExecution::where('github_app_id', $github_app->id)
+                    ->whereIn('status', GithubRunnerStatus::occupying())
+                    ->exists();
+            if ($hasLiveRunners) {
+                throw new \Exception('You cannot delete this GitHub App because servers use it for GitHub Actions runners. Disable the runners on these servers and wait for running jobs to finish first.');
             }
 
             $privateKey = $github_app->privateKey;
