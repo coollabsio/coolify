@@ -5,7 +5,9 @@ namespace App\Actions\Service;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class DeleteService
 {
@@ -44,8 +46,9 @@ class DeleteService
     }
 
     /**
-     * Removes the container of one service part. Returns false when the server does not respond:
-     * the container then stays until the service starts again (compose up --remove-orphans).
+     * Removes the container of one service part. Returns false when the server does not respond,
+     * also when it is still marked reachable but the SSH call fails: the container then stays until
+     * the service starts again (compose up --remove-orphans), and the part can still be deleted from Coolify.
      */
     public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): bool
     {
@@ -54,7 +57,18 @@ class DeleteService
             return false;
         }
 
-        $this->removeContainers($service, $resource);
+        try {
+            $this->removeContainers($service, $resource);
+        } catch (Throwable $e) {
+            Log::warning('Could not remove the container of a service part; it is removed when the service starts again.', [
+                'service_uuid' => $service->uuid,
+                'subresource_uuid' => $resource->uuid,
+                'server_uuid' => $service->server->uuid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
 
         return true;
     }
