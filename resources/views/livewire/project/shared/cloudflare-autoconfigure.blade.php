@@ -82,7 +82,7 @@
                             </div>
 
                             <x-forms.input label="Server IP (A record target)"
-                                value="{{ $serverIp ?: 'Unavailable' }}" readonly
+                                value="{{ $this->publicServerIpForDomainConnect() ?: 'Unavailable' }}" readonly
                                 helper="This IP is taken from the destination server." />
 
                             <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
