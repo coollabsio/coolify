@@ -83,7 +83,7 @@ class OauthLoginService
             [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
             $providerUserId = $subject;
         } else {
-            $issuer = $oauthSetting->provider;
+            $issuer = OauthIdentityIssuer::forSetting($oauthSetting);
             $providerUserId = $oauthUser->id ?? null;
             if (is_int($providerUserId)) {
                 $providerUserId = (string) $providerUserId;
@@ -133,14 +133,19 @@ class OauthLoginService
             throw new HttpException(403, 'Google account is not in the configured Workspace');
         }
 
+        $issuer = OauthIdentityIssuer::forSetting($oauthSetting);
+        if ($issuer === null) {
+            throw new HttpException(403, 'OAuth provider instance is not configured');
+        }
+
         $identityKey = [
             'provider' => $provider,
-            'issuer' => $provider,
+            'issuer' => $issuer,
             'provider_user_id' => $providerUserId,
         ];
 
         try {
-            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims, $identityKey): User {
+            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $issuer, $providerUserId, $rawClaims, $identityKey): User {
                 $identity = OauthIdentity::where($identityKey)->first();
 
                 if ($identity) {
@@ -176,7 +181,7 @@ class OauthLoginService
                 OauthIdentity::create([
                     'user_id' => $user->id,
                     'provider' => $provider,
-                    'issuer' => $provider,
+                    'issuer' => $issuer,
                     'provider_user_id' => $providerUserId,
                     'email' => $email,
                     'raw_claims' => $rawClaims,

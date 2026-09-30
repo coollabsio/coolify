@@ -278,6 +278,7 @@ it('links a user from before the upgrade without an email verification claim', f
     $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
         'client_id' => 'client-id',
         'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
         'enabled' => true,
     ]);
 

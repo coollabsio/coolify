@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OauthSetting;
+use App\Services\Auth\OauthIdentityIssuer;
 use App\Services\Auth\OauthLoginService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,11 @@ class OauthController extends Controller
     {
         $user = $request->user();
         $oauthSetting = $this->enabledProvider($provider);
-        if (! $user->oauthIdentities()->where('provider', $oauthSetting->provider)->exists()) {
+        $linkedIdentities = $user->oauthIdentities()->where('provider', $oauthSetting->provider);
+        if (! $oauthSetting->isOidc()) {
+            $linkedIdentities->where('issuer', OauthIdentityIssuer::forSetting($oauthSetting));
+        }
+        if (! $linkedIdentities->exists()) {
             abort(403, 'No identity from this provider is linked to your account.');
         }
 
