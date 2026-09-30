@@ -311,6 +311,57 @@ describe('status updates after a server transfer', function () {
 
         expect($this->application->fresh()->status)->toStartWith('running');
     });
+
+    test('container status check looks up foreign preview owners with one query for all containers', function () {
+        $deleted = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $preview = ApplicationPreview::forceCreate([
+            'application_id' => $deleted->id,
+            'pull_request_id' => 3,
+            'pull_request_html_url' => 'https://example.com/pr/3',
+            'status' => 'exited',
+        ]);
+        $deleted->delete();
+
+        $containers = collect(range(1, 5))->map(fn (int $i) => [
+            'Name' => "/foreign-app-{$i}-pr-{$i}",
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => "foreign-app-{$i}",
+                'coolify.pullRequestId' => (string) $i,
+                'com.docker.compose.service' => "foreign-app-{$i}-pr-{$i}",
+            ]],
+        ])->push([
+            'Name' => '/'.$deleted->uuid.'-pr-3',
+            'State' => ['Status' => 'running', 'Health' => ['Status' => 'healthy']],
+            'RestartCount' => 0,
+            'Config' => ['Labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => $deleted->uuid,
+                'coolify.pullRequestId' => '3',
+                'com.docker.compose.service' => $deleted->uuid.'-pr-3',
+            ]],
+        ]);
+
+        $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+        $server = $this->server->fresh();
+
+        DB::enableQueryLog();
+        GetContainersStatus::run($server, $containers, collect());
+        $ownerLookups = collect(DB::getQueryLog())
+            ->filter(fn (array $query) => str_contains($query['query'], 'from "applications"') && preg_match('/"uuid" (=|in) /', $query['query']) === 1)
+            ->count();
+        DB::disableQueryLog();
+
+        expect($ownerLookups)->toBe(1)
+            // The preview of a trashed owner still resolves.
+            ->and($preview->fresh()->status)->toBe('running:healthy');
+    });
 });
 
 describe('orphaned preview cleanup', function () {

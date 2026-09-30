@@ -154,13 +154,15 @@ function resolveContainerApplicationId(Collection $applications, Collection|arra
  */
 function containerApplicationIdsByUuid(Collection $applications, iterable $containerLabels): array
 {
-    $knownUuids = $applications->pluck('uuid')->flip();
     $uuids = [];
     foreach ($containerLabels as $labels) {
         $uuid = containerOwnerUuid($labels, 'application');
-        if ($uuid && ! $knownUuids->has($uuid)) {
+        if ($uuid) {
             $uuids[$uuid] = true;
         }
+    }
+    foreach ($applications->pluck('uuid')->filter() as $knownUuid) {
+        unset($uuids[$knownUuid]);
     }
     if ($uuids === []) {
         return [];

@@ -106,6 +106,14 @@ class GetContainersStatus
         $foundDatabases = [];
         $foundServices = [];
 
+        // Owners of preview containers outside this server's applications, in one query.
+        $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
+            $this->applications,
+            $this->containers
+                ->map(fn ($container) => format_docker_labels_to_json(data_get($container, $this->server->isSwarm() ? 'Spec.Labels' : 'Config.Labels') ?? []))
+                ->filter(fn (Collection $labels) => (bool) $labels->get('coolify.pullRequestId') && isContainerOfType($labels, 'application'))
+        );
+
         foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
                 $labels = data_get($container, 'Spec.Labels');
@@ -136,7 +144,7 @@ class GetContainersStatus
             if ($isApplicationContainer) {
                 $pullRequestId = data_get($labels, 'coolify.pullRequestId');
                 if ($pullRequestId) {
-                    $applicationId = resolveContainerApplicationId($this->applications, $flatLabels);
+                    $applicationId = resolveContainerApplicationId($this->applications, $flatLabels, $foreignApplicationIdsByUuid);
                     $preview = $applicationId
                         ? ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first()
                         : null;
