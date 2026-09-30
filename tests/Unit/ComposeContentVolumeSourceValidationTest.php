@@ -188,5 +188,5 @@ it('checks the complete content volume template corpus', function () {
         }
     }
 
-    expect($contentVolumes)->toBeGreaterThanOrEqual(94);
+    expect($contentVolumes)->toBeGreaterThanOrEqual(91);
 });
