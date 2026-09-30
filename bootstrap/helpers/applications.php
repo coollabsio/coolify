@@ -63,7 +63,7 @@ function queue_application_deployment(Application $application, string $deployme
             ];
         }
 
-        return ApplicationDeploymentQueue::create([
+        $deployment = ApplicationDeploymentQueue::create([
             'application_id' => $application_id,
             'application_name' => $application->name,
             'server_id' => $server_id,
@@ -83,13 +83,24 @@ function queue_application_deployment(Application $application, string $deployme
             'only_this_server' => $only_this_server,
             'parent_deployment_uuid' => $parent_deployment_uuid,
         ]);
+
+        // Decide whether to start while the application and server rows are still locked,
+        // so concurrent requests cannot both see an idle queue and start two deployments.
+        $started = $no_questions_asked || next_queuable($server_id, $application_id, $commit, $pull_request_id);
+        if ($started) {
+            $deployment->update([
+                'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ]);
+        }
+
+        return ['deployment' => $deployment, 'started' => $started];
     });
 
-    if (is_array($admission)) {
+    if (! isset($admission['deployment'])) {
         return $admission;
     }
 
-    $deployment = $admission;
+    $deployment = $admission['deployment'];
 
     if (auth()->check() && ! $is_webhook && ! $is_api && ! $rollback) {
         auditLog($restart_only ? 'ui.application.restarted' : 'ui.application.deployed', [
@@ -100,17 +111,7 @@ function queue_application_deployment(Application $application, string $deployme
         ]);
     }
 
-    if ($no_questions_asked) {
-        $deployment->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
-        ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $deployment->id,
-        );
-    } elseif (next_queuable($server_id, $application_id, $commit, $pull_request_id)) {
-        $deployment->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
+    if ($admission['started']) {
         ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
         );
@@ -141,17 +142,44 @@ function queue_next_deployment(Application $application)
         ->sortBy('created_at');
 
     foreach ($queued_deployments as $next_deployment) {
-        // Check if this queued deployment can actually run
-        if (next_queuable($next_deployment->server_id, $next_deployment->application_id, $next_deployment->commit, $next_deployment->pull_request_id)) {
-            $next_deployment->update([
-                'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-            ]);
-
-            ApplicationDeploymentJob::dispatch(
-                application_deployment_queue_id: $next_deployment->id,
-            );
-        }
+        start_queued_deployment($next_deployment);
     }
+}
+
+/**
+ * Start a queued deployment if it can run now. The check and the status change run under
+ * the same application and server row locks as queue admission, so two workers cannot both
+ * start the same deployment or exceed the per-application and per-server limits.
+ */
+function start_queued_deployment(ApplicationDeploymentQueue $deployment): bool
+{
+    $started = DB::transaction(function () use ($deployment): bool {
+        Application::query()->whereKey($deployment->application_id)->lockForUpdate()->first();
+        Server::query()->whereKey($deployment->server_id)->lockForUpdate()->first();
+        $current = ApplicationDeploymentQueue::query()->whereKey($deployment->id)->lockForUpdate()->first();
+
+        if (! $current || $current->status !== ApplicationDeploymentStatus::QUEUED->value) {
+            return false;
+        }
+
+        if (! next_queuable($current->server_id, $current->application_id, $current->commit, $current->pull_request_id)) {
+            return false;
+        }
+
+        $current->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+
+        return true;
+    });
+
+    if ($started) {
+        ApplicationDeploymentJob::dispatch(
+            application_deployment_queue_id: $deployment->id,
+        );
+    }
+
+    return $started;
 }
 
 function next_queuable(string $server_id, string $application_id, string $commit = 'HEAD', int $pull_request_id = 0): bool
@@ -188,19 +216,8 @@ function next_after_cancel(?Server $server = null)
             ->get()
             ->sortBy('created_at');
 
-        if ($next_found->count() > 0) {
-            foreach ($next_found as $next) {
-                // Use next_queuable to properly check if this deployment can run
-                if (next_queuable($next->server_id, $next->application_id, $next->commit, $next->pull_request_id)) {
-                    $next->update([
-                        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-                    ]);
-
-                    ApplicationDeploymentJob::dispatch(
-                        application_deployment_queue_id: $next->id,
-                    );
-                }
-            }
+        foreach ($next_found as $next) {
+            start_queued_deployment($next);
         }
     }
 }

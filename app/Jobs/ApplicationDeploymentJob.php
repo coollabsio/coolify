@@ -310,6 +310,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->refresh();
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment was cancelled before starting.');
+            $this->handleCancelledDeployment();
 
             return;
         }
@@ -659,7 +660,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * An inline Dockerfile image has no commit tag. The main server builds it and pushes it with the
      * `latest` tag just before it queues the additional servers, so an additional server pulls that
-     * image instead of building its own. A failed pull fails the deployment.
+     * image instead of building its own. A missing image fails the deployment with a clear message.
      */
     private function pull_image_for_additional_server(): bool
     {
@@ -667,11 +668,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return false;
         }
 
+        $image = escapeshellarg($this->production_image_name);
         $this->application_deployment_queue->addLogEntry("Pulling image ({$this->production_image_name}) that the main server pushed. Build step skipped.");
-        $this->execute_remote_command([
-            'docker pull '.escapeshellarg($this->production_image_name),
-            'hidden' => true,
-        ]);
+        $this->execute_remote_command(
+            [
+                "docker pull {$image}",
+                'hidden' => true,
+                'ignore_errors' => true,
+            ],
+            [
+                "docker images -q {$image} 2>/dev/null",
+                'hidden' => true,
+                'save' => 'local_image_found',
+            ],
+        );
+
+        if (str($this->saved_outputs->get('local_image_found'))->isEmpty()) {
+            $message = "Image ({$this->production_image_name}) not found in the registry; the main server must push it first.";
+            if (! $this->server->canBuildApplications()) {
+                $message .= " The server ({$this->server->name}) is set to deployments only and cannot build it.";
+            }
+            throw new DeploymentException($message);
+        }
 
         return true;
     }
@@ -5614,10 +5632,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            $this->handleCancelledDeployment();
             throw new DeploymentException('Deployment cancelled by user', 69420);
         }
 
         return false;
+    }
+
+    /**
+     * A cancelled deployment on an additional server can be the last one of a multi-server
+     * deployment, so it must also trigger the combined notification.
+     */
+    private function handleCancelledDeployment(): void
+    {
+        if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
+            $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
+        }
     }
 
     /**
