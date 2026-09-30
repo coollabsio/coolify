@@ -59,6 +59,8 @@ beforeEach(function () {
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
     ]);
+    $this->mariadb = create_standalone_mariadb($this->environment->id, $this->destination);
+    $this->mariadb->update(['status' => 'running:healthy']);
 
     Queue::fake();
 });
@@ -152,6 +154,33 @@ test('the import form strips owners by default and keeps them when the option is
     $form->set('filename', 'backup.dump')->set('customLocation', '/backups/backup.dump')->call('runImport');
 });
 
+test('passes the restore users option to the MariaDB all-databases restore script', function (bool $restoreMysqlUsers) {
+    $script = importRestoreScript($this->mariadb, new DatabaseImportSource('server', path: '/backups/all.sql.gz', dumpAll: true, restoreMysqlUsers: $restoreMysqlUsers));
+
+    expect(str_contains($script, 'awk'))->toBe(! $restoreMysqlUsers);
+})->with(['default' => [false], 'restore users' => [true]]);
+
+test('the import form skips MySQL users by default and restores them when the option is checked', function () {
+    $activity = Activity::create(['log_name' => 'default', 'description' => 'queued', 'properties' => ['status' => 'queued']]);
+    StartDatabaseImport::shouldRun()->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $source->dumpAll && $source->restoreMysqlUsers === true)->andReturn($activity);
+
+    $form = restoreOptionsForm($this->mariadb)
+        ->assertSet('restoreMysqlUsers', false)
+        ->assertDontSee('Restore users and privileges');
+
+    $form->set('dumpAll', true)->assertSee('Restore users and privileges');
+    expect($form->get('restoreCommandText'))->toContain('awk');
+
+    $form->set('restoreMysqlUsers', true)->assertSee('passwords');
+    expect($form->get('restoreCommandText'))->not->toContain('awk');
+
+    $form->set('filename', 'all.sql.gz')->set('customLocation', '/backups/all.sql.gz')->call('runImport');
+});
+
+test('the import form does not offer the restore users option for PostgreSQL', function () {
+    restoreOptionsForm($this->postgres)->set('dumpAll', true)->assertDontSee('Restore users and privileges');
+});
+
 test('the import form lets the user pick the SQLite database file to restore into', function () {
     $activity = Activity::create(['log_name' => 'default', 'description' => 'queued', 'properties' => ['status' => 'queued']]);
     StartDatabaseImport::shouldRun()->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $source->sqliteDatabase === 'cache.db')->andReturn($activity);
@@ -196,6 +225,27 @@ test('the API passes keep owners and the SQLite target to the import', function 
         ->postJson("/api/v1/databases/{$this->postgres->uuid}/imports", ['source' => 'server', 'path' => '/tmp/backup.dump', 'keep_owners' => 'yes'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('keep_owners');
+});
+
+test('the API passes the restore users option to the import', function () {
+    app('auth')->forgetGuards();
+    $headers = ['Authorization' => 'Bearer '.$this->user->createToken('imports', ['*'])->plainTextToken];
+    $activity = Activity::create(['log_name' => 'default', 'description' => 'queued', 'properties' => ['status' => 'queued']]);
+    $action = Mockery::mock(StartDatabaseImport::class);
+    $action->shouldReceive('handle')->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $resource->is($this->mariadb) && $source->restoreMysqlUsers === true)->andReturn($activity);
+    $action->shouldReceive('handle')->once()->withArgs(fn ($resource, DatabaseImportSource $source) => $resource->is($this->mariadb) && $source->restoreMysqlUsers === false)->andReturn($activity);
+    app()->instance(StartDatabaseImport::class, $action);
+
+    $this->withHeaders($headers)
+        ->postJson("/api/v1/databases/{$this->mariadb->uuid}/imports", ['source' => 'server', 'path' => '/tmp/all.sql.gz', 'dump_all' => true, 'restore_mysql_users' => true])
+        ->assertAccepted();
+    $this->withHeaders($headers)
+        ->postJson("/api/v1/databases/{$this->mariadb->uuid}/imports", ['source' => 'server', 'path' => '/tmp/all.sql.gz', 'dump_all' => true])
+        ->assertAccepted();
+    $this->withHeaders($headers)
+        ->postJson("/api/v1/databases/{$this->mariadb->uuid}/imports", ['source' => 'server', 'path' => '/tmp/all.sql.gz', 'restore_mysql_users' => 'yes'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('restore_mysql_users');
 });
 
 test('the API rejects a SQLite target that is not a database file', function () {

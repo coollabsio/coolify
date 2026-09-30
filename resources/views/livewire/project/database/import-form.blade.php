@@ -86,6 +86,19 @@
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif
+                    @if (in_array($resourceDbType, ['standalone-mysql', 'standalone-mariadb', 'mysql', 'mariadb'], true) && $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="restoreMysqlUsers" live label="Restore users and privileges (mysql system database)"
+                                helper="Off: the system databases (mysql, sys) of the backup are skipped, so this database keeps its own users and passwords. On: the users, passwords, and privileges of the backup replace the current ones."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        @if ($restoreMysqlUsers)
+                            <x-callout type="warning" title="Restoring users changes passwords">
+                                The backup replaces all users, passwords, and privileges, including the root password. After the next restart of the database, the passwords from the backup apply, so the credentials Coolify stores for this database, and its health check, may stop working.
+                                <span class="mt-1 block">Update the passwords in Coolify's database configuration after the restore.</span>
+                            </x-callout>
+                        @endif
+                    @endif
                     @if ($resourceDbType === 'standalone-sqlite' && count($this->sqliteDatabaseFiles) > 0)
                         <div class="max-w-sm">
                             <x-forms.listbox id="sqliteDatabase" label="Restore into" live

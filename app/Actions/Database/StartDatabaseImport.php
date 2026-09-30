@@ -152,7 +152,7 @@ class StartDatabaseImport
         if ($safety = $this->commands->buildPostgresSafetyCommand($resource, $container, $containerPath)) {
             $commandList[] = $safety;
         }
-        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting, $source->keepOwners, $sqliteDatabase));
+        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting, $source->keepOwners, $sqliteDatabase, $source->restoreMysqlUsers));
         $commandList[] = 'echo '.escapeshellarg($restore).' | base64 -d > '.escapeshellarg($scriptPath);
         $commandList[] = 'chmod +x '.escapeshellarg($scriptPath);
         $commandList[] = 'docker cp '.escapeshellarg($scriptPath).' '.escapeshellarg("{$container}:{$scriptPath}");

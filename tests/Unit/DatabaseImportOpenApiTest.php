@@ -66,9 +66,9 @@ test('constrains additional properties on each database import source branch', f
     expect($schema)->not->toHaveKey('additionalProperties');
 
     $expectedProperties = [
-        ['source', 'upload_id', 'dump_all', 'replace_existing', 'keep_owners', 'sqlite_database'],
-        ['source', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'sqlite_database'],
-        ['source', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'sqlite_database'],
+        ['source', 'upload_id', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
+        ['source', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
+        ['source', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
     ];
 
     expect($schema['oneOf'])->toHaveCount(count($expectedProperties));
@@ -79,6 +79,8 @@ test('constrains additional properties on each database import source branch', f
             ->and($source['properties']['replace_existing'])
             ->toMatchArray(['type' => 'boolean', 'default' => false])
             ->and($source['properties']['keep_owners'])
+            ->toMatchArray(['type' => 'boolean', 'default' => false])
+            ->and($source['properties']['restore_mysql_users'])
             ->toMatchArray(['type' => 'boolean', 'default' => false])
             ->and($source['properties']['sqlite_database'])
             ->toMatchArray(['type' => 'string']);

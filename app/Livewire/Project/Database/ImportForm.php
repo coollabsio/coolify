@@ -166,6 +166,11 @@ class ImportForm extends Component
     public bool $keepOwners = false;
 
     /**
+     * MySQL and MariaDB all-databases backups: also restore the system databases (users, passwords and privileges).
+     */
+    public bool $restoreMysqlUsers = false;
+
+    /**
      * SQLite: the database file to restore into. Always one of the database's own files.
      */
     public ?string $sqliteDatabase = null;
@@ -252,6 +257,11 @@ class ImportForm extends Component
         $this->refreshRestoreCommandText();
     }
 
+    public function updatedRestoreMysqlUsers(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
     public function updatedSqliteDatabase(): void
     {
         if (! in_array($this->sqliteDatabase, $this->sqliteDatabaseFiles, true)) {
@@ -281,7 +291,7 @@ class ImportForm extends Component
 
         try {
             $this->restoreCommandText = $this->resource && $commands->supports($this->resource)
-                ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase)
+                ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers)
                 : '';
         } catch (\InvalidArgumentException) {
             $this->restoreCommandText = '';
@@ -453,8 +463,8 @@ class ImportForm extends Component
         try {
             $this->importRunning = true;
             $source = Storage::exists("upload/{$this->resourceUuid}/restore")
-                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase)
-                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase);
+                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers)
+                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -614,7 +624,7 @@ class ImportForm extends Component
 
         try {
             $this->importRunning = true;
-            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase);
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -643,6 +653,6 @@ class ImportForm extends Component
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase);
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers);
     }
 }

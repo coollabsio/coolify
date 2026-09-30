@@ -15,6 +15,7 @@ readonly class DatabaseImportSource
         public bool $replaceExisting = false,
         public bool $keepOwners = false,
         public ?string $sqliteDatabase = null,
+        public bool $restoreMysqlUsers = false,
     ) {
         if (! in_array($type, ['upload', 's3', 'server'], true)) {
             throw new InvalidArgumentException('Invalid database import source.');

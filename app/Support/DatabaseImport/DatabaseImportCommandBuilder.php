@@ -26,16 +26,44 @@ use_single_tar_member() { [ "$(find "$work" -type f | wc -l | tr -d ' ')" = 1 ] 
 SH;
 
     /**
+     * Streams an all-databases MySQL or MariaDB dump without its system databases. The mysql
+     * database holds the users and their passwords (user and global_priv), so restoring it
+     * would give the target the source passwords after its next restart. Everything from a
+     * switch to a system database (`-- Current Database:` or USE) up to the next switch to
+     * another database is dropped, as are the CREATE DATABASE statements of system databases.
+     */
+    private const MYSQL_SYSTEM_DATABASE_FILTER = <<<'AWK'
+function database(line) {
+  if (index(line, "`") > 0) { sub(/^[^`]*`/, "", line); sub(/`.*$/, "", line); return tolower(line) }
+  gsub(/\/\*[^*]*\*\//, " ", line)
+  line = tolower(line)
+  sub(/^[ \t]*(use|create[ \t]+(database|schema))[ \t]+/, "", line)
+  sub(/^if[ \t]+not[ \t]+exists[ \t]+/, "", line)
+  sub(/[ \t;].*$/, "", line)
+  return line
+}
+function is_system(name) { return name == "mysql" || name == "sys" || name == "performance_schema" || name == "information_schema" }
+/^-- Current Database: `/ { skip = is_system(database($0)) }
+tolower($0) ~ /^[ \t]*use[ \t]/ { skip = is_system(database($0)) }
+tolower($0) ~ /^[ \t]*create[ \t]+(database|schema)[ \t]/ { if (is_system(database($0))) { next } skip = 0 }
+/^\/\*!40103 SET TIME_ZONE=@OLD_TIME_ZONE/ { skip = 0 }
+!skip { print }
+AWK;
+
+    /**
      * @param  bool  $keepOwners  PostgreSQL archives: restore object owners and privileges. Off by default,
      *                            because roles from another host (for example RDS) usually do not exist here.
      * @param  string|null  $sqliteDatabase  SQLite: the database file to restore into, validated by the resource.
+     * @param  bool  $restoreMysqlUsers  MySQL and MariaDB all-databases backups: also restore the system databases
+     *                                   (users, passwords and privileges). Off by default, because the source
+     *                                   passwords would replace the ones Coolify stores for this database.
      */
-    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false, bool $keepOwners = false, ?string $sqliteDatabase = null): string
+    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false, bool $keepOwners = false, ?string $sqliteDatabase = null, bool $restoreMysqlUsers = false): string
     {
         $script = match ($this->databaseType($resource)) {
             'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting, $keepOwners),
-            'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll),
-            'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll),
+            'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll, $restoreMysqlUsers),
+            'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll, $restoreMysqlUsers),
             'mongodb' => $this->mongodb($replaceExisting),
             'sqlite' => $this->sqlite($resource->databaseFilePath($sqliteDatabase)),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
@@ -225,9 +253,10 @@ SH;
 
     /**
      * MySQL and MariaDB restore SQL dumps. A tar backup must wrap exactly one dump.
-     * The all-databases mode checks the backup before it drops any database.
+     * The all-databases mode checks the backup before it drops any database and skips
+     * the system databases unless their users and privileges are restored as well.
      */
-    private function mysql(string $binary, string $prefix, bool $dumpAll): string
+    private function mysql(string $binary, string $prefix, bool $dumpAll, bool $restoreMysqlUsers = false): string
     {
         $preflight = <<<'SH'
 if is_tar; then
@@ -250,11 +279,20 @@ SH;
         $root = "{$binary} -u root -p\${{$prefix}_ROOT_PASSWORD}";
         $database = "\${{$prefix}_DATABASE:-default}";
 
+        if ($restoreMysqlUsers) {
+            $source = 'stream';
+        } else {
+            // Without pipefail a failing filter would feed an empty restore, so it ends the
+            // input with an invalid statement and the client fails instead.
+            $preflight .= "command -v awk >/dev/null 2>&1 || fail 'awk is required to skip the system databases of the backup. Nothing was changed.'\n";
+            $source = '{ stream | awk '.escapeshellarg(self::MYSQL_SYSTEM_DATABASE_FILTER)." || echo 'Coolify could not filter the system databases of the backup;'; }";
+        }
+
         return $preflight.<<<SH
 for pid in \$({$root} -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do {$root} -e "KILL \$pid" 2>/dev/null || true; done
 {$root} -N -e "SELECT CONCAT('DROP DATABASE IF EXISTS \\`',schema_name,'\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','mysql','performance_schema','sys');" | {$root} || exit 1
 {$root} -e "CREATE DATABASE IF NOT EXISTS \\`{$database}\\`;" || exit 1
-stream | {$root} {$database}
+{$source} | {$root} {$database}
 SH;
     }
 

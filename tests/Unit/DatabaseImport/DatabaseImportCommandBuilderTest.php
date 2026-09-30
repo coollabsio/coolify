@@ -152,6 +152,33 @@ test('keeps PostgreSQL owners and privileges when requested', function () {
         ->not->toContain('--no-acl');
 });
 
+test('skips the system databases of MySQL and MariaDB all-databases backups by default', function (string $class, string $binary) {
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class), '/tmp/backup.sql', true);
+
+    expect($command)->toContain('command -v awk')
+        ->toMatch('/stream \| \{?\s*awk /')
+        ->toContain('"mysql"')->toContain('"sys"')->toContain('"performance_schema"')->toContain('"information_schema"')
+        ->toContain("| {$binary} -u root");
+})->with([
+    'mysql' => [StandaloneMysql::class, 'mysql'],
+    'mariadb' => [StandaloneMariadb::class, 'mariadb'],
+]);
+
+test('restores the system databases of MySQL and MariaDB all-databases backups when requested', function (string $class, string $binary) {
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class), '/tmp/backup.sql', true, restoreMysqlUsers: true);
+
+    expect($command)->not->toContain('awk')
+        ->toContain("stream | {$binary} -u root");
+})->with([
+    'mysql' => [StandaloneMysql::class, 'mysql'],
+    'mariadb' => [StandaloneMariadb::class, 'mariadb'],
+]);
+
+test('restores single MySQL databases without the system database filter', function () {
+    expect((new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandaloneMysql::class), '/tmp/backup.sql', false))
+        ->not->toContain('awk');
+});
+
 test('restores SQLite backups into the selected database file', function () {
     $resource = Mockery::mock(StandaloneSqlite::class);
     $resource->shouldReceive('getMorphClass')->andReturn(StandaloneSqlite::class);
