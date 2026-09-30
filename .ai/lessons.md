@@ -39,6 +39,7 @@
 - Put destructive actions on the footer's left and primary actions last on the right.
 - Use shared section, helper, tooltip, and icon-button components instead of local variants.
 - Keep validation, preview, and save controls in a fixed footer when the body is large.
+- `x-modal-confirmation` parses `submitAction` with `resources/js/modal-confirmation.js`: quoted arguments lose their quotes, unquoted ones arrive as text. Quote text that can contain commas or parentheses.
 
 ## Verify layered UI behavior visually
 - Inspect the real layout with all conditional elements visible, especially compound status badges.

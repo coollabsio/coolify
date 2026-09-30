@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
@@ -122,9 +123,11 @@ class Domains extends Component
     public bool $dnsValidationEnabled = true;
 
     /** Resolved or literal IP users should point DNS at. */
+    #[Locked]
     public ?string $serverIp = null;
 
     /** Raw server IP/hostname as configured (may be a hostname). */
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     protected $listeners = [
