@@ -100,10 +100,10 @@ it('shows the restart warning after deleting a certificate from the proxy page',
     $certificateId = GetTraefikCertificates::run($this->server)[0]['id'];
 
     Livewire::test(Proxy::class, ['server' => $this->server])
-        ->assertDontSee('Restart the proxy to stop serving deleted TLS certificates.')
+        ->assertDontSee('Restart the proxy to apply TLS certificate changes.')
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('refreshServerShow')
-        ->assertSee('Restart the proxy to stop serving deleted TLS certificates.');
+        ->assertSee('Restart the proxy to apply TLS certificate changes.');
 });
 
 function actingAsTraefikCertificateUser(Team $team, string $role): User
@@ -143,7 +143,7 @@ it('lets a member list certificates but not delete them', function () {
     Livewire::test(Proxy::class, ['server' => $this->server])
         ->call('loadTraefikCertificates')
         ->assertSet('traefikCertificates', fn (array $certificates): bool => count($certificates) === 40)
-        ->assertDontSeeHtml('submitAction="deleteTraefikCertificate')
+        ->assertDontSeeHtml('deleteTraefikCertificate(')
         ->call('deleteTraefikCertificate', $certificateId)
         ->assertDispatched('error')
         ->assertNotDispatched('success');
