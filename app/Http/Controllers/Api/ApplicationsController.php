@@ -156,7 +156,7 @@ class ApplicationsController extends Controller
                 : $request->input($field);
         }
 
-        if (array_key_exists('custom_container_name_prefix', $settings)) {
+        if (array_key_exists('custom_container_name_prefix', $settings) && is_scalar($settings['custom_container_name_prefix'] ?? '')) {
             $settings['custom_container_name_prefix'] = str($settings['custom_container_name_prefix'])->slug()->value() ?: null;
         }
 
@@ -166,6 +166,12 @@ class ApplicationsController extends Controller
     private function containerNamePrefixValidationResponse(array $settings, Server $server, ?Application $application = null): ?JsonResponse
     {
         $prefix = $settings['custom_container_name_prefix'] ?? null;
+        if (! is_null($prefix) && ! is_string($prefix)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['custom_container_name_prefix' => ['The custom container name prefix field must be a string.']],
+            ], 422);
+        }
         if (! filled($prefix) || ! ApplicationSetting::isContainerNamePrefixInUse($prefix, $server, $application?->id)) {
             return null;
         }
