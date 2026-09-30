@@ -105,10 +105,13 @@ class AppServiceProvider extends ServiceProvider
     private function configureGitHubHttp(): void
     {
         Http::macro('GitSource', function (string $url) {
-            return Http::withOptions(SafeExternalUrl::httpClientOptions(
-                $url,
-                allowPrivateNetworks: SafeExternalUrl::gitSourcesMayUsePrivateNetworks(),
-            ));
+            return Http::withOptions([
+                ...SafeExternalUrl::httpClientOptions(
+                    $url,
+                    allowPrivateNetworks: SafeExternalUrl::gitSourcesMayUsePrivateNetworks(),
+                ),
+                'allow_redirects' => SafeExternalUrl::sameOriginRedirectOptions(),
+            ]);
         });
 
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
