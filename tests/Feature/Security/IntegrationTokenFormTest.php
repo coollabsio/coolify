@@ -311,3 +311,129 @@ test('new integration token form controls declare authorization matching server-
     expect($form)
         ->toMatch('/<x-forms\.checkbox(?=[^>]*id="automatic-dns")(?=[^>]*canGate="create")(?=[^>]*:canResource="\\\\App\\\\Models\\\\IntegrationToken::class")[^>]*>/');
 });
+
+function vaultIntegrationToken(Team $team, array $metadata = ['base_url' => 'https://example.com:8200']): IntegrationToken
+{
+    return IntegrationToken::query()->create([
+        'team_id' => $team->id,
+        'provider' => 'vault',
+        'name' => 'Production Vault',
+        'token' => 'hvs.stored-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => $metadata,
+    ]);
+}
+
+test('changing the vault base url without re-entering the token does not send the stored token to the new host', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasErrors(['newToken'])
+        ->assertNotDispatched('success');
+
+    Http::assertNothingSent();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'example.net'));
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200'])
+        ->and($savedToken->fresh()->token)->toBe('hvs.stored-secret');
+});
+
+test('changing the vault namespace without re-entering the token is rejected', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.namespace', 'team-b')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('changing the infisical base url or client id without re-entering the client secret is rejected', function (string $field, string $value) {
+    Http::fake();
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'infisical',
+        'name' => 'Production Infisical',
+        'token' => 'stored-client-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => ['base_url' => 'https://example.com', 'client_id' => 'client-a'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set("metadata.{$field}", $value)
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com', 'client_id' => 'client-a']);
+})->with([
+    'base url' => ['base_url', 'https://example.net'],
+    'client id' => ['client_id', 'client-b'],
+]);
+
+test('an admin changing the vault base url without the token gets a validation error', function () {
+    Http::fake();
+    $admin = User::factory()->create();
+    $this->team->members()->attach($admin->id, ['role' => 'admin']);
+    $this->actingAs($admin);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+});
+
+test('changing the vault base url with a re-entered token validates against the new host and is audited', function () {
+    Http::fake([
+        'https://example.net:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
+    ]);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', 'hvs.new-secret')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.net:8200/v1/auth/token/lookup-self'
+        && $request->hasHeader('X-Vault-Token', 'hvs.new-secret'));
+    Http::assertNotSent(fn ($request) => $request->hasHeader('X-Vault-Token', 'hvs.stored-secret'));
+
+    $savedToken->refresh();
+    expect($savedToken->metadata)->toBe(['base_url' => 'https://example.net:8200'])
+        ->and($savedToken->token)->toBe('hvs.new-secret');
+
+    $event = AuditEvent::query()->where('event', 'ui.integration_token.base_url_changed')->first();
+    expect($event)->not->toBeNull()
+        ->and($event->team_id)->toBe($this->team->id);
+    expect(json_encode($event->toArray()))->toContain('example.net')
+        ->not->toContain('hvs.new-secret');
+});
+
+test('saving a vault token with unchanged connection settings and a blank token keeps working', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Renamed Vault')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertNothingSent();
+    $savedToken->refresh();
+    expect($savedToken->name)->toBe('Renamed Vault')
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
