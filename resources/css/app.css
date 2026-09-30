@@ -127,6 +127,15 @@
     box-shadow: var(--button-depth-hover), 0 0 0 1px var(--color-accent);
 }
 
+/* Destructive buttons keep a focus indicator in their own red instead of the accent. */
+.button.button-error:not(:disabled):focus-visible {
+    box-shadow: var(--button-depth), 0 0 0 1px var(--color-red-500);
+}
+
+.button.button-error:not(:disabled):hover:focus-visible {
+    box-shadow: var(--button-depth-hover), 0 0 0 1px var(--color-red-500);
+}
+
 /* Other button-like controls retain the lighter scale feedback. */
 .button,
 .icon-button,

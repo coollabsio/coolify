@@ -156,8 +156,8 @@
                                                                     :actions="[
                                                                         'Save the current acme.json as a backup that you can restore below.',
                                                                         'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
-                                                                        'Restart the proxy before it stops using the certificate. If a route still uses the domain, Traefik requests a new certificate after the restart.',
                                                                     ]"
+                                                                    warningMessage="The proxy keeps using the certificate until you restart it. If a route still uses the domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
                                                                     confirmationText="{{ $certificate['main_domain'] }}"
                                                                     confirmationLabel="Confirm by entering the domain"
                                                                     shortConfirmationLabel="Domain"
