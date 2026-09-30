@@ -30,8 +30,9 @@ class StopService
                     $activity->save();
                 });
 
-            $server = $service->destination->server;
-            if (! $server->isFunctional()) {
+            // The server is null once it is deleted (for example "Delete server" with all resources).
+            $server = $service->destination?->server;
+            if (! $server?->isFunctional()) {
                 return 'Server is not functional';
             }
 
@@ -66,7 +67,10 @@ class StopService
         } catch (\Exception $e) {
             return $e->getMessage();
         } finally {
-            ServiceStatusChanged::dispatch($service->environment->project->team->id);
+            $teamId = $service->environment?->project?->team?->id;
+            if ($teamId !== null) {
+                ServiceStatusChanged::dispatch($teamId);
+            }
         }
     }
 

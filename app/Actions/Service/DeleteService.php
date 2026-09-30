@@ -43,15 +43,20 @@ class DeleteService
         }
     }
 
-    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): void
+    /**
+     * Removes the container of one service part. Returns false when the server does not respond:
+     * the container then stays until the service starts again (compose up --remove-orphans).
+     */
+    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): bool
     {
         $service = $resource->service;
-        $server = $service?->server;
-        if (! $server?->isFunctional()) {
-            throw new RuntimeException('Server is not functional.');
+        if (! $service?->server?->isFunctional()) {
+            return false;
         }
 
         $this->removeContainers($service, $resource);
+
+        return true;
     }
 
     private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void

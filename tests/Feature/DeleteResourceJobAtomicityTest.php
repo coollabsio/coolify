@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Service\DeleteService;
+use App\Actions\Service\StopService;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $team = Team::factory()->create();
@@ -59,7 +61,7 @@ it('deletes a non-service Coolify resource when remote cleanup fails', function 
     Queue::assertNotPushed(QueuedCommand::class);
 });
 
-it('keeps a service when remote cleanup fails', function () {
+it('removes a service from Coolify and warns the team when its server does not respond', function () {
     Notification::fake();
     $service = Service::factory()->create([
         'environment_id' => $this->application->environment_id,
@@ -76,21 +78,72 @@ it('keeps a service when remote cleanup fails', function () {
         'webhook_enabled' => true,
         'webhook_url' => 'https://example.com/webhook',
     ]);
-    $service->delete();
     Process::fake();
 
-    expect(fn () => (new DeleteResourceJob($service))->handle())
-        ->toThrow(RuntimeException::class, 'Server is not functional.');
+    (new DeleteResourceJob($service))->handle();
 
-    expect(Service::find($service->id))->not->toBeNull()
-        ->and(ServiceApplication::where('service_id', $service->id)->exists())->toBeTrue();
-    Notification::assertCount(1);
+    Process::assertNothingRan();
+    expect(Service::withTrashed()->find($service->id))->toBeNull()
+        ->and(ServiceApplication::withTrashed()->where('service_id', $service->id)->exists())->toBeFalse();
     Notification::assertSentTo(
         $service->team(),
         GeneralNotification::class,
         fn (GeneralNotification $notification): bool => ! $notification->success
-            && str_contains($notification->message, 'Remove from Coolify only')
+            && str_contains($notification->message, "was removed from Coolify, but its Docker resources could not be removed from server '{$service->server->name}'")
     );
+});
+
+it('removes a service from Coolify when its server was deleted', function () {
+    Notification::fake();
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
+    ]);
+    // "Delete server" soft-deletes the server before the queued resource jobs run.
+    $service->server->delete();
+    Server::flushIdentityMap();
+    Process::fake();
+
+    (new DeleteResourceJob($service->fresh()))->handle();
+
+    Process::assertNothingRan();
+    expect(Service::withTrashed()->find($service->id))->toBeNull()
+        ->and(ServiceApplication::withTrashed()->where('service_id', $service->id)->exists())->toBeFalse();
+    Notification::assertNothingSent();
+});
+
+it('stops a service without an error when its server was deleted', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $service->server->delete();
+    Server::flushIdentityMap();
+
+    expect(StopService::run($service->fresh()))->toBe('Server is not functional');
+});
+
+it('skips the container of a service part when the server does not respond', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'server_id' => $this->application->destination->server_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $part = ServiceApplication::create(['service_id' => $service->id, 'name' => 'web', 'image' => 'nginx:alpine']);
+    Process::fake();
+
+    expect(app(DeleteService::class)->removeSubresourceContainer($part))->toBeFalse();
+    Process::assertNothingRan();
 });
 
 it('deletes only local service metadata when explicitly requested', function () {
