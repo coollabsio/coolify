@@ -123,15 +123,14 @@ function queue_application_deployment(Application $application, string $deployme
         'deployment_uuid' => $deployment_uuid,
     ];
 }
-function force_start_deployment(ApplicationDeploymentQueue $deployment)
+/**
+ * Start a queued deployment right away, ignoring the per-application and per-server
+ * concurrency limits. It returns false without dispatching when the deployment is no
+ * longer queued, so a repeated force start never runs the same deployment twice.
+ */
+function force_start_deployment(ApplicationDeploymentQueue $deployment): bool
 {
-    $deployment->update([
-        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-    ]);
-
-    ApplicationDeploymentJob::dispatch(
-        application_deployment_queue_id: $deployment->id,
-    );
+    return start_queued_deployment($deployment, force: true);
 }
 function queue_next_deployment(Application $application)
 {
@@ -150,10 +149,11 @@ function queue_next_deployment(Application $application)
  * Start a queued deployment if it can run now. The check and the status change run under
  * the same application and server row locks as queue admission, so two workers cannot both
  * start the same deployment or exceed the per-application and per-server limits.
+ * With $force, the limits are skipped but the deployment still has to be queued.
  */
-function start_queued_deployment(ApplicationDeploymentQueue $deployment): bool
+function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $force = false): bool
 {
-    $started = DB::transaction(function () use ($deployment): bool {
+    $started = DB::transaction(function () use ($deployment, $force): bool {
         Application::query()->whereKey($deployment->application_id)->lockForUpdate()->first();
         Server::query()->whereKey($deployment->server_id)->lockForUpdate()->first();
         $current = ApplicationDeploymentQueue::query()->whereKey($deployment->id)->lockForUpdate()->first();
@@ -162,7 +162,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment): bool
             return false;
         }
 
-        if (! next_queuable($current->server_id, $current->application_id, $current->commit, $current->pull_request_id)) {
+        if (! $force && ! next_queuable($current->server_id, $current->application_id, $current->commit, $current->pull_request_id)) {
             return false;
         }
 

@@ -55,7 +55,12 @@ class DeploymentNavbar extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
-            force_start_deployment($this->application_deployment_queue);
+            $started = force_start_deployment($this->application_deployment_queue);
+            $this->application_deployment_queue->refresh();
+
+            if (! $started) {
+                $this->dispatch('info', 'This deployment is no longer queued, so it was not started again.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
