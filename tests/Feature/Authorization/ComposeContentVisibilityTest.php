@@ -3,6 +3,7 @@
 use App\Livewire\Project\Application\General as ApplicationGeneral;
 use App\Livewire\Project\Service\EditCompose;
 use App\Livewire\Project\Service\StackForm;
+use App\Livewire\Project\Shared\EnvironmentVariable\All as EnvironmentVariables;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -84,5 +85,35 @@ it('keeps compose content available to an owner', function () {
         $component = $mountComponent()->assertSet('dockerComposeRaw', $this->composeRaw);
 
         expect($component->get('dockerCompose'))->toContain('TOKEN:');
+    }
+});
+
+it('keeps hardcoded compose values out of the member environment variable list', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    foreach ([$this->application, $this->service] as $resource) {
+        $component = Livewire::test(EnvironmentVariables::class, ['resource' => $resource])
+            ->call('loadEnvironmentVariables');
+
+        expect($component->instance()->hardcodedEnvironmentVariables->pluck('key')->all())->toBe(['TOKEN'])
+            ->and(json_encode($component->snapshot).$component->html())
+            ->not->toContain('stored-raw-compose-value')
+            ->not->toContain('stored-generated-compose-value')
+            ->not->toContain('Copy value')
+            ->toContain('Hidden (only admins can view)');
+    }
+});
+
+it('shows hardcoded compose values to an owner', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    foreach ([$this->application, $this->service] as $resource) {
+        Livewire::test(EnvironmentVariables::class, ['resource' => $resource])
+            ->call('loadEnvironmentVariables')
+            ->assertSee('stored-raw-compose-value')
+            ->assertSeeHtml('Copy value')
+            ->assertDontSee('Hidden (only admins can view)');
     }
 });

@@ -4,6 +4,10 @@ import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+import { parseSubmitAction } from './modal-confirmation.js';
+
+// Used by the modal-confirmation Blade component to call its submitAction.
+window.parseModalSubmitAction = parseSubmitAction;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);

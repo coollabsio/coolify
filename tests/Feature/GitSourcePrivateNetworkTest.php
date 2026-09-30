@@ -71,7 +71,7 @@ test('other outbound URLs still block private networks by default', function () 
 test('the Git source HTTP client allows a private GitHub Enterprise on self-hosted', function () {
     $options = Http::GitHub('https://10.20.30.40/api/v3', 'secret')->getOptions();
 
-    expect($options['allow_redirects'])->toBeFalse()
+    expect($options['allow_redirects'])->toMatchArray(['max' => 5, 'strict' => true])
         ->and($options['headers']['Authorization'])->toBe('Bearer secret');
 });
 

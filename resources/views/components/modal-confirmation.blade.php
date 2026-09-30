@@ -102,9 +102,7 @@
             return Promise.resolve(true);
         }
 
-        const methodName = this.submitAction.split('(')[0];
-        const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const { method: methodName, params } = window.parseModalSubmitAction(this.submitAction);
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods

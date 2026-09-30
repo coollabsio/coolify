@@ -1358,55 +1358,42 @@ it('hides dns check buttons from members', function () {
         ->assertDontSee('Check DNS');
 });
 
+function openDnsProviderModalWithZone(Team $team, Application $application): mixed
+{
+    $token = IntegrationToken::factory()->for($team)->create(['provider' => 'cloudflare', 'name' => 'Cloudflare', 'token' => 'secret']);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    $application->update(['fqdn' => 'https://app.example.com']);
+
+    return Livewire::test(Domains::class, ['application' => $application->fresh()])->call('openDnsProviderModal');
+}
+
 it('disables create dns record for members and hides replace confirmation', function () {
-    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
-    $this->actingAs($this->user->fresh());
+    Http::fake(['https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response([
+        'success' => true,
+        'result' => [['id' => 'rec-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.10']],
+    ])]);
+    $setRole = function (string $role): void {
+        $this->team->members()->updateExistingPivot($this->user->id, ['role' => $role]);
+        $this->actingAs($this->user->fresh());
+    };
 
-    $proposal = [
-        'hostname' => 'app.example.com',
-        'zone_id' => 1,
-        'zone' => 'example.com',
-        'credential' => 'Cloudflare',
-        'target' => '203.0.113.10',
-        'managed' => false,
-    ];
-
-    $createHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [$proposal])
-        ->html();
-
-    expect($createHtml)->toContain('Create DNS record')
+    // The owner opens the DNS dialog, then becomes a member while the page is still open.
+    $createPage = openDnsProviderModalWithZone($this->team, $this->application);
+    $setRole('member');
+    expect($createPage->call('$refresh')->html())->toContain('Create DNS record')
         ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
 
-    $replaceHtml = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [$proposal])
-        ->set('dnsProviderConflicts', [
-            'app.example.com|1' => [
-                'record_id' => 'rec-1',
-                'current' => '198.51.100.10',
-                'proposed' => '203.0.113.10',
-            ],
-        ])
-        ->html();
-
-    expect($replaceHtml)->toContain('Currently 198.51.100.10')
+    $setRole('owner');
+    $replacePage = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('openDnsProviderModal')
+        ->call('createManagedDnsRecord', 'app.example.com', DnsProviderZone::query()->value('id'));
+    $setRole('member');
+    expect($replacePage->call('$refresh')->html())->toContain('Currently 198.51.100.10')
         ->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Replace record/s');
 });
 
 it('shows create dns record enabled for owners', function () {
-    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('showDnsProviderModal', true)
-        ->set('dnsProviderProposals', [[
-            'hostname' => 'app.example.com',
-            'zone_id' => 1,
-            'zone' => 'example.com',
-            'credential' => 'Cloudflare',
-            'target' => '203.0.113.10',
-            'managed' => false,
-        ]])
-        ->html();
+    $html = openDnsProviderModalWithZone($this->team, $this->application)->html();
 
     expect($html)->toContain('Create DNS record')
         ->not->toMatch('/<button[^>]*\sdisabled(?:[=\s>])[^>]*>.*?Create DNS record/s');
