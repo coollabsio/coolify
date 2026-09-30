@@ -110,8 +110,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
                         return;
                     }
 
-                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
-                    if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
+                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity.
+                    // Never skip while the server is marked unreachable or unusable: the heartbeat does not
+                    // restore these flags, so deployments would fail with "Server is not functional" forever.
+                    if ($server->isSentinelEnabled() && $server->isSentinelLive()
+                        && $server->settings->is_reachable && $server->settings->is_usable) {
                         return;
                     }
                     if ($this->shouldSkipDueToBackoff($server)) {
