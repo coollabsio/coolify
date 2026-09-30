@@ -1,4 +1,4 @@
-name: Build Coolify (SHA)
+name: Build Coolify Main
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
   packages: write
+
+concurrency:
+  group: coolify-main-build
+  cancel-in-progress: false
 
 env:
   GITHUB_REGISTRY: ghcr.io
@@ -62,9 +66,11 @@ jobs:
           push: true
           build-args: |
             COOLIFY_VERSION=${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ matrix.arch }}
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ matrix.arch }}
 
   merge-manifest:
     runs-on: ubuntu-24.04
@@ -93,9 +99,10 @@ jobs:
         run: |
           IMAGE="${REGISTRY}/${IMAGE_NAME}"
           docker buildx imagetools create \
-            "${IMAGE}:sha-${SHA}-amd64" \
-            "${IMAGE}:sha-${SHA}-aarch64" \
-            --tag "${IMAGE}:sha-${SHA}"
+            "${IMAGE}:main-amd64" \
+            "${IMAGE}:main-aarch64" \
+            --tag "${IMAGE}:sha-${SHA}" \
+            --tag "${IMAGE}:main"
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         env:
@@ -104,9 +111,10 @@ jobs:
         run: |
           IMAGE="${REGISTRY}/${IMAGE_NAME}"
           docker buildx imagetools create \
-            "${IMAGE}:sha-${SHA}-amd64" \
-            "${IMAGE}:sha-${SHA}-aarch64" \
-            --tag "${IMAGE}:sha-${SHA}"
+            "${IMAGE}:main-amd64" \
+            "${IMAGE}:main-aarch64" \
+            --tag "${IMAGE}:sha-${SHA}" \
+            --tag "${IMAGE}:main"
 
       - uses: sarisia/actions-status-discord@v1
         if: always()
