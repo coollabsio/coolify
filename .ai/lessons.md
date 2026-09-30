@@ -90,4 +90,6 @@
 
 ## Non-root SSH users: keep file access behind sudo
 - `parseCommandsByLineForSudo()` does not prefix `cd` or `echo`, and the SSH user's shell opens redirects (`>`, `<`) and expands globs. On the Coolify host, `/data/coolify` is `9999:root 0700`, so these fail for a non-root user.
-- In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs.
+- In remote commands, use absolute paths (`docker compose -f <dir>/docker-compose.yml`, `--project-directory <dir>`), `echo ... | tee <file> > /dev/null`, and `find` instead of globs. scp also runs as the SSH user; stage files outside `/data/coolify`.
+- The parsers add sudo only to line starts (and after `&&`, `||`, `|`, `$(`). Put `if`/`else` branches on their own lines. When a redirect or `cd` must stay, make the whole line one `sh -c '...'` script; it runs as `sudo sh -c` without inner sudo or bash.
+- Tests that replace `DatabaseStartCommandExecutor` or use root servers miss non-root bugs. Test the parsed commands of a non-root server.

@@ -273,10 +273,18 @@ it('appends registry url to env file when the key is missing', function () {
     $component = new Updates;
     $method = new ReflectionMethod(Updates::class, 'registryEnvSyncCommand');
 
-    expect($method->invoke($component, 'ghcr.io'))
-        ->toContain("grep -q '^REGISTRY_URL=' /data/coolify/source/.env")
-        ->toContain("sed -i 's|^REGISTRY_URL=.*|REGISTRY_URL=ghcr.io|' /data/coolify/source/.env")
-        ->toContain("printf '%s\\n' 'REGISTRY_URL=ghcr.io' >> /data/coolify/source/.env");
+    $server = new Server;
+    $server->user = 'cooluser';
+    $lines = parseCommandsByLineForSudo(collect($method->invoke($component, 'ghcr.io')), $server);
+
+    // Each branch runs through sudo for a non-root SSH user; nothing is opened by the SSH user's shell.
+    expect($lines)->toBe([
+        "if sudo grep -q '^REGISTRY_URL=' /data/coolify/source/.env; then",
+        "sudo     sed -i 's|^REGISTRY_URL=.*|REGISTRY_URL=ghcr.io|' /data/coolify/source/.env",
+        'else',
+        "sudo     printf '%s\\n' 'REGISTRY_URL=ghcr.io' | sudo tee -a /data/coolify/source/.env > /dev/null",
+        'fi',
+    ]);
 });
 
 it('prevents downgrade even with manual update', function () {

@@ -80,7 +80,9 @@ it('starts the proxy without entering proxy directories as the SSH user', functi
     expectNoUnprivilegedProxyFileAccess($lines);
     expect($lines)
         ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml pull")
-        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans");
+        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans")
+        // The backfill reads a stored configuration in an `else` branch, which must run through sudo too.
+        ->and(implode("\n", $lines))->toMatch("/^sudo\\s+head -c \\d+ '\\S+\\/docker-compose\\.yml'$/m");
 })->with([
     'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy'],
     'caddy' => [ProxyTypes::CADDY->value, '/data/coolify/proxy/caddy'],

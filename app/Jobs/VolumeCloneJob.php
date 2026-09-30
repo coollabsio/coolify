@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
+use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,9 +16,7 @@ use Illuminate\Support\Str;
 
 class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected string $cloneDir = '/data/coolify/clone';
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, StagesCloneArchives;
 
     public int $timeout = 3600;
 
@@ -65,8 +64,8 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
     {
         $srcVol = escapeshellarg($this->sourceVolume);
         $tgtVol = escapeshellarg($this->targetVolume);
-        $sourceCloneDir = "{$this->cloneDir}/{$this->sourceVolume}";
-        $targetCloneDir = "{$this->cloneDir}/{$this->targetVolume}";
+        $sourceCloneDir = $this->cloneArchiveDirectory($this->sourceServer, $this->sourceVolume);
+        $targetCloneDir = $this->cloneArchiveDirectory($this->targetServer, $this->targetVolume);
         $srcDir = escapeshellarg($sourceCloneDir);
         $tgtDir = escapeshellarg($targetCloneDir);
         $localTempDir = storage_path('app/tmp/volume-clones/'.Str::uuid()->toString());
@@ -76,15 +75,11 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
             File::ensureDirectoryExists($localTempDir, 0755);
 
             instant_remote_process([
-                "mkdir -p {$srcDir}",
-                "chmod 777 {$srcDir}",
+                ...$this->prepareCloneArchiveDirectory($this->sourceServer, $sourceCloneDir),
                 "docker run --rm -v {$srcVol}:/source -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/volume-data.tar.gz .'",
             ], $this->sourceServer);
 
-            instant_remote_process([
-                "mkdir -p {$tgtDir}",
-                "chmod 777 {$tgtDir}",
-            ], $this->targetServer);
+            instant_remote_process($this->prepareCloneArchiveDirectory($this->targetServer, $targetCloneDir), $this->targetServer);
 
             // Coolify host is the intermediary: download from source, upload to target.
             instant_scp_from_server(

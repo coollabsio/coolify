@@ -427,10 +427,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Local backup file is empty or was not created');
                     }
                 } catch (Throwable $e) {
-                    // Local backup failed
-                    if ($this->database instanceof StandaloneClickhouse) {
-                        deleteBackupsLocally($this->backup_location, $this->server);
-                    }
+                    // Local backup failed: the partial file is not tracked, so retention would never remove it.
+                    deleteBackupsLocally($this->backup_location, $this->server);
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
@@ -610,7 +608,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -658,7 +656,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $backupCommand .= " {$escapedContainerName} pg_dumpall --username $escapedUsername";
-                $backupCommand = $this->buildCompressedDumpCommand($backupCommand).' > '.$escapedBackupLocation;
+                $backupCommand = $this->buildCompressedDumpCommand($backupCommand, $escapedBackupLocation);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -667,7 +665,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -687,14 +685,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $dumpCommand = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
-                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.$escapedBackupLocation;
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -714,14 +712,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             if ($this->backup->dump_all) {
                 $dumpCommand = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
-                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.$escapedBackupLocation;
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand, $escapedBackupLocation);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -744,7 +742,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 backupDirectory: $this->backup_dir,
             );
 
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -765,10 +763,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception("Invalid database file name: {$database}");
             }
             $commands[] = 'mkdir -p '.escapeshellarg($this->backup_dir);
-            $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
+            $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
-            $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
-            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
+            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->timeout, disableMultiplexing: true);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
@@ -882,13 +880,31 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         return "{$helperImage}:{$latestVersion}";
     }
 
-    private function buildCompressedDumpCommand(string $dumpCommand): string
+    /**
+     * The SSH user's shell opens a `>` redirect. For a non-root SSH user, the dump and the redirect into
+     * the backup directory must run in one root shell, so each line that writes the backup file becomes
+     * one `sh -c` script. The exit status of the dump stays the exit status of the line.
+     *
+     * @param  list<string>  $commands
+     * @return list<string>
+     */
+    private function writeBackupFileAsRoot(array $commands): array
+    {
+        $redirect = '> '.escapeshellarg($this->backup_location);
+
+        return array_map(
+            fn (string $command): string => str_contains($command, $redirect) ? 'sh -c '.escapeshellarg($command) : $command,
+            $commands,
+        );
+    }
+
+    private function buildCompressedDumpCommand(string $dumpCommand, string $escapedBackupLocation): string
     {
         $cpuPercentage = BackupCompression::cpuPercentage($this->server->settings->backup_compression_cpu_percentage);
         $compressorCommand = BackupCompression::compressorCommand($cpuPercentage);
         $script = "compressor=\$({$compressorCommand}); exec \$compressor";
 
-        return $dumpCommand.' | docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script);
+        return pipeToFileKeepingExitStatus($dumpCommand, 'docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script), $escapedBackupLocation);
     }
 
     /**

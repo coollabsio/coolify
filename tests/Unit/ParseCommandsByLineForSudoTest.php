@@ -777,3 +777,24 @@ test('do keyword with word boundary is not given sudo', function () {
 
     expect($result[0])->toBe('do');
 });
+
+test('keeps a single sudo sh -c script unchanged in both parsers', function () {
+    // A redirect inside the script is opened by root. Inner sudo fails where root is not in sudoers (Alpine).
+    $line = 'sh -c '.escapeshellarg("docker exec 'db' pg_dump 'app' > '/data/coolify/backups/app.dmp' && echo it's done | cat");
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toBe("sudo {$line}")
+        ->and(parseLineForSudo($line, $this->server))->toBe("sudo {$line}");
+});
+
+test('still wraps a sh -c call that is not the whole line', function () {
+    $line = "docker exec db pg_dumpall | docker run --rm -i helper sh -c 'gzip' > /data/coolify/backups/all.gz";
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toStartWith("sudo bash -c '");
+});
+
+test('parseLineForSudo adds sudo to each pipe stage without doubling it', function () {
+    expect(parseLineForSudo("echo 'ZW52' | base64 -d | tee /data/coolify/applications/app/.env > /dev/null", $this->server))
+        ->toBe("sudo echo 'ZW52' | sudo base64 -d | sudo tee /data/coolify/applications/app/.env > /dev/null")
+        ->and(parseLineForSudo('docker ps | sudo grep app', $this->server))
+        ->toBe('sudo docker ps | sudo grep app');
+});

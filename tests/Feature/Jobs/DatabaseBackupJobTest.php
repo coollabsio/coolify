@@ -346,10 +346,11 @@ test('database dump compression uses the helper image and shared CPU setting', f
 
     $command = (new ReflectionClass($job))
         ->getMethod('buildCompressedDumpCommand')
-        ->invoke($job, 'docker exec database pg_dumpall');
+        ->invoke($job, 'docker exec database pg_dumpall', "'/backups/pg-dump-all.gz'");
 
     expect($command)
-        ->toStartWith('docker exec database pg_dumpall | docker run --rm -i')
+        ->toStartWith('status=$( { { docker exec database pg_dumpall; echo $? >&3; } | docker run --rm -i')
+        ->toContain("> '/backups/pg-dump-all.gz'; } 3>&1 ) && [ \"\$status\" -eq 0 ]")
         ->toContain('coolify-helper')
         ->toContain('command -v pigz')
         ->toContain('pigz -3 -p')

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,9 +18,7 @@ use Illuminate\Support\Str;
  */
 class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected string $cloneDir = '/data/coolify/clone';
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, StagesCloneArchives;
 
     public int $timeout = 3600;
 
@@ -64,8 +63,8 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
     {
         $archiveName = 'hostpath-data.tar.gz';
         $token = Str::uuid()->toString();
-        $sourceCloneDir = "{$this->cloneDir}/hostpath-{$token}";
-        $targetCloneDir = "{$this->cloneDir}/hostpath-{$token}";
+        $sourceCloneDir = $this->cloneArchiveDirectory($this->sourceServer, "hostpath-{$token}");
+        $targetCloneDir = $this->cloneArchiveDirectory($this->targetServer, "hostpath-{$token}");
         $srcDir = escapeshellarg($sourceCloneDir);
         $tgtDir = escapeshellarg($targetCloneDir);
         $srcPath = escapeshellarg($this->sourcePath);
@@ -78,16 +77,12 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
             File::ensureDirectoryExists($localTempDir, 0755);
 
             instant_remote_process([
-                "mkdir -p {$srcDir}",
-                "chmod 777 {$srcDir}",
+                ...$this->prepareCloneArchiveDirectory($this->sourceServer, $sourceCloneDir),
                 "test -e {$srcPath}",
                 "docker run --rm -v {$srcPath}:/source:ro -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/{$archiveName} .'",
             ], $this->sourceServer);
 
-            instant_remote_process([
-                "mkdir -p {$tgtDir}",
-                "chmod 777 {$tgtDir}",
-            ], $this->targetServer);
+            instant_remote_process($this->prepareCloneArchiveDirectory($this->targetServer, $targetCloneDir), $this->targetServer);
 
             instant_scp_from_server(
                 "{$sourceCloneDir}/{$archiveName}",
