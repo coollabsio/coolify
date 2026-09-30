@@ -1,7 +1,9 @@
 <?php
 
+use App\Jobs\CleanupInstanceStuffsJob;
 use App\Models\InstanceSettings;
 use App\Models\NotificationThrottle;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -136,4 +138,37 @@ it('releases the unreachable claim when sending the unreachable notification thr
 
     expect(fn () => $this->server->sendUnreachableNotification())->toThrow(RuntimeException::class)
         ->and(NotificationThrottle::wasSent($this->server, Unreachable::class))->toBeFalse();
+});
+
+it('deletes throttle rows whose subject no longer exists', function () {
+    $trashedServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $trashedServer->delete();
+    $rows = [
+        'kept' => ['notifiable_type' => $this->server->getMorphClass(), 'notifiable_id' => $this->server->id],
+        'kept-soft-deleted' => ['notifiable_type' => $trashedServer->getMorphClass(), 'notifiable_id' => $trashedServer->id],
+        'missing-server' => ['notifiable_type' => $this->server->getMorphClass(), 'notifiable_id' => 999999],
+        'missing-backup' => ['notifiable_type' => ScheduledDatabaseBackup::class, 'notifiable_id' => 999999],
+        'missing-class' => ['notifiable_type' => 'App\Models\RemovedModel', 'notifiable_id' => 1],
+    ];
+    foreach ($rows as $notification => $row) {
+        NotificationThrottle::query()->insert($row + ['notification' => $notification, 'sent_at' => now()]);
+    }
+
+    expect(NotificationThrottle::deleteOrphans())->toBe(3)
+        ->and(NotificationThrottle::query()->orderBy('notification')->pluck('notification')->all())->toBe(['kept', 'kept-soft-deleted']);
+});
+
+it('deletes orphaned throttle rows during the instance cleanup', function () {
+    InstanceSettings::query()->firstOrCreate(['id' => 0]);
+    NotificationThrottle::record($this->server, Unreachable::class);
+    NotificationThrottle::query()->insert([
+        'notifiable_type' => ScheduledDatabaseBackup::class,
+        'notifiable_id' => 999999,
+        'notification' => 'App\Notifications\Database\BackupMissing',
+        'sent_at' => now(),
+    ]);
+
+    (new CleanupInstanceStuffsJob)->handle();
+
+    expect(NotificationThrottle::query()->pluck('notifiable_type')->all())->toBe([$this->server->getMorphClass()]);
 });

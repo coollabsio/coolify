@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -35,6 +36,7 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
             $this->cleanupInvitationLink();
             $this->cleanupExpiredEmailChangeRequests();
             $this->enforceBackupRetention();
+            $this->deleteOrphanedNotificationThrottles();
         } catch (\Throwable $e) {
             Log::error('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
         }
@@ -57,6 +59,20 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
                 'email_change_code' => null,
                 'email_change_code_expires_at' => null,
             ]);
+    }
+
+    private function deleteOrphanedNotificationThrottles(): void
+    {
+        if (! Cache::add('notification-throttle-orphan-cleanup', true, 3600)) {
+            return;
+        }
+
+        try {
+            NotificationThrottle::deleteOrphans();
+        } catch (\Throwable $e) {
+            Log::error('Failed to delete orphaned notification throttles: '.$e->getMessage());
+            Cache::forget('notification-throttle-orphan-cleanup');
+        }
     }
 
     private function enforceBackupRetention(): void

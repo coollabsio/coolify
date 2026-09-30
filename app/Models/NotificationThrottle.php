@@ -7,6 +7,7 @@ use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Throwable;
 
 /**
@@ -132,5 +133,37 @@ class NotificationThrottle extends Model
             ->whereMorphedTo('notifiable', $notifiable)
             ->where('notification', $notification)
             ->exists();
+    }
+
+    /**
+     * Delete rows whose subject no longer exists. Subjects are often removed with bulk or cascading
+     * deletes that skip model events, so this sweep is the reliable cleanup. Soft-deleted subjects are kept.
+     *
+     * Returns the number of deleted rows.
+     */
+    public static function deleteOrphans(): int
+    {
+        $deleted = 0;
+
+        foreach (static::query()->distinct()->pluck('notifiable_type') as $type) {
+            $class = Relation::getMorphedModel($type) ?? $type;
+            $throttles = static::query()->where('notifiable_type', $type);
+
+            if (! is_a($class, Model::class, true)) {
+                $deleted += $throttles->delete();
+
+                continue;
+            }
+
+            $subject = new $class;
+            $deleted += $throttles->whereNotExists(
+                $class::query()
+                    ->withoutGlobalScopes()
+                    ->selectRaw('1')
+                    ->whereColumn($subject->getQualifiedKeyName(), (new static)->qualifyColumn('notifiable_id'))
+            )->delete();
+        }
+
+        return $deleted;
     }
 }
