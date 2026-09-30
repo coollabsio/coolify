@@ -69,7 +69,7 @@
                                 @endif
                                 @if ($form['ignoresDriverOptions'])
                                     <span class="block text-xs text-amber-800 dark:text-amber-300/90">
-                                        Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them, check the volume for data, delete this storage entry and the Docker volume, then redeploy.
+                                        Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them: stop the resource, back up any data you need, delete this entry together with the Docker volume, then redeploy.
                                     </span>
                                 @endif
                             </div>
@@ -174,13 +174,13 @@
                                             buttonTitle="Delete" submitAction="delete({{ $id }})"
                                             :checkboxes="[[
                                                 'id' => 'deleteDockerVolume',
-                                                'label' => 'Also permanently delete the Docker volume and all its data.',
-                                                'default_warning' => 'The Docker volume and its data will not be deleted. Docker Compose applies the driver options only to a new volume.',
+                                                'label' => 'Permanently delete the Docker volume and all data in it. The next deployment creates the volume again with the driver options.',
+                                                'default_warning' => 'The Docker volume and its data stay on the server. The driver options are not applied, because Docker keeps using the existing volume.',
                                             ]]"
                                             :actions="[
-                                                'This removes the storage entry from Coolify.',
-                                                'The next deployment creates the volume with the driver options of the Compose file.',
-                                            ]" confirmationText="{{ $form['name'] }}"
+                                                'Remove the storage entry from Coolify.',
+                                            ]"
+                                            warningMessage="Stop the resource first: Docker cannot delete a volume that a running container uses. If the volume contains data you need, use Backup before you delete it." confirmationText="{{ $form['name'] }}"
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif
