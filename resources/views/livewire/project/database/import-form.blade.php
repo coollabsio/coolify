@@ -76,12 +76,12 @@
                     @endif
                     @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
                         <div class="max-w-sm">
-                            <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
+                            <x-forms.checkbox id="replaceExisting" live label="Replace objects that already exist"
                                 helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                         <div class="max-w-sm">
-                            <x-forms.checkbox id="keepOwners" label="Keep owners and privileges"
+                            <x-forms.checkbox id="keepOwners" live label="Keep owners and privileges"
                                 helper="Archive backups: restores object owners and GRANTs from the backup. Leave this off for backups from another server (for example Amazon RDS): its roles usually do not exist here, and the whole restore would be rolled back."
                                 canGate="update" :canResource="$this->resource" />
                         </div>
@@ -96,7 +96,7 @@
                     @endif
                     @if ($resourceDbType === 'standalone-mongodb')
                         <div class="max-w-sm">
-                            <x-forms.checkbox id="replaceExisting" label="Replace collections that already exist"
+                            <x-forms.checkbox id="replaceExisting" live label="Replace collections that already exist"
                                 helper="Drops each collection from the backup before restoring it. Without this option, documents that already exist are skipped."
                                 canGate="update" :canResource="$this->resource" />
                         </div>

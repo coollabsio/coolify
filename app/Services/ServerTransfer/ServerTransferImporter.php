@@ -1049,6 +1049,8 @@ class ServerTransferImporter
                 'mount_path' => data_get($volume, 'mount_path'),
                 'host_path' => data_get($volume, 'host_path'),
                 'is_preview_suffix_enabled' => (bool) data_get($volume, 'is_preview_suffix_enabled', false),
+                // The server keeps its Docker volumes. A bundle without the flag is from a Coolify version that created them without driver options.
+                'ignores_compose_driver_options' => (bool) data_get($volume, 'ignores_compose_driver_options', true),
                 'resource_type' => $resource->getMorphClass(),
                 'resource_id' => $resource->id,
             ]);

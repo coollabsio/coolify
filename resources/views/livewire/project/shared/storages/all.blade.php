@@ -67,6 +67,11 @@
                                         Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
                                     </span>
                                 @endif
+                                @if ($form['ignoresDriverOptions'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them, check the volume for data, delete this storage entry and the Docker volume, then redeploy.
+                                    </span>
+                                @endif
                             </div>
 
                             @if ($hasSourcePaths)
@@ -160,6 +165,22 @@
                                                     ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
                                                     : null,
                                             ]))" confirmationText="{{ $form['name'] }}"
+                                            confirmationLabel="Please confirm by entering the Storage Name below"
+                                            shortConfirmationLabel="Storage Name" />
+                                    @endif
+
+                                    @if ($form['canDeleteToApplyDriverOptions'])
+                                        <x-modal-confirmation title="Delete volume entry to apply driver options?" isErrorButton
+                                            buttonTitle="Delete" submitAction="delete({{ $id }})"
+                                            :checkboxes="[[
+                                                'id' => 'deleteDockerVolume',
+                                                'label' => 'Also permanently delete the Docker volume and all its data.',
+                                                'default_warning' => 'The Docker volume and its data will not be deleted. Docker Compose applies the driver options only to a new volume.',
+                                            ]]"
+                                            :actions="[
+                                                'This removes the storage entry from Coolify.',
+                                                'The next deployment creates the volume with the driver options of the Compose file.',
+                                            ]" confirmationText="{{ $form['name'] }}"
                                             confirmationLabel="Please confirm by entering the Storage Name below"
                                             shortConfirmationLabel="Storage Name" />
                                     @endif

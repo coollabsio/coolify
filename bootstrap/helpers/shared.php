@@ -2983,8 +2983,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             } elseif (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
-                            $topLevelVolumes->put($name, composeRenamedVolumeDeclaration($declaration, $name));
-                            LocalPersistentVolume::updateOrCreate(
+                            $persistentVolume = LocalPersistentVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
@@ -2997,6 +2996,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     'resource_type' => get_class($savedService),
                                 ]
                             );
+                            $topLevelVolumes->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                         }
                         dispatch(new ServerFilesFromServerJob($savedService));
 
@@ -3564,7 +3564,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
                                 $name = $volume->before(':');
-                                $volumeKey = $name->value();
                                 $mount = $volume->after(':');
                                 if ($name->startsWith('.') || $name->startsWith('~')) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
@@ -3594,7 +3593,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $name));
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         if ($topLevelVolumes->has($name->value())) {
@@ -3607,7 +3606,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $name->value()));
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -3623,7 +3622,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                         } elseif (is_array($volume)) {
                             $source = data_get($volume, 'source');
-                            $volumeKey = (string) $source;
                             $target = data_get($volume, 'target');
                             $read_only = data_get($volume, 'read_only');
                             if ($source && $target) {
@@ -3665,7 +3663,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $source));
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }
@@ -3686,7 +3684,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
                                 $name = $volume->before(':');
-                                $volumeKey = $name->value();
                                 $mount = $volume->after(':');
                                 if ($name->startsWith('.') || $name->startsWith('~')) {
                                     $dir = base_configuration_dir().'/applications/'.$resource->uuid;
@@ -3717,7 +3714,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $name));
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         $uuid = $resource->uuid;
@@ -3733,7 +3730,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $name->value()));
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -3749,7 +3746,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                         } elseif (is_array($volume)) {
                             $source = data_get($volume, 'source');
-                            $volumeKey = (string) $source;
                             $target = data_get($volume, 'target');
                             $read_only = data_get($volume, 'read_only');
                             if ($source && $target) {
@@ -3791,7 +3787,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, composeRenamedVolumeDeclaration($declaredTopLevelVolumes->get($volumeKey), $source));
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }

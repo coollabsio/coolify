@@ -22,7 +22,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool}>
      */
     public array $forms = [];
 
@@ -141,7 +141,7 @@ class All extends Component
             return false;
         }
 
-        if ($this->isComposeOrService && $storage->isDeclaredInCompose()) {
+        if ($this->isComposeOrService && $storage->isDeclaredInCompose() && ! $storage->ignoresComposeDriverOptionsOfDeclaration()) {
             $this->dispatch('error', 'This volume is managed by the current Docker Compose file.');
 
             return false;
@@ -198,6 +198,7 @@ class All extends Component
     {
         $forms = [];
         foreach ($this->resource->persistentStorages->sortBy('id') as $storage) {
+            $ignoresDriverOptions = $this->isComposeOrService && $storage->ignoresComposeDriverOptionsOfDeclaration();
             $forms[$storage->id] = [
                 'name' => $storage->name,
                 'mountPath' => $storage->mount_path,
@@ -206,8 +207,11 @@ class All extends Component
                 'isShared' => $storage->isSharedWithAnotherResource(),
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
+                    && ! $ignoresDriverOptions
                     && ! $storage->isDeclaredInCompose(),
+                'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
                 'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
+                'ignoresDriverOptions' => $ignoresDriverOptions,
             ];
         }
         $this->forms = $forms;

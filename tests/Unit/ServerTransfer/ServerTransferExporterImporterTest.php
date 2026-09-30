@@ -910,3 +910,33 @@ test('import rejects shell-like file ownership and mode metadata', function (str
     'mode command' => ['chmod', '600; id'],
     'option mode' => ['chmod', '--reference=/etc/passwd'],
 ]);
+
+test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
+    LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
+    $bundle = $this->exporter->export($this->server);
+    $storage = &$bundle['projects'][0]['environments'][0]['applications'][0]['persistent_storages'][0];
+    expect($storage['ignores_compose_driver_options'])->toBe((bool) $exported);
+    if ($exported === null) {
+        // A bundle from a Coolify version without the flag: its volumes were created without driver options.
+        unset($storage['ignores_compose_driver_options']);
+    }
+    unset($storage);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->persistentStorages()->sole()->ignores_compose_driver_options)->toBe($expected);
+})->with([
+    'existing volume' => [true, true],
+    'new volume' => [false, false],
+    'bundle without the flag' => [null, true],
+]);
