@@ -157,7 +157,7 @@ trait HasDatabaseStatusInfo
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
+                isPemKeyFileRequired: $existingCert->requiresPemKeyFile(),
             );
 
             $this->refresh();
