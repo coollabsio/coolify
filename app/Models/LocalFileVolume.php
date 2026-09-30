@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Stringable;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -170,11 +171,7 @@ class LocalFileVolume extends BaseModel
             $server = $this->resource->destination->server;
         }
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
+        $path = $this->resolvedFsPath($workdir);
 
         if (! $this->isAdminControlledComposeMount()) {
             $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
@@ -254,11 +251,7 @@ class LocalFileVolume extends BaseModel
         $isService = data_get($this->resource, 'service');
         $workdir = $isService ? $this->resource->service->workdir() : $this->resource->workdir();
         $commands = collect([]);
-        $path = data_get_str($this, 'fs_path');
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
+        $path = $this->resolvedFsPath($workdir);
 
         if (! $this->isAdminControlledComposeMount()) {
             $path = str(confinePathToBase($workdir, $path->value(), 'storage path'));
@@ -302,20 +295,9 @@ class LocalFileVolume extends BaseModel
         $commands = collect([]);
         $escapedWorkdir = escapeshellarg($workdir);
 
-        if ($this->is_directory) {
-            // Validate fs_path early before any shell interpolation
-            validateShellSafePath($this->fs_path, 'storage path');
-            $escapedFsPath = escapeshellarg($this->fs_path);
-            $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
-            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
-        }
-        $path = data_get_str($this, 'fs_path');
+        $path = $this->resolvedFsPath($workdir);
         $content = data_get($this, 'content');
         $writesContent = $this->writesContentOnServer();
-        if ($path->startsWith('.')) {
-            $path = $path->after('.');
-            $path = $workdir.$path;
-        }
 
         if ($writesContent) {
             $path = str($this->confinedContentPath($path->value(), $server));
@@ -324,9 +306,14 @@ class LocalFileVolume extends BaseModel
             $this->assertRemotePathIsConfined($workdir, $path->value(), $server);
         }
 
-        $pathForParentDirectory = $writesContent ? $path : str($this->fs_path);
-        if ($pathForParentDirectory->startsWith('.') || $pathForParentDirectory->startsWith('/') || $pathForParentDirectory->startsWith('~')) {
-            $parent_dir = $pathForParentDirectory->beforeLast('/');
+        if ($this->is_directory) {
+            validateShellSafePath($path, 'storage path');
+            $commands->push('mkdir -p '.escapeshellarg($path).' > /dev/null 2>&1 || true');
+            $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
+        }
+
+        if ($path->startsWith('/') || $path->startsWith('~')) {
+            $parent_dir = $path->beforeLast('/');
             if ($parent_dir != '') {
                 $escapedParentDir = escapeshellarg($parent_dir);
                 $commands->push("mkdir -p {$escapedParentDir} > /dev/null 2>&1 || true");
@@ -432,12 +419,27 @@ class LocalFileVolume extends BaseModel
      */
     public function contentPathOnServer(): string
     {
-        $path = (string) $this->fs_path;
+        return $this->localConfinedContentPath($this->resolvedFsPath($this->ownerResource()->workdir())->value())[1];
+    }
+
+    /**
+     * The host path of this mount. Like a relative bind source in Compose, a relative path is inside
+     * the resource directory. Remote commands run in the home directory of the SSH user, so they
+     * must never get the relative path. A `~` path stays in the home directory.
+     */
+    public function resolvedFsPath(string $workdir): Stringable
+    {
+        $path = trim((string) $this->fs_path);
+        if (str_starts_with($path, '/') || str_starts_with($path, '~')) {
+            return str($path);
+        }
         if (str_starts_with($path, '.')) {
-            $path = $this->ownerResource()->workdir().substr($path, 1);
+            $path = substr($path, 1);
         }
 
-        return $this->localConfinedContentPath($path)[1];
+        $path = ltrim($path, '/');
+
+        return str(rtrim($workdir, '/').($path === '' ? '' : '/'.$path));
     }
 
     /**

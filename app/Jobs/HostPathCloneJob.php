@@ -63,10 +63,8 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
     {
         $archiveName = 'hostpath-data.tar.gz';
         $token = Str::uuid()->toString();
-        $sourceCloneDir = $this->cloneArchiveDirectory($this->sourceServer, "hostpath-{$token}");
-        $targetCloneDir = $this->cloneArchiveDirectory($this->targetServer, "hostpath-{$token}");
-        $srcDir = escapeshellarg($sourceCloneDir);
-        $tgtDir = escapeshellarg($targetCloneDir);
+        $sourceCloneDir = null;
+        $targetCloneDir = null;
         $srcPath = escapeshellarg($this->sourcePath);
         $tgtPath = escapeshellarg($this->targetPath);
         $tgtParent = escapeshellarg(dirname($this->targetPath));
@@ -76,13 +74,15 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
         try {
             File::ensureDirectoryExists($localTempDir, 0755);
 
+            $sourceCloneDir = $this->createCloneArchiveDirectory($this->sourceServer, "hostpath-{$token}");
+            $srcDir = escapeshellarg($sourceCloneDir);
             instant_remote_process([
-                ...$this->prepareCloneArchiveDirectory($this->sourceServer, $sourceCloneDir),
                 "test -e {$srcPath}",
                 "docker run --rm -v {$srcPath}:/source:ro -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/{$archiveName} .'",
             ], $this->sourceServer);
 
-            instant_remote_process($this->prepareCloneArchiveDirectory($this->targetServer, $targetCloneDir), $this->targetServer);
+            $targetCloneDir = $this->createCloneArchiveDirectory($this->targetServer, "hostpath-{$token}");
+            $tgtDir = escapeshellarg($targetCloneDir);
 
             instant_scp_from_server(
                 "{$sourceCloneDir}/{$archiveName}",
@@ -111,17 +111,8 @@ class HostPathCloneJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to clean up local host-path clone directory: '.$e->getMessage());
             }
 
-            try {
-                instant_remote_process(["rm -rf {$srcDir}"], $this->sourceServer, false);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up source host-path clone directory: '.$e->getMessage());
-            }
-
-            try {
-                instant_remote_process(["rm -rf {$tgtDir}"], $this->targetServer, false);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up target host-path clone directory: '.$e->getMessage());
-            }
+            $this->removeCloneArchiveDirectory($this->sourceServer, $sourceCloneDir);
+            $this->removeCloneArchiveDirectory($this->targetServer, $targetCloneDir);
         }
     }
 }

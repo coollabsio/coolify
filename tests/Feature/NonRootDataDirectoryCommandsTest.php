@@ -113,27 +113,57 @@ it('writes a database dump and its redirect in one root shell', function () {
     ]);
 });
 
-it('stages clone archives outside /data/coolify only for a non-root SSH user', function () {
+it('stages clone archives in a random mktemp directory only for a non-root SSH user', function () {
     $stager = new class
     {
         use StagesCloneArchives {
-            cloneArchiveDirectory as public;
-            prepareCloneArchiveDirectory as public;
+            createCloneArchiveDirectory as public;
         }
     };
     $rootServer = Server::factory()->create(['team_id' => $this->server->team_id, 'user' => 'root', 'private_key_id' => $this->server->private_key_id]);
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'mktemp -d') ? '/var/tmp/coolify-clone.Ab3dE6gH9k' : '',
+    ));
 
-    $nonRootDirectory = $stager->cloneArchiveDirectory($this->server, 'volume-a');
+    $nonRootDirectory = $stager->createCloneArchiveDirectory($this->server, 'volume-a');
+    $rootDirectory = $stager->createCloneArchiveDirectory($rootServer, 'volume-a');
 
-    expect($nonRootDirectory)->toBe('/var/tmp/coolify-clone/volume-a')
-        ->and($stager->prepareCloneArchiveDirectory($this->server, $nonRootDirectory))->toBe([
-            "mkdir -p '/var/tmp/coolify-clone/volume-a'",
-            "chown 'cooluser' '/var/tmp/coolify-clone/volume-a'",
-            "chmod 700 '/var/tmp/coolify-clone/volume-a'",
-        ])
-        ->and($stager->cloneArchiveDirectory($rootServer, 'volume-a'))->toBe('/data/coolify/clone/volume-a')
-        ->and($stager->prepareCloneArchiveDirectory($rootServer, '/data/coolify/clone/volume-a'))->toBe([
-            "mkdir -p '/data/coolify/clone/volume-a'",
-            "chmod 777 '/data/coolify/clone/volume-a'",
-        ]);
+    $commands = [];
+    Process::assertRan(function ($process) use (&$commands) {
+        $commands[] = $process->command;
+
+        return true;
+    });
+    $commands = implode("\n", $commands);
+
+    expect($nonRootDirectory)->toBe('/var/tmp/coolify-clone.Ab3dE6gH9k')
+        ->and($commands)->toContain('sudo mktemp -d /var/tmp/coolify-clone.XXXXXXXXXX')
+        ->and($commands)->toContain("sudo chown 'cooluser' '/var/tmp/coolify-clone.Ab3dE6gH9k'")
+        ->and($commands)->toContain("sudo chmod 700 '/var/tmp/coolify-clone.Ab3dE6gH9k'")
+        ->and($commands)->not->toContain('/var/tmp/coolify-clone/')
+        ->and($rootDirectory)->toBe('/data/coolify/clone/volume-a')
+        ->and($commands)->toContain("mkdir -p '/data/coolify/clone/volume-a'")
+        ->and($commands)->toContain("chmod 777 '/data/coolify/clone/volume-a'");
 });
+
+it('rejects a clone archive directory that mktemp did not create', function (string $output) {
+    $stager = new class
+    {
+        use StagesCloneArchives {
+            createCloneArchiveDirectory as public;
+        }
+    };
+    Process::fake(fn ($process) => Process::result(
+        output: str_contains($process->command, 'mktemp -d') ? $output : '',
+    ));
+
+    expect(fn () => $stager->createCloneArchiveDirectory($this->server, 'volume-a'))->toThrow(RuntimeException::class);
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'chown') || str_contains($process->command, 'chmod'));
+})->with([
+    'empty' => [''],
+    'predictable path' => ['/var/tmp/coolify-clone/volume-a'],
+    'traversal' => ['/var/tmp/coolify-clone.Ab3dE6gH9k/../../etc'],
+    'other directory' => ['/tmp/coolify-clone.Ab3dE6gH9k'],
+    'extra line' => ["/var/tmp/coolify-clone.Ab3dE6gH9k\n/etc"],
+    'shell characters' => ['/var/tmp/coolify-clone.Ab3d$(id)k'],
+]);
