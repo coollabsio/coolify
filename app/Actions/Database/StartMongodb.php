@@ -328,41 +328,36 @@ class StartMongodb
         return $environment_variables->all();
     }
 
+    /**
+     * The shell is chosen when the check runs: images before MongoDB 5 (and some custom images) have only the legacy mongo shell.
+     */
     private function generate_health_check_command(): array
     {
-        $usesLegacyShell = str($this->database->image)->startsWith('mongo:4');
-        $command = [
-            'CMD',
-            $usesLegacyShell ? 'mongo' : 'mongosh',
-            '--quiet',
-            '--host',
-            $this->database->uuid,
-        ];
+        $mongosh = $this->health_check_shell_command(legacy: false);
+        $mongo = $this->health_check_shell_command(legacy: true);
+
+        return ['CMD-SHELL', "if command -v mongosh >/dev/null 2>&1; then {$mongosh}; else {$mongo}; fi"];
+    }
+
+    private function health_check_shell_command(bool $legacy): string
+    {
+        $command = [$legacy ? 'mongo' : 'mongosh', '--quiet', '--host', $this->database->uuid];
 
         if ($this->database->enable_ssl) {
-            $command = [
-                ...$command,
-                $usesLegacyShell ? '--ssl' : '--tls',
-                $usesLegacyShell ? '--sslCAFile' : '--tlsCAFile',
-                '/etc/mongo/certs/ca.pem',
-            ];
+            $command = [...$command, $legacy ? '--ssl' : '--tls', $legacy ? '--sslCAFile' : '--tlsCAFile', '/etc/mongo/certs/ca.pem'];
 
             if ($this->database->ssl_mode === 'verify-full') {
-                $command = [
-                    ...$command,
-                    $usesLegacyShell ? '--sslPEMKeyFile' : '--tlsCertificateKeyFile',
-                    '/etc/mongo/certs/server.pem',
-                ];
+                $command = [...$command, $legacy ? '--sslPEMKeyFile' : '--tlsCertificateKeyFile', '/etc/mongo/certs/server.pem'];
             }
         }
 
-        return [
+        $command = [
             ...$command,
             '--eval',
-            $usesLegacyShell
-                ? 'quit(db.isMaster().ismaster === true ? 0 : 1)'
-                : 'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+            $legacy ? 'quit(db.isMaster().ismaster === true ? 0 : 1)' : 'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
         ];
+
+        return implode(' ', array_map('escapeshellarg', $command));
     }
 
     private function add_custom_mongo_conf()

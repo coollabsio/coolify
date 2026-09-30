@@ -3,14 +3,6 @@
 use App\Actions\Database\StartMongodb;
 use App\Models\StandaloneMongodb;
 
-it('uses the generated MongoDB health check in the Compose configuration', function () {
-    $source = remoteOutputSource('app/Actions/Database/StartMongodb.php');
-
-    expect($source)
-        ->toContain("'healthcheck' => \$this->database->healthCheckConfiguration(\$this->generate_health_check_command())")
-        ->not->toContain("'healthcheck' => \$this->database->healthCheckConfiguration([\n                        'CMD',\n                        'echo',\n                        'ok'");
-});
-
 function generatedMongodbHealthCheckCommand(array $attributes): array
 {
     $action = new StartMongodb;
@@ -21,69 +13,73 @@ function generatedMongodbHealthCheckCommand(array $attributes): array
     return $method->invoke($action);
 }
 
-it('generates a credential-free writable-primary MongoDB health check', function (string $image, bool $enableSsl, ?string $sslMode, array $expectedCommand) {
-    $command = generatedMongodbHealthCheckCommand([
+/**
+ * Runs the health check script with fake shells on PATH and returns the program and arguments that were called.
+ *
+ * @param  list<string>  $availableShells
+ */
+function runMongodbHealthCheck(array $healthCheck, array $availableShells): string
+{
+    $bin = sys_get_temp_dir().'/mongodb-healthcheck-'.bin2hex(random_bytes(4));
+    mkdir($bin);
+    foreach ($availableShells as $shell) {
+        file_put_contents("$bin/$shell", "#!/bin/sh\necho $shell; for arg in \"\$@\"; do echo \"\$arg\"; done\n");
+        chmod("$bin/$shell", 0755);
+    }
+
+    $output = shell_exec('PATH='.escapeshellarg($bin).' /bin/sh -c '.escapeshellarg($healthCheck[1]));
+
+    array_map('unlink', glob("$bin/*"));
+    rmdir($bin);
+
+    return trim((string) $output);
+}
+
+it('uses mongosh when the image has it and the legacy mongo shell otherwise', function (array $availableShells, bool $enableSsl, ?string $sslMode, array $expectedCall) {
+    $healthCheck = generatedMongodbHealthCheckCommand([
         'uuid' => 'mongodb-test-resource',
-        'image' => $image,
+        'image' => 'registry.example.com/mongo:any',
         'enable_ssl' => $enableSsl,
         'ssl_mode' => $sslMode,
         'mongo_initdb_root_username' => 'root-user',
         'mongo_initdb_root_password' => 'root-password',
     ]);
 
-    expect($command)->toBe($expectedCommand)
-        ->and(implode(' ', $command))
+    expect($healthCheck[0])->toBe('CMD-SHELL')
+        ->and($healthCheck[1])
         ->not->toContain('root-user')
         ->not->toContain('root-password')
-        ->not->toContain('--tlsAllowInvalidHostnames')
-        ->not->toContain('--tlsAllowInvalidCertificates');
+        ->not->toContain('AllowInvalid')
+        ->and(runMongodbHealthCheck($healthCheck, $availableShells))->toBe(implode("\n", $expectedCall));
 })->with([
-    'without TLS' => ['mongo:8', false, null, [
-        'CMD', 'mongosh', '--quiet', '--host', 'mongodb-test-resource', '--eval',
+    'mongosh without TLS' => [['mongosh', 'mongo'], false, null, [
+        'mongosh', '--quiet', '--host', 'mongodb-test-resource', '--eval',
         'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
     ]],
-    'TLS allow mode' => ['mongo:8', true, 'allow', [
-        'CMD', 'mongosh', '--quiet', '--host', 'mongodb-test-resource',
+    'mongosh with TLS require' => [['mongosh'], true, 'require', [
+        'mongosh', '--quiet', '--host', 'mongodb-test-resource',
         '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem', '--eval',
         'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
     ]],
-    'TLS prefer mode' => ['mongo:8', true, 'prefer', [
-        'CMD', 'mongosh', '--quiet', '--host', 'mongodb-test-resource',
-        '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem', '--eval',
+    'mongosh with TLS verify-full' => [['mongosh'], true, 'verify-full', [
+        'mongosh', '--quiet', '--host', 'mongodb-test-resource',
+        '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem',
+        '--tlsCertificateKeyFile', '/etc/mongo/certs/server.pem', '--eval',
         'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
     ]],
-    'TLS require mode' => ['mongo:8', true, 'require', [
-        'CMD', 'mongosh', '--quiet', '--host', 'mongodb-test-resource',
-        '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem', '--eval',
-        'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
-    ]],
-    'TLS verify-full mode' => ['mongo:8', true, 'verify-full', [
-        'CMD', 'mongosh', '--quiet', '--host', 'mongodb-test-resource',
-        '--tls',
-        '--tlsCAFile',
-        '/etc/mongo/certs/ca.pem',
-        '--tlsCertificateKeyFile',
-        '/etc/mongo/certs/server.pem',
-        '--eval',
-        'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
-    ]],
-    'MongoDB 4 without TLS' => ['mongo:4.4', false, null, [
-        'CMD', 'mongo', '--quiet', '--host', 'mongodb-test-resource', '--eval',
+    'legacy mongo without TLS' => [['mongo'], false, null, [
+        'mongo', '--quiet', '--host', 'mongodb-test-resource', '--eval',
         'quit(db.isMaster().ismaster === true ? 0 : 1)',
     ]],
-    'MongoDB 4 TLS require mode' => ['mongo:4.4', true, 'require', [
-        'CMD', 'mongo', '--quiet', '--host', 'mongodb-test-resource',
+    'legacy mongo with TLS require' => [['mongo'], true, 'require', [
+        'mongo', '--quiet', '--host', 'mongodb-test-resource',
         '--ssl', '--sslCAFile', '/etc/mongo/certs/ca.pem', '--eval',
         'quit(db.isMaster().ismaster === true ? 0 : 1)',
     ]],
-    'MongoDB 4 TLS verify-full mode' => ['mongo:4.4', true, 'verify-full', [
-        'CMD', 'mongo', '--quiet', '--host', 'mongodb-test-resource',
-        '--ssl',
-        '--sslCAFile',
-        '/etc/mongo/certs/ca.pem',
-        '--sslPEMKeyFile',
-        '/etc/mongo/certs/server.pem',
-        '--eval',
+    'legacy mongo with TLS verify-full' => [['mongo'], true, 'verify-full', [
+        'mongo', '--quiet', '--host', 'mongodb-test-resource',
+        '--ssl', '--sslCAFile', '/etc/mongo/certs/ca.pem',
+        '--sslPEMKeyFile', '/etc/mongo/certs/server.pem', '--eval',
         'quit(db.isMaster().ismaster === true ? 0 : 1)',
     ]],
 ]);
