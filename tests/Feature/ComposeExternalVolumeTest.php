@@ -4,6 +4,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\StartService;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\DeleteResourceJob;
+use App\Livewire\Project\Service\StackForm;
 use App\Livewire\Project\Service\Storage as StoragePage;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -609,23 +610,111 @@ describe('legacy parsers', function () {
     });
 });
 
+function variableExternalVolumeCompose(string $name, bool $oldSyntax = false): string
+{
+    $declaration = $oldSyntax ? "    external:\n      name: '{$name}'\n" : "    external: true\n    name: '{$name}'\n";
+
+    return "services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n{$declaration}";
+}
+
+dataset('external volume names with a variable', [
+    'variable' => ['${SHARED_VOLUME}', false],
+    'variable with a default' => ['${SHARED_VOLUME:-shared}', false],
+    'variable with text around it' => ['stack-${STACK}_data', false],
+    'two variables' => ['${PROJECT}-${ENVIRONMENT}', false],
+    'old syntax' => ['$SHARED_VOLUME', true],
+]);
+
 describe('validation', function () {
-    it('rejects an external volume name with a variable', function (string $compose) {
-        expect(fn () => validateDockerComposeForInjection($compose))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+    it('accepts an external volume name with a variable and leaves it to Docker Compose', function (string $name, bool $oldSyntax) {
+        $compose = variableExternalVolumeCompose($name, $oldSyntax);
+        $declaration = $oldSyntax ? ['external' => ['name' => $name]] : ['external' => true, 'name' => $name];
+        validateDockerComposeForInjection($compose);
 
-        $application = externalVolumeApplication($compose);
-        expect(fn () => applicationParser($application))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+        $application = applicationParser(externalVolumeApplication($compose))->toArray();
+        $service = serviceParser(externalVolumeService($compose))->toArray();
 
+        expect($application['services']['web']['volumes'])->toBe(['shared-data:/data'])
+            ->and($application['volumes'])->toBe(['shared-data' => $declaration])
+            ->and($service['services']['web']['volumes'])->toBe(['shared-data:/data'])
+            ->and($service['volumes'])->toBe(['shared-data' => $declaration])
+            ->and(persistentVolumeNames())->toBe([]);
+    })->with('external volume names with a variable');
+
+    it('keeps the old volume of an existing application whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $application = externalVolumeApplication(variableExternalVolumeCompose($name, $oldSyntax));
+        $uuid = $application->uuid;
+        legacyExternalVolumeRow($application, "{$uuid}_shared-data");
+
+        $parsed = applicationParser($application)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$uuid}_shared-data:/data"])
+            ->and($parsed['volumes']["{$uuid}_shared-data"])->toBe(['name' => "{$uuid}_shared-data"])
+            ->and($application->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data", $name)]);
+    })->with('external volume names with a variable');
+
+    it('keeps the old volume of an existing service whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $compose = variableExternalVolumeCompose($name, $oldSyntax);
         $service = externalVolumeService($compose);
-        expect(fn () => serviceParser($service))
-            ->toThrow(Exception::class, 'Coolify does not resolve variables in the name of an external volume');
+        $uuid = $service->uuid;
+        legacyExternalVolumeRow(legacyExternalVolumeServiceResource($service, 'web', $compose), "{$uuid}_shared-data");
+
+        $parsed = serviceParser($service)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$uuid}_shared-data:/data"])
+            ->and($parsed['volumes']["{$uuid}_shared-data"])->toBe(['name' => "{$uuid}_shared-data"])
+            ->and($service->composeVolumeWarnings())->toBe([legacyExternalVolumeWarning("{$uuid}_shared-data", $name)]);
+    })->with('external volume names with a variable');
+
+    it('saves a service Compose file whose external volume name has a variable', function () {
+        $compose = variableExternalVolumeCompose('${SHARED_VOLUME}');
+        $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        $owner = User::factory()->create();
+        $team = $service->environment->project->team;
+        $team->members()->attach($owner, ['role' => 'owner']);
+        $this->actingAs($owner);
+        session(['currentTeam' => $team]);
+
+        Livewire::test(StackForm::class, ['service' => $service])
+            ->set('dockerComposeRaw', $compose)
+            ->call('submit')
+            ->assertDispatched('success');
+
+        expect($service->fresh()->docker_compose_raw)->toBe($compose);
+    });
+
+    it('keeps the old behavior of a legacy Compose application whose external volume name has a variable', function (string $name, bool $oldSyntax) {
+        $application = externalVolumeApplication(variableExternalVolumeCompose($name, $oldSyntax), '2');
+
+        $parsed = parseDockerComposeFile($application)->toArray();
+
+        expect($parsed['services']['web']['volumes'])->toBe(["{$application->uuid}-shared-data:/data"]);
+    })->with('external volume names with a variable');
+
+    it('rejects an external volume name with an unsafe or unsupported variable', function (string $name) {
+        $compose = variableExternalVolumeCompose($name);
+        $application = externalVolumeApplication($compose);
+
+        expect(fn () => validateDockerComposeForInjection($compose))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume shared-data')
+            ->and(fn () => applicationParser($application))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume shared-data');
     })->with([
-        'name field' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME}\n"],
-        'name field with default' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME:-shared}\n"],
-        'old syntax' => ["services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external:\n      name: \$SHARED_VOLUME\n"],
+        'command after a variable' => ['${SHARED_VOLUME}; rm -rf /'],
+        'command substitution' => ['$(id)'],
+        'space' => ['shared ${VOLUME}'],
+        'dollar sign alone' => ['shared-$'],
+        'escaped dollar sign' => ['$$SHARED_VOLUME'],
+        'required variable syntax' => ['${SHARED_VOLUME:?required}'],
+        'default with a space' => ['${SHARED_VOLUME:-a b}'],
     ]);
+
+    it('rejects a variable in the key of an external volume', function () {
+        $compose = "services:\n  web:\n    image: nginx\nvolumes:\n  \${SHARED_VOLUME}:\n    external: true\n";
+
+        expect(fn () => validateDockerComposeForInjection($compose))
+            ->toThrow(Exception::class, 'Invalid external Docker Compose volume. Volume names must start with an alphanumeric character');
+    });
 
     it('rejects an external volume name that is not a valid Docker volume name', function () {
         $compose = "services:\n  web:\n    image: nginx\nvolumes:\n  shared-data:\n    external: true\n    name: 'shared data;rm -rf /'\n";

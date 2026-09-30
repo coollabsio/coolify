@@ -549,19 +549,25 @@ function composeExternalVolumeMounts(?string $compose): array
 }
 
 /**
- * The key and the name of an external volume must be literal Docker volume names. Docker Compose
- * can resolve variables in `name:`, but then only the deployment `.env` sets which existing volume
- * the resource mounts, and Coolify cannot show or check that volume. Thus variables are rejected.
+ * The key of an external volume must be a literal Docker volume name, because Docker Compose does not
+ * resolve variables in keys. The name (`name:` or the old `external: {name: x}`) may also contain
+ * variables (see isComposeVolumeNameWithVariables()): Docker Compose resolves them from the deployment
+ * `.env` when it starts the resource. Coolify never removes an external volume, because it gets no
+ * storage entry, so Coolify does not need the resolved name.
  *
  * @param  array<string, mixed>  $declaration
  *
- * @throws Exception If the key or the name is not a literal, valid Docker volume name
+ * @throws Exception If the key or the name is not a valid Docker volume name
  */
 function validateComposeExternalVolume(int|string $key, array $declaration): void
 {
     $key = (string) $key;
-    $label = preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key) === 1 ? "volume {$key}" : 'volume';
-    $names = [$key];
+    if (preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key) !== 1) {
+        throw new Exception(
+            'Invalid external Docker Compose volume. Volume names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores.'
+        );
+    }
+    $names = [];
     if (array_key_exists('name', $declaration)) {
         $names[] = $declaration['name'];
     }
@@ -570,17 +576,23 @@ function validateComposeExternalVolume(int|string $key, array $declaration): voi
     }
 
     foreach ($names as $name) {
-        if (is_string($name) && str_contains($name, '$')) {
+        if (! is_string($name) || (preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $name) !== 1 && ! isComposeVolumeNameWithVariables($name))) {
             throw new Exception(
-                "Invalid external Docker Compose {$label}: Coolify does not resolve variables in the name of an external volume. Use the literal name of the existing Docker volume."
-            );
-        }
-        if (! is_string($name) || preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $name) !== 1) {
-            throw new Exception(
-                "Invalid external Docker Compose {$label}. Volume names must start with an alphanumeric character and contain only alphanumeric characters, dots, hyphens, and underscores."
+                "Invalid external Docker Compose volume {$key}. The name must be a Docker volume name (alphanumeric characters, dots, hyphens, and underscores) and can contain variables such as \${NAME} or \${NAME:-default}."
             );
         }
     }
+}
+
+/**
+ * Tells if a volume name contains Compose variables and otherwise only Docker volume name characters.
+ * The variables are `$NAME`, `${NAME}`, `${NAME-default}` and `${NAME:-default}`, with a default
+ * that contains only Docker volume name characters.
+ */
+function isComposeVolumeNameWithVariables(string $name): bool
+{
+    return str_contains($name, '$')
+        && preg_match('/^(?:[A-Za-z0-9._-]|\$[A-Za-z_][A-Za-z0-9_]*|\$\{[A-Za-z_][A-Za-z0-9_]*(?::?-[A-Za-z0-9._-]*)?\})+$/', $name) === 1;
 }
 
 /**

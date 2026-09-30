@@ -151,6 +151,15 @@ test('loading a safe Compose file from Git saves it', function () {
     expect($this->application->refresh()->docker_compose_raw)->toBe(trim($compose));
 });
 
+test('loading a Compose file with a variable external volume name saves it', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    volumes:\n      - 'shared-data:/data'\nvolumes:\n  shared-data:\n    external: true\n    name: \${SHARED_VOLUME}\n";
+    fakeRepositoryCompose($compose);
+
+    $this->application->loadComposeFile();
+
+    expect($this->application->fresh()->docker_compose_raw)->toBe(trim($compose));
+});
+
 test('the queued LoadComposeFile action rejects injection', function () {
     fakeRepositoryCompose(composeInjectionPayloads()['service name command substitution'][0]);
 
