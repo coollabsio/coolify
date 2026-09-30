@@ -26,9 +26,14 @@ class RestartDatabase
      */
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null)
     {
-        $reservation ??= DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {
-            return ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+            $reservation = DatabaseOperationReservation::acquire($database->uuid);
+            if ($reservation === null) {
+                return ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+            }
+        } elseif (! DatabaseOperationReservation::renew($database->uuid, $reservation)) {
+            // Do not stop the database for a request that expired in the queue.
+            return StartDatabase::operationInProgressError($database) ?? DatabaseOperationReservation::EXPIRED_MESSAGE;
         }
 
         try {
@@ -45,10 +50,17 @@ class RestartDatabase
                 return $prerequisiteError;
             }
             StopDatabase::run($database, dockerCleanup: false);
+            // The stop can take a while; keep the reservation for the start that follows.
+            DatabaseOperationReservation::renew($database->uuid, $reservation);
 
             return StartDatabase::run($database, $reservation);
         } finally {
             DatabaseOperationReservation::release($database->uuid, $reservation);
         }
+    }
+
+    public function asJob(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): mixed
+    {
+        return StartDatabase::runQueued($database, 'Database restart failed.', fn (): mixed => $this->handle($database, $reservation));
     }
 }

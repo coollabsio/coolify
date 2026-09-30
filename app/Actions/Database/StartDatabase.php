@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
+use App\Events\DatabaseStatusChanged;
 use App\Exceptions\DatabaseStartException;
 use App\Jobs\DatabaseStartJob;
 use App\Models\StandaloneClickhouse;
@@ -37,9 +38,13 @@ class StartDatabase
      */
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): Activity|string
     {
-        $reservation ??= DatabaseOperationReservation::acquire($database->uuid);
         if ($reservation === null) {
-            return ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+            $reservation = DatabaseOperationReservation::acquire($database->uuid);
+            if ($reservation === null) {
+                return ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE;
+            }
+        } elseif (! DatabaseOperationReservation::renew($database->uuid, $reservation)) {
+            return self::expiredReservationError($database);
         }
 
         try {
@@ -47,6 +52,11 @@ class StartDatabase
         } finally {
             DatabaseOperationReservation::release($database->uuid, $reservation);
         }
+    }
+
+    public function asJob(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, ?string $reservation = null): Activity|string
+    {
+        return self::runQueued($database, 'Database start failed.', fn (): Activity|string => $this->handle($database, $reservation));
     }
 
     private function queueStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $reservation): Activity|string
@@ -69,18 +79,7 @@ class StartDatabase
             'last_restart_type' => null,
         ]);
 
-        $activity = activity()
-            ->withProperties([
-                'server_uuid' => $server->uuid,
-                'type' => ActivityTypes::INLINE->value,
-                'type_uuid' => $database->uuid,
-                'status' => ProcessStatus::QUEUED->value,
-                'team_id' => $server->team_id,
-                'operation' => ResourceStartActivity::DATABASE_START_OPERATION,
-            ])
-            ->performedOn($database)
-            ->event(ActivityTypes::INLINE->value)
-            ->log('[]');
+        $activity = self::logQueuedStartActivity($database);
 
         if ($activity === null) {
             return 'Database start could not be queued because activity logging is disabled.';
@@ -105,6 +104,91 @@ class StartDatabase
         }
 
         return $activity;
+    }
+
+    private static function logQueuedStartActivity(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?Activity
+    {
+        $server = $database->destination->server;
+
+        return activity()
+            ->withProperties([
+                'server_uuid' => $server->uuid,
+                'type' => ActivityTypes::INLINE->value,
+                'type_uuid' => $database->uuid,
+                'status' => ProcessStatus::QUEUED->value,
+                'team_id' => $server->team_id,
+                'operation' => ResourceStartActivity::DATABASE_START_OPERATION,
+            ])
+            ->performedOn($database)
+            ->event(ActivityTypes::INLINE->value)
+            ->log('[]');
+    }
+
+    /**
+     * A queued action whose reservation expired or was taken over must not run: a newer start
+     * may have run in the meantime. If another operation is in progress, that one reports its
+     * own result; otherwise the caller must record the expired request as failed.
+     */
+    private static function expiredReservationError(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): string
+    {
+        return self::operationInProgressError($database) ?? DatabaseOperationReservation::EXPIRED_MESSAGE;
+    }
+
+    /**
+     * Run a queued start or restart. The request that queued it has already answered, so an
+     * error would be lost. Record it as a failed start activity, the same as a failed start
+     * job, so that the UI shows the error. An error that already has its own start activity
+     * (created by this run) or that reports another operation in progress is not recorded again.
+     *
+     * @param  callable(): (Activity|string|null)  $operation
+     */
+    public static function runQueued(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $failureMessage, callable $operation): mixed
+    {
+        $lastStartActivityId = self::latestStartActivityId($database);
+
+        try {
+            $result = $operation();
+        } catch (Throwable $e) {
+            if (self::latestStartActivityId($database) === $lastStartActivityId) {
+                self::recordFailedStart($database, $e instanceof DatabaseStartException ? $e->getMessage() : $failureMessage);
+            }
+
+            throw $e;
+        }
+
+        if (is_string($result)
+            && $result !== ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE
+            && self::latestStartActivityId($database) === $lastStartActivityId) {
+            self::recordFailedStart($database, $result);
+        }
+
+        return $result;
+    }
+
+    public static function recordFailedStart(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database, string $message): void
+    {
+        try {
+            $activity = self::logQueuedStartActivity($database);
+            if ($activity !== null) {
+                ResourceStartActivity::markFailed($activity, $message);
+            }
+        } finally {
+            event(new DatabaseStatusChanged);
+        }
+    }
+
+    private static function latestStartActivityId(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $database): ?int
+    {
+        if (blank($database->uuid)) {
+            return null;
+        }
+
+        $id = Activity::query()
+            ->where('properties->type_uuid', $database->uuid)
+            ->where('properties->operation', ResourceStartActivity::DATABASE_START_OPERATION)
+            ->max('id');
+
+        return $id === null ? null : (int) $id;
     }
 
     /**
