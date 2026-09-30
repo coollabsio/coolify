@@ -36,6 +36,7 @@
                 });
                 this.on('complete', function (file) {
                     $wire.filename = file.name;
+                    $wire.selectSqliteDatabaseFor(file.name);
                     $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
                     $wire.isUploading = false;
                 });
@@ -77,6 +78,19 @@
                         <div class="max-w-sm">
                             <x-forms.checkbox id="replaceExisting" label="Replace objects that already exist"
                                 helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="keepOwners" label="Keep owners and privileges"
+                                helper="Archive backups: restores object owners and GRANTs from the backup. Leave this off for backups from another server (for example Amazon RDS): its roles usually do not exist here, and the whole restore would be rolled back."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if ($resourceDbType === 'standalone-sqlite' && count($this->sqliteDatabaseFiles) > 0)
+                        <div class="max-w-sm">
+                            <x-forms.listbox id="sqliteDatabase" label="Restore into" live
+                                helper="The database file the backup replaces. Coolify preselects the file named in the backup file name."
+                                :options="collect($this->sqliteDatabaseFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()"
                                 canGate="update" :canResource="$this->resource" />
                         </div>
                     @endif

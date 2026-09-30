@@ -9,6 +9,7 @@ use App\Models\DnsProviderZone;
 use App\Models\ManagedDnsRecord;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Support\DnsRecordHints;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
@@ -48,6 +49,11 @@ trait InteractsWithDnsProviders
         $this->authorizeDnsProviderChange();
         $hostname = strtolower($hostname);
         $cloudflare = app(CloudflareDnsProvider::class);
+        if ($this->publicServerIpsForDnsProvider() === []) {
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
+
+            return;
+        }
         $zone = $this->findTeamZone($zoneId, $hostname);
         $content = $this->dnsRecordContent($content);
         if ($zone === null || $content === null) {
@@ -102,6 +108,12 @@ trait InteractsWithDnsProviders
         if (blank($this->serverIp) || filter_var($this->serverIp, FILTER_VALIDATE_IP) === false) {
             return false;
         }
+        $content = $this->dnsRecordContent();
+        if ($content === null) {
+            $this->dispatch('warning', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
+
+            return false;
+        }
         $this->markDnsPending($hostnames);
 
         $proposalsByHostname = collect($this->dnsProviderProposals)->groupBy('hostname');
@@ -134,7 +146,7 @@ trait InteractsWithDnsProviders
                 $resource?->getMorphClass(),
                 $resource?->getKey(),
                 $proposal['hostname'],
-                $this->serverIp,
+                $content,
             );
             $this->dispatch('info', "Adding DNS record for {$proposal['hostname']}.");
         }
@@ -155,6 +167,11 @@ trait InteractsWithDnsProviders
         $hostname = strtolower($hostname);
         $key = $hostname.'|'.$zoneId;
         $conflict = $this->dnsProviderConflicts[$key] ?? null;
+        if ($this->publicServerIpsForDnsProvider() === []) {
+            $this->dispatch('error', DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE);
+
+            return;
+        }
         $zone = $this->findTeamZone($zoneId, $hostname);
         $content = $this->dnsRecordContent($conflict['proposed'] ?? null);
         if ($conflict === null || $zone === null || $content === null) {
@@ -188,11 +205,12 @@ trait InteractsWithDnsProviders
         $provider = app(CloudflareDnsProvider::class);
         $hostnames ??= $this->allDomainHostnames();
         $teamId = $this->dnsTeamId();
+        $target = $this->dnsRecordContent();
         $managed = ManagedDnsRecord::query()->where('team_id', $teamId)->whereIn('name', $hostnames)->pluck('id', 'name');
         $this->dnsProviderProposals = collect($hostnames)->flatMap(fn (string $hostname) => $provider->findZones($teamId, $hostname)
             ->map(fn (DnsProviderZone $zone) => [
                 'hostname' => $hostname, 'zone_id' => $zone->id, 'zone' => $zone->name,
-                'credential' => $zone->integrationToken->name, 'target' => (string) $this->serverIp,
+                'credential' => $zone->integrationToken->name, 'target' => $target,
                 'managed' => $managed->has($hostname),
             ])->all())->values()->all();
     }
@@ -353,12 +371,26 @@ trait InteractsWithDnsProviders
     }
 
     /**
-     * Content of a DNS record for this resource: one of its server addresses (IPv4 or IPv6),
+     * Server addresses that a DNS provider may publish. Private, reserved, CGNAT, and link-local addresses are excluded:
+     * a public DNS record must not expose them, and the record would not be reachable anyway.
+     *
+     * @return array<int, string>
+     */
+    protected function publicServerIpsForDnsProvider(): array
+    {
+        return array_values(array_filter(
+            $this->serverIpsForDnsHints(),
+            fn (?string $address): bool => is_string($address) && DnsRecordHints::isPublicAddress($address),
+        ));
+    }
+
+    /**
+     * Content of a DNS record for this resource: one of its public server addresses (IPv4 or IPv6),
      * the first one when none is requested. Any other address is rejected.
      */
     protected function dnsRecordContent(?string $requested = null): ?string
     {
-        $addresses = array_values(array_filter($this->serverIpsForDnsHints()));
+        $addresses = $this->publicServerIpsForDnsProvider();
 
         return $requested === null ? ($addresses[0] ?? null) : (in_array($requested, $addresses, true) ? $requested : null);
     }

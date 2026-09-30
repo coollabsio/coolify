@@ -5,6 +5,7 @@ namespace App\Actions\Database;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
@@ -45,6 +46,7 @@ class StartDatabaseImport
         if (! str($resource->status)->startsWith('running')) {
             throw new DatabaseImportException('The database must be running before an import can start.');
         }
+        $sqliteDatabase = $this->sqliteRestoreTarget($resource, $source);
 
         [$server, $container, $network] = $this->target($resource);
         $destination = $resource instanceof ServiceDatabase ? $resource->service?->destination : $resource->destination;
@@ -71,14 +73,14 @@ class StartDatabaseImport
                 throw new DatabaseImportException(ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE, 409);
             }
 
-            return $this->startImport($resource, $source, $teamId, $server, $container, $network);
+            return $this->startImport($resource, $source, $teamId, $server, $container, $network, $sqliteDatabase);
         } finally {
             DatabaseOperationReservation::release($resource->uuid, $reservation);
             $lock->release();
         }
     }
 
-    private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network): Activity
+    private function startImport(Model $resource, DatabaseImportSource $source, int $teamId, Server $server, string $container, string $network, ?string $sqliteDatabase): Activity
     {
         $active = ResourceStartActivity::active($resource->uuid, ResourceStartActivity::DATABASE_IMPORT_OPERATION, $teamId);
         if (ResourceStartActivity::failStale($active)->isNotEmpty()) {
@@ -150,7 +152,7 @@ class StartDatabaseImport
         if ($safety = $this->commands->buildPostgresSafetyCommand($resource, $container, $containerPath)) {
             $commandList[] = $safety;
         }
-        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting));
+        $restore = base64_encode($this->commands->buildRestoreCommand($resource, $containerPath, $source->dumpAll, $source->replaceExisting, $source->keepOwners, $sqliteDatabase));
         $commandList[] = 'echo '.escapeshellarg($restore).' | base64 -d > '.escapeshellarg($scriptPath);
         $commandList[] = 'chmod +x '.escapeshellarg($scriptPath);
         $commandList[] = 'docker cp '.escapeshellarg($scriptPath).' '.escapeshellarg("{$container}:{$scriptPath}");
@@ -176,6 +178,24 @@ class StartDatabaseImport
         }
 
         return [$resource->destination?->server, $resource->uuid, $resource->destination?->network ?? 'coolify'];
+    }
+
+    /**
+     * The SQLite file a backup is restored into. It must be one of the database's own files; without
+     * a choice it is the file named in the backup path, else the first file.
+     */
+    private function sqliteRestoreTarget(Model $resource, DatabaseImportSource $source): ?string
+    {
+        if (! $resource instanceof StandaloneSqlite) {
+            return null;
+        }
+
+        $file = $source->sqliteDatabase ?? $resource->defaultRestoreFile($source->type === 'upload' ? null : $source->path);
+        if ($file === null || ! in_array($file, $resource->databaseFiles(), true)) {
+            throw new DatabaseImportException('The SQLite database file is not one of the files of this database.');
+        }
+
+        return $file;
     }
 
     private function assertServerPath(?string $path): void

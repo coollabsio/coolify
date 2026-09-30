@@ -172,7 +172,7 @@ function restoreScriptResource(string $engine): object
 /**
  * @return array{exit: int, stdout: string, stderr: string, calls: list<array{name: string, args: string, header: string}>, dir: string, backup: string, leftovers: list<string>}
  */
-function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false): array
+function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false, bool $keepOwners = false): array
 {
     $dir = restoreScriptTempDir();
 
@@ -199,7 +199,7 @@ SH);
         $backup = $dir.'/backup file';
         file_put_contents($backup, $contents);
 
-        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource($engine), $backup, $dumpAll, $replaceExisting);
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource($engine), $backup, $dumpAll, $replaceExisting, $keepOwners);
 
         $result = restoreScriptProcess(['sh', '-c', $script], $dir, [
             'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
@@ -285,12 +285,12 @@ test('restores single PostgreSQL archives with pg_restore and SQL with psql', fu
     expect($run['exit'])->toBe(0, $run['stderr']);
     restoreScriptExpectCalls($run['calls'], $expectedCalls);
 })->with([
-    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
-    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
-    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
     'plain SQL' => ['pg-sql', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
     'gzip SQL' => ['pg-sql-gz', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
     // SQL cannot replace single objects: it restores into a new database, and only a
@@ -312,6 +312,14 @@ test('restores single PostgreSQL archives with pg_restore and SQL with psql', fu
         ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
     ]],
 ]);
+
+test('keeps PostgreSQL owners and privileges only when requested', function (string $fixture) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), keepOwners: true);
+
+    expect($run['exit'])->toBe(0, $run['stderr']);
+    restoreScriptExpectCalls($run['calls'], [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]);
+    expect($run['calls'][0]['args'])->not->toContain('--no-owner')->not->toContain('--no-acl');
+})->with(['custom archive' => ['pg-custom'], 'gzip custom archive' => ['pg-custom-gz']]);
 
 test('rejects unsupported single PostgreSQL backups before calling any client', function (string $fixture, string $message) {
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture));

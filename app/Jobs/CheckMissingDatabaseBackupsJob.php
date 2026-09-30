@@ -51,10 +51,11 @@ class CheckMissingDatabaseBackupsJob implements ShouldBeEncrypted, ShouldBeUniqu
         }
 
         // Send once for each period without backup activity.
-        if (! NotificationThrottle::claim($backup, BackupMissing::class, $lastActivityAt)) {
-            return;
-        }
-
-        $backup->team->notify(new BackupMissing($backup, $lastExecutionAt));
+        NotificationThrottle::sendOnce(
+            $backup,
+            BackupMissing::class,
+            $lastActivityAt,
+            fn () => $backup->team->notify(new BackupMissing($backup, $lastExecutionAt)),
+        );
     }
 }

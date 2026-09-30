@@ -431,6 +431,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->build_server = $this->server;
 
+        // An additional server of a multi-server application does not build: it pulls the image the main server pushed.
+        if ($this->is_this_additional_server && str($this->application->docker_registry_image_name)->isNotEmpty()) {
+            if (! $this->server->canBuildApplications()) {
+                // Disabled build cache forces a rebuild, which would skip the registry pull on a server that cannot build.
+                $this->force_rebuild = false;
+            }
+            $this->application_deployment_queue->addLogEntry('Additional server: pulls the image from the registry, no build server needed.');
+
+            return;
+        }
+
         // A deployments-only server never builds. Docker image and Compose applications are exempt:
         // the first builds nothing and the second does not support build servers.
         $mustBuildElsewhere = ! $this->server->canBuildApplications()
@@ -1443,6 +1454,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Build configuration changed. Rebuilding image.');
             }
         } else {
+            if ($this->is_this_additional_server && ! $this->server->canBuildApplications() && $this->application->build_pack !== 'dockercompose') {
+                throw new DeploymentException("Image ({$this->production_image_name}) not found in the registry; the main server must push it first. The server ({$this->server->name}) is set to deployments only and cannot build it.");
+            }
             $this->application_deployment_queue->addLogEntry("Image not found ({$this->production_image_name}). Building new image.");
         }
         if ($this->restart_only) {

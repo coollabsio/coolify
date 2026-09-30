@@ -40,7 +40,29 @@ class ServersController extends Controller
             ]);
         }
 
-        return serializeApiResponse($settings);
+        return serializeApiResponse($settings)
+            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD);
+    }
+
+    /**
+     * Rejects requests where the deprecated is_build_server flag disagrees with server_role.
+     */
+    private function legacyBuildServerRoleConflict(Request $request): ?JsonResponse
+    {
+        if (! $request->filled('is_build_server') || ! $request->filled('server_role')) {
+            return null;
+        }
+
+        $wantsBuildOnly = $request->boolean('is_build_server');
+        $roleIsBuildOnly = $request->string('server_role')->toString() === ServerRole::BUILD->value;
+        if ($wantsBuildOnly === $roleIsBuildOnly) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => ['is_build_server' => ['is_build_server is deprecated and conflicts with server_role. Send only server_role.']],
+        ], 422);
     }
 
     private function removeSensitiveData($server)
@@ -452,6 +474,7 @@ class ServersController extends Controller
                         'user' => ['type' => 'string', 'example' => 'root', 'description' => 'The user of the server.'],
                         'private_key_uuid' => ['type' => 'string', 'example' => 'og888os', 'description' => 'The UUID of the private key.'],
                         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both'], 'example' => 'both', 'description' => 'Server role.'],
+                        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
                     ],
@@ -493,7 +516,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -513,6 +536,7 @@ class ServersController extends Controller
             'private_key_uuid' => 'string|required',
             'user' => ValidationPatterns::serverUsernameRules(required: false),
             'server_role' => 'string|nullable|in:deployment,build,both',
+            'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
         ], [
@@ -542,9 +566,15 @@ class ServersController extends Controller
         if (is_null($request->port)) {
             $request->offsetSet('port', 22);
         }
-        $serverRole = $request->filled('server_role')
-            ? ServerRole::from($request->string('server_role')->toString())
-            : ServerRole::BOTH;
+        $legacyRoleConflict = $this->legacyBuildServerRoleConflict($request);
+        if ($legacyRoleConflict) {
+            return $legacyRoleConflict;
+        }
+        $serverRole = match (true) {
+            $request->filled('server_role') => ServerRole::from($request->string('server_role')->toString()),
+            $request->filled('is_build_server') && $request->boolean('is_build_server') => ServerRole::BUILD,
+            default => ServerRole::BOTH,
+        };
 
         if ($serverRole === ServerRole::DEPLOYMENT && ! ModelsServer::buildServers($teamId)->exists()) {
             return response()->json([
@@ -639,6 +669,7 @@ class ServersController extends Controller
                         'user' => ['type' => 'string', 'description' => 'The user of the server.'],
                         'private_key_uuid' => ['type' => 'string', 'description' => 'The UUID of the private key.'],
                         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both'], 'description' => 'Server role.'],
+                        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false changes a build server to both and leaves other roles unchanged. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
                         'concurrent_builds' => ['type' => 'integer', 'description' => 'Number of concurrent builds.'],
@@ -684,7 +715,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -703,6 +734,7 @@ class ServersController extends Controller
             'private_key_uuid' => 'string|nullable',
             'user' => ValidationPatterns::serverUsernameRules(required: false),
             'server_role' => 'string|nullable|in:deployment,build,both',
+            'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
             'concurrent_builds' => 'integer|min:1',
@@ -760,9 +792,21 @@ class ServersController extends Controller
             ], 422);
         }
 
+        $legacyRoleConflict = $this->legacyBuildServerRoleConflict($request);
+        if ($legacyRoleConflict) {
+            return $legacyRoleConflict;
+        }
+
         $serverRole = null;
         if ($request->filled('server_role')) {
             $serverRole = ServerRole::from($request->string('server_role')->toString());
+        } elseif ($request->filled('is_build_server')) {
+            // Legacy flag: true makes the server build only, false turns a build only server back into a regular one.
+            if ($request->boolean('is_build_server')) {
+                $serverRole = ServerRole::BUILD;
+            } elseif ($server->isBuildServer()) {
+                $serverRole = ServerRole::BOTH;
+            }
         }
 
         if ($serverRole === ServerRole::BUILD && ! $server->isBuildServer() && ! $server->isEmpty()) {

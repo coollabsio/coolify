@@ -22,6 +22,7 @@ use OpenApi\Attributes as OA;
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
+        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],

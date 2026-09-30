@@ -16,11 +16,14 @@
                         </header>
                         <div class="application-settings-section-body flex flex-col gap-3">
                             <p class="text-sm text-neutral-600 dark:text-fg-dim">Coolify matched each hostname to a zone available through your connected DNS credentials.</p>
+                            @if (collect($dnsProviderProposals)->contains(fn (array $proposal): bool => blank($proposal['target'])))
+                                <x-callout type="warning" title="No public IP">{{ \App\Support\DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE }}</x-callout>
+                            @endif
                             @foreach ($dnsProviderProposals as $proposal)
                                 @php($key = $proposal['hostname'].'|'.$proposal['zone_id'])
                                 <div wire:key="dns-proposal-{{ $key }}" class="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between">
                                     <div class="min-w-0 text-sm"><div class="truncate font-medium text-black dark:text-fg">{{ $proposal['hostname'] }}</div>
-                                        <div class="text-xs text-neutral-500 dark:text-fg-dim">{{ $proposal['credential'] }} · {{ $proposal['zone'] }} · {{ $proposal['target'] }}</div>
+                                        <div class="text-xs text-neutral-500 dark:text-fg-dim">{{ $proposal['credential'] }} · {{ $proposal['zone'] }}@if (filled($proposal['target'])) · {{ $proposal['target'] }}@endif</div>
                                     </div>
                                     @if ($proposal['managed'])
                                         <x-status-badge status="Managed by Coolify" type="success" />
@@ -33,6 +36,8 @@
                                                 :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Replace record"
                                                 canGate="update" :canResource="$dnsAuthResource" />
                                         </div>
+                                    @elseif (blank($proposal['target']))
+                                        <span class="text-xs text-neutral-500 dark:text-fg-dim">Add manually</span>
                                     @else
                                         <x-forms.button type="button"
                                             wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($proposal['hostname']) }}, {{ $proposal['zone_id'] }})"

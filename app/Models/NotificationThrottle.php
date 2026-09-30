@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Contracts\ThrottledNotification;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Throwable;
 
 /**
  * Records when a notification was last sent for a resource, so repeated checks
@@ -60,6 +62,29 @@ class NotificationThrottle extends Model
             'notification' => $notification,
             'sent_at' => now(),
         ]) === 1;
+    }
+
+    /**
+     * Claim the throttle, then run $send. When $send throws, the claim is released so the
+     * next attempt is not throttled, and the exception is rethrown.
+     *
+     * Returns false when the claim failed and $send did not run.
+     */
+    public static function sendOnce(Model $notifiable, string $notification, ?CarbonInterface $sentBefore, Closure $send): bool
+    {
+        if (! static::claim($notifiable, $notification, $sentBefore)) {
+            return false;
+        }
+
+        try {
+            $send();
+        } catch (Throwable $exception) {
+            static::release($notifiable, $notification);
+
+            throw $exception;
+        }
+
+        return true;
     }
 
     /**

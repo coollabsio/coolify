@@ -310,7 +310,10 @@ function clone_application(Application $source, $destination, array $overrides =
     $persistentVolumes = $source->persistentStorages()->get();
     foreach ($persistentVolumes as $volume) {
         $newName = '';
-        if (str_starts_with($volume->name, $source->uuid)) {
+        if ($volume->standalone_sqlite_id !== null) {
+            // A mounted SQLite database volume stays connected to the source only; the clone gets its own volume.
+            $newName = $newApplication->uuid.'-'.$volume->name;
+        } elseif (str_starts_with($volume->name, $source->uuid)) {
             $newName = str($volume->name)->replace($source->uuid, $newApplication->uuid);
         } else {
             $newName = $newApplication->uuid.'-'.str($volume->name)->afterLast('-');
@@ -324,6 +327,7 @@ function clone_application(Application $source, $destination, array $overrides =
         ])->fill([
             'name' => $newName,
             'resource_id' => $newApplication->id,
+            'standalone_sqlite_id' => null,
         ]);
         $newPersistentVolume->save();
 

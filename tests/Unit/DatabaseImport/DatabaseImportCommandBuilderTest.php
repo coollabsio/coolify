@@ -136,6 +136,32 @@ test('replaces existing PostgreSQL objects when requested', function () {
         ->toContain('--exit-on-error');
 });
 
+test('restores PostgreSQL archives without owners and privileges by default', function (bool $replaceExisting) {
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump', false, $replaceExisting);
+
+    // Dumps from other hosts (for example RDS) reference roles that do not exist here, and
+    // --single-transaction would roll back the whole restore on the first ALTER OWNER.
+    expect($command)->toContain('pg_restore --exit-on-error --single-transaction --no-owner --no-acl');
+})->with(['keep existing objects' => [false], 'replace existing objects' => [true]]);
+
+test('keeps PostgreSQL owners and privileges when requested', function () {
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump', false, false, keepOwners: true);
+
+    expect($command)->toContain('pg_restore --exit-on-error --single-transaction -U')
+        ->not->toContain('--no-owner')
+        ->not->toContain('--no-acl');
+});
+
+test('restores SQLite backups into the selected database file', function () {
+    $resource = Mockery::mock(StandaloneSqlite::class);
+    $resource->shouldReceive('getMorphClass')->andReturn(StandaloneSqlite::class);
+    $resource->shouldReceive('databaseFilePath')->once()->with('cache.db')->andReturn('/var/lib/sqlite/cache.db');
+
+    $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand($resource, '/tmp/backup', false, sqliteDatabase: 'cache.db');
+
+    expect($command)->toContain("sqlite3 -bail '/var/lib/sqlite/cache.db'");
+});
+
 test('rejects unsupported database types', function () {
     $builder = new DatabaseImportCommandBuilder;
     $redis = importResource(StandaloneRedis::class);

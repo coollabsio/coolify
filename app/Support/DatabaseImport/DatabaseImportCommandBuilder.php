@@ -25,14 +25,19 @@ use_single_tar_member() { [ "$(find "$work" -type f | wc -l | tr -d ' ')" = 1 ] 
 
 SH;
 
-    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false): string
+    /**
+     * @param  bool  $keepOwners  PostgreSQL archives: restore object owners and privileges. Off by default,
+     *                            because roles from another host (for example RDS) usually do not exist here.
+     * @param  string|null  $sqliteDatabase  SQLite: the database file to restore into, validated by the resource.
+     */
+    public function buildRestoreCommand(object $resource, string $path, bool $dumpAll, bool $replaceExisting = false, bool $keepOwners = false, ?string $sqliteDatabase = null): string
     {
         $script = match ($this->databaseType($resource)) {
-            'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting),
+            'postgresql' => $dumpAll ? $this->postgresqlDumpAll() : $this->postgresqlSingle($replaceExisting, $keepOwners),
             'mysql' => $this->mysql('mysql', 'MYSQL', $dumpAll),
             'mariadb' => $this->mysql('mariadb', 'MARIADB', $dumpAll),
             'mongodb' => $this->mongodb($replaceExisting),
-            'sqlite' => $this->sqlite($resource->databaseFilePath()),
+            'sqlite' => $this->sqlite($resource->databaseFilePath($sqliteDatabase)),
             default => throw new InvalidArgumentException('Database import is not supported for this database type.'),
         };
 
@@ -145,11 +150,14 @@ SH;
      * pg_dump custom and tar archives are restored with pg_restore, SQL dumps with psql.
      * pg_restore cannot read gzip files, so both clients receive the backup on stdin.
      * SQL cannot replace single objects, so replacing recreates the target database.
+     * Archives skip owners and privileges unless they are kept, because a single missing
+     * role would roll back the whole single-transaction restore.
      */
-    private function postgresqlSingle(bool $replaceExisting): string
+    private function postgresqlSingle(bool $replaceExisting, bool $keepOwners): string
     {
         // Every restore runs in one transaction, so a failure part-way rolls back and leaves the
         // current data as it was, also when --clean dropped objects first.
+        $owners = $keepOwners ? '' : ' --no-owner --no-acl';
         $clean = $replaceExisting ? ' --clean --if-exists' : '';
         $sqlRestore = $replaceExisting ? <<<'SH'
 
@@ -178,7 +186,7 @@ SH;
         return <<<SH
 db=\${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}
 if [ "\$(stream | head -c 5)" = PGDMP ] || is_tar; then
-  stream | pg_restore --exit-on-error --single-transaction{$clean} -U \$POSTGRES_USER -d "\$db"
+  stream | pg_restore --exit-on-error --single-transaction{$owners}{$clean} -U \$POSTGRES_USER -d "\$db"
 elif ! is_text; then
   fail 'Unsupported PostgreSQL backup format. Use a pg_dump archive (custom or tar format) or an SQL file.'
 elif stream | head -c 4096 | grep -q 'PostgreSQL database cluster dump'; then
@@ -276,7 +284,7 @@ SH;
     }
 
     /**
-     * SQLite restores a plain or gzip-compressed database file into the first database
+     * SQLite restores a plain or gzip-compressed database file into the selected database
      * file with .restore, which replaces its contents. SQLite reads an empty file (for
      * example from a failed dump) as an empty database, so only real database files are restored.
      */

@@ -1815,9 +1815,7 @@ $siteAddress {
 
     public function sendUnreachableNotification()
     {
-        if (NotificationThrottle::claim($this, Unreachable::class)) {
-            $this->team->notify(new Unreachable($this));
-        }
+        NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)

@@ -6,6 +6,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Team;
 use App\Notifications\Database\BackupMissing;
+use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -124,4 +125,13 @@ it('waits to mark an incident sent until a notification channel is enabled', fun
     (new CheckMissingDatabaseBackupsJob)->handle();
 
     Notification::assertSentTo($team, BackupMissing::class);
+});
+
+it('releases the missing backup claim when sending the notification throws', function () {
+    $team = teamWithBackupFailureNotifications();
+    $backup = missingBackupSchedule($team);
+    $this->mock(Dispatcher::class, fn ($mock) => $mock->shouldReceive('send')->once()->andThrow(new RuntimeException('SMTP is down')));
+
+    expect(fn () => (new CheckMissingDatabaseBackupsJob)->handle())->toThrow(RuntimeException::class, 'SMTP is down')
+        ->and(NotificationThrottle::wasSent($backup, BackupMissing::class))->toBeFalse();
 });

@@ -9,6 +9,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\RemoteProcessCommand;
+use App\Traits\BroadcastsToTeam;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -123,12 +124,7 @@ class RunRemoteProcess
         $this->activity->save();
         if ($this->call_event_on_finish) {
             try {
-                $eventClass = "App\\Events\\$this->call_event_on_finish";
-                if (! is_null($this->call_event_data)) {
-                    event(new $eventClass($this->call_event_data));
-                } else {
-                    event(new $eventClass($this->activity->causer_id));
-                }
+                self::dispatchFinishEvent($this->activity, $this->call_event_on_finish, $this->call_event_data);
             } catch (\Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());
             }
@@ -138,6 +134,25 @@ class RunRemoteProcess
         }
 
         return $processResult;
+    }
+
+    /**
+     * Dispatches the event that a remote process asked for when it finishes.
+     *
+     * Without explicit event data, a team event goes to the team of the server that ran the
+     * process. The causer is a user, so its id is only used for events on a user channel.
+     */
+    public static function dispatchFinishEvent(Activity $activity, string $eventName, mixed $eventData = null): void
+    {
+        $eventClass = "App\\Events\\{$eventName}";
+
+        if (is_null($eventData)) {
+            $eventData = in_array(BroadcastsToTeam::class, class_uses_recursive($eventClass), true)
+                ? $activity->getExtraProperty('team_id')
+                : $activity->causer_id;
+        }
+
+        event(new $eventClass($eventData));
     }
 
     protected function getCommand(): string

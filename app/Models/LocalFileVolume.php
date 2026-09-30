@@ -640,8 +640,17 @@ class LocalFileVolume extends BaseModel
                         continue;
                     }
 
-                    $resolvedSource = replaceLocalSource(str((string) $source), str($this->composeSourceDirectory()));
-                    if (normalizeUnixPath($resolvedSource->value()) === normalizeUnixPath($this->fs_path)) {
+                    $sourceDirectory = str($this->composeSourceDirectory());
+                    $fsPath = normalizeUnixPath($this->fs_path);
+                    if (normalizeUnixPath(legacyReplaceLocalSource(str((string) $source), $sourceDirectory)->value()) === $fsPath) {
+                        return true;
+                    }
+                    try {
+                        $resolvedSource = replaceLocalSource(str((string) $source), $sourceDirectory)->value();
+                    } catch (\Throwable) {
+                        continue;
+                    }
+                    if (normalizeUnixPath($resolvedSource) === $fsPath) {
                         return true;
                     }
                 }

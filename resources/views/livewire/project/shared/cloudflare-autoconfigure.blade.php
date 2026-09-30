@@ -171,6 +171,11 @@
                                 Use Recheck after changing DNS.
                             </x-callout>
                         @else
+                            @if (collect($dnsProviderProposals)->isNotEmpty() && collect($dnsHints)->contains(fn (array $record): bool => ! \App\Support\DnsRecordHints::isPublicAddress($record['value'])))
+                                <x-callout type="warning" title="No public IP">
+                                    {{ \App\Support\DnsRecordHints::NO_PUBLIC_ADDRESS_MESSAGE }}
+                                </x-callout>
+                            @endif
                             <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-coolgray-300">
                                 <table class="w-full min-w-[32rem] text-left text-sm">
                                     <thead
@@ -201,7 +206,7 @@
                                                     ])
                                                 </td>
                                                 <td class="px-3 py-2.5 text-right">
-                                                    @php($recordProviders = collect($dnsProviderProposals)->where('hostname', $record['name'])->where('managed', false))
+                                                    @php($recordProviders = \App\Support\DnsRecordHints::isPublicAddress($record['value']) ? collect($dnsProviderProposals)->where('hostname', $record['name'])->where('managed', false) : collect())
                                                     @foreach ($recordProviders as $provider)
                                                         <x-forms.button type="button"
                                                             wire:click="createManagedDnsRecord({{ \Illuminate\Support\Js::from($record['name']) }}, {{ $provider['zone_id'] }}, {{ \Illuminate\Support\Js::from($record['value']) }})"

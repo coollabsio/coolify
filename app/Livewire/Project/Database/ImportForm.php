@@ -11,6 +11,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
@@ -159,6 +160,16 @@ class ImportForm extends Component
 
     public bool $replaceExisting = false;
 
+    /**
+     * PostgreSQL archives: restore owners and privileges instead of skipping them.
+     */
+    public bool $keepOwners = false;
+
+    /**
+     * SQLite: the database file to restore into. Always one of the database's own files.
+     */
+    public ?string $sqliteDatabase = null;
+
     public string $restoreCommandText = '';
 
     public string $customLocation = '';
@@ -182,6 +193,15 @@ class ImportForm extends Component
         }
 
         return $this->resourceType::find($this->resourceId);
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function sqliteDatabaseFiles(): array
+    {
+        return $this->resource instanceof StandaloneSqlite ? $this->resource->databaseFiles() : [];
     }
 
     #[Computed]
@@ -208,6 +228,12 @@ class ImportForm extends Component
         $this->parameters = get_route_parameters();
         $this->getContainers();
         $this->loadAvailableS3Storages();
+        $this->initializeRestoreOptions();
+    }
+
+    protected function initializeRestoreOptions(): void
+    {
+        $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
         $this->refreshRestoreCommandText();
     }
 
@@ -221,6 +247,31 @@ class ImportForm extends Component
         $this->refreshRestoreCommandText();
     }
 
+    public function updatedKeepOwners(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedSqliteDatabase(): void
+    {
+        if (! in_array($this->sqliteDatabase, $this->sqliteDatabaseFiles, true)) {
+            $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
+        }
+        $this->refreshRestoreCommandText();
+    }
+
+    /**
+     * Preselects the SQLite file whose name matches the chosen backup, else the first file.
+     */
+    public function selectSqliteDatabaseFor(?string $backupName = null): void
+    {
+        if (! $this->resource instanceof StandaloneSqlite) {
+            return;
+        }
+        $this->sqliteDatabase = $this->resource->defaultRestoreFile($backupName);
+        $this->refreshRestoreCommandText();
+    }
+
     /**
      * Shows the exact script the import runs, so the confirmation matches the restore.
      */
@@ -228,9 +279,13 @@ class ImportForm extends Component
     {
         $commands = app(DatabaseImportCommandBuilder::class);
 
-        $this->restoreCommandText = $this->resource && $commands->supports($this->resource)
-            ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting)
-            : '';
+        try {
+            $this->restoreCommandText = $this->resource && $commands->supports($this->resource)
+                ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase)
+                : '';
+        } catch (\InvalidArgumentException) {
+            $this->restoreCommandText = '';
+        }
     }
 
     public function getContainers()
@@ -361,6 +416,7 @@ class ImportForm extends Component
                     return;
                 }
                 $this->filename = $this->customLocation;
+                $this->selectSqliteDatabaseFor($this->customLocation);
                 $this->dispatch('success', 'The file exists.');
             } catch (\Throwable $e) {
                 return handleError($e, $this);
@@ -397,8 +453,8 @@ class ImportForm extends Component
         try {
             $this->importRunning = true;
             $source = Storage::exists("upload/{$this->resourceUuid}/restore")
-                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting)
-                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
+                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase)
+                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -514,6 +570,7 @@ class ImportForm extends Component
 
             // Get file size
             $this->s3FileSize = $disk->size($cleanPath);
+            $this->selectSqliteDatabaseFor($cleanPath);
 
             $this->dispatch('success', 'File found in S3. Size: '.formatBytes($this->s3FileSize));
         } catch (\Throwable $e) {
@@ -557,7 +614,7 @@ class ImportForm extends Component
 
         try {
             $this->importRunning = true;
-            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting);
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) currentTeam()->id);
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
@@ -586,6 +643,6 @@ class ImportForm extends Component
 
     public function buildRestoreCommand(string $tmpPath): string
     {
-        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting);
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase);
     }
 }

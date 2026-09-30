@@ -143,6 +143,29 @@ test('queued dns configuration creates the record and broadcasts completion', fu
         && $event->hostname === 'app.example.com');
 });
 
+test('queued dns configuration refuses a private record address without calling the provider', function (string $address) {
+    Event::fake([DnsRecordConfigurationFinished::class]);
+    $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret']);
+    $zone = DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake();
+
+    $job = new ConfigureDnsRecordJob(
+        teamId: $token->team_id,
+        zoneId: $zone->id,
+        resourceType: null,
+        resourceId: null,
+        hostname: 'app.example.com',
+        content: $address,
+    );
+    $job->handle(app(CloudflareDnsProvider::class));
+
+    Http::assertNothingSent();
+    expect(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeFalse();
+    Event::assertDispatched(DnsRecordConfigurationFinished::class, fn ($event) => $event->successful === false
+        && $event->hostname === 'app.example.com'
+        && $event->message === 'The server has no public IP address; add the DNS record manually.');
+})->with(['10.0.0.5', '100.100.1.1', '127.0.0.1', '169.254.1.1', 'fd00::5']);
+
 test('missing zone throws from handle without broadcasting completion', function () {
     Event::fake([DnsRecordConfigurationFinished::class]);
     $token = IntegrationToken::factory()->create(['provider' => 'cloudflare', 'token' => 'secret']);
@@ -443,6 +466,72 @@ describe('domain DNS configuration after add', function () {
             && (string) $job->resourceId === (string) $webApp->id);
         Queue::assertNotPushed(CheckDomainDnsJob::class);
     });
+
+    test('private server addresses are never queued as dns records', function (string $address) {
+        $this->server->update(['ip' => $address]);
+        $application = Application::factory()->create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Private DNS App',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'fqdn' => null,
+            'redirect' => 'both',
+            'build_pack' => 'nixpacks',
+        ]);
+        $application->settings()->update(['is_container_label_readonly_enabled' => true]);
+
+        Livewire::test(Domains::class, ['application' => $application->fresh()])
+            ->set('newDomain', 'https://app.example.com')
+            ->call('addDomain')
+            ->assertHasNoErrors()
+            ->assertDispatched('warning', 'The server has no public IP address; add the DNS record manually.')
+            ->assertNotDispatched('info')
+            ->assertSet('showDnsProviderModal', false);
+
+        expect(explode(',', (string) $application->fresh()->fqdn))->toContain('https://app.example.com');
+        Queue::assertNotPushed(ConfigureDnsRecordJob::class);
+    })->with([
+        'rfc1918 10/8' => '10.0.0.5',
+        'rfc1918 172.16/12' => '172.16.0.5',
+        'rfc1918 192.168/16' => '192.168.1.5',
+        'cgnat' => '100.64.0.5',
+        'tailscale' => '100.100.1.1',
+        'loopback' => '127.0.0.1',
+        'link-local' => '169.254.1.1',
+        'ipv6 unique local' => 'fd00::5',
+        'ipv6 link-local' => 'fe80::5',
+        'ipv6 loopback' => '::1',
+    ]);
+
+    test('service domains never queue a dns record for a private server address', function () {
+        $this->server->update(['ip' => '100.100.1.1']);
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        $webApp = ServiceApplication::create([
+            'uuid' => (string) Str::uuid(),
+            'service_id' => $service->id,
+            'name' => 'web',
+            'human_name' => 'Web',
+            'image' => 'nginx:alpine',
+            'fqdn' => null,
+        ]);
+
+        Livewire::test(ServiceDomains::class, ['service' => $service->fresh(['applications', 'server'])])
+            ->set('newServiceApplicationId', $webApp->id)
+            ->set('newDomain', 'https://web.example.com')
+            ->call('addDomain')
+            ->assertHasNoErrors()
+            ->assertDispatched('warning', 'The server has no public IP address; add the DNS record manually.')
+            ->assertSet('showDnsProviderModal', false);
+
+        Queue::assertNotPushed(ConfigureDnsRecordJob::class);
+    });
 });
 
 test('dns provider action controls declare update authorization against the resource', function () {
@@ -658,6 +747,42 @@ test('dns records point only at an address of the resource server in a zone of t
     'another ip' => ['app.example.com', '6.6.6.6'],
     'hostname outside the zone' => ['www.other.org', null],
 ]);
+
+test('a dns record is never created for a private server address', function (string $address, ?string $content) {
+    ['application' => $application, 'zone' => $zone] = prepareManagedDnsApplication();
+    Server::query()->whereKey($application->destination->server_id)->update(['ip' => $address]);
+    Http::fake();
+
+    Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call('createManagedDnsRecord', 'app.example.com', $zone->id, $content)
+        ->assertDispatched('error', 'The server has no public IP address; add the DNS record manually.');
+    Http::assertNothingSent();
+    expect(ManagedDnsRecord::query()->exists())->toBeFalse();
+})->with([
+    'private ipv4' => ['10.0.0.5', null],
+    'private ipv4 requested explicitly' => ['10.0.0.5', '10.0.0.5'],
+    'tailscale cgnat' => ['100.100.1.1', '100.100.1.1'],
+    'ipv6 unique local' => ['fd00::5', 'fd00::5'],
+]);
+
+test('replacing a conflicting dns record is refused once the server has no public address', function () {
+    ['application' => $application, 'zone' => $zone] = prepareManagedDnsApplication();
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'record-1', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.50']],
+        ]),
+    ]);
+    $component = Livewire::test(Domains::class, ['application' => $application->fresh()])
+        ->call('createManagedDnsRecord', 'app.example.com', $zone->id);
+
+    Server::query()->whereKey($application->destination->server_id)->update(['ip' => '192.168.1.5']);
+    $component->call('refreshDomains')
+        ->call('replaceManagedDnsRecord', 'app.example.com', $zone->id)
+        ->assertDispatched('error', 'The server has no public IP address; add the DNS record manually.');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'PATCH');
+});
 
 /**
  * @return array{application: Application, zone: DnsProviderZone}

@@ -127,11 +127,12 @@ it('updates the server role through the API', function (string $role) {
     'deployment and build' => ['both'],
 ]);
 
-it('rejects the legacy build server API field', function () {
+it('accepts the deprecated build server API field as a server role', function () {
     patchServerUpdatePrivateKeyApi($this, $this->server, $this->bearerToken, [
         'is_build_server' => true,
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors('is_build_server');
+    ])->assertCreated();
+
+    expect($this->server->settings->fresh()->server_role->value)->toBe('build');
 });
 
 it('requires a dedicated build server before selecting deployment only', function () {

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\Server\HighDiskUsage;
 use App\Notifications\Server\Unreachable;
 use Carbon\Carbon;
+use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -79,4 +80,60 @@ it('keeps unreachable_notification_sent in the server API response', function ()
         ->getJson('/api/v1/servers/'.$this->server->uuid)
         ->assertOk()
         ->assertJsonPath('unreachable_notification_sent', true);
+});
+
+function throttledDiskUsageNotification(Server $server): HighDiskUsage
+{
+    return new HighDiskUsage($server, 95, 80);
+}
+
+it('releases the throttle claim when sending the notification throws', function () {
+    $sends = 0;
+    $this->mock(NotificationDispatcher::class, function ($mock) use (&$sends) {
+        $mock->shouldReceive('send')->twice()->andReturnUsing(function () use (&$sends) {
+            $sends++;
+            if ($sends === 1) {
+                throw new RuntimeException('SMTP is down');
+            }
+        });
+    });
+
+    expect(fn () => $this->team->notify(throttledDiskUsageNotification($this->server)))
+        ->toThrow(RuntimeException::class, 'SMTP is down')
+        ->and(NotificationThrottle::wasSent($this->server, HighDiskUsage::class))->toBeFalse();
+
+    $this->team->notify(throttledDiskUsageNotification($this->server));
+
+    expect($sends)->toBe(2)
+        ->and(NotificationThrottle::wasSent($this->server, HighDiskUsage::class))->toBeTrue();
+});
+
+it('throttles the notification after it was sent successfully', function () {
+    $this->mock(NotificationDispatcher::class, fn ($mock) => $mock->shouldReceive('send')->once());
+
+    $this->team->notify(throttledDiskUsageNotification($this->server));
+    $this->team->notify(throttledDiskUsageNotification($this->server));
+
+    expect(NotificationThrottle::wasSent($this->server, HighDiskUsage::class))->toBeTrue();
+});
+
+it('does not send a notification that another worker is already sending', function () {
+    $notification = throttledDiskUsageNotification($this->server);
+    $concurrentClaim = null;
+    $this->mock(NotificationDispatcher::class, function ($mock) use ($notification, &$concurrentClaim) {
+        $mock->shouldReceive('send')->once()->andReturnUsing(function () use ($notification, &$concurrentClaim) {
+            $concurrentClaim = NotificationThrottle::claimFor($notification);
+        });
+    });
+
+    $this->team->notify($notification);
+
+    expect($concurrentClaim)->toBeFalse();
+});
+
+it('releases the unreachable claim when sending the unreachable notification throws', function () {
+    $this->mock(NotificationDispatcher::class, fn ($mock) => $mock->shouldReceive('send')->once()->andThrow(new RuntimeException('Discord is down')));
+
+    expect(fn () => $this->server->sendUnreachableNotification())->toThrow(RuntimeException::class)
+        ->and(NotificationThrottle::wasSent($this->server, Unreachable::class))->toBeFalse();
 });

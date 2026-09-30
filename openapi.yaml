@@ -10644,6 +10644,10 @@ paths:
                   enum: [deployment, build, both]
                   example: both
                   description: 'Server role.'
+                is_build_server:
+                  type: boolean
+                  deprecated: true
+                  description: 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'
                 instant_validate:
                   type: boolean
                   example: false
@@ -10798,6 +10802,10 @@ paths:
                   type: string
                   enum: [deployment, build, both]
                   description: 'Server role.'
+                is_build_server:
+                  type: boolean
+                  deprecated: true
+                  description: 'Deprecated: use server_role instead. true sets server_role to build, false changes a build server to both and leaves other roles unchanged. Must not conflict with server_role.'
                 instant_validate:
                   type: boolean
                   description: 'Instant validate.'
@@ -14225,6 +14233,14 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
         -
@@ -14248,6 +14264,14 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
         -
@@ -14269,6 +14293,14 @@ components:
               description: 'Drop matching PostgreSQL objects before restoring a single-database archive.'
               type: boolean
               default: false
+            keep_owners:
+              description: 'Restore object owners and privileges from a single-database PostgreSQL archive. By default they are skipped, because the roles of another server usually do not exist.'
+              type: boolean
+              default: false
+            sqlite_database:
+              description: 'SQLite: the database file to restore into. Must be one of the database files. Defaults to the file named in the backup file name, else the first file.'
+              type: string
+              example: app.db
           type: object
           additionalProperties: false
     DatabaseImportStatus:
@@ -15157,6 +15189,11 @@ components:
             - deployment
             - build
             - both
+        is_build_server:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use server_role instead. true when server_role is build.'
         is_cloudflare_tunnel:
           type: boolean
         is_jump_server:

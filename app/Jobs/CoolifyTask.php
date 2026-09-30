@@ -113,12 +113,7 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         // Dispatch cleanup event on failure (same as on success)
         if ($this->call_event_on_finish) {
             try {
-                $eventClass = "App\\Events\\$this->call_event_on_finish";
-                if (! is_null($this->call_event_data)) {
-                    event(new $eventClass($this->call_event_data));
-                } else {
-                    event(new $eventClass($this->activity->causer_id));
-                }
+                RunRemoteProcess::dispatchFinishEvent($this->activity, $this->call_event_on_finish, $this->call_event_data);
                 Log::info('Cleanup event dispatched after job failure', [
                     'event' => $this->call_event_on_finish,
                 ]);

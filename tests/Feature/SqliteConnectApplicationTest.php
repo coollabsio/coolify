@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -283,4 +284,45 @@ it('blocks deleting the sqlite volume or database while an application is connec
 
     expect($databaseVolume->fresh())->not->toBeNull()
         ->and(StandaloneSqlite::find($this->sqlite->id))->not->toBeNull();
+});
+
+it('does not connect a cloned application to the sqlite database', function () {
+    Process::fake();
+    $this->application->update(['redirect' => 'both']);
+    $this->application->refresh();
+    $originalVolume = connectSqliteVolume($this->application, $this->sqlite);
+
+    $clone = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $clonedVolume = $clone->persistentStorages()->sole();
+
+    expect($clonedVolume->standalone_sqlite_id)->toBeNull()
+        ->and($clonedVolume->name)->toBe($clone->uuid.'-sqlite-data-'.$this->sqlite->uuid)
+        ->and($clonedVolume->mount_path)->toBe(StandaloneSqlite::DATA_DIRECTORY)
+        ->and($clonedVolume->isSharedWithAnotherResource())->toBeFalse()
+        ->and($this->sqlite->connectedVolumes()->pluck('id')->all())->toBe([$originalVolume->id])
+        ->and($this->sqlite->connectedApplicationNames()->all())->toBe([$this->application->name])
+        ->and($originalVolume->fresh()->standalone_sqlite_id)->toBe($this->sqlite->id);
+});
+
+it('allows deleting the sqlite database once the original application is gone, even if it was cloned', function () {
+    Process::fake();
+    Queue::fake();
+    $this->application->update(['redirect' => 'both']);
+    $this->application->refresh();
+    $originalVolume = connectSqliteVolume($this->application, $this->sqlite);
+
+    clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $originalVolume->delete();
+
+    expect($this->sqlite->fresh()->hasConnectedApplications())->toBeFalse();
+
+    Livewire::test(Danger::class, ['resource' => $this->sqlite])
+        ->call('delete', 'password')
+        ->assertNotDispatched('error', fn (string $name, array $params) => str_contains($params[0] ?? '', 'is mounted by'));
 });

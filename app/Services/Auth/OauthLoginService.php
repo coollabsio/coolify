@@ -28,8 +28,19 @@ class OauthLoginService
             ? $this->resolveOidcUser($oauthUser, $oauthSetting, $email)
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
-        $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
-        session(['currentTeam' => $team]);
+        // Choose the team like the password login: restore the last active team,
+        // or the sole team. A multi-team user without a valid stored choice gets
+        // no session team, so DecideWhatToDoWithUser shows the team selection.
+        $user->unsetRelation('teams');
+        $team = $user->resolveStoredTeam();
+        if (! $team && $user->teams->isEmpty()) {
+            $team = $user->recreate_personal_team();
+        }
+        if ($team) {
+            session(['currentTeam' => $team]);
+        } else {
+            session()->forget('currentTeam');
+        }
 
         if ($this->requiresTwoFactorChallenge($user)) {
             Auth::logout();
@@ -59,6 +70,50 @@ class OauthLoginService
     public function requiresTwoFactorChallenge(User $user): bool
     {
         return $user->hasEnabledTwoFactorAuthentication();
+    }
+
+    /**
+     * Whether the identity returned by the provider is already linked to the
+     * given user. Used to confirm destructive actions through OAuth: it never
+     * links, updates, or creates identities or users, and never logs anyone in.
+     */
+    public function identityBelongsToUser(User $user, OauthSetting $oauthSetting, object $oauthUser): bool
+    {
+        if ($oauthSetting->provider === 'oidc') {
+            [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
+            $providerUserId = $subject;
+        } else {
+            $issuer = $oauthSetting->provider;
+            $providerUserId = $oauthUser->id ?? null;
+            if (is_int($providerUserId)) {
+                $providerUserId = (string) $providerUserId;
+            }
+        }
+
+        if (! is_string($issuer) || $issuer === '' || ! is_string($providerUserId) || trim($providerUserId) === '') {
+            return false;
+        }
+
+        return $user->oauthIdentities()
+            ->where('provider', $oauthSetting->provider)
+            ->where('issuer', $issuer)
+            ->where('provider_user_id', $providerUserId)
+            ->exists();
+    }
+
+    /**
+     * @return array{0: mixed, 1: mixed}
+     */
+    private function oidcIssuerAndSubject(object $oauthUser): array
+    {
+        $issuer = $oauthUser instanceof OidcUser && filled($oauthUser->issuer)
+            ? $oauthUser->issuer
+            : data_get($oauthUser->user, 'iss');
+        $subject = $oauthUser instanceof OidcUser && filled($oauthUser->subject)
+            ? $oauthUser->subject
+            : data_get($oauthUser->user, 'sub', $oauthUser->id);
+
+        return [$issuer, $subject];
     }
 
     private function resolveOauthUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
@@ -162,12 +217,7 @@ class OauthLoginService
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
     {
-        $issuer = $oauthUser instanceof OidcUser && filled($oauthUser->issuer)
-            ? $oauthUser->issuer
-            : data_get($oauthUser->user, 'iss');
-        $subject = $oauthUser instanceof OidcUser && filled($oauthUser->subject)
-            ? $oauthUser->subject
-            : data_get($oauthUser->user, 'sub', $oauthUser->id);
+        [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
         $emailVerified = ($oauthUser instanceof OidcUser && $oauthUser->emailVerified)
             || data_get($oauthUser->user, 'email_verified') === true;
 

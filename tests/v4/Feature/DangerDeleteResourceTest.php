@@ -88,13 +88,29 @@ test('delete redirects before dispatching resource cleanup after the response', 
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
 });
 
-test('delete succeeds without password for an oauth user', function () {
+test('delete requires confirmation for an oauth user', function () {
     OauthIdentity::create([
         'user_id' => $this->user->id,
         'provider' => 'oidc',
         'issuer' => 'https://idp.example.com',
         'provider_user_id' => 'oauth-user-id',
     ]);
+
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', '')
+        ->assertHasErrors('password');
+
+    Queue::assertNotPushed(DeleteResourceJob::class);
+});
+
+test('delete succeeds without password for an oauth user after confirming through the provider', function () {
+    OauthIdentity::create([
+        'user_id' => $this->user->id,
+        'provider' => 'oidc',
+        'issuer' => 'https://idp.example.com',
+        'provider_user_id' => 'oauth-user-id',
+    ]);
+    session()->passwordConfirmed();
 
     Livewire::test(Danger::class, ['resource' => $this->application])
         ->call('delete', '')

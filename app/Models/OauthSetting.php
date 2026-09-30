@@ -82,6 +82,23 @@ class OauthSetting extends Model
         return __("auth.login.{$this->provider}");
     }
 
+    /**
+     * Human-readable provider name, e.g. for "Confirm with Google".
+     */
+    public function providerName(): string
+    {
+        if ($this->isOidc()) {
+            return filled($this->custom_label) ? $this->custom_label : 'SSO';
+        }
+
+        return match ($this->provider) {
+            'azure' => 'Microsoft',
+            'github' => 'GitHub',
+            'gitlab' => 'GitLab',
+            default => str($this->provider)->headline()->value(),
+        };
+    }
+
     public function isOidc(): bool
     {
         return $this->provider === 'oidc';

@@ -3554,3 +3554,27 @@ it('restarts a preview dns check when the domain already has a completed result'
 
     Queue::assertPushed(CheckDomainDnsJob::class);
 });
+
+it('shows a manual dns note instead of create buttons when the server has no public ip', function (string $address) {
+    $this->server->update(['ip' => $address]);
+    Http::fake();
+
+    $component = openDnsProviderModalWithZone($this->team, $this->application)
+        ->assertSet('showDnsProviderModal', true)
+        ->call('openManualDnsRecords');
+
+    expect($component->html())
+        ->toContain('The server has no public IP address; add the DNS record manually.')
+        ->not->toContain('Create DNS record')
+        ->not->toContain('Add with Cloudflare');
+    Http::assertNothingSent();
+})->with(['10.0.0.5', '100.100.1.1', 'fd00::5']);
+
+it('offers dns provider record creation for a public server ip', function () {
+    $component = openDnsProviderModalWithZone($this->team, $this->application)->call('openManualDnsRecords');
+
+    expect($component->html())
+        ->toContain('Create DNS record')
+        ->toContain('Add with Cloudflare')
+        ->not->toContain('The server has no public IP address; add the DNS record manually.');
+});
