@@ -10,7 +10,6 @@ use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsRe
 use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -604,34 +603,12 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
-     * Whether destructive actions must be confirmed. Users with a password
-     * confirm with it; users with a linked OAuth identity can also confirm by
-     * re-authenticating through their provider. Only users with neither have
-     * no way to confirm.
+     * Whether destructive actions must be confirmed with the account password.
+     * Users with a linked OAuth identity only confirm with the dialog's typed
+     * confirmation, and users without a password have no way to confirm.
      */
     public function requiresPasswordConfirmation(): bool
     {
-        return $this->hasPassword() || $this->hasSsoIdentity();
-    }
-
-    /**
-     * Enabled OAuth providers the user can re-authenticate with to confirm
-     * destructive actions.
-     *
-     * @return Collection<int, OauthSetting>
-     */
-    public function oauthConfirmationProviders(): Collection
-    {
-        $providers = $this->oauthIdentities()->distinct()->pluck('provider');
-        if ($providers->isEmpty()) {
-            return new Collection;
-        }
-
-        return OauthSetting::query()
-            ->whereIn('provider', $providers)
-            ->where('enabled', true)
-            ->get()
-            ->filter(fn (OauthSetting $setting): bool => $setting->couldBeEnabled())
-            ->values();
+        return $this->hasPassword() && ! $this->hasSsoIdentity();
     }
 }

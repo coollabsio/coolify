@@ -73,35 +73,6 @@ class OauthLoginService
     }
 
     /**
-     * Whether the identity returned by the provider is already linked to the
-     * given user. Used to confirm destructive actions through OAuth: it never
-     * links, updates, or creates identities or users, and never logs anyone in.
-     */
-    public function identityBelongsToUser(User $user, OauthSetting $oauthSetting, object $oauthUser): bool
-    {
-        if ($oauthSetting->provider === 'oidc') {
-            [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
-            $providerUserId = $subject;
-        } else {
-            $issuer = OauthIdentityIssuer::forSetting($oauthSetting);
-            $providerUserId = $oauthUser->id ?? null;
-            if (is_int($providerUserId)) {
-                $providerUserId = (string) $providerUserId;
-            }
-        }
-
-        if (! is_string($issuer) || $issuer === '' || ! is_string($providerUserId) || trim($providerUserId) === '') {
-            return false;
-        }
-
-        return $user->oauthIdentities()
-            ->where('provider', $oauthSetting->provider)
-            ->where('issuer', $issuer)
-            ->where('provider_user_id', $providerUserId)
-            ->exists();
-    }
-
-    /**
      * @return array{0: mixed, 1: mixed}
      */
     private function oidcIssuerAndSubject(object $oauthUser): array

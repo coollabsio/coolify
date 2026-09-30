@@ -91,24 +91,3 @@ function get_socialite_provider(string $provider)
 
     return $socialite;
 }
-
-/**
- * Authorization parameters that ask the provider to re-authenticate the user
- * instead of reusing an existing provider session, where the provider
- * supports it. Used to confirm destructive actions through OAuth.
- *
- * Socialite's with() replaces earlier parameters, so provider defaults set in
- * get_socialite_provider() (Google's hd) are repeated here.
- *
- * @return array<string, int|string|null>
- */
-function socialite_reauthentication_parameters(OauthSetting $oauthSetting): array
-{
-    return match ($oauthSetting->provider) {
-        'google' => ['hd' => $oauthSetting->tenant, 'prompt' => 'select_account', 'max_age' => 0],
-        'oidc', 'authentik', 'zitadel', 'clerk' => ['prompt' => 'login', 'max_age' => 0],
-        'azure', 'infomaniak' => ['prompt' => 'login'],
-        'github' => ['prompt' => 'select_account'],
-        default => [],
-    };
-}

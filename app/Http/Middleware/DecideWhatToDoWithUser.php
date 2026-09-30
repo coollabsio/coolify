@@ -12,13 +12,6 @@ class DecideWhatToDoWithUser
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // OAuth confirmation of destructive actions only re-authenticates the
-        // logged-in user and returns to the page it started from, so it must not
-        // be redirected to onboarding, subscription, or team selection.
-        if ($request->routeIs('auth.confirm', 'auth.callback')) {
-            return $next($request);
-        }
-
         if (auth()?->user()?->teams?->count() === 0) {
             $currentTeam = auth()->user()?->recreate_personal_team();
             refreshSession($currentTeam);

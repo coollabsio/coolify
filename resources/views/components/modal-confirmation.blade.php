@@ -34,14 +34,8 @@
     use Illuminate\View\ComponentSlot;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
-    // Skip ONLY the password step (disabled globally, recently confirmed, or no way to confirm)
+    // Skip ONLY the password step (disabled globally, OAuth users, users without a password, or recently confirmed)
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
-    // Users with a linked OAuth identity can confirm by re-authenticating with their provider
-    $confirmingUser = auth()->user();
-    $confirmWithPasswordInput = $confirmingUser?->hasPassword() ?? false;
-    $oauthConfirmationProviders = ($confirmWithPassword && ! $skipPasswordConfirmation && $confirmingUser)
-        ? $confirmingUser->oauthConfirmationProviders()
-        : collect();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
         // Password confirmation requirement is not affected by temporary two-step disable
@@ -356,96 +350,61 @@
                     @if (!$skipPasswordConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
                             <x-callout type="danger" title="Final Confirmation" class="mb-4">
-                                @if ($confirmWithPasswordInput && $oauthConfirmationProviders->isNotEmpty())
-                                    Please enter your password or confirm with your sign-in provider to confirm this destructive action.
-                                @elseif ($confirmWithPasswordInput)
-                                    Please enter your password to confirm this destructive action.
-                                @elseif ($oauthConfirmationProviders->isNotEmpty())
-                                    Please confirm with your sign-in provider to confirm this destructive action.
-                                @else
-                                    Your sign-in provider is not available, so this action cannot be confirmed. Please ask an administrator.
-                                @endif
+                                Please enter your password to confirm this destructive action.
                             </x-callout>
-                            @if ($confirmWithPasswordInput)
-                                <div class="flex flex-col gap-2 mb-4">
-                                    @php
-                                        $passwordConfirm = Str::uuid();
-                                    @endphp
-                                    <label for="password-confirm-{{ $passwordConfirm }}"
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Your Password
-                                    </label>
-                                    <form @submit.prevent="false" @keydown.enter.prevent>
-                                        <input type="text" name="username" autocomplete="username"
-                                            value="{{ auth()->user()->email }}" style="display: none;">
-                                        <input type="password" id="password-confirm-{{ $passwordConfirm }}"
-                                            x-model="password" class="w-full input" placeholder="Enter your password"
-                                            autocomplete="current-password">
-                                    </form>
-                                    <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
-                                    </p>
-                                    @error('password')
-                                        <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                            @endif
-                            @if ($oauthConfirmationProviders->isNotEmpty())
-                                <div class="flex flex-col gap-2 mb-4">
-                                    @if ($confirmWithPasswordInput)
-                                        <div class="text-[12px] text-neutral-500 dark:text-fg-dim">Or confirm with your sign-in provider:</div>
-                                    @endif
-                                    <div class="flex flex-wrap gap-2">
-                                        @foreach ($oauthConfirmationProviders as $oauthConfirmationProvider)
-                                            <a href="{{ route('auth.confirm', $oauthConfirmationProvider->provider) }}"
-                                                class="button">
-                                                Confirm with {{ $oauthConfirmationProvider->providerName() }}
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                    <p class="text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
-                                        You will return to this page. Then start the action again; it will not ask for confirmation for a while.
-                                    </p>
-                                    @if (! $confirmWithPasswordInput)
-                                        @error('password')
-                                            <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
-                                        @enderror
-                                    @endif
-                                </div>
-                            @endif
+                            <div class="flex flex-col gap-2 mb-4">
+                                @php
+                                    $passwordConfirm = Str::uuid();
+                                @endphp
+                                <label for="password-confirm-{{ $passwordConfirm }}"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Your Password
+                                </label>
+                                <form @submit.prevent="false" @keydown.enter.prevent>
+                                    <input type="text" name="username" autocomplete="username"
+                                        value="{{ auth()->user()->email }}" style="display: none;">
+                                    <input type="password" id="password-confirm-{{ $passwordConfirm }}"
+                                        x-model="password" class="w-full input" placeholder="Enter your password"
+                                        autocomplete="current-password">
+                                </form>
+                                <p x-show="passwordError" x-text="passwordError" class="mt-1 text-sm text-red-500">
+                                </p>
+                                @error('password')
+                                    <p class="mt-1 text-sm text-red-500">{{ $message }}</p>
+                                @enderror
+                            </div>
 
                             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
-                                @if ($confirmWithPasswordInput)
-                                    <x-forms.button :showLoadingIndicator="false"
-                                        x-bind:disabled="!password || submitting" class="w-auto" isError
-                                        @click="
-                                        if (dispatchEvent) {
-                                            $wire.dispatch(dispatchEventType, dispatchEventMessage);
-                                        }
-                                        submitting = true;
-                                        modalOpen = false;
-                                        $nextTick(() => {
-                                            submitForm().then((result) => {
-                                                submitting = false;
-                                                if (result === true) {
-                                                    resetModal();
-                                                } else {
-                                                    modalOpen = true;
-                                                    passwordError = result;
-                                                    password = '';
-                                                }
-                                            }).catch(() => {
-                                                submitting = false;
+                                <x-forms.button :showLoadingIndicator="false"
+                                    x-bind:disabled="!password || submitting" class="w-auto" isError
+                                    @click="
+                                    if (dispatchEvent) {
+                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                                    }
+                                    submitting = true;
+                                    modalOpen = false;
+                                    $nextTick(() => {
+                                        submitForm().then((result) => {
+                                            submitting = false;
+                                            if (result === true) {
+                                                resetModal();
+                                            } else {
                                                 modalOpen = true;
-                                            });
+                                                passwordError = result;
+                                                password = '';
+                                            }
+                                        }).catch(() => {
+                                            submitting = false;
+                                            modalOpen = true;
                                         });
-                                        ">
-                                        <x-loading-on-button x-show="submitting" x-cloak />
-                                        <span x-text="step3ButtonText"></span>
-                                    </x-forms.button>
-                                @endif
+                                    });
+                                    ">
+                                    <x-loading-on-button x-show="submitting" x-cloak />
+                                    <span x-text="step3ButtonText"></span>
+                                </x-forms.button>
                             </div>
                         </div>
                     @endif

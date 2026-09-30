@@ -8,6 +8,7 @@ use App\Services\Auth\OauthIdentityIssuer;
 use App\Services\Auth\OauthLoginService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Once;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -211,25 +212,18 @@ describe('login', function () {
 });
 
 describe('confirmation', function () {
-    it('matches the linked identity only on the same instance', function () {
-        $user = User::factory()->create(['email' => 'user@example.com']);
-        $setting = instanceOauthSetting('gitlab', ['base_url' => 'https://gitlab.example.com/']);
-        $service = app(OauthLoginService::class);
-        $service->login('gitlab', instanceOauthUser(1, 'user@example.com', ['confirmed_at' => '2026-01-01T00:00:00Z']), $setting);
-
-        expect($service->identityBelongsToUser($user, $setting, instanceOauthUser(1, 'user@example.com')))->toBeTrue();
-
-        $setting->update(['base_url' => 'https://gitlab.attacker.example']);
-
-        expect($service->identityBelongsToUser($user, $setting->refresh(), instanceOauthUser(1, 'user@example.com')))->toBeFalse();
-    });
-
-    it('does not start a confirmation without an identity from the configured instance', function () {
+    it('has no OAuth re-authentication route for confirming destructive actions', function () {
         $user = User::factory()->create(['email' => 'user@example.com']);
         linkInstanceIdentity($user, 'gitlab', 'https://gitlab.example.com', '1');
-        instanceOauthSetting('gitlab', ['base_url' => 'https://gitlab.attacker.example']);
+        instanceOauthSetting('gitlab', ['base_url' => 'https://gitlab.example.com']);
 
-        $this->actingAs($user)->get(route('auth.confirm', 'gitlab'))->assertForbidden();
+        expect(Route::has('auth.confirm'))->toBeFalse();
+
+        // The path falls through to the catch-all route and stays inside Coolify.
+        $response = $this->actingAs($user)->get('/auth/gitlab/confirm');
+
+        $response->assertRedirect();
+        expect($response->headers->get('Location'))->toStartWith(url('/'));
     });
 });
 

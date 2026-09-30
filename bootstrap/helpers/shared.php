@@ -4922,14 +4922,13 @@ function formatContainerStatus(string $status): string
  * Check if the password step of a destructive action should be skipped.
  * Returns true if:
  * - Two-step confirmation is globally disabled
- * - User has neither a password nor a linked OAuth identity (no way to confirm)
- * - User confirmed recently (password or OAuth re-authentication), using the
- *   same `auth.password_confirmed_at` session value and timeout as Laravel
+ * - User has a linked OAuth identity (they only use the dialog's typed confirmation)
+ * - User has no password (no way to confirm)
+ * - User confirmed their password recently (`auth.password_confirmed_at`
+ *   within `auth.password_timeout`)
  *
- * Users with a linked OAuth identity are never skipped silently: they confirm
- * with their password or by re-authenticating through their provider.
- *
- * Used by modal-confirmation.blade.php to determine if password step should be shown.
+ * Used by modal-confirmation.blade.php to determine if password step should be shown,
+ * and by verifyPasswordConfirmation() to enforce the same rule on the server.
  *
  * @return bool True if password confirmation should be skipped
  */
@@ -4963,7 +4962,6 @@ function hasRecentPasswordConfirmation(): bool
 /**
  * Verify password for two-step confirmation.
  * Skips verification in the cases listed in shouldSkipPasswordConfirmation().
- * Users without a password must confirm through their OAuth provider first.
  *
  * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
  * @param  Component|null  $component  Optional Livewire component to add errors to
@@ -4976,15 +4974,8 @@ function verifyPasswordConfirmation(mixed $password, ?Component $component = nul
         return true;
     }
 
-    $user = Auth::user();
-    if (! $user->hasPassword()) {
-        $component?->addError('password', 'Please confirm with your sign-in provider first.');
-
-        return false;
-    }
-
     // Verify the password
-    if (! is_string($password) || ! Hash::check($password, $user->password)) {
+    if (! is_string($password) || ! Hash::check($password, Auth::user()->password)) {
         $component?->addError('password', 'The provided password is incorrect.');
 
         return false;
