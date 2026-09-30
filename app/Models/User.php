@@ -65,9 +65,11 @@ class User extends Authenticatable implements SendsEmail
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'created_before_oauth_identities',
     ];
 
     protected $casts = [
+        'created_before_oauth_identities' => 'boolean',
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',

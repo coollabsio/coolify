@@ -56,7 +56,7 @@ it('reads the ACME file with sudo on non-root servers', function () {
     $certificates = GetTraefikCertificates::run($this->server);
 
     expect($certificates)->toHaveCount(40);
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo bash -c 'sh -c '\\''if [ ! -f")
+    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'if [ ! -f")
         && str_contains($process->command, 'head -c'));
 });
 
@@ -70,7 +70,7 @@ it('uploads a large ACME file instead of passing it as a shell argument', functi
         ->and($remaining)->toHaveCount(39)
         ->and(collect($remaining)->pluck('domain.main'))->not->toContain('app1.example.com');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo bash -c 'sh -c '\\''set -e;")
+    Process::assertRan(fn ($process) => str_contains($process->command, "\nsudo sh -c 'set -e;")
         && str_contains($process->command, 'umask 077')
         && str_contains($process->command, 'chmod 600')
         && str_contains($process->command, 'mv --'));

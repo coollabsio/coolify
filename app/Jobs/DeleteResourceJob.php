@@ -99,24 +99,21 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
-            if ($this->resource instanceof Service) {
-                if ($this->resource->trashed()) {
-                    $this->resource->restore();
-                }
-
-                $this->resource->server?->team?->notify(new GeneralNotification(
-                    "Service deletion failed for '{$this->resource->name}'. Docker resources may still exist on server '{$this->resource->server?->name}'. You can retry the cleanup or select 'Remove from Coolify only' in the deletion dialog. Error: {$e->getMessage()}",
-                    success: false,
-                ));
-
-                throw $e;
-            }
-
+            // A resource can always be deleted from Coolify, also when its server does not respond.
             Log::warning('Remote cleanup failed while deleting resource; continuing with local deletion.', [
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->type(),
                 'error' => $e->getMessage(),
             ]);
+
+            // A deleted server has nothing left to clean up. Otherwise tell the team what may remain.
+            $server = data_get($this->resource, 'destination.server');
+            if ($server) {
+                $this->resource->team()?->notify(new GeneralNotification(
+                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: {$e->getMessage()}",
+                    success: false,
+                ));
+            }
         }
 
         try {

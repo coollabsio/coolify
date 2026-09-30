@@ -83,7 +83,7 @@ it('restores a gzipped backup with .restore into the first database file', funct
     expect($command)
         ->toStartWith("backup='/tmp/restore_1'\n")
         ->toContain('stream() { if is_gzip; then gunzip -c "$backup"; else cat "$backup"; fi; }')
-        ->toEndWith("stream > \"\$backup.db\" || fail 'The backup cannot be read. Nothing was changed.'\nsqlite3 -bail '/var/lib/sqlite/app.db' '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status");
+        ->toEndWith("stream > \"\$backup.db\" || fail 'The backup cannot be read. Nothing was changed.'\n[ \"\$(head -c 15 \"\$backup.db\")\" = 'SQLite format 3' ] || { rm -f \"\$backup.db\"; fail 'The backup is not a SQLite database. Nothing was changed.'; }\nsqlite3 -bail '/var/lib/sqlite/app.db' '.timeout 10000' \".restore \$backup.db\"; status=\$?; rm -f \"\$backup.db\"; exit \$status");
 });
 
 it('normalises the file list when saved from the general page', function () {

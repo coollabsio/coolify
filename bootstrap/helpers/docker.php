@@ -65,8 +65,7 @@ function caddyTrafficAppKey(string $uuid, ?string $serviceName = null): string
  * New containers carry `coolify.{type}Uuid`. Containers created before that label carry a
  * numeric `coolify.{type}Id` instead. Ids change when a server moves to another instance, so
  * for those containers the owner is read from the compose project (Swarm: stack namespace),
- * which is the resource UUID for deployments since mid-2024. Use resolveContainerOwner() to
- * also fall back to the numeric id for older containers.
+ * which is the resource UUID for deployments since mid-2024.
  *
  * @param  'application'|'service'|'database'  $type
  */
@@ -89,11 +88,11 @@ function containerOwnerUuid(Collection|array|string $labels, string $type): ?str
 }
 
 /**
- * Resource that owns a container, from the given candidates.
- *
- * Order: UUID label, compose project / stack namespace (see containerOwnerUuid()), then the
- * numeric id label of containers without a UUID label. The id is only correct on the instance
- * that created the container, so it is the last fallback.
+ * Resource that owns a container, from the given candidates, by UUID label or compose project /
+ * stack namespace (see containerOwnerUuid()). Applications deployed before mid-2024 used the
+ * deployment directory as compose project; their compose service (the container name) starts
+ * with the application UUID. The numeric id label is never used: another Coolify instance that
+ * manages the same server can have a resource with the same id.
  *
  * @template TResource of \Illuminate\Database\Eloquent\Model
  *
@@ -107,13 +106,13 @@ function resolveContainerOwner(Collection $resources, Collection|array|string $l
 
     $uuid = containerOwnerUuid($labels, $type);
     $owner = $uuid ? $resources->firstWhere('uuid', $uuid) : null;
-    if ($owner || filled($labels->get("coolify.{$type}Uuid"))) {
+    if ($owner || $type !== 'application' || filled($labels->get('coolify.applicationUuid')) || ! $labels->has('coolify.applicationId')) {
         return $owner;
     }
 
-    $legacyId = $labels->get("coolify.{$type}Id");
+    $composeService = (string) $labels->get('com.docker.compose.service');
 
-    return is_numeric($legacyId) ? $resources->first(fn ($resource) => (int) $resource->id === (int) $legacyId) : null;
+    return $resources->first(fn ($resource) => $composeService === $resource->uuid || str_starts_with($composeService, $resource->uuid.'-'));
 }
 
 /**
@@ -131,13 +130,8 @@ function resolveContainerApplicationId(Collection $applications, Collection|arra
 
     $uuid = containerOwnerUuid($labels, 'application');
     $id = $uuid ? Application::withTrashed()->where('uuid', $uuid)->value('id') : null;
-    if ($id !== null || filled($labels->get('coolify.applicationUuid'))) {
-        return $id !== null ? (int) $id : null;
-    }
 
-    $legacyId = $labels->get('coolify.applicationId');
-
-    return is_numeric($legacyId) ? (int) $legacyId : null;
+    return $id !== null ? (int) $id : null;
 }
 
 /**
@@ -189,10 +183,9 @@ function resolveServiceContainerOwner(Collection $services, Collection|array $fl
  * @param  'application'|'service'|'database'  $type
  * @param  list<string>  $extraFilters  Additional `--filter` values, e.g. `label=coolify.pullRequestId=0`.
  * @param  list<string>|null  $legacyExtraFilters  Filters for containers without the UUID label; defaults to $extraFilters.
- * @param  int|null  $legacyId  Local numeric id: also match older containers by `coolify.{type}Id` (may repeat a container).
  * @return list<string>
  */
-function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters = [], string $format = '{{json .}}', bool $all = true, ?array $legacyExtraFilters = null, ?int $legacyId = null): array
+function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters = [], string $format = '{{json .}}', bool $all = true, ?array $legacyExtraFilters = null): array
 {
     $filters = fn (array $values) => collect($values)->map(fn (string $filter) => '--filter '.escapeshellarg($filter))->implode(' ');
     $base = 'docker ps'.($all ? ' -a' : '');
@@ -203,8 +196,9 @@ function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters
         $base.' '.$filters(["label=coolify.{$type}Uuid={$uuid}", ...$extraFilters]).' '.$formatArgument,
         $base.' '.$filters(["label=coolify.{$type}Id", "label=com.docker.compose.project={$uuid}", ...$legacyFilters]).' '.$formatArgument,
     ];
-    if ($legacyId !== null) {
-        $commands[] = $base.' '.$filters(["label=coolify.{$type}Id={$legacyId}", ...$legacyFilters]).' '.$formatArgument;
+    if ($type === 'application') {
+        // Deployed before mid-2024 (see resolveContainerOwner()): the container name starts with the UUID.
+        $commands[] = $base.' '.$filters(['label=coolify.applicationId', "name=^{$uuid}", ...$legacyFilters]).' '.$formatArgument;
     }
 
     return $commands;
@@ -217,7 +211,7 @@ function dockerPsByOwnerCommands(string $type, string $uuid, array $extraFilters
  */
 function containersOwnedBy(Server $server, string $type, Model $resource): Collection
 {
-    $output = instant_remote_process(dockerPsByOwnerCommands($type, $resource->uuid, legacyId: (int) $resource->id), $server);
+    $output = instant_remote_process(dockerPsByOwnerCommands($type, $resource->uuid), $server);
 
     return format_docker_command_output_to_json($output)->filter()->unique('ID')->values();
 }
@@ -229,9 +223,9 @@ function containersOwnedBy(Server $server, string $type, Model $resource): Colle
  * @param  list<string>  $extraFilters
  * @param  list<string>|null  $legacyExtraFilters
  */
-function containerIdsByOwnerScript(string $type, string $uuid, array $extraFilters = [], bool $all = true, ?array $legacyExtraFilters = null, ?int $legacyId = null): string
+function containerIdsByOwnerScript(string $type, string $uuid, array $extraFilters = [], bool $all = true, ?array $legacyExtraFilters = null): string
 {
-    $commands = dockerPsByOwnerCommands($type, $uuid, $extraFilters, '{{.ID}}', $all, $legacyExtraFilters, $legacyId);
+    $commands = dockerPsByOwnerCommands($type, $uuid, $extraFilters, '{{.ID}}', $all, $legacyExtraFilters);
 
     return 'container_ids=$({ '.implode('; ', $commands).'; } | sort -u)';
 }

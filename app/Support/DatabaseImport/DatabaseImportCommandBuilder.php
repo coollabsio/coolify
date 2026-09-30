@@ -277,7 +277,8 @@ SH;
 
     /**
      * SQLite restores a plain or gzip-compressed database file into the first database
-     * file with .restore, which replaces its contents.
+     * file with .restore, which replaces its contents. SQLite reads an empty file (for
+     * example from a failed dump) as an empty database, so only real database files are restored.
      */
     private function sqlite(string $file): string
     {
@@ -285,6 +286,7 @@ SH;
 
         return <<<SH
 stream > "\$backup.db" || fail 'The backup cannot be read. Nothing was changed.'
+[ "\$(head -c 15 "\$backup.db")" = 'SQLite format 3' ] || { rm -f "\$backup.db"; fail 'The backup is not a SQLite database. Nothing was changed.'; }
 sqlite3 -bail {$file} '.timeout 10000' ".restore \$backup.db"; status=\$?; rm -f "\$backup.db"; exit \$status
 SH;
     }

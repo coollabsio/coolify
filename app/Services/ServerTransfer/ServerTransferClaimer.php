@@ -165,7 +165,8 @@ class ServerTransferClaimer
         try {
             instant_remote_process([
                 'mkdir -p '.escapeshellarg(ServerTransferBundle::MAILBOX_DIR),
-                'echo '.escapeshellarg($b64).' | base64 -d > '.escapeshellarg($path),
+                // tee, not a redirect: the SSH user's shell opens a redirect, and a non-root user cannot enter /data/coolify.
+                'echo '.escapeshellarg($b64).' | base64 -d | tee '.escapeshellarg($path).' > /dev/null',
                 'chmod 600 '.escapeshellarg($path),
                 'chown 9999:root '.escapeshellarg($path).' || true',
             ], $server, true);

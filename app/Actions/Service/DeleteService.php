@@ -43,15 +43,20 @@ class DeleteService
         }
     }
 
-    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): void
+    /**
+     * Removes the container of one service part. Returns false when the server does not respond:
+     * the container then stays until the service starts again (compose up --remove-orphans).
+     */
+    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): bool
     {
         $service = $resource->service;
-        $server = $service?->server;
-        if (! $server?->isFunctional()) {
-            throw new RuntimeException('Server is not functional.');
+        if (! $service?->server?->isFunctional()) {
+            return false;
         }
 
         $this->removeContainers($service, $resource);
+
+        return true;
     }
 
     private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
@@ -67,7 +72,7 @@ class DeleteService
 
         // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
         // assignment would become "sudo container_ids=...", which sudo rejects.
-        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters, legacyId: (int) $service->id)
+        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters)
             .'; [ -z "$container_ids" ] || docker rm -f $container_ids';
         instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }

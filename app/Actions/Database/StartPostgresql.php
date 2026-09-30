@@ -209,7 +209,7 @@ class StartPostgresql
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
@@ -293,7 +293,8 @@ class StartPostgresql
 
     private function generate_init_scripts()
     {
-        $this->commands[] = "rm -rf $this->configuration_dir/docker-entrypoint-initdb.d/*";
+        // find instead of a shell glob: a non-root SSH user cannot read the directory to expand it.
+        $this->commands[] = "find $this->configuration_dir/docker-entrypoint-initdb.d -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true";
 
         if (blank($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
             return;

@@ -997,8 +997,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 $this->write_deployment_configurations();
                 if ($this->preserveRepository) {
+                    $start_in_workdir = "cd {$server_workdir} && {$start_command}";
+                    if ($this->server->isNonRoot()) {
+                        // A non-root SSH user cannot cd into the resource directory on the Coolify host. As one
+                        // `sh -c` script, the sudo parser runs the cd and the start command as root.
+                        $start_in_workdir = 'sh -c '.escapeshellarg($start_in_workdir);
+                    }
                     $this->execute_remote_command(
-                        ['command' => "cd {$server_workdir} && {$start_command}", 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
+                        ['command' => $start_in_workdir, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
                 } else {
                     $this->execute_remote_command(
@@ -1233,7 +1239,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'skip_command_log' => true,
                 ],
                 [
-                    "echo '{$readme}' > $mainDir/README.md",
+                    "echo '{$readme}' | tee $mainDir/README.md > /dev/null",
                 ]
             );
             if ($this->use_build_server) {

@@ -98,13 +98,16 @@ class OauthLoginService
                     return $identity->user;
                 }
 
-                if (! $this->hasVerifiedEmail($provider, $rawClaims)) {
-                    throw new HttpException(403, 'OAuth provider did not verify the email address');
-                }
-
                 $user = User::whereEmail($email)->first();
                 if ($user?->oauthIdentities()->exists()) {
                     throw new HttpException(403, 'OAuth identity cannot be linked to this account');
+                }
+
+                // Before OAuth identities existed, OAuth sign-in matched users by email only.
+                // Users from that time keep signing in without email delivery, so their
+                // first identity links without a provider verification claim.
+                if ($user?->created_before_oauth_identities !== true && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
+                    throw new HttpException(403, 'OAuth provider did not verify the email address');
                 }
 
                 if (! $user) {
@@ -125,6 +128,10 @@ class OauthLoginService
                     'last_login_at' => now(),
                 ]);
 
+                if ($user->created_before_oauth_identities) {
+                    $user->forceFill(['created_before_oauth_identities' => false])->save();
+                }
+
                 return $user;
             });
         } catch (UniqueConstraintViolationException $exception) {
@@ -134,17 +141,21 @@ class OauthLoginService
 
     /**
      * GitHub and Bitbucket select only verified primary email addresses in
-     * their Socialite providers. Other providers must return an explicit
-     * boolean verification claim in the raw provider response.
+     * their Socialite providers. Microsoft Graph has no verification flag, but
+     * Entra ID only issues a user principal name in a domain the tenant
+     * verified, so only that name is trusted. GitLab confirms the primary
+     * email of an account. Other providers must return an explicit boolean
+     * verification claim in the raw provider response.
      *
      * @param  array<string, mixed>  $rawClaims
      */
-    private function hasVerifiedEmail(string $provider, array $rawClaims): bool
+    private function hasVerifiedEmail(string $provider, array $rawClaims, string $email): bool
     {
         return match ($provider) {
             'github', 'bitbucket' => true,
             'discord' => data_get($rawClaims, 'verified') === true,
-            'google' => data_get($rawClaims, 'verified_email') === true,
+            'azure' => strtolower((string) data_get($rawClaims, 'userPrincipalName')) === $email,
+            'gitlab' => filled(data_get($rawClaims, 'confirmed_at')),
             default => data_get($rawClaims, 'email_verified') === true,
         };
     }
