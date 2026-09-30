@@ -329,7 +329,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
         ]);
-        if ($this->server->isFunctional() === false) {
+        if ($this->server->isFunctionalAfterRecheck() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
 

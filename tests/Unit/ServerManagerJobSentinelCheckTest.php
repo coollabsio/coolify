@@ -35,6 +35,8 @@ function createSentinelCheckServer(Team $team, Carbon $sentinelUpdatedAt, Server
         'server_timezone' => 'UTC',
         'server_role' => $role,
         'is_build_server' => $role === ServerRole::BUILD,
+        'is_reachable' => true,
+        'is_usable' => true,
     ]);
 
     return $server->refresh();
@@ -75,6 +77,21 @@ it('skips ServerConnectionCheckJob when sentinel is live', function () {
     // Sentinel is healthy so SSH connection check is skipped
     Queue::assertNotPushed(ServerConnectionCheckJob::class);
 });
+
+it('dispatches ServerConnectionCheckJob when sentinel is live but the server is marked unusable', function (string $flag) {
+    // A Sentinel heartbeat does not restore these flags, so only the SSH check can recover them
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    $server->settings->update([$flag => false]);
+
+    expect($server->isSentinelLive())->toBeTrue();
+
+    $job = new ServerManagerJob;
+    $job->handle();
+
+    Queue::assertPushed(ServerConnectionCheckJob::class, function ($job) use ($server) {
+        return $job->server->id === $server->id;
+    });
+})->with(['is_reachable', 'is_usable']);
 
 it('dispatches ServerConnectionCheckJob when sentinel is not live', function () {
     $server = createSentinelCheckServer($this->team, Carbon::now()->subMinutes(10));

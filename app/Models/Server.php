@@ -1630,6 +1630,25 @@ $siteAddress {
         return $isFunctional;
     }
 
+    /**
+     * Like isFunctional(), but runs a live SSH and Docker check when the server is marked
+     * unreachable. The flag can be stale after one failed scheduled check.
+     */
+    public function isFunctionalAfterRecheck(): bool
+    {
+        if ($this->isFunctional()) {
+            return true;
+        }
+        if ($this->settings->is_reachable || $this->settings->force_disabled || $this->hasPlaceholderIp()) {
+            return false;
+        }
+
+        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        $this->settings->refresh();
+
+        return $this->isFunctional();
+    }
+
     public function isLogDrainEnabled()
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
