@@ -7,6 +7,7 @@
 - Use the same regression test before and after the production change so the result shows the behavior difference.
 - Several dev instances can run from one checkout (see `./scripts/dev urls`). After you add a migration, run it on each running instance of that checkout, or those instances fail on the new code.
 - The checkout is shared with other sessions. When the full suite fails, rerun each failing file alone and compare with a clean `git archive HEAD` copy before you connect a failure to your change.
+- `sshd` keeps the login shell of an open multiplexed SSH connection. Call `SshMultiplexingHelper::removeMuxFile()` before a live test of SSH or login-shell behavior.
 - Redirect browser test output to a file (`> /tmp/x.log 2>&1`); piping it (`| tail`) hangs because the Playwright server keeps the pipe open.
 - Call `visit()` directly in each `tests/v4/Browser` test body; Pest does not mark a test that only uses helper-wrapped `visit()` as a browser test, so it fails with `sendText() on null`.
 
@@ -39,6 +40,7 @@
 - Put destructive actions on the footer's left and primary actions last on the right.
 - Use shared section, helper, tooltip, and icon-button components instead of local variants.
 - Keep validation, preview, and save controls in a fixed footer when the body is large.
+- `x-modal-confirmation` parses `submitAction` with `resources/js/modal-confirmation.js`: quoted arguments lose their quotes, unquoted ones arrive as text. Quote text that can contain commas or parentheses.
 
 ## Verify layered UI behavior visually
 - Inspect the real layout with all conditional elements visible, especially compound status badges.

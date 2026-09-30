@@ -263,6 +263,31 @@ test('the source can be removed', function () {
     ]);
 });
 
+test('only tokens of the resource team can be linked, also after a team switch', function () {
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'member']);
+    $otherToken = IntegrationToken::query()->create([
+        'team_id' => $otherTeam->id,
+        'provider' => 'doppler',
+        'name' => 'Other team Doppler',
+        'token' => 'dp.st.other',
+        'capabilities' => ['secrets'],
+    ]);
+
+    $component = Livewire::test(SecretManagerLinks::class, ['resource' => $this->application]);
+    // The user switches to the other team in another browser tab; the next save reloads the token list.
+    session(['currentTeam' => $otherTeam]);
+    $component->set('integration_token_uuid', $this->token->uuid)
+        ->set('integration_token_uuid', $otherToken->uuid);
+
+    expect($component->get('availableTokens')->pluck('id')->all())->toBe([$this->token->id]);
+    $this->assertDatabaseMissing('secret_manager_links', ['integration_token_id' => $otherToken->id]);
+    $this->assertDatabaseHas('secret_manager_links', [
+        'resourceable_id' => $this->application->id,
+        'integration_token_id' => $this->token->id,
+    ]);
+});
+
 test('members without update permission cannot save a source', function () {
     $member = User::factory()->create();
     $this->team->members()->attach($member->id, ['role' => 'member']);

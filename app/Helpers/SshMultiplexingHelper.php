@@ -250,9 +250,13 @@ class SshMultiplexingHelper
             .$delimiter;
     }
 
+    /**
+     * sshd runs this with the SSH user's login shell, which can be fish or csh/tcsh. They cannot
+     * parse POSIX `if ... fi`, so the logic runs in `sh`; bash is preferred, Alpine may lack it.
+     */
     private static function remoteShellCommand(): string
     {
-        return 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi';
+        return 'sh -c "if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi"';
     }
 
     public static function getConnectionTimeout(Server $server): int

@@ -150,6 +150,26 @@ test('a doppler link fetches secrets with the stored token', function () {
         && str_contains($request->url(), 'project=proj'));
 });
 
+test('a link never fetches secrets with a token of another team', function () {
+    Http::fake();
+    $otherToken = IntegrationToken::query()->create([
+        'team_id' => Team::factory()->create()->id,
+        'provider' => 'doppler',
+        'name' => 'Other team Doppler',
+        'token' => 'dp.st.other',
+        'capabilities' => ['secrets'],
+    ]);
+    // For example a link saved before this check, or written by another code path.
+    $link = $this->application->secretManagerLink()->create([
+        'integration_token_id' => $otherToken->id,
+        'settings' => ['project' => 'proj', 'config' => 'prd'],
+    ]);
+
+    expect(fn () => $link->fetchSecrets())
+        ->toThrow(RuntimeException::class, 'The secret manager token does not belong to the team of this resource.');
+    Http::assertNothingSent();
+});
+
 test('a vault link uses the base url and namespace from the token metadata', function () {
     Http::fake([
         'https://example.com:8200/v1/kv/data/apps/web' => Http::response([

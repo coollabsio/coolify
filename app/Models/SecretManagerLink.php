@@ -46,6 +46,10 @@ class SecretManagerLink extends BaseModel
     public function fetchSecrets(): array
     {
         $token = $this->integrationToken;
+        $teamId = $this->resourceable?->team()?->id;
+        if ($teamId === null || (int) $token->team_id !== (int) $teamId) {
+            throw new \RuntimeException('The secret manager token does not belong to the team of this resource.');
+        }
         $settings = $this->settings ?? [];
         $metadata = $token->metadata ?? [];
 

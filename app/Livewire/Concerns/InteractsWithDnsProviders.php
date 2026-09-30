@@ -11,13 +11,17 @@ use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Locked;
+use RuntimeException;
 
 trait InteractsWithDnsProviders
 {
     public bool $showDnsProviderModal = false;
 
+    #[Locked]
     public array $dnsProviderProposals = [];
 
+    #[Locked]
     public array $dnsProviderConflicts = [];
 
     public bool $deleteManagedDns = true;
@@ -42,10 +46,11 @@ trait InteractsWithDnsProviders
     public function createManagedDnsRecord(string $hostname, int $zoneId, ?string $content = null): void
     {
         $this->authorizeDnsProviderChange();
+        $hostname = strtolower($hostname);
         $cloudflare = app(CloudflareDnsProvider::class);
-        $zone = $this->findTeamZone($zoneId);
-        $content ??= $this->serverIp;
-        if ($zone === null || blank($content) || filter_var($content, FILTER_VALIDATE_IP) === false) {
+        $zone = $this->findTeamZone($zoneId, $hostname);
+        $content = $this->dnsRecordContent($content);
+        if ($zone === null || $content === null) {
             $this->dispatch('error', 'No connected DNS provider or public server IP is available for this domain.');
 
             return;
@@ -80,7 +85,7 @@ trait InteractsWithDnsProviders
         return collect($urls)->contains(function (string $url) use ($provider): bool {
             $hostname = parse_url($url, PHP_URL_HOST);
 
-            return is_string($hostname) && $provider->findZones(currentTeam()->id, $hostname)->isNotEmpty();
+            return is_string($hostname) && $provider->findZones($this->dnsTeamId(), $hostname)->isNotEmpty();
         });
     }
 
@@ -124,7 +129,7 @@ trait InteractsWithDnsProviders
 
             $resource = $this->dnsResourceForHostname($proposal['hostname']);
             ConfigureDnsRecordJob::dispatch(
-                currentTeam()->id,
+                $this->dnsTeamId(),
                 $zone->id,
                 $resource?->getMorphClass(),
                 $resource?->getKey(),
@@ -147,11 +152,12 @@ trait InteractsWithDnsProviders
     public function replaceManagedDnsRecord(string $hostname, int $zoneId, string $password = ''): void
     {
         $this->authorizeDnsProviderChange();
+        $hostname = strtolower($hostname);
         $key = $hostname.'|'.$zoneId;
         $conflict = $this->dnsProviderConflicts[$key] ?? null;
-        $zone = $this->findTeamZone($zoneId);
-        $content = $this->serverIp;
-        if ($conflict === null || $zone === null || blank($content) || filter_var($content, FILTER_VALIDATE_IP) === false) {
+        $zone = $this->findTeamZone($zoneId, $hostname);
+        $content = $this->dnsRecordContent($conflict['proposed'] ?? null);
+        if ($conflict === null || $zone === null || $content === null) {
             $this->dispatch('error', 'The DNS conflict is no longer available. Check the record again.');
 
             return;
@@ -181,8 +187,9 @@ trait InteractsWithDnsProviders
     {
         $provider = app(CloudflareDnsProvider::class);
         $hostnames ??= $this->allDomainHostnames();
-        $managed = ManagedDnsRecord::query()->where('team_id', currentTeam()->id)->whereIn('name', $hostnames)->pluck('id', 'name');
-        $this->dnsProviderProposals = collect($hostnames)->flatMap(fn (string $hostname) => $provider->findZones(currentTeam()->id, $hostname)
+        $teamId = $this->dnsTeamId();
+        $managed = ManagedDnsRecord::query()->where('team_id', $teamId)->whereIn('name', $hostnames)->pluck('id', 'name');
+        $this->dnsProviderProposals = collect($hostnames)->flatMap(fn (string $hostname) => $provider->findZones($teamId, $hostname)
             ->map(fn (DnsProviderZone $zone) => [
                 'hostname' => $hostname, 'zone_id' => $zone->id, 'zone' => $zone->name,
                 'credential' => $zone->integrationToken->name, 'target' => (string) $this->serverIp,
@@ -250,7 +257,7 @@ trait InteractsWithDnsProviders
             return;
         }
 
-        $result = app(ManagedDnsRecordCleanup::class)->releaseHostname($resource, $hostname, currentTeam()->id, $deleteRecord);
+        $result = app(ManagedDnsRecordCleanup::class)->releaseHostname($resource, $hostname, $this->dnsTeamId(), $deleteRecord);
         $this->reportManagedDnsRelease($result, 'removed');
     }
 
@@ -273,7 +280,7 @@ trait InteractsWithDnsProviders
      */
     protected function releaseManagedDnsForEditedDomains(Model $resource, array $previousHostnames): void
     {
-        $result = app(ManagedDnsRecordCleanup::class)->releaseRemovedHostnames($resource, $previousHostnames, currentTeam()->id);
+        $result = app(ManagedDnsRecordCleanup::class)->releaseRemovedHostnames($resource, $previousHostnames, $this->dnsTeamId());
         $this->reportManagedDnsRelease($result, 'updated');
     }
 
@@ -314,13 +321,46 @@ trait InteractsWithDnsProviders
 
     protected function authorizeDnsProviderChange(): void
     {
-        $this->authorize('update', property_exists($this, 'application') ? $this->application : $this->service);
+        $this->authorize('update', $this->dnsResource());
     }
 
-    protected function findTeamZone(int $zoneId): ?DnsProviderZone
+    /** The application or service whose domains this component manages. */
+    protected function dnsResource(): Model
     {
+        return property_exists($this, 'application') ? $this->application : $this->service;
+    }
+
+    /**
+     * Team of the resource. The session team can differ: a user can switch teams in another tab
+     * while this component is still open.
+     */
+    protected function dnsTeamId(): int
+    {
+        return $this->dnsResource()->team()?->id ?? throw new RuntimeException('The resource has no team.');
+    }
+
+    /**
+     * Zone of the resource team. With a hostname, only a zone that manages that hostname.
+     */
+    protected function findTeamZone(int $zoneId, ?string $hostname = null): ?DnsProviderZone
+    {
+        if ($hostname !== null) {
+            return app(CloudflareDnsProvider::class)->findZones($this->dnsTeamId(), $hostname)->firstWhere('id', $zoneId);
+        }
+
         return DnsProviderZone::query()->whereKey($zoneId)
-            ->whereHas('integrationToken', fn ($query) => $query->where('team_id', currentTeam()->id))->first();
+            ->whereHas('integrationToken', fn ($query) => $query->where('team_id', $this->dnsTeamId()))->first();
+    }
+
+    /**
+     * Content of a DNS record for this resource: one of its server addresses (IPv4 or IPv6),
+     * the first one when none is requested. Any other address is rejected.
+     */
+    protected function dnsRecordContent(?string $requested = null): ?string
+    {
+        $addresses = array_values(array_filter($this->serverIpsForDnsHints()));
+
+        return $requested === null ? ($addresses[0] ?? null) : (in_array($requested, $addresses, true) ? $requested : null);
     }
 
     abstract protected function persistDomainDnsStatuses(): void;

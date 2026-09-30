@@ -28,7 +28,7 @@
                                         @php($conflict = $dnsProviderConflicts[$key])
                                         <div class="flex flex-col items-end gap-2 text-xs"><span class="text-red-600 dark:text-red-400">Currently {{ $conflict['current'] }}</span>
                                             <x-modal-confirmation title="Replace conflicting DNS record?" isErrorButton buttonTitle="Replace record"
-                                                submitAction="replaceManagedDnsRecord({{ \Illuminate\Support\Js::from($proposal['hostname']) }}, {{ $proposal['zone_id'] }})"
+                                                submitAction="replaceManagedDnsRecord({{ $proposal['hostname'] }}, {{ $proposal['zone_id'] }})"
                                                 :actions="['Replace '.$proposal['hostname'].' value '.$conflict['current'].' with '.$conflict['proposed'], 'Coolify will manage the replaced record.']"
                                                 :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Replace record"
                                                 canGate="update" :canResource="$dnsAuthResource" />

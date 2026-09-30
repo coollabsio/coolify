@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Models\IntegrationToken;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -41,8 +42,7 @@ class SecretManagerLinks extends Component
     private function loadData(): void
     {
         $this->link = $this->resource->secretManagerLink()->with('integrationToken')->first();
-        $this->availableTokens = IntegrationToken::ownedByCurrentTeam()
-            ->whereIn('provider', IntegrationToken::SECRET_MANAGER_PROVIDERS)
+        $this->availableTokens = $this->resourceTeamTokens()
             ->get()
             ->filter(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true))
             ->values();
@@ -59,7 +59,19 @@ class SecretManagerLinks extends Component
             return null;
         }
 
-        return $this->availableTokens->firstWhere('uuid', $this->integration_token_uuid);
+        return $this->resourceTeamTokens()->where('uuid', $this->integration_token_uuid)->get()
+            ->first(fn (IntegrationToken $token) => in_array('secrets', $token->capabilities ?? [], true));
+    }
+
+    /**
+     * Secret manager tokens of the resource's team. The session team can differ: a user can
+     * switch teams in another tab while this component is still open.
+     */
+    private function resourceTeamTokens(): Builder
+    {
+        return IntegrationToken::query()
+            ->where('team_id', $this->resource->team()?->id)
+            ->whereIn('provider', IntegrationToken::SECRET_MANAGER_PROVIDERS);
     }
 
     protected function rules(): array
