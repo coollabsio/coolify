@@ -17,6 +17,32 @@ it('extracts normalized published proxy ports from valid compose syntax', functi
     'long syntax with a published range' => ["services:\n  caddy:\n    ports:\n      - target: 443\n        published: '8443-8444'\n        protocol: UDP\n", []],
 ]);
 
+it('accepts Docker Compose variables and checks only ports with a resolvable default', function (mixed $ports, array $expected) {
+    $configuration = Yaml::dump(['services' => ['traefik' => ['ports' => $ports]]], 8, 2);
+
+    expect(ProxyPortParser::fromConfiguration($configuration))->toBe($expected);
+})->with([
+    'host port default' => [['${HTTP_PORT:-80}:80'], [80]],
+    'host port default without colon' => [['${HTTP_PORT-80}:80'], [80]],
+    'host port without default' => [['${HTTP_PORT}:80'], []],
+    'unbraced host port' => [['$HTTP_PORT:80'], []],
+    'required host port' => [['${HTTP_PORT:?HTTP_PORT must be set}:80'], []],
+    'alternative host port' => [['${HTTP_PORT:+8080}:80'], []],
+    'host IP with a host port default' => [['127.0.0.1:${P:-8080}:8080'], [8080]],
+    'host IP default' => [['${BIND_IP:-0.0.0.0}:80:80'], [80]],
+    'host IP without default' => [['${BIND_IP}:443:443'], []],
+    'container port variable' => [['8080:${CONTAINER_PORT}'], []],
+    'default with protocol' => [['${HTTPS_PORT:-443}:443/udp'], [443]],
+    'protocol variable' => [['443:443/${PROTOCOL:-udp}'], [443]],
+    'invalid default is skipped like an unset variable' => [['${HTTP_PORT:-abc}:80'], []],
+    'default range' => [['${RANGE:-10000-10100}:10000-10100'], []],
+    'mixed with literal ports' => [['${HTTP_PORT:-80}:80', '${HTTPS_PORT}:443', '8080:8080'], [80, 8080]],
+    'long syntax published default' => [[['target' => 80, 'published' => '${HTTP_PORT:-8080}']], [8080]],
+    'long syntax published variable' => [[['target' => 80, 'published' => '${HTTP_PORT}']], []],
+    'long syntax host IP default' => [[['target' => 80, 'published' => 80, 'host_ip' => '${BIND_IP:-127.0.0.1}']], [80]],
+    'long syntax target variable' => [[['target' => '${TARGET}', 'published' => 9000]], []],
+]);
+
 it('rejects malformed proxy port values', function (mixed $port) {
     $configuration = Yaml::dump(['services' => ['traefik' => ['ports' => [$port]]]], 8, 2);
 
@@ -30,7 +56,11 @@ it('rejects malformed proxy port values', function (mixed $port) {
     'decimal' => 80.5,
     'scientific notation' => '8e1',
     'comma separated' => '80,443',
-    'environment variable' => '${HTTP_PORT:-80}:80',
+    'environment variable followed by a semicolon' => '${HTTP_PORT:-80};id:80',
+    'environment variable with command substitution' => '${HTTP_PORT}$(id):80',
+    'environment variable with backticks' => '`id`${HTTP_PORT}:80',
+    'environment variable default with command substitution' => '${HTTP_PORT:-$(id)}:80',
+    'environment variable with a pipe' => '${HTTP_PORT}:80|id',
     'leading whitespace' => ' 80',
     'trailing whitespace' => '80 ',
     'newline' => "80\nid",
@@ -68,6 +98,8 @@ it('rejects malformed proxy ports in long compose syntax', function (array $port
     'invalid protocol' => [['target' => 80, 'published' => 8080, 'protocol' => 'http']],
     'reversed published range' => [['target' => 80, 'published' => '90-80']],
     'host injection' => [['target' => 80, 'published' => 8080, 'host_ip' => '$(id)']],
+    'variable with command substitution' => [['target' => 80, 'published' => '${HTTP_PORT}$(id)']],
+    'variable with an invalid protocol' => [['target' => 80, 'published' => '${HTTP_PORT}', 'protocol' => 'http']],
 ]);
 
 it('rejects invalid proxy port collection shapes', function (mixed $ports) {
