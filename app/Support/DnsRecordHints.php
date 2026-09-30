@@ -40,6 +40,25 @@ class DnsRecordHints
     }
 
     /**
+     * Whether two DNS record values name the same address. IP addresses are compared in binary form,
+     * so equivalent IPv6 notations (2001:db8::1 and 2001:0DB8:0:0::1) match; other values must be identical.
+     */
+    public static function sameAddress(?string $first, ?string $second): bool
+    {
+        if ($first === null || $second === null) {
+            return false;
+        }
+
+        $firstBinary = @inet_pton(trim($first));
+        $secondBinary = @inet_pton(trim($second));
+        if ($firstBinary !== false && $secondBinary !== false) {
+            return $firstBinary === $secondBinary;
+        }
+
+        return $first === $second;
+    }
+
+    /**
      * Build A/AAAA entries for every hostname (deduped).
      *
      * @param  array<int, string|null>  $hostnames

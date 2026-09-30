@@ -32,6 +32,7 @@ use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\DnsRecordHints;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -2323,7 +2324,7 @@ function validateDNSEntry(string $fqdn, Server $server)
                             $found_matching_ip = true;
                             break 2;
                         }
-                        if ($ip && $result->getData() === $ip) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
                             $found_matching_ip = true;
                             break 2;
                         }

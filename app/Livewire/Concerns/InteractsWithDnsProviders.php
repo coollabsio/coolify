@@ -392,7 +392,11 @@ trait InteractsWithDnsProviders
     {
         $addresses = $this->publicServerIpsForDnsProvider();
 
-        return $requested === null ? ($addresses[0] ?? null) : (in_array($requested, $addresses, true) ? $requested : null);
+        if ($requested === null) {
+            return $addresses[0] ?? null;
+        }
+
+        return collect($addresses)->first(fn (string $address): bool => DnsRecordHints::sameAddress($address, $requested));
     }
 
     abstract protected function persistDomainDnsStatuses(): void;

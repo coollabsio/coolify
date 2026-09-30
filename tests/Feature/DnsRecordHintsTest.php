@@ -74,3 +74,16 @@ it('treats only publicly routable addresses as public dns record targets', funct
     'not an ip' => ['app.example.com', false],
     'empty' => ['', false],
 ]);
+
+it('compares IP addresses independent of their notation', function (string $first, string $second, bool $same) {
+    expect(DnsRecordHints::sameAddress($first, $second))->toBe($same);
+})->with([
+    'compressed vs expanded IPv6' => ['2001:db8::1', '2001:0db8:0:0::1', true],
+    'upper vs lower case IPv6' => ['2001:DB8::A', '2001:db8::a', true],
+    'fully expanded IPv6' => ['2001:0db8:0000:0000:0000:0000:0000:0001', '2001:db8::1', true],
+    'different IPv6' => ['2001:db8::1', '2001:db8::2', false],
+    'same IPv4' => ['203.0.113.10', '203.0.113.10', true],
+    'different IPv4' => ['203.0.113.10', '203.0.113.11', false],
+    'IPv4 vs IPv6' => ['203.0.113.10', '::ffff:203.0.113.10', false],
+    'non-IP values' => ['target.example.com', 'target.example.com', true],
+]);
