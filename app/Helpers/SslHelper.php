@@ -35,7 +35,8 @@ class SslHelper
         try {
             $privateKey = openssl_pkey_new([
                 'private_key_type' => OPENSSL_KEYTYPE_EC,
-                'curve_name' => 'secp521r1',
+                // Electron clients such as MongoDB Compass (BoringSSL) cannot use a P-521 server key.
+                'curve_name' => $isCaCertificate ? 'secp521r1' : 'prime256v1',
             ]);
 
             if ($privateKey === false) {
