@@ -2,20 +2,26 @@
 
 namespace App\Http\Controllers\Webhook;
 
+use App\Enums\GithubRunnerStatus;
 use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
+use App\Jobs\ProvisionGithubRunnerJob;
 use App\Models\Application;
 use App\Models\GithubApp;
+use App\Models\GithubRunnerConfig;
+use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -255,6 +261,83 @@ class Github extends Controller
         }
     }
 
+    /**
+     * Handles GitHub Actions runner demand. Every lookup is scoped to the App whose signature was verified.
+     * GitHub can give a job to any idle runner with matching labels, so progress is matched by runner name.
+     */
+    private function handleWorkflowJob(GithubApp $githubApp, Collection $payload)
+    {
+        $action = data_get($payload, 'action');
+        $jobId = (int) data_get($payload, 'workflow_job.id', 0);
+        $runnerName = (string) data_get($payload, 'workflow_job.runner_name', '');
+        if ($jobId <= 0) {
+            return response('Nothing to do. No workflow job found.');
+        }
+
+        $jobDetails = array_filter([
+            'workflow_job_id' => $jobId,
+            'workflow_job_html_url' => data_get($payload, 'workflow_job.html_url'),
+            'workflow_name' => data_get($payload, 'workflow_job.workflow_name'),
+            'job_name' => data_get($payload, 'workflow_job.name'),
+            'repository_full_name' => data_get($payload, 'repository.full_name'),
+        ], fn ($value) => filled($value));
+
+        if ($action === 'queued') {
+            $labels = array_values(array_filter((array) data_get($payload, 'workflow_job.labels', []), 'is_string'));
+            $matches = $githubApp->runnerConfigs()
+                ->where('is_enabled', true)
+                ->get()
+                ->contains(fn (GithubRunnerConfig $config) => $config->matchesLabels($labels));
+            if (! $matches) {
+                return response('Nothing to do. No runner configuration matches the job labels.');
+            }
+
+            $execution = GithubRunnerExecution::createOrFirst(
+                ['github_app_id' => $githubApp->id, 'trigger_workflow_job_id' => $jobId],
+                [...$jobDetails, 'labels' => $labels, 'status' => GithubRunnerStatus::Queued, 'queued_at' => now()],
+            );
+            if ($execution->wasRecentlyCreated) {
+                ProvisionGithubRunnerJob::dispatch($execution->id);
+            }
+
+            return response('Runner queued.');
+        }
+
+        $execution = filled($runnerName)
+            ? GithubRunnerExecution::query()->where('github_app_id', $githubApp->id)->where('runner_name', $runnerName)->first()
+            : null;
+
+        if ($action === 'in_progress' && $execution && in_array($execution->status, [GithubRunnerStatus::Provisioning, GithubRunnerStatus::Idle], true)) {
+            $execution->update([...$jobDetails, 'status' => GithubRunnerStatus::Running, 'started_at' => now()]);
+
+            return response('Runner marked running.');
+        }
+
+        if ($action === 'completed') {
+            if ($execution) {
+                $execution->update([...$jobDetails, 'conclusion' => data_get($payload, 'workflow_job.conclusion')]);
+                if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
+                    $execution->finish(GithubRunnerStatus::Completed);
+                    CleanupGithubRunnerJob::dispatch($execution->id);
+                }
+
+                return response('Runner cleanup queued.');
+            }
+
+            // The job ended without a Coolify runner, so its queued runner is no longer needed.
+            GithubRunnerExecution::query()
+                ->where('github_app_id', $githubApp->id)
+                ->where('trigger_workflow_job_id', $jobId)
+                ->where('status', GithubRunnerStatus::Queued)
+                ->first()
+                ?->finish(GithubRunnerStatus::Cancelled, 'The job ended before a runner started.');
+
+            return response('Queued runner cancelled.');
+        }
+
+        return response('Nothing to do.');
+    }
+
     public function normal(Request $request)
     {
         try {
@@ -305,6 +388,9 @@ class Github extends Controller
                 }
 
                 return response('cool');
+            }
+            if ($x_github_event === 'workflow_job') {
+                return $this->handleWorkflowJob($github_app, $payload);
             }
             if ($x_github_event === 'push') {
                 $id = $this->webhookPayloadDatabaseId($payload, 'repository.id');
