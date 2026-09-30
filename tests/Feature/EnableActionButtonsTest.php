@@ -142,3 +142,70 @@ it('keeps notification email smtp disabled when enable validation fails', functi
         ->assertDispatched('error')
         ->assertSet('smtpEnabled', false);
 });
+
+it('reverts a notification provider toggle to the saved value when enabling fails', function (string $component, string $method, string $enabledProperty, string $settingsRelation, string $settingsColumn) {
+    [, $team] = actingAsEnableActionOwner();
+
+    Livewire::test($component)
+        ->set($enabledProperty, true)
+        ->call($method)
+        ->assertDispatched('error')
+        ->assertSet($enabledProperty, false);
+
+    expect($team->{$settingsRelation}->fresh()->{$settingsColumn})->toBeFalse();
+})->with([
+    'discord' => [Discord::class, 'instantSaveDiscordEnabled', 'discordEnabled', 'discordNotificationSettings', 'discord_enabled'],
+    'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackNotificationSettings', 'slack_enabled'],
+    'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramNotificationSettings', 'telegram_enabled'],
+    'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookNotificationSettings', 'webhook_enabled'],
+]);
+
+it('reverts a notification provider toggle to the saved value when disabling fails', function (string $component, string $method, string $enabledProperty, string $requiredProperty, string $settingsRelation, array $savedSettings) {
+    [, $team] = actingAsEnableActionOwner();
+    $team->{$settingsRelation}->update($savedSettings);
+
+    Livewire::test($component)
+        ->assertSet($enabledProperty, true)
+        ->set($requiredProperty, '')
+        ->set($enabledProperty, false)
+        ->call($method)
+        ->assertDispatched('error')
+        ->assertSet($enabledProperty, true);
+
+    expect($team->{$settingsRelation}->fresh()->{array_key_first($savedSettings)})->toBeTrue();
+})->with([
+    'discord' => [Discord::class, 'instantSaveDiscordEnabled', 'discordEnabled', 'discordWebhookUrl', 'discordNotificationSettings', ['discord_enabled' => true, 'discord_webhook_url' => 'https://discord.com/api/webhooks/1/abc']],
+    'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C']],
+    'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42']],
+    'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token']],
+    'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify']],
+]);
+
+it('reverts a notification event toggle to the saved value when saving fails', function (string $component, string $urlProperty, string $eventProperty, string $settingsRelation, string $eventColumn) {
+    [, $team] = actingAsEnableActionOwner();
+    $saved = (bool) $team->{$settingsRelation}->{$eventColumn};
+
+    Livewire::test($component)
+        ->set($urlProperty, 'not-a-url')
+        ->call('toggleEvent', $eventProperty)
+        ->assertSet($eventProperty, $saved);
+
+    expect((bool) $team->{$settingsRelation}->fresh()->{$eventColumn})->toBe($saved);
+})->with([
+    'discord' => [Discord::class, 'discordWebhookUrl', 'deploymentSuccessDiscordNotifications', 'discordNotificationSettings', 'deployment_success_discord_notifications'],
+    'slack' => [Slack::class, 'slackWebhookUrl', 'deploymentSuccessSlackNotifications', 'slackNotificationSettings', 'deployment_success_slack_notifications'],
+]);
+
+it('reverts the discord mention setting to the saved value when saving fails', function () {
+    [, $team] = actingAsEnableActionOwner();
+    $team->discordNotificationSettings->update(['discord_ping_enabled' => true]);
+
+    Livewire::test(Discord::class)
+        ->set('discordWebhookUrl', 'not-a-url')
+        ->set('discordPingEnabled', false)
+        ->call('instantSaveDiscordPingEnabled')
+        ->assertSet('discordPingEnabled', true);
+
+    expect($team->discordNotificationSettings->fresh()->discord_ping_enabled)->toBeTrue();
+});
