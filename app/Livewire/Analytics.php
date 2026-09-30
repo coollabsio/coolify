@@ -560,14 +560,7 @@ class Analytics extends Component
      */
     private function window(): array
     {
-        $to = now();
-        $from = match ($this->range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
-        };
-
-        return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+        return SentinelTrafficClient::rangeWindow($this->range);
     }
 
     public function placeholder(array $params = []): View

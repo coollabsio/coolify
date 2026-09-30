@@ -235,6 +235,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->allServiceApplicationIds = $this->serviceApplicationsById->keys();
         $this->allServiceDatabaseIds = $this->serviceDatabasesById->keys();
 
+        // Owners of application containers outside this server's applications, in one query.
+        $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
+            $this->applications,
+            $this->containers
+                ->map(fn ($container) => collect(data_get($container, 'labels')))
+                ->filter(fn (Collection $labels) => $labels->has('coolify.managed') && isContainerOfType($labels, 'application'))
+        );
+
         foreach ($this->containers as $container) {
             $containerStatus = data_get($container, 'state', 'exited');
             $rawHealthStatus = data_get($container, 'health_status');
@@ -259,7 +267,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
             // Containers are matched by owner UUID; numeric ids differ between instances.
             if (isContainerOfType($labels, 'application')) {
-                $applicationId = resolveContainerApplicationId($this->applications, $labels);
+                $applicationId = resolveContainerApplicationId($this->applications, $labels, $foreignApplicationIdsByUuid);
                 if ($applicationId === null) {
                     continue;
                 }

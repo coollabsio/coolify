@@ -9,6 +9,7 @@ use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class SentinelTrafficClient
 {
@@ -57,15 +58,20 @@ class SentinelTrafficClient
     /**
      * Convert a UI range key (24h/7d/30d) into ISO-8601 Zulu from/to bounds.
      *
+     * The window ends at the next full minute instead of the current second: the bounds are
+     * part of the 60s response cache key, so every load within that minute reuses the cached
+     * response. The window still covers "now" (Sentinel rolls traffic up per minute, so the
+     * end in the future adds nothing) and spans exactly the requested range.
+     *
      * @return array{0: string, 1: string}
      */
     public static function rangeWindow(string $range): array
     {
-        $to = now();
+        $to = now()->utc()->ceilMinute();
         $from = match ($range) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
+            '7d' => $to->copy()->subDays(7),
+            '30d' => $to->copy()->subDays(30),
+            default => $to->copy()->subDay(),
         };
 
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
@@ -352,10 +358,7 @@ class SentinelTrafficClient
                 return [];
             }
 
-            return array_values(array_filter(
-                array_map(fn ($app) => is_array($app) ? ($app['uuid'] ?? null) : null, $bundle['apps'] ?? []),
-                fn ($uuid) => is_string($uuid) && $uuid !== ''
-            ));
+            return $this->safeReportedKeys(array_map(fn ($app) => is_array($app) ? ($app['uuid'] ?? null) : null, $bundle['apps'] ?? []));
         }
 
         // Fallback for older Sentinel without /traffic/dashboard: batch the individual endpoints.
@@ -374,10 +377,29 @@ class SentinelTrafficClient
             return [];
         }
 
-        return array_values(array_filter(
-            $this->apps(),
-            fn ($uuid) => is_string($uuid) && $uuid !== ''
-        ));
+        return $this->safeReportedKeys($this->apps());
+    }
+
+    /**
+     * The usable keys of a Sentinel-reported key list. A key that would be unsafe in a request
+     * url is dropped (and logged) on its own, so it doesn't fail the whole server's analytics.
+     *
+     * @param  array<int, mixed>  $keys
+     * @return array<int, string>
+     */
+    private function safeReportedKeys(array $keys): array
+    {
+        $keys = array_values(array_filter($keys, fn ($key) => is_string($key) && $key !== ''));
+        $safe = array_values(array_filter($keys, fn (string $key) => $this->isSafeKey($key)));
+
+        if (count($safe) !== count($keys)) {
+            Log::warning('Traffic analytics skipped unsafe app keys reported by Sentinel', [
+                'server' => $this->server->uuid,
+                'skipped' => count($keys) - count($safe),
+            ]);
+        }
+
+        return $safe;
     }
 
     /**
@@ -509,7 +531,7 @@ class SentinelTrafficClient
 
         foreach ($bundle['apps'] ?? [] as $app) {
             $uuid = is_array($app) ? ($app['uuid'] ?? null) : null;
-            if (is_string($uuid) && $uuid !== '' && isset($app['overview'])) {
+            if (is_string($uuid) && $this->isSafeKey($uuid) && isset($app['overview'])) {
                 $put($this->overviewUrl($uuid, $from, $to), $app['overview']);
             }
         }

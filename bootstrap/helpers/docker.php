@@ -118,8 +118,11 @@ function resolveContainerOwner(Collection $resources, Collection|array|string $l
 /**
  * Id of the application that owns a container, also for applications not in $applications
  * (for example the parent of a preview). Same order as resolveContainerOwner().
+ *
+ * @param  array<string, int>|null  $applicationIdsByUuid  Owners outside $applications, preloaded with
+ *                                                         containerApplicationIdsByUuid(); null queries per call.
  */
-function resolveContainerApplicationId(Collection $applications, Collection|array|string $labels): ?int
+function resolveContainerApplicationId(Collection $applications, Collection|array|string $labels, ?array $applicationIdsByUuid = null): ?int
 {
     $labels = is_string($labels) ? format_docker_labels_to_json($labels) : collect($labels);
 
@@ -129,9 +132,45 @@ function resolveContainerApplicationId(Collection $applications, Collection|arra
     }
 
     $uuid = containerOwnerUuid($labels, 'application');
-    $id = $uuid ? Application::withTrashed()->where('uuid', $uuid)->value('id') : null;
+    if (! $uuid) {
+        return null;
+    }
+    if ($applicationIdsByUuid !== null) {
+        return $applicationIdsByUuid[$uuid] ?? null;
+    }
+
+    $id = Application::withTrashed()->where('uuid', $uuid)->value('id');
 
     return $id !== null ? (int) $id : null;
+}
+
+/**
+ * Ids of the applications (including trashed ones) that own the given containers but are not in
+ * $applications, keyed by owner UUID, in one query. Pass the result to resolveContainerApplicationId()
+ * so a batch of containers does not query once per container.
+ *
+ * @param  iterable<Collection|array|string>  $containerLabels
+ * @return array<string, int>
+ */
+function containerApplicationIdsByUuid(Collection $applications, iterable $containerLabels): array
+{
+    $knownUuids = $applications->pluck('uuid')->flip();
+    $uuids = [];
+    foreach ($containerLabels as $labels) {
+        $uuid = containerOwnerUuid($labels, 'application');
+        if ($uuid && ! $knownUuids->has($uuid)) {
+            $uuids[$uuid] = true;
+        }
+    }
+    if ($uuids === []) {
+        return [];
+    }
+
+    return Application::withTrashed()
+        ->whereIn('uuid', array_keys($uuids))
+        ->pluck('id', 'uuid')
+        ->map(fn ($id) => (int) $id)
+        ->all();
 }
 
 /**

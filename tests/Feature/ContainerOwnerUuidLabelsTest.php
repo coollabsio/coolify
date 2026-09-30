@@ -16,6 +16,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 
 uses(RefreshDatabase::class);
@@ -196,6 +197,53 @@ describe('status updates after a server transfer', function () {
         expect($job->foundApplicationIds->all())->toContain((string) $this->application->id)
             ->not->toContain((string) $otherApplication->id)
             ->and($this->application->fresh()->status)->toStartWith('running');
+    });
+
+    test('Sentinel push looks up foreign application owners with one query for all containers', function () {
+        $deleted = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $deleted->delete();
+
+        $containers = collect(range(1, 5))->map(fn (int $i) => [
+            'name' => "foreign-{$i}",
+            'state' => 'running',
+            'health_status' => 'healthy',
+            'labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => "foreign-app-{$i}",
+                'coolify.pullRequestId' => '0',
+                'com.docker.compose.service' => "foreign-app-{$i}",
+            ],
+        ])->push([
+            'name' => $deleted->uuid.'-pr-3',
+            'state' => 'running',
+            'health_status' => 'healthy',
+            'labels' => [
+                'coolify.managed' => 'true',
+                'coolify.applicationUuid' => $deleted->uuid,
+                'coolify.pullRequestId' => '3',
+                'com.docker.compose.service' => $deleted->uuid.'-pr-3',
+            ],
+        ])->all();
+
+        $job = new PushServerUpdateJob($this->server, ['containers' => $containers]);
+
+        DB::enableQueryLog();
+        $job->handle();
+        $ownerLookups = collect(DB::getQueryLog())
+            ->filter(fn (array $query) => str_contains($query['query'], 'from "applications"') && preg_match('/"uuid" (=|in) /', $query['query']) === 1)
+            ->count();
+        DB::disableQueryLog();
+
+        $previewLabels = end($containers)['labels'];
+        expect($ownerLookups)->toBe(1)
+            // A trashed owner still resolves, with and without the preloaded ids.
+            ->and(resolveContainerApplicationId(collect(), $previewLabels))->toBe($deleted->id)
+            ->and(resolveContainerApplicationId(collect(), $previewLabels, containerApplicationIdsByUuid(collect(), [$previewLabels])))->toBe($deleted->id)
+            ->and(containerApplicationIdsByUuid(collect([$this->application]), [['coolify.applicationUuid' => $this->application->uuid]]))->toBe([]);
     });
 
     test('Sentinel push matches a new application container by its UUID label', function () {

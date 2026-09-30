@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -424,4 +425,60 @@ it('shows the not-enabled empty state when no server has traffic analytics on', 
         ->assertOk()
         ->assertSee('Traffic analytics is not enabled')
         ->assertDontSee('Unique visitors');
+});
+
+it('keeps a server visible when Sentinel reports one unsafe app key', function () {
+    $server = bootEnabledGlobalServer();
+
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'coolify-test']);
+    $application = Application::factory()->create([
+        'name' => 'Safe Leaderboard App',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid, 'bad key$(reboot)']);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('1,000')
+        ->assertSee('Safe Leaderboard App')
+        ->assertDontSee('bad key$(reboot)');
+});
+
+it('queries Sentinel with the same window for loads within one cache interval', function () {
+    $server = bootEnabledGlobalServer();
+
+    $fake = new class($server) extends FakeGlobalAnalyticsTrafficClient
+    {
+        public array $urls = [];
+
+        protected function raw(string $url): string
+        {
+            $this->urls[] = $url;
+
+            return parent::raw($url);
+        }
+    };
+    $fake->responses = fakeGlobalAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $this->travelTo(Carbon::parse('2026-09-30 10:00:05', 'UTC'));
+    $component = loadLazy(Livewire::test(Analytics::class));
+    $firstUrls = $fake->urls;
+    $fake->urls = [];
+
+    $this->travelTo(Carbon::parse('2026-09-30 10:00:50', 'UTC'));
+    $component->call('loadData');
+
+    // The second load asks for exactly the windows of the first one (the 60s cache keys).
+    expect($firstUrls)->not->toBeEmpty()
+        ->and($fake->urls)->not->toBeEmpty()
+        ->and(array_values(array_diff($fake->urls, $firstUrls)))->toBe([]);
 });
