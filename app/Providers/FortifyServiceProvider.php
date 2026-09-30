@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
-use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -115,7 +114,6 @@ class FortifyServiceProvider extends ServiceProvider
         });
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
-        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
 
         Fortify::confirmPasswordView(function () {
