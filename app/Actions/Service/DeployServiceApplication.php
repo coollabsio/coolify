@@ -2,6 +2,7 @@
 
 namespace App\Actions\Service;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -32,6 +33,8 @@ class DeployServiceApplication
         $commands = collect([
             'echo '.escapeshellarg("Saved configuration files to {$workdir}."),
             'touch '.escapeshellarg("{$workdir}/.env"),
+            ...EnsureContentFilesOnServer::echoCommands($serviceApplication->fileStorages()->get(), $service->server),
+            ...StartService::composeVolumeWarningCommands($service),
         ]);
 
         if ($pullLatestImages) {

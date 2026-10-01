@@ -40,7 +40,7 @@ test('empty component renders the contents slot for backward compatibility', fun
         ->toContain('Enable metrics');
 });
 
-test('empty component prefers the actions slot when both action slots are provided', function () {
+test('empty component renders only the contents slot when both action slots are provided', function () {
     $html = Blade::render(<<<'BLADE'
         <x-empty title="Conflict check" size="sm">
             <x-slot:actions>
@@ -53,8 +53,8 @@ test('empty component prefers the actions slot when both action slots are provid
     BLADE);
 
     expect($html)
-        ->toContain('From actions')
-        ->not->toContain('From contents');
+        ->toContain('From contents')
+        ->not->toContain('From actions');
 });
 
 test('instance backup settings show a configure button when backup is not set up', function () {

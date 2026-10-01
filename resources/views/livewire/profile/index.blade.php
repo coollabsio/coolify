@@ -260,8 +260,8 @@
                             <div x-data="{ showCode: false }">
                                 <div x-cloak x-show="showCode" class="space-y-2 pb-3">
                                     <x-forms.copy-input
-                                        text="{{ decrypt(request()->user()->two_factor_secret) }}" />
-                                    <x-forms.copy-input text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
+                                        :text="decrypt(request()->user()->two_factor_secret)" />
+                                    <x-forms.copy-input :text="request()->user()->twoFactorQrCodeUrl()" />
                                 </div>
                                 <x-forms.button type="button" x-on:click="showCode = !showCode">
                                     <span x-text="showCode ? 'Hide manual setup' : 'Show manual setup'"></span>

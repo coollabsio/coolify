@@ -12,10 +12,12 @@ use App\Models\Server;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
@@ -23,6 +25,7 @@ class Domains extends Component
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
     use InteractsWithDnsProviders;
+    use ListensToTeamChannel;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -120,9 +123,11 @@ class Domains extends Component
     public bool $dnsValidationEnabled = true;
 
     /** Resolved or literal IP users should point DNS at. */
+    #[Locked]
     public ?string $serverIp = null;
 
     /** Raw server IP/hostname as configured (may be a hostname). */
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     protected $listeners = [
@@ -132,9 +137,7 @@ class Domains extends Component
 
     public function getListeners(): array
     {
-        return array_merge($this->listeners, [
-            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
-        ]);
+        return array_merge($this->listeners, $this->teamChannelListeners(['DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished']));
     }
 
     protected function rules(): array
@@ -1564,10 +1567,12 @@ class Domains extends Component
             }
 
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($this->application);
             if (! $this->saveDomainList($updated, $service, noindexDomains: $noindexDomains)) {
                 return;
             }
 
+            $this->releaseManagedDnsForEditedDomains($this->application, $previousDnsHostnames);
             $this->resetDefaultLabels();
 
             $this->forceSaveDomains = false;

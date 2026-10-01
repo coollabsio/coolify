@@ -236,6 +236,79 @@ describe('GitHub Source Change Component', function () {
             ->and($privateKey->refresh()->name)->toBe('github-app-actual-github-slug');
     });
 
+    test('saving settings keeps key selection within the source team', function (string $action) {
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        $ownKey = PrivateKey::create([
+            'name' => 'own-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $ownKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $foreignKey->id)
+            ->call($action);
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->set('privateKeyId', $ownKey->id)
+            ->call($action)
+            ->assertHasNoErrors();
+
+        expect($githubApp->refresh()->private_key_id)->toBe($ownKey->id);
+    })->with(['submit', 'instantSave']);
+
+    test('github app tokens only use a key from the source team', function () {
+        Http::fake();
+
+        $otherTeam = Team::factory()->create();
+        $foreignKey = PrivateKey::create([
+            'name' => 'other-team-key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        GithubApp::query()->whereKey($githubApp->id)->update(['private_key_id' => $foreignKey->id]);
+        $githubApp->refresh();
+
+        expect(fn () => generateGithubJwt($githubApp))->toThrow(RuntimeException::class)
+            ->and(syncGithubAppName($githubApp))->toBeNull()
+            ->and($foreignKey->refresh()->name)->toBe('other-team-key');
+
+        Http::assertNothingSent();
+    });
+
     test('ghe.com installation path encodes the organization segment', function () {
         $githubApp = new GithubApp;
         $githubApp->forceFill([
@@ -334,8 +407,8 @@ describe('GitHub Source Change Component', function () {
             ->assertSet('webhook_endpoint', 'http://staging.example.com')
             ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
             ->assertSet('use_custom_webhook_endpoint', true)
-            ->assertSee('Use custom webhook endpoint')
-            ->assertSee('Selected endpoint')
+            ->assertSee('Webhook endpoint')
+            ->assertSee('Use a custom endpoint')
             ->assertSee('Custom endpoint')
             ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
     });
@@ -689,7 +762,7 @@ describe('GitHub Source Change Component', function () {
             ->and($public->isConnected())->toBeTrue();
     });
 
-    test('shows connected badge and test connection for installed github apps', function () {
+    test('shows test connection for installed github apps', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -713,8 +786,8 @@ describe('GitHub Source Change Component', function () {
             ->test(Change::class)
             ->assertSuccessful()
             ->assertSet('isConnected', true)
-            ->assertSee('Connected')
-            ->assertSee('Test Connection');
+            ->assertSee('Test connection')
+            ->assertSeeHtml('wire:click.prevent="testConnection"');
     });
 
     test('testConnection succeeds when github app credentials are valid', function () {
@@ -808,6 +881,6 @@ describe('GitHub Source Change Component', function () {
             ->assertSee('Finished GitHub App')
             ->assertSee('Connected')
             ->assertSee('Incomplete GitHub App')
-            ->assertSee('Setup required');
+            ->assertSee('Setup incomplete');
     });
 });

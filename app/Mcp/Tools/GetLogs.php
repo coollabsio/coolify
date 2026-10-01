@@ -223,7 +223,7 @@ class GetLogs extends Tool
             if (! $server) {
                 throw new \RuntimeException('Application has no server destination.');
             }
-            $containers = getCurrentApplicationContainerStatus($server, $resource->id);
+            $containers = getCurrentApplicationContainerStatus($server, $resource);
             if ($containers->count() === 0) {
                 throw new \RuntimeException('Application has no running containers.');
             }

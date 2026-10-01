@@ -28,8 +28,19 @@ class OauthLoginService
             ? $this->resolveOidcUser($oauthUser, $oauthSetting, $email)
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
-        $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
-        session(['currentTeam' => $user->currentTeam = $team]);
+        // Choose the team like the password login: restore the last active team,
+        // or the sole team. A multi-team user without a valid stored choice gets
+        // no session team, so DecideWhatToDoWithUser shows the team selection.
+        $user->unsetRelation('teams');
+        $team = $user->resolveStoredTeam();
+        if (! $team && $user->teams->isEmpty()) {
+            $team = $user->recreate_personal_team();
+        }
+        if ($team) {
+            session(['currentTeam' => $team]);
+        } else {
+            session()->forget('currentTeam');
+        }
 
         if ($this->requiresTwoFactorChallenge($user)) {
             Auth::logout();
@@ -61,6 +72,21 @@ class OauthLoginService
         return $user->hasEnabledTwoFactorAuthentication();
     }
 
+    /**
+     * @return array{0: mixed, 1: mixed}
+     */
+    private function oidcIssuerAndSubject(object $oauthUser): array
+    {
+        $issuer = $oauthUser instanceof OidcUser && filled($oauthUser->issuer)
+            ? $oauthUser->issuer
+            : data_get($oauthUser->user, 'iss');
+        $subject = $oauthUser instanceof OidcUser && filled($oauthUser->subject)
+            ? $oauthUser->subject
+            : data_get($oauthUser->user, 'sub', $oauthUser->id);
+
+        return [$issuer, $subject];
+    }
+
     private function resolveOauthUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
     {
         $provider = $oauthSetting->provider;
@@ -78,14 +104,19 @@ class OauthLoginService
             throw new HttpException(403, 'Google account is not in the configured Workspace');
         }
 
+        $issuer = OauthIdentityIssuer::forSetting($oauthSetting);
+        if ($issuer === null) {
+            throw new HttpException(403, 'OAuth provider instance is not configured');
+        }
+
         $identityKey = [
             'provider' => $provider,
-            'issuer' => $provider,
+            'issuer' => $issuer,
             'provider_user_id' => $providerUserId,
         ];
 
         try {
-            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims, $identityKey): User {
+            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $issuer, $providerUserId, $rawClaims, $identityKey): User {
                 $identity = OauthIdentity::where($identityKey)->first();
 
                 if ($identity) {
@@ -98,13 +129,16 @@ class OauthLoginService
                     return $identity->user;
                 }
 
-                if (! $this->hasVerifiedEmail($provider, $rawClaims)) {
-                    throw new HttpException(403, 'OAuth provider did not verify the email address');
-                }
-
                 $user = User::whereEmail($email)->first();
                 if ($user?->oauthIdentities()->exists()) {
                     throw new HttpException(403, 'OAuth identity cannot be linked to this account');
+                }
+
+                // Before OAuth identities existed, OAuth sign-in matched users by email only.
+                // Users from that time keep signing in without email delivery, so their
+                // first identity links without a provider verification claim.
+                if ($user?->created_before_oauth_identities !== true && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
+                    throw new HttpException(403, 'OAuth provider did not verify the email address');
                 }
 
                 if (! $user) {
@@ -118,12 +152,16 @@ class OauthLoginService
                 OauthIdentity::create([
                     'user_id' => $user->id,
                     'provider' => $provider,
-                    'issuer' => $provider,
+                    'issuer' => $issuer,
                     'provider_user_id' => $providerUserId,
                     'email' => $email,
                     'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
+
+                if ($user->created_before_oauth_identities) {
+                    $user->forceFill(['created_before_oauth_identities' => false])->save();
+                }
 
                 return $user;
             });
@@ -134,29 +172,28 @@ class OauthLoginService
 
     /**
      * GitHub and Bitbucket select only verified primary email addresses in
-     * their Socialite providers. Other providers must return an explicit
-     * boolean verification claim in the raw provider response.
+     * their Socialite providers. Microsoft Graph has no verification flag, but
+     * Entra ID only issues a user principal name in a domain the tenant
+     * verified, so only that name is trusted. GitLab confirms the primary
+     * email of an account. Other providers must return an explicit boolean
+     * verification claim in the raw provider response.
      *
      * @param  array<string, mixed>  $rawClaims
      */
-    private function hasVerifiedEmail(string $provider, array $rawClaims): bool
+    private function hasVerifiedEmail(string $provider, array $rawClaims, string $email): bool
     {
         return match ($provider) {
             'github', 'bitbucket' => true,
             'discord' => data_get($rawClaims, 'verified') === true,
-            'google' => data_get($rawClaims, 'verified_email') === true,
+            'azure' => strtolower((string) data_get($rawClaims, 'userPrincipalName')) === $email,
+            'gitlab' => filled(data_get($rawClaims, 'confirmed_at')),
             default => data_get($rawClaims, 'email_verified') === true,
         };
     }
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
     {
-        $issuer = $oauthUser instanceof OidcUser && filled($oauthUser->issuer)
-            ? $oauthUser->issuer
-            : data_get($oauthUser->user, 'iss');
-        $subject = $oauthUser instanceof OidcUser && filled($oauthUser->subject)
-            ? $oauthUser->subject
-            : data_get($oauthUser->user, 'sub', $oauthUser->id);
+        [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
         $emailVerified = ($oauthUser instanceof OidcUser && $oauthUser->emailVerified)
             || data_get($oauthUser->user, 'email_verified') === true;
 

@@ -10,8 +10,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Horizon\Contracts\Silenced;
 
 class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
@@ -31,7 +31,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function failed(?\Throwable $exception): void
     {
-        if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
+        if ($exception instanceof TimeoutExceededException) {
             Log::warning('ServerStorageCheckJob timed out', [
                 'server_id' => $this->server->id,
                 'server_name' => $this->server->name,
@@ -58,20 +58,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 return 'No percentage could be retrieved.';
             }
             if ($this->percentage > $serverDiskUsageNotificationThreshold) {
-                $executed = RateLimiter::attempt(
-                    'high-disk-usage:'.$this->server->id,
-                    $maxAttempts = 0,
-                    function () use ($team, $serverDiskUsageNotificationThreshold) {
-                        $team->notify(new HighDiskUsage($this->server, $this->percentage, $serverDiskUsageNotificationThreshold));
-                    },
-                    $decaySeconds = 3600,
-                );
-
-                if (! $executed) {
-                    return 'Too many messages sent!';
-                }
-            } else {
-                RateLimiter::hit('high-disk-usage:'.$this->server->id, 600);
+                $team->notify(new HighDiskUsage($this->server, $this->percentage, $serverDiskUsageNotificationThreshold));
             }
         } catch (\Throwable $e) {
             return handleError($e);

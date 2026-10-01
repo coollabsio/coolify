@@ -7,6 +7,8 @@ use App\Exceptions\DnsRecordConflictException;
 use App\Models\DnsProviderZone;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
+use App\Support\DnsRecordHints;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Collection;
@@ -19,6 +21,8 @@ class CloudflareDnsProvider
 {
     /** @var array<int, Collection<int, DnsProviderZone>> */
     private array $zoneCache = [];
+
+    public function __construct(private ManagedDnsHostnameLock $hostnameLock) {}
 
     public function syncZones(IntegrationToken $token): int
     {
@@ -100,13 +104,36 @@ class CloudflareDnsProvider
     /**
      * Creates the record with Coolify's ownership comment, or references an existing record that already has the wanted content.
      * Existing records that Coolify did not create are only referenced and never marked as owned.
+     * Runs under the hostname lock and always checks the provider again, so a create that waited for a release
+     * creates the record again when the release deleted it.
+     *
+     * @param  array<int, Model>  $additionalResources  Other resources that use the hostname and also reference the record.
+     *
+     * @throws LockTimeoutException when another change for the hostname does not finish in time
      */
-    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null): ManagedDnsRecord
+    public function createRecord(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource = null, array $additionalResources = []): ManagedDnsRecord
     {
         $hostname = strtolower(rtrim($hostname, '.'));
+
+        return $this->hostnameLock->run(
+            (int) $zone->integrationToken->team_id,
+            $hostname,
+            function () use ($zone, $hostname, $content, $resource, $additionalResources): ManagedDnsRecord {
+                $record = $this->createRecordLocked($zone, $hostname, $content, $resource);
+                foreach ($additionalResources as $additionalResource) {
+                    $record->addReference($additionalResource);
+                }
+
+                return $record;
+            },
+        );
+    }
+
+    private function createRecordLocked(DnsProviderZone $zone, string $hostname, string $content, ?Model $resource): ManagedDnsRecord
+    {
         $type = $this->recordType($content);
         $remoteRecords = $this->findRecords($zone, $hostname, $type);
-        $matching = collect($remoteRecords)->first(fn (array $remote): bool => $remote['content'] === $content);
+        $matching = collect($remoteRecords)->first(fn (array $remote): bool => DnsRecordHints::sameAddress($remote['content'], $content));
         if ($matching !== null) {
             if ($matching['id'] === '') {
                 throw new RuntimeException('Cloudflare DNS records could not be checked.');
@@ -149,6 +176,10 @@ class CloudflareDnsProvider
     /**
      * Points an existing (conflicting) record at the new content after explicit user confirmation.
      * Only the content changes: proxy status, TTL, comment and other settings stay as they are.
+     *
+     * @param  array<int, Model>  $additionalResources  Other resources that use the hostname and also reference the record.
+     *
+     * @throws LockTimeoutException when another change for the hostname does not finish in time
      */
     public function replaceRecord(
         DnsProviderZone $zone,
@@ -157,8 +188,32 @@ class CloudflareDnsProvider
         string $content,
         ?Model $resource = null,
         ?string $expectedCurrent = null,
+        array $additionalResources = [],
     ): ManagedDnsRecord {
         $hostname = strtolower(rtrim($hostname, '.'));
+
+        return $this->hostnameLock->run(
+            (int) $zone->integrationToken->team_id,
+            $hostname,
+            function () use ($zone, $recordId, $hostname, $content, $resource, $expectedCurrent, $additionalResources): ManagedDnsRecord {
+                $record = $this->replaceRecordLocked($zone, $recordId, $hostname, $content, $resource, $expectedCurrent);
+                foreach ($additionalResources as $additionalResource) {
+                    $record->addReference($additionalResource);
+                }
+
+                return $record;
+            },
+        );
+    }
+
+    private function replaceRecordLocked(
+        DnsProviderZone $zone,
+        string $recordId,
+        string $hostname,
+        string $content,
+        ?Model $resource,
+        ?string $expectedCurrent,
+    ): ManagedDnsRecord {
         $type = $this->recordType($content);
         $remoteRecords = $this->findRecords($zone, $hostname, $type);
         if (count($remoteRecords) > 1) {
@@ -168,7 +223,7 @@ class CloudflareDnsProvider
         if ($remote === null
             || $remote['id'] === ''
             || $remote['id'] !== $recordId
-            || ($expectedCurrent !== null && $remote['content'] !== $expectedCurrent)
+            || ($expectedCurrent !== null && ! DnsRecordHints::sameAddress($remote['content'], $expectedCurrent))
             || $remote['name'] !== $hostname) {
             throw new RuntimeException('The DNS conflict is no longer available. Check the record again.');
         }
@@ -211,7 +266,7 @@ class CloudflareDnsProvider
             }
             if (($remote['type'] ?? null) !== $record->type
                 || strtolower((string) ($remote['name'] ?? '')) !== $record->name
-                || ($remote['content'] ?? null) !== $record->content
+                || ! DnsRecordHints::sameAddress(is_string($remote['content'] ?? null) ? $remote['content'] : null, $record->content)
                 || ($remote['comment'] ?? null) !== $record->ownershipComment()) {
                 return ManagedDnsDeletionResult::ChangedExternally;
             }

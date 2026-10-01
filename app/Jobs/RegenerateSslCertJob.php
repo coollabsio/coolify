@@ -65,6 +65,7 @@ class RegenerateSslCertJob implements ShouldBeEncrypted, ShouldQueue
                     mountPath: $certificate->mount_path,
                     caCert: $caCert->ssl_certificate,
                     caKey: $caCert->ssl_private_key,
+                    isPemKeyFileRequired: $certificate->requiresPemKeyFile(),
                 );
                 $resource = $certificate->database;
                 if ($resource) {

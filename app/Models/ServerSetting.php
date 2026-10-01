@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ServerRole;
+use App\Services\ScheduleNextRunRecalculator;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ use OpenApi\Attributes as OA;
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
+        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
@@ -116,6 +118,7 @@ class ServerSetting extends Model
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'server_disk_usage_check_frequency',
+        'server_disk_usage_notification_interval_hours',
         'is_terminal_enabled',
         'deployment_queue_limit',
         'backup_compression_cpu_percentage',
@@ -168,6 +171,8 @@ class ServerSetting extends Model
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
+        'docker_cleanup_next_run_at' => 'datetime',
+        'server_disk_usage_notification_interval_hours' => 'integer',
     ];
 
     /**
@@ -188,6 +193,15 @@ class ServerSetting extends Model
 
     protected static function booted()
     {
+        static::saving(function ($setting) {
+            if (! $setting->exists || $setting->isDirty(['docker_cleanup_frequency', 'server_timezone'])) {
+                // Without a frequency (a new row that uses the column default), the dispatcher calculates it.
+                $frequency = $setting->getAttributes()['docker_cleanup_frequency'] ?? null;
+                $setting->docker_cleanup_next_run_at = $frequency === null
+                    ? null
+                    : next_cron_run_at($frequency, $setting->server_timezone, now());
+            }
+        });
         static::creating(function ($setting) {
             try {
                 if (str($setting->sentinel_token)->isEmpty()) {
@@ -201,6 +215,11 @@ class ServerSetting extends Model
             }
         });
         static::updated(function ($settings) {
+            if ($settings->wasChanged('server_timezone') && $settings->server) {
+                // A failure must not fail the settings save: the schedules correct themselves after their next run.
+                rescue(fn () => app(ScheduleNextRunRecalculator::class)->forServer($settings->server));
+            }
+
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||

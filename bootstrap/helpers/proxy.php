@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
@@ -163,8 +164,8 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
         data_set($config, 'services.traefik.command', applyTraefikAccessLogCommands($server, $commands, $enabled));
         unset($config['services']['traefik-logrotate']);
 
-        if ($enabled && ! $server->isSwarm() && ! isDev()) {
-            $proxyPath = $server->proxyPath();
+        if ($enabled && ! $server->isSwarm()) {
+            $proxyPath = devHostDockerPath($server, $server->proxyPath());
             $config['services']['traefik-logrotate'] = [
                 'container_name' => 'coolify-proxy-logrotate',
                 'image' => 'alpine:3.24',
@@ -181,14 +182,16 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
             ];
         }
     } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
-        $trafficVolume = $server->proxyPath().':/traffic';
+        // Caddy writes /traffic/access.log and Sentinel reads <trafficLogDirectory>/access.log, so both use one path.
+        $trafficVolume = StartSentinel::trafficLogDirectory($server).':/traffic';
         $volumes = data_get($config, 'services.caddy.volumes', []);
 
         if (! is_array($volumes)) {
             throw new RuntimeException('Caddy volumes must be a YAML list.');
         }
 
-        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => $volume !== $trafficVolume));
+        // Coolify owns /traffic: replace an older mount with a different source path.
+        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => ! isCaddyTrafficVolume($volume)));
         if ($enabled) {
             $volumes[] = $trafficVolume;
         }
@@ -197,6 +200,24 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
     }
 
     return $config;
+}
+
+/**
+ * True for a Caddy volume that mounts to the /traffic access-log directory (short or long syntax).
+ */
+function isCaddyTrafficVolume(mixed $volume): bool
+{
+    if (is_array($volume)) {
+        return rtrim((string) data_get($volume, 'target'), '/') === '/traffic';
+    }
+
+    if (! is_string($volume)) {
+        return false;
+    }
+
+    $parts = explode(':', $volume);
+
+    return count($parts) >= 2 && rtrim($parts[1], '/') === '/traffic';
 }
 
 /**
@@ -513,6 +534,47 @@ function removeLegacyTraefikDashboardExposure(Server $server): bool
     return true;
 }
 
+/**
+ * Development only. Older dev builds wrote the dev data volume path (/var/lib/docker/volumes/<name>_coolify_data/_data)
+ * into the proxy configuration of every server. Replace it with the path for this server (devHostDockerPath()):
+ * /data/coolify on a dev KVM VM, the configured volume path on the testing-host server. The next proxy restart applies it.
+ */
+function replaceDevHostDockerProxyPaths(Server $server): bool
+{
+    if (! app()->bound('config') || ! isDev()) {
+        return false;
+    }
+    $configuration = $server->proxy->get('last_saved_proxy_configuration');
+    if (! is_string($configuration) || blank($configuration)) {
+        return false;
+    }
+
+    $configuredVolume = preg_quote(basename(dirname(devDockerVolumeDataPath('constants.coolify.dev_data_volume', 'coolify_dev_coolify_data'))), '#');
+    $pattern = "#/var/lib/docker/volumes/(?:[A-Za-z0-9][A-Za-z0-9_.-]*_coolify_data|{$configuredVolume})/_data(?=[/:'\"\\s]|$)#m";
+    $fixed = preg_replace($pattern, devHostDockerPath($server, base_configuration_dir()), $configuration);
+    if (! is_string($fixed) || $fixed === $configuration) {
+        return false;
+    }
+
+    try {
+        // The Caddy /traffic mount and the Traefik log rotation mount depend on the proxy type, so rebuild them.
+        $fixed = applyTrafficAnalyticsToProxyConfiguration($server, $fixed);
+    } catch (Throwable) {
+        // Keep the plain path replacement for a configuration that is not a YAML mapping.
+    }
+
+    if (blank($server->proxy->get('last_applied_settings'))) {
+        $server->proxy->last_applied_settings = md5(base64_encode($configuration));
+    }
+    $server->proxy->last_saved_proxy_configuration = $fixed;
+    $server->proxy->last_saved_settings = md5(base64_encode($fixed));
+    $server->save();
+
+    Log::info('Replaced the development data volume path in the proxy configuration', ['server_id' => $server->id]);
+
+    return true;
+}
+
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
     Log::info('Generating default proxy configuration', [
@@ -612,11 +674,10 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
-            $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
-            $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
         }
+        $config['services']['traefik']['volumes'][] = devHostDockerPath($server, $proxy_path).':/traefik';
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
             data_forget($config, 'services.traefik.restart');
@@ -650,7 +711,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             'services' => [
                 'caddy' => [
                     'container_name' => 'coolify-proxy',
-                    'image' => 'lucaslorentz/caddy-docker-proxy:2.13-alpine',
+                    'image' => Server::RECOMMENDED_CADDY_PROXY_IMAGE,
                     'restart' => RESTART_MODE,
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
@@ -671,9 +732,9 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                     ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',
-                        "{$proxy_path}/dynamic:/dynamic",
-                        "{$proxy_path}/config:/config",
-                        "{$proxy_path}/data:/data",
+                        devHostDockerPath($server, "{$proxy_path}/dynamic").':/dynamic',
+                        devHostDockerPath($server, "{$proxy_path}/config").':/config',
+                        devHostDockerPath($server, "{$proxy_path}/data").':/data',
                     ],
                 ],
             ],

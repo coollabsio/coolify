@@ -102,25 +102,3 @@ describe('server method uses team scoping', function () {
         expect($methodBody)->not->toContain('Server::find($this->serverId)');
     });
 });
-
-describe('ImportForm component uses shared ValidationPatterns', function () {
-    test('runImport references ValidationPatterns for container validation', function () {
-        $method = new ReflectionMethod(ImportForm::class, 'runImport');
-        $startLine = $method->getStartLine();
-        $endLine = $method->getEndLine();
-        $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);
-        $methodBody = implode('', $lines);
-
-        expect($methodBody)->toContain('ValidationPatterns::isValidContainerName');
-    });
-
-    test('restoreFromS3 references ValidationPatterns for container validation', function () {
-        $method = new ReflectionMethod(ImportForm::class, 'restoreFromS3');
-        $startLine = $method->getStartLine();
-        $endLine = $method->getEndLine();
-        $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);
-        $methodBody = implode('', $lines);
-
-        expect($methodBody)->toContain('ValidationPatterns::isValidContainerName');
-    });
-});

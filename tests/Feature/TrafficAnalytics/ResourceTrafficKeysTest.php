@@ -96,7 +96,7 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-function makeComposeApplication(): Application
+function makeTrafficComposeApplication(): Application
 {
     return Application::factory()->create([
         'name' => 'Compose Shop',
@@ -260,7 +260,7 @@ it('merges overviews, paths, breakdowns, and series of several keys', function (
 });
 
 it('shows a compose application with the data of all its compose service keys', function () {
-    $application = makeComposeApplication();
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 
@@ -287,7 +287,7 @@ it('shows a compose application with the data of all its compose service keys', 
 });
 
 it('sums every compose key in the application traffic card', function () {
-    $application = makeComposeApplication();
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 
@@ -303,7 +303,7 @@ it('sums every compose key in the application traffic card', function () {
 });
 
 it('groups compose keys of one application into one leaderboard row', function () {
-    $application = makeComposeApplication();
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 

@@ -7,6 +7,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
 
@@ -44,7 +44,7 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -1153,7 +1153,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('coollabsio/openclaw'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_OPENCLAW')->first();
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
                     $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
                     if ($username) {
@@ -1572,20 +1572,12 @@ class Service extends BaseModel
         }
 
         $workdir = $this->workdir();
-
-        instant_remote_process([
+        // Absolute paths and tee, no cd or scp: a non-root SSH user cannot enter /data/coolify on the Coolify host.
+        $commands = [
             "mkdir -p $workdir",
-            "cd $workdir",
-        ], $this->server);
-
-        $filename = new_public_id().'-docker-compose.yml';
-        Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
-        $path = Storage::path("tmp/{$filename}");
-        instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
-        Storage::disk('local')->delete("tmp/{$filename}");
-
-        $commands[] = "cd $workdir";
-        $environmentFilename = new_public_id().'.env.tmp';
+            "echo '".base64_encode($this->docker_compose)."' | base64 -d | tee $workdir/docker-compose.yml > /dev/null",
+        ];
+        $environmentFile = "$workdir/".new_public_id().'.env.tmp';
 
         $envs = collect([]);
 
@@ -1616,11 +1608,12 @@ class Service extends BaseModel
             $envs->push("{$env->key}={$this->resolveSecretManagerEnvironmentVariable($env)}");
         }
         if ($envs->count() === 0) {
-            $commands[] = "touch {$environmentFilename} && mv {$environmentFilename} .env";
+            $commands[] = "touch {$environmentFile}";
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFilename} > /dev/null && mv {$environmentFilename} .env";
+            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFile} > /dev/null";
         }
+        $commands[] = "mv {$environmentFile} $workdir/.env";
 
         instant_remote_process($commands, $this->server);
     }

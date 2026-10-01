@@ -109,13 +109,16 @@ test('can update general settings when the application has a wildcard domain', f
         'destination_id' => $this->destination->id,
         'destination_type' => StandaloneDocker::class,
         'build_pack' => 'nixpacks',
-        'fqdn' => 'https://example.com,https://*.example.com',
         'static_image' => 'nginx:alpine',
         'base_directory' => '/',
         'ports_exposes' => '3000',
         'is_http_basic_auth_enabled' => false,
         'redirect' => 'no',
     ]);
+    // Legacy wildcard domains can no longer be entered (the model normalizes them away on save),
+    // so seed the stored value directly, as it exists on older installs.
+    Application::query()->whereKey($application->id)->update(['fqdn' => 'https://example.com,https://*.example.com']);
+    $application->refresh();
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()

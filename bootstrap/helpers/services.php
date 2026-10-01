@@ -26,6 +26,7 @@ function service_logo_urls(mixed $logo): array
 }
 
 use App\Models\Application;
+use App\Models\LocalFileVolume;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -200,7 +201,6 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $escapedWorkdir = escapeshellarg($workdir);
         $commands = collect([
             "mkdir -p -- {$escapedWorkdir} > /dev/null 2>&1 || true",
-            "cd {$escapedWorkdir}",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
@@ -224,20 +224,29 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 if ($fileVolume->is_based_on_git) {
                     $fileVolume->loadStorageOnServer();
                 }
+            } elseif ($isDir === 'OK' && ! $fileVolume->is_directory && filled($content)) {
+                // A configured file must not lose its content because a directory is at its path.
+                // Docker leaves an empty directory when it starts before the file exists: replace it.
+                // A directory with files stays; the start or deployment shows a warning for it.
+                if (LocalFileVolume::remoteFileStates([(string) $fileLocation], $server)[0] === 'empty-directory') {
+                    $fileVolume->saveStorageOnServer();
+                }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && ! $fileVolume->is_directory && $isInit && $content) {
-                // Does not exists (no dir or file), not flagged as directory, is init, has content
+                // Does not exists (no dir or file), not flagged as directory, is init, has content.
+                // Content is written only inside the resource directory, as a literal path.
+                $escapedContentLocation = escapeshellarg($fileVolume->confinedContentPath((string) $fileLocation, $server));
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
-                    "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
+                    'mkdir -p -- "$(dirname -- '.$escapedContentLocation.')"',
+                    "echo '$content' | base64 -d | tee -- {$escapedContentLocation}",
                 ], $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init

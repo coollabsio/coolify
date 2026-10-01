@@ -14,6 +14,7 @@ use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
+use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -29,6 +30,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -125,6 +127,22 @@ class Server extends BaseModel
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
 
+    /**
+     * Default Caddy proxy image. caddy-docker-proxy 2.13 ships Caddy 2.11.
+     */
+    public const RECOMMENDED_CADDY_PROXY_IMAGE = 'lucaslorentz/caddy-docker-proxy:2.13-alpine';
+
+    /**
+     * First caddy-docker-proxy version that ships Caddy 2.8+ (`log_append`, `basic_auth`).
+     * Version 2.8 of the image still runs Caddy 2.7.6.
+     */
+    public const MINIMUM_CURRENT_CADDY_PROXY_VERSION = [2, 9];
+
+    /**
+     * Address of the development `testing-host` server (docker-compose.dev*.yml, ServerSeeder).
+     */
+    public const DEV_TESTING_HOST_IP = 'coolify-testing-host';
+
     public static $batch_counter = 0;
 
     /**
@@ -219,6 +237,7 @@ class Server extends BaseModel
             });
             $server->settings()->delete();
             $server->sslCertificates()->delete();
+            $server->notificationThrottles()->delete();
         });
 
         static::updated(function () {
@@ -264,7 +283,6 @@ class Server extends BaseModel
         'logdrain_newrelic_license_key' => 'encrypted',
         'delete_unused_volumes' => 'boolean',
         'delete_unused_networks' => 'boolean',
-        'unreachable_notification_sent' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
     ];
@@ -583,11 +601,6 @@ class Server extends BaseModel
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         $redirect_url = $this->proxy->redirect_url;
-        if (isDev()) {
-            if ($proxy_type === ProxyTypes::CADDY->value) {
-                $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
-            }
-        }
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
         } elseif ($proxy_type === ProxyTypes::CADDY->value) {
@@ -909,10 +922,24 @@ $siteAddress {
             return false;
         }
 
+        if ($this->proxy->get('certificates_restart_required')) {
+            return true;
+        }
+
         $savedSettings = $this->proxy->get('last_saved_settings');
         $appliedSettings = $this->proxy->get('last_applied_settings');
 
         return filled($savedSettings) && filled($appliedSettings) && $savedSettings !== $appliedSettings;
+    }
+
+    /**
+     * Record the configuration the proxy runs with after a start or restart.
+     */
+    public function markProxyConfigurationApplied(string $configuration): void
+    {
+        $this->proxy->last_applied_settings = str(base64_encode($configuration))->pipe('md5')->value();
+        $this->proxy->certificates_restart_required = false;
+        $this->save();
     }
 
     public function hasCurrentTraefikOutdatedInfo(): bool
@@ -946,8 +973,23 @@ $siteAddress {
     }
 
     /**
+     * True only in development for the `testing-host` server. That container runs containers on the
+     * host Docker daemon (/var/run/docker.sock), but its /data/coolify is a Docker named volume. The host
+     * daemon must therefore mount the volume's host path instead of /data/coolify (see devHostDockerPath()).
+     *
+     * Dev KVM VMs and all other servers have their own Docker daemon and their own /data/coolify.
+     * A `host.docker.internal` server writes to the real host /data/coolify, so it also needs no change.
+     */
+    public function sharesDevHostDocker(): bool
+    {
+        // The saving hook can leave a Stringable in `ip`, so compare the string value.
+        return isDev() && (string) $this->ip === self::DEV_TESTING_HOST_IP;
+    }
+
+    /**
      * Usable dedicated (build-only) servers of a team. Servers with the combined role
-     * host deployments, so they are never picked as build servers.
+     * host deployments, so they are never picked as build servers. Servers dedicated to
+     * GitHub Actions runners are also left out.
      */
     public static function buildServers($teamId): Builder
     {
@@ -955,7 +997,8 @@ $siteAddress {
             ->whereRelation('settings', 'is_reachable', true)
             ->whereRelation('settings', 'is_usable', true)
             ->whereRelation('settings', 'is_swarm_worker', false)
-            ->whereRelation('settings', 'force_disabled', false);
+            ->whereRelation('settings', 'force_disabled', false)
+            ->whereDoesntHave('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true)->where('is_dedicated', true));
 
         return self::whereServerRole($query, ServerRole::BUILD);
     }
@@ -972,6 +1015,15 @@ $siteAddress {
     public function isTransferredAway(): bool
     {
         return data_get($this->server_metadata, 'transfer.status') === 'transferred';
+    }
+
+    /**
+     * Management was disabled manually on this instance; the server is ready to be transferred.
+     */
+    public function isManagementDisabled(): bool
+    {
+        return $this->isTransferredAway()
+            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
     }
 
     /**
@@ -1091,26 +1143,81 @@ $siteAddress {
     }
 
     /**
-     * Caddy's `log_append` tags access-log lines with the app UUID for traffic analytics. It needs
-     * Caddy 2.8+, which caddy-docker-proxy ships from 2.9: the 2.8 image (the default before 2.13)
-     * runs Caddy 2.7.6, which rejects the whole Caddyfile. A saved change that is not applied yet may still run the
-     * old image, so it counts as unsupported.
+     * Major and minor version from a caddy-docker-proxy image tag, for example [2, 8] for
+     * `lucaslorentz/caddy-docker-proxy:2.8-alpine`. Other images, `latest`, and digests without a tag give null.
+     *
+     * @return array{0: int, 1: int}|null
      */
-    public function caddySupportsLogAppend(): bool
+    public static function caddyDockerProxyImageVersion(?string $image): ?array
     {
-        if ($this->proxyType() !== ProxyTypes::CADDY->value || $this->hasPendingProxyConfiguration()) {
-            return false;
+        if ($image === null || preg_match('#(?:^|/)caddy-docker-proxy:(\d+)\.(\d+)#', $image, $version) !== 1) {
+            return null;
+        }
+
+        return [(int) $version[1], (int) $version[2]];
+    }
+
+    /**
+     * Caddy image in the saved proxy configuration. Null for other proxies or a configuration that cannot be read.
+     */
+    public function configuredCaddyProxyImage(): ?string
+    {
+        if ($this->proxyType() !== ProxyTypes::CADDY->value) {
+            return null;
         }
 
         try {
             $image = data_get(Yaml::parse((string) $this->proxy->get('last_saved_proxy_configuration')), 'services.caddy.image');
         } catch (ParseException) {
+            return null;
+        }
+
+        return is_string($image) && $image !== '' ? $image : null;
+    }
+
+    /**
+     * The saved Caddy image when it is caddy-docker-proxy older than 2.9 (Caddy 2.7), else null.
+     * Unknown versions (custom images, `latest`, digests) are not reported.
+     */
+    public function outdatedCaddyProxyImage(): ?string
+    {
+        $image = $this->configuredCaddyProxyImage();
+        $version = self::caddyDockerProxyImageVersion($image);
+
+        return $version !== null && $version < self::MINIMUM_CURRENT_CADDY_PROXY_VERSION ? $image : null;
+    }
+
+    /**
+     * True when the Caddy proxy runs caddy-docker-proxy 2.9+ (Caddy 2.8+). The 2.8 image (the default before 2.13)
+     * runs Caddy 2.7.6, which rejects the whole Caddyfile when it contains newer directives. A saved change that
+     * is not applied yet may still run the old image, so it counts as unsupported.
+     */
+    private function caddyRunsCurrentVersion(): bool
+    {
+        if ($this->hasPendingProxyConfiguration()) {
             return false;
         }
 
-        return is_string($image)
-            && preg_match('#(?:^|/)caddy-docker-proxy:(\d+)\.(\d+)#', $image, $version) === 1
-            && [(int) $version[1], (int) $version[2]] >= [2, 9];
+        $version = self::caddyDockerProxyImageVersion($this->configuredCaddyProxyImage());
+
+        return $version !== null && $version >= self::MINIMUM_CURRENT_CADDY_PROXY_VERSION;
+    }
+
+    /**
+     * Caddy's `log_append` tags access-log lines with the app UUID for traffic analytics. It needs Caddy 2.8+.
+     */
+    public function caddySupportsLogAppend(): bool
+    {
+        return $this->caddyRunsCurrentVersion();
+    }
+
+    /**
+     * Caddy 2.8 renamed `basicauth` to `basic_auth`. Caddy 2.7 knows only `basicauth`, and Caddy 2.8+ still
+     * accepts it as a deprecated name, so `basicauth` is the safe fallback.
+     */
+    public function caddySupportsBasicAuthDirective(): bool
+    {
+        return $this->caddyRunsCurrentVersion();
     }
 
     public function isServerApiEnabled(): bool
@@ -1265,6 +1372,7 @@ $siteAddress {
         $keydbs = StandaloneKeydb::where($destinationCondition)->get();
         $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
         $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+        $sqlites = StandaloneSqlite::where($destinationCondition)->get();
 
         return $postgresqls
             ->concat($redis)
@@ -1274,6 +1382,7 @@ $siteAddress {
             ->concat($keydbs)
             ->concat($dragonflies)
             ->concat($clickhouses)
+            ->concat($sqlites)
             ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
     }
 
@@ -1401,6 +1510,21 @@ $siteAddress {
         return $standalone_docker->concat($swarm_docker);
     }
 
+    public function githubRunnerConfig()
+    {
+        return $this->hasOne(GithubRunnerConfig::class);
+    }
+
+    public function githubRunnerExecutions()
+    {
+        return $this->hasMany(GithubRunnerExecution::class);
+    }
+
+    public function hasEnabledGithubRunners(): bool
+    {
+        return $this->githubRunnerConfig()->where('is_enabled', true)->exists();
+    }
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
@@ -1419,6 +1543,19 @@ $siteAddress {
     public function cloudProviderToken()
     {
         return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function notificationThrottles(): MorphMany
+    {
+        return $this->morphMany(NotificationThrottle::class, 'notifiable');
+    }
+
+    /**
+     * True while an Unreachable notification was sent and no Reachable notification followed.
+     */
+    protected function unreachableNotificationSent(): Attribute
+    {
+        return Attribute::get(fn (): bool => NotificationThrottle::wasSent($this, Unreachable::class));
     }
 
     public function sslCertificates()
@@ -1491,6 +1628,25 @@ $siteAddress {
         }
 
         return $isFunctional;
+    }
+
+    /**
+     * Like isFunctional(), but runs a live SSH and Docker check when the server is marked
+     * unreachable. The flag can be stale after one failed scheduled check.
+     */
+    public function isFunctionalAfterRecheck(): bool
+    {
+        if ($this->isFunctional()) {
+            return true;
+        }
+        if ($this->settings->is_reachable || $this->settings->force_disabled || $this->hasPlaceholderIp()) {
+            return false;
+        }
+
+        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        $this->settings->refresh();
+
+        return $this->isFunctional();
     }
 
     public function isLogDrainEnabled()
@@ -1665,25 +1821,21 @@ $siteAddress {
             return;
         }
 
-        if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
+        if ($this->unreachable_count >= ServerConnectionCheckJob::UNREACHABLE_THRESHOLD && ! $unreachableNotificationSent) {
             $this->sendUnreachableNotification();
         }
     }
 
     public function sendReachableNotification()
     {
-        $this->unreachable_notification_sent = false;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Reachable($this));
+        if (NotificationThrottle::release($this, Unreachable::class)) {
+            $this->team->notify(new Reachable($this));
+        }
     }
 
     public function sendUnreachableNotification()
     {
-        $this->unreachable_notification_sent = true;
-        $this->save();
-        $this->refresh();
-        $this->team->notify(new Unreachable($this));
+        NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)
@@ -1949,6 +2101,7 @@ $siteAddress {
             $this->proxy->set('last_saved_proxy_configuration', null);
             $this->proxy->set('last_saved_settings', null);
             $this->proxy->set('last_applied_settings', null);
+            $this->proxy->set('certificates_restart_required', false);
             $this->detected_traefik_version = null;
             $this->traefik_outdated_info = null;
             $this->save();
@@ -2019,18 +2172,7 @@ $siteAddress {
             $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;
-                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-                $base64Cert = base64_encode($certificateContent);
-
-                $commands = collect([
-                    "mkdir -p $caCertPath",
-                    "chown -R 9999:root $caCertPath",
-                    "chmod -R 700 $caCertPath",
-                    "rm -rf $caCertPath/coolify-ca.crt",
-                    "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-                    "chmod 644 $caCertPath/coolify-ca.crt",
-                ]);
+                $commands = SslHelper::caCertificateFileCommands($certificateContent);
 
                 instant_remote_process($commands, $this, false);
 

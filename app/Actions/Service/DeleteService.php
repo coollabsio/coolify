@@ -5,7 +5,9 @@ namespace App\Actions\Service;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class DeleteService
 {
@@ -43,28 +45,50 @@ class DeleteService
         }
     }
 
-    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): void
+    /**
+     * Removes the container of one service part. Returns false when the server does not respond,
+     * also when it is still marked reachable but the SSH call fails: the container then stays until
+     * the service starts again (compose up --remove-orphans), and the part can still be deleted from Coolify.
+     */
+    public function removeSubresourceContainer(ServiceApplication|ServiceDatabase $resource): bool
     {
         $service = $resource->service;
-        $server = $service?->server;
-        if (! $server?->isFunctional()) {
-            throw new RuntimeException('Server is not functional.');
+        if (! $service?->server?->isFunctional()) {
+            return false;
         }
 
-        $this->removeContainers($service, $resource);
+        try {
+            $this->removeContainers($service, $resource);
+        } catch (Throwable $e) {
+            Log::warning('Could not remove the container of a service part; it is removed when the service starts again.', [
+                'service_uuid' => $service->uuid,
+                'subresource_uuid' => $resource->uuid,
+                'server_uuid' => $service->server->uuid,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     private function removeContainers(Service $service, ServiceApplication|ServiceDatabase|null $subresource = null): void
     {
-        $filters = "--filter 'label=coolify.serviceId={$service->id}'";
+        $filters = [];
+        $legacyFilters = [];
         if ($subresource !== null) {
-            // Applications and databases are separate tables, so an id alone can match the other type.
             $subType = $subresource instanceof ServiceDatabase ? 'database' : 'application';
-            $filters .= " --filter 'label=coolify.service.subId={$subresource->id}' --filter 'label=coolify.service.subType={$subType}'";
+            $filters = ["label=coolify.service.subUuid={$subresource->uuid}", "label=coolify.service.subType={$subType}"];
+            // Containers from before the UUID labels: the compose service key is the subresource name.
+            $legacyFilters = ["label=com.docker.compose.service={$subresource->name}", "label=coolify.service.subType={$subType}"];
         }
 
-        $command = "container_ids=\$(docker ps -aq {$filters}); [ -z \"\$container_ids\" ] || docker rm -f \$container_ids";
-        instant_remote_process([$command], $service->server);
+        // One sh -c line, so non-root servers run the whole script with sudo. A leading variable
+        // assignment would become "sudo container_ids=...", which sudo rejects.
+        $script = containerIdsByOwnerScript('service', $service->uuid, $filters, legacyExtraFilters: $legacyFilters)
+            .'; [ -z "$container_ids" ] || docker rm -f $container_ids';
+        instant_remote_process(['sh -c '.escapeshellarg($script)], $service->server);
     }
 
     public function deleteLocal(Service $service): void

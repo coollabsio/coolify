@@ -20,6 +20,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -35,7 +36,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
         public bool $deleteVolumes = true,
         public bool $deleteConnectedNetworks = true,
         public bool $deleteConfigurations = true,
@@ -72,6 +73,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
+                case 'standalone-sqlite':
                     StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
                     break;
                 case 'service':
@@ -97,24 +99,21 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } catch (\Throwable $e) {
-            if ($this->resource instanceof Service) {
-                if ($this->resource->trashed()) {
-                    $this->resource->restore();
-                }
-
-                $this->resource->server?->team?->notify(new GeneralNotification(
-                    "Service deletion failed for '{$this->resource->name}'. Docker resources may still exist on server '{$this->resource->server?->name}'. You can retry the cleanup or select 'Remove from Coolify only' in the deletion dialog. Error: {$e->getMessage()}",
-                    success: false,
-                ));
-
-                throw $e;
-            }
-
+            // A resource can always be deleted from Coolify, also when its server does not respond.
             Log::warning('Remote cleanup failed while deleting resource; continuing with local deletion.', [
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->type(),
                 'error' => $e->getMessage(),
             ]);
+
+            // A deleted server has nothing left to clean up. Otherwise tell the team what may remain.
+            $server = data_get($this->resource, 'destination.server');
+            if ($server) {
+                $this->resource->team()?->notify(new GeneralNotification(
+                    "'{$this->resource->name}' was removed from Coolify, but its Docker resources could not be removed from server '{$server->name}' and may still exist there. Error: {$e->getMessage()}",
+                    success: false,
+                ));
+            }
         }
 
         try {
@@ -164,7 +163,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             || $this->resource instanceof StandaloneMariadb
             || $this->resource instanceof StandaloneKeydb
             || $this->resource instanceof StandaloneDragonfly
-            || $this->resource instanceof StandaloneClickhouse;
+            || $this->resource instanceof StandaloneClickhouse
+            || $this->resource instanceof StandaloneSqlite;
     }
 
     private function deleteScheduledVolumeBackups(): void
@@ -261,7 +261,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedStackName = escapeshellarg("{$application->uuid}-{$pull_request_id}");
                 instant_remote_process(["docker stack rm {$escapedStackName}"], $server);
             } else {
-                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pull_request_id)->toArray();
+                $containers = getCurrentApplicationContainerStatus($server, $application, $pull_request_id)->toArray();
                 $this->stopPreviewContainers($containers, $server);
             }
         } catch (\Throwable $e) {

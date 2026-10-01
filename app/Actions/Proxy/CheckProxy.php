@@ -53,6 +53,17 @@ class CheckProxy
 
             return true;
         } else {
+            $status = getContainerStatus($server, $proxyContainerName);
+            if ($status === 'running') {
+                $server->proxy->set('status', 'running');
+                $server->save();
+
+                return false;
+            }
+            if ($server->settings->is_cloudflare_tunnel) {
+                return false;
+            }
+
             $portsToCheck = [];
 
             try {
@@ -63,17 +74,6 @@ class CheckProxy
             } catch (\Throwable $e) {
                 Log::error('Error checking proxy: '.$e->getMessage());
 
-                return false;
-            }
-
-            $status = getContainerStatus($server, $proxyContainerName);
-            if ($status === 'running') {
-                $server->proxy->set('status', 'running');
-                $server->save();
-
-                return false;
-            }
-            if ($server->settings->is_cloudflare_tunnel) {
                 return false;
             }
             if (count($portsToCheck) === 0) {

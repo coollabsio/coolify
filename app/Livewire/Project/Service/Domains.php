@@ -13,10 +13,12 @@ use App\Models\ServiceApplication;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Domains extends Component
@@ -24,6 +26,7 @@ class Domains extends Component
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
     use InteractsWithDnsProviders;
+    use ListensToTeamChannel;
 
     protected bool $notifyRedirectUpdate = true;
 
@@ -108,8 +111,10 @@ class Domains extends Component
 
     public bool $dnsValidationEnabled = true;
 
+    #[Locked]
     public ?string $serverIp = null;
 
+    #[Locked]
     public ?string $serverIpConfigured = null;
 
     /** Pending save payload after conflict/port confirmation */
@@ -123,9 +128,7 @@ class Domains extends Component
 
     public function getListeners(): array
     {
-        return array_merge($this->listeners, [
-            'echo-private:team.'.currentTeam()->id.',DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished',
-        ]);
+        return array_merge($this->listeners, $this->teamChannelListeners(['DnsRecordConfigurationFinished' => 'dnsRecordConfigurationFinished']));
     }
 
     protected function rules(): array
@@ -1322,10 +1325,13 @@ class Domains extends Component
                 }
             }
             $this->pendingAction = 'update';
+            $previousDnsHostnames = $this->managedDnsHostnamesOf($app);
 
             if (! $this->saveDomainListForApp($app, $updated, noindexDomains: $noindexDomains, redirect: $this->editingRedirect)) {
                 return;
             }
+
+            $this->releaseManagedDnsForEditedDomains($app, $previousDnsHostnames);
 
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');

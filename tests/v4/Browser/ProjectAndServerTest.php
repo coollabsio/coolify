@@ -44,7 +44,9 @@ beforeEach(function () {
 });
 
 it('shows dashboard with projects and servers after login', function () {
-    $page = loginAndSkipBoarding();
+    loginAndSkipBoarding();
+
+    $page = visit('/dashboard');
 
     $page->assertSee('Dashboard')
         ->assertSee('Core Project Alpha')
@@ -85,7 +87,7 @@ it('shows server configuration page for owner', function () {
 
     $page->assertSee('localhost')
         ->assertSee('General')
-        ->assertSee('Configuration')
+        ->assertSee('Server overview')
         ->assertSee('Save')
         ->screenshot(filename: 'core-server-configuration');
 });

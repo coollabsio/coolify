@@ -12,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\RemoteProcessCommand;
 use App\Support\ResourceStartActivity;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Filesystem\FilesystemManager;
@@ -72,7 +73,7 @@ function importServerBackup(object $test, string $path, string $magicHex): strin
         $test->team->id,
     );
 
-    return (string) $activity->getExtraProperty('command');
+    return (string) RemoteProcessCommand::read($activity);
 }
 
 test('plain and gzip server backups are copied into the database container unchanged', function (string $path, string $magicHex) {
@@ -115,7 +116,7 @@ test('uploaded backups use the same preparation as server backups', function (st
         new DatabaseImportSource('upload'),
         $this->team->id,
     );
-    $command = (string) $activity->getExtraProperty('command');
+    $command = (string) RemoteProcessCommand::read($activity);
 
     expect(str_contains($command, "'backup-decompress-"))->toBe($usesHelper)
         ->and(str_contains($command, "docker cp '/tmp/database-import-"))->toBeTrue();
@@ -149,7 +150,7 @@ test('s3 backups are prepared in the s3 helper and streamed into the database co
         new DatabaseImportSource('s3', path: 'backups/restore.sql.xz', s3StorageUuid: $storage->uuid),
         $this->team->id,
     );
-    $command = (string) $activity->getExtraProperty('command');
+    $command = (string) RemoteProcessCommand::read($activity);
 
     expect($command)
         ->toContain('unxz -c')

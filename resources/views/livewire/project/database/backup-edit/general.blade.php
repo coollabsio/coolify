@@ -79,6 +79,10 @@
                 <x-forms.input label="Databases to back up"
                     helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneSqlite')
+                <x-forms.input label="Database files to back up"
+                    helper="Comma-separated file names inside the data volume. Leave empty to back up every configured file."
+                    id="databasesToBackup" />
             @endif
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -92,6 +96,7 @@
                     min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
                     helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
+            <x-next-run :at="$backup->next_run_at" :timezone="$timezone" :enabled="$backup->enabled" :frequency="$backup->frequency" />
         </div>
     </x-application.settings-section>
 </form>

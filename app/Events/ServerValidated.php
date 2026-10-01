@@ -2,38 +2,22 @@
 
 namespace App\Events;
 
+use App\Traits\BroadcastsToTeam;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 class ServerValidated implements ShouldBroadcast
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public ?int $teamId = null;
+    use BroadcastsToTeam, Dispatchable, InteractsWithSockets, SerializesModels;
 
     public ?string $serverUuid = null;
 
-    public function __construct(?int $teamId = null, ?string $serverUuid = null)
+    public function __construct(?int $teamId, ?string $serverUuid = null)
     {
-        if (is_null($teamId) && auth()->check() && auth()->user()->currentTeam()) {
-            $teamId = auth()->user()->currentTeam()->id;
-        }
         $this->teamId = $teamId;
         $this->serverUuid = $serverUuid;
-    }
-
-    public function broadcastOn(): array
-    {
-        if (is_null($this->teamId)) {
-            return [];
-        }
-
-        return [
-            new PrivateChannel("team.{$this->teamId}"),
-        ];
     }
 
     public function broadcastAs(): string

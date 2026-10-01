@@ -112,6 +112,7 @@ class TrafficAnalyticsSettings extends Component
         return view('livewire.server.traffic-analytics-settings', [
             'unsupportedReason' => $this->server->trafficAnalyticsUnsupportedReason(),
             'caddyRedeployNote' => $this->caddyRedeployNote(),
+            'outdatedCaddyImage' => $this->server->outdatedCaddyProxyImage(),
         ]);
     }
 

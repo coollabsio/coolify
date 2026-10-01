@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\LocalPersistentVolume;
 use App\Models\Server;
+use App\Traits\StagesCloneArchives;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,9 +16,7 @@ use Illuminate\Support\Str;
 
 class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected string $cloneDir = '/data/coolify/clone';
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, StagesCloneArchives;
 
     public int $timeout = 3600;
 
@@ -55,36 +54,53 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        $sourceConfiguration = $this->sourceVolumeConfiguration();
+        $createTargetVolume = $this->createTargetVolumeCommand($sourceConfiguration);
+
+        if ($this->isBindVolume($sourceConfiguration)) {
+            instant_remote_process([$createTargetVolume], $this->sourceServer);
+            $this->logSkippedBindVolumeCopy($sourceConfiguration);
+
+            return;
+        }
+
         instant_remote_process([
-            "docker volume create {$tgtVol}",
+            $createTargetVolume,
             "docker run --rm -v {$srcVol}:/source -v {$tgtVol}:/target alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'",
         ], $this->sourceServer);
+        $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
     }
 
     protected function cloneRemoteVolume(): void
     {
         $srcVol = escapeshellarg($this->sourceVolume);
         $tgtVol = escapeshellarg($this->targetVolume);
-        $sourceCloneDir = "{$this->cloneDir}/{$this->sourceVolume}";
-        $targetCloneDir = "{$this->cloneDir}/{$this->targetVolume}";
-        $srcDir = escapeshellarg($sourceCloneDir);
-        $tgtDir = escapeshellarg($targetCloneDir);
+        $sourceConfiguration = $this->sourceVolumeConfiguration();
+        $createTargetVolume = $this->createTargetVolumeCommand($sourceConfiguration);
+
+        if ($this->isBindVolume($sourceConfiguration)) {
+            instant_remote_process([$createTargetVolume], $this->targetServer);
+            $this->logSkippedBindVolumeCopy($sourceConfiguration);
+
+            return;
+        }
+
+        $sourceCloneDir = null;
+        $targetCloneDir = null;
         $localTempDir = storage_path('app/tmp/volume-clones/'.Str::uuid()->toString());
         $localArchive = $localTempDir.'/volume-data.tar.gz';
 
         try {
             File::ensureDirectoryExists($localTempDir, 0755);
 
+            $sourceCloneDir = $this->createCloneArchiveDirectory($this->sourceServer, $this->sourceVolume);
+            $srcDir = escapeshellarg($sourceCloneDir);
             instant_remote_process([
-                "mkdir -p {$srcDir}",
-                "chmod 777 {$srcDir}",
                 "docker run --rm -v {$srcVol}:/source -v {$srcDir}:/clone alpine sh -c 'cd /source && tar czf /clone/volume-data.tar.gz .'",
             ], $this->sourceServer);
 
-            instant_remote_process([
-                "mkdir -p {$tgtDir}",
-                "chmod 777 {$tgtDir}",
-            ], $this->targetServer);
+            $targetCloneDir = $this->createCloneArchiveDirectory($this->targetServer, $this->targetVolume);
+            $tgtDir = escapeshellarg($targetCloneDir);
 
             // Coolify host is the intermediary: download from source, upload to target.
             instant_scp_from_server(
@@ -100,9 +116,10 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
             );
 
             instant_remote_process([
-                "docker volume create {$tgtVol}",
+                $createTargetVolume,
                 "docker run --rm -v {$tgtVol}:/target -v {$tgtDir}:/clone alpine sh -c 'cd /target && tar xzf /clone/volume-data.tar.gz && chown -R 1000:1000 /target'",
             ], $this->targetServer);
+            $this->rememberTargetVolumeWithoutDriverOptions($sourceConfiguration);
         } catch (\Exception $e) {
             \Log::error("Failed to clone volume {$this->sourceVolume} to {$this->targetVolume}: ".$e->getMessage());
             throw $e;
@@ -113,23 +130,99 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
                 \Log::warning('Failed to clean up local volume clone directory: '.$e->getMessage());
             }
 
-            try {
-                instant_remote_process([
-                    "rm -rf {$srcDir}",
-                ], $this->sourceServer, false);
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up source server clone directory: '.$e->getMessage());
-            }
+            $this->removeCloneArchiveDirectory($this->sourceServer, $sourceCloneDir);
+            $this->removeCloneArchiveDirectory($this->targetServer, $targetCloneDir);
+        }
+    }
 
-            try {
-                if ($this->targetServer) {
-                    instant_remote_process([
-                        "rm -rf {$tgtDir}",
-                    ], $this->targetServer, false);
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Failed to clean up target server clone directory: '.$e->getMessage());
+    /**
+     * The driver and driver options of the source volume. A missing source volume gives a plain
+     * `local` volume, as Docker creates an empty source volume for the copy.
+     *
+     * @return array{driver: string, options: array<string, string>}
+     */
+    protected function sourceVolumeConfiguration(): array
+    {
+        $output = instant_remote_process([
+            'docker volume inspect '.escapeshellarg($this->sourceVolume)." 2>/dev/null || echo '[]'",
+        ], $this->sourceServer);
+        $inspected = json_decode((string) $output, true);
+        $volume = is_array($inspected) && is_array($inspected[0] ?? null) ? $inspected[0] : [];
+
+        $driver = data_get($volume, 'Driver');
+        $options = [];
+        foreach ((array) data_get($volume, 'Options', []) as $key => $value) {
+            if (is_string($key) && $key !== '' && is_scalar($value)) {
+                $options[$key] = (string) $value;
             }
         }
+
+        return [
+            'driver' => is_string($driver) && $driver !== '' ? $driver : 'local',
+            'options' => $options,
+        ];
+    }
+
+    /**
+     * Creates the target volume like the source volume. The Compose file of the copy declares the same
+     * `driver` and `driver_opts`, and Docker Compose does not change the options of an existing volume.
+     * One `sh -c` line, so the non-root sudo parser only puts sudo in front of it and never changes
+     * an option value.
+     *
+     * @param  array{driver: string, options: array<string, string>}  $configuration
+     */
+    protected function createTargetVolumeCommand(array $configuration): string
+    {
+        $command = 'docker volume create';
+        if ($configuration['driver'] !== 'local') {
+            $command .= ' --driver '.escapeshellarg($configuration['driver']);
+        }
+        foreach ($configuration['options'] as $key => $value) {
+            $command .= ' --opt '.escapeshellarg("{$key}={$value}");
+        }
+        $command .= ' '.escapeshellarg($this->targetVolume);
+
+        return 'sh -c '.escapeshellarg($command);
+    }
+
+    /**
+     * A `local` volume with `type: none` and `o: bind` is a host folder. Copying the data would write
+     * into that folder (on the same server, the folder of the source volume itself), so the job only
+     * creates the volume.
+     *
+     * @param  array{driver: string, options: array<string, string>}  $configuration
+     */
+    protected function isBindVolume(array $configuration): bool
+    {
+        return $configuration['driver'] === 'local'
+            && ($configuration['options']['type'] ?? null) === 'none'
+            && in_array('bind', array_map('trim', explode(',', $configuration['options']['o'] ?? '')), true);
+    }
+
+    /**
+     * @param  array{driver: string, options: array<string, string>}  $configuration
+     */
+    protected function logSkippedBindVolumeCopy(array $configuration): void
+    {
+        $device = $configuration['options']['device'] ?? 'unknown';
+        \Log::info("Volume {$this->sourceVolume} is a bind mount of the host folder {$device}. Created {$this->targetVolume} with the same options and did not copy the data.");
+    }
+
+    /**
+     * A target volume without driver options gets the name-only Compose declaration, like any volume
+     * that Docker created without the options (see composeRenamedVolumeDeclarationFor()).
+     *
+     * @param  array{driver: string, options: array<string, string>}  $configuration
+     */
+    protected function rememberTargetVolumeWithoutDriverOptions(array $configuration): void
+    {
+        if ($configuration['driver'] !== 'local' || $configuration['options'] !== []) {
+            return;
+        }
+        if ($this->persistentVolume->name !== $this->targetVolume || $this->persistentVolume->ignores_compose_driver_options) {
+            return;
+        }
+
+        $this->persistentVolume->forceFill(['ignores_compose_driver_options' => true])->saveQuietly();
     }
 }

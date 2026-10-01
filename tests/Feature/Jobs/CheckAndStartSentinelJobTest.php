@@ -35,7 +35,7 @@ it('does not enable Sentinel for excluded server types', function (array $settin
 
     expect($server->fresh()->isSentinelEnabled())->toBeFalse();
 })->with([
-    'build server' => [['is_build_server' => true]],
+    'build server' => [['server_role' => 'build', 'is_build_server' => true]],
     'swarm manager' => [['is_swarm_manager' => true]],
     'swarm worker' => [['is_swarm_worker' => true]],
     'transferred server' => [[], ['transfer' => ['status' => 'transferred']]],

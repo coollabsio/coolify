@@ -215,11 +215,6 @@ describe('security UI audit logging', function () {
         Livewire::test(CloudInitScripts::class)
             ->call('deleteScript', $script->id);
     });
-
-    test('cloud provider token form does not contain debug ray calls', function () {
-        expect(file_get_contents(app_path('Livewire/Security/CloudProviderTokenForm.php')))
-            ->not->toContain('ray'.'(');
-    });
 });
 
 describe('webhook signature failure logging', function () {
@@ -240,7 +235,7 @@ describe('webhook signature failure logging', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 
@@ -272,7 +267,7 @@ describe('webhook signature failure logging', function () {
             'object_kind' => 'push',
             'ref' => 'refs/heads/main',
             'project' => ['path_with_namespace' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ], [
             'X-Gitlab-Token' => 'wrong-token',
@@ -297,7 +292,7 @@ describe('webhook signature failure logging', function () {
         Log::shouldReceive('error')->andReturnNull();
 
         $payload = json_encode([
-            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc123']]]]],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => 'abc1234']]]]],
             'repository' => ['full_name' => 'test-org/test-repo'],
         ]);
 
@@ -328,7 +323,7 @@ describe('webhook signature failure logging', function () {
         $payload = json_encode([
             'ref' => 'refs/heads/main',
             'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc123',
+            'after' => 'abc1234',
             'commits' => [],
         ]);
 

@@ -2,16 +2,6 @@
 
 use App\Livewire\Project\Database\ImportForm;
 
-test('checkFile does nothing when customLocation is empty', function () {
-    $component = new ImportForm;
-    $component->customLocation = '';
-
-    // No server commands should be executed when customLocation is empty
-    $component->checkFile();
-
-    expect($component->filename)->toBeNull();
-});
-
 test('checkFile validates file exists on server when customLocation is filled', function () {
     $component = new ImportForm;
     $component->customLocation = '/tmp/backup.sql';

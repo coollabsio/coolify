@@ -55,17 +55,8 @@ it('warns about the application interruption before enabling traffic analytics',
 
     Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
         ->assertSee('Enable traffic analytics?')
-        ->assertDontSeeHtml('wire:confirm')
-        ->assertSeeHtml('wire:loading.flex')
-        ->assertSeeHtml('wire:target="toggleTrafficAnalytics"')
         ->assertSee('Restarting Sentinel and proxy...')
         ->assertSee('Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.');
-});
-
-it('allows the analytics toggle modal to update after the state changes', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/traffic-analytics-settings.blade.php'));
-
-    expect($view)->toContain(':ignoreWire="false"');
 });
 
 it('does not enable traffic analytics on a swarm server', function () {

@@ -22,7 +22,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool}>
      */
     public array $forms = [];
 
@@ -68,7 +68,7 @@ class All extends Component
         $this->authorize('view', $this->resource);
         $this->resource->refresh();
         $this->resource->unsetRelation('persistentStorages');
-        $this->resource->load(['persistentStorages' => fn ($query) => $query->orderBy('id')]);
+        $this->resource->load(['persistentStorages' => fn ($query) => $query->with('standaloneSqlite')->orderBy('id')]);
 
         foreach ($this->resource->persistentStorages as $storage) {
             $storage->setRelation('resource', $this->resource);
@@ -95,7 +95,9 @@ class All extends Component
         }
 
         $form = $this->forms[$storageId];
-        $storage->name = $form['name'];
+        if (! $storage->isSharedWithAnotherResource()) {
+            $storage->name = $form['name'];
+        }
         $storage->mount_path = $form['mountPath'];
         $storage->is_preview_suffix_enabled = (bool) $form['isPreviewSuffixEnabled'];
         $storage->save();
@@ -133,7 +135,13 @@ class All extends Component
 
         $storage = $this->findStorageOrFail($storageId);
 
-        if ($this->isComposeOrService && $storage->isDeclaredInCompose()) {
+        if ($storage->isSharedWithAnotherResource()) {
+            $this->dispatch('error', 'This volume is connected to a SQLite database. Unlink it on the SQLite database page.');
+
+            return false;
+        }
+
+        if ($this->isComposeOrService && $storage->isDeclaredInCompose() && ! $storage->ignoresComposeDriverOptionsOfDeclaration()) {
             $this->dispatch('error', 'This volume is managed by the current Docker Compose file.');
 
             return false;
@@ -190,14 +198,20 @@ class All extends Component
     {
         $forms = [];
         foreach ($this->resource->persistentStorages->sortBy('id') as $storage) {
+            $ignoresDriverOptions = $this->isComposeOrService && $storage->ignoresComposeDriverOptionsOfDeclaration();
             $forms[$storage->id] = [
                 'name' => $storage->name,
                 'mountPath' => $storage->mount_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
+                'isShared' => $storage->isSharedWithAnotherResource(),
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
+                    && ! $ignoresDriverOptions
                     && ! $storage->isDeclaredInCompose(),
+                'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
+                'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
+                'ignoresDriverOptions' => $ignoresDriverOptions,
             ];
         }
         $this->forms = $forms;

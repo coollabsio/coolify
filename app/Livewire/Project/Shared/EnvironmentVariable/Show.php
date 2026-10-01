@@ -17,6 +17,7 @@ use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -92,7 +93,6 @@ class Show extends Component
     public array $problematicVariables = [];
 
     protected $listeners = [
-        'refreshEnvs' => 'refresh',
         'refresh',
         'compose_loaded' => '$refresh',
     ];
@@ -173,7 +173,7 @@ class Show extends Component
 
     public function copyValue(): ?string
     {
-        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
+        if ($this->env->is_shown_once || (auth()->user()?->cannot('update', $this->env) ?? true)) {
             return null;
         }
 
@@ -188,7 +188,6 @@ class Show extends Component
     }
 
     private function syncData(bool $toModel = false): void
-
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);
@@ -296,8 +295,8 @@ class Show extends Component
         }
         $this->serialize();
         $this->env->save();
-        $this->checkEnvs();
-        $this->dispatch('refreshEnvs');
+        $this->refresh();
+        $this->dispatch('refreshEnvs')->to(All::class);
     }
 
     public function instantSave()
@@ -330,6 +329,8 @@ class Show extends Component
             if ($this->is_required && $this->resource instanceof Service) {
                 event(new ApplicationConfigurationChanged($this->resource->team()->id));
             }
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return handleError($e);
         }

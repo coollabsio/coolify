@@ -3,6 +3,7 @@
 namespace App\Actions\Shared;
 
 use App\Models\Server;
+use App\Support\DnsRecordHints;
 use Lorisleiva\Actions\Concerns\AsAction;
 use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
@@ -92,7 +93,7 @@ class CheckDomainDns
                     }
 
                     $receivedAddressRecord = true;
-                    if (isCloudflareIp($record->getData()) || ($expectedIp && $record->getData() === $expectedIp)) {
+                    if (isCloudflareIp($record->getData()) || ($expectedIp && DnsRecordHints::sameAddress($record->getData(), $expectedIp))) {
                         return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                     }
                 }
@@ -103,7 +104,7 @@ class CheckDomainDns
 
         if (! $receivedAddressRecord && hrtime(true) < $deadline) {
             foreach ($this->resolveWithSystemDns($host, $type) as $resolvedIp) {
-                if (isCloudflareIp($resolvedIp) || ($expectedIp && $resolvedIp === $expectedIp)) {
+                if (isCloudflareIp($resolvedIp) || ($expectedIp && DnsRecordHints::sameAddress($resolvedIp, $expectedIp))) {
                     return $this->result('ok', $this->successMessage($server, $expectedIp), $expectedIp);
                 }
             }

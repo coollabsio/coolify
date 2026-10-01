@@ -65,9 +65,11 @@ class User extends Authenticatable implements SendsEmail
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'created_before_oauth_identities',
     ];
 
     protected $casts = [
+        'created_before_oauth_identities' => 'boolean',
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
@@ -207,14 +209,38 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
-     * Delete the user if they are not verified and have a force password reset.
+     * Delete the user if they are a provisional invitee that never joined any team.
      * This is used to clean up users that have been invited, did not accept the invitation (and did not verify their email and have a force password reset).
+     * Users that already belong to a team other than their own personal team, or still have pending invitations, are kept.
      */
-    public function deleteIfNotVerifiedAndForcePasswordReset()
+    public function deleteIfNotVerifiedAndForcePasswordReset(): void
     {
-        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true && ! TeamInvitation::whereEmail($this->email)->exists()) {
-            $this->delete();
+        if ($this->hasVerifiedEmail() || $this->force_password_reset !== true) {
+            return;
         }
+
+        if (TeamInvitation::whereEmail($this->email)->exists()) {
+            return;
+        }
+
+        if ($this->belongsToNonPersonalTeam()) {
+            return;
+        }
+
+        $this->delete();
+    }
+
+    /**
+     * Whether the user is a member of any team other than a personal team where they are the only member.
+     */
+    private function belongsToNonPersonalTeam(): bool
+    {
+        return $this->teams()
+            ->where(function ($query) {
+                $query->where('personal_team', false)
+                    ->orWhereHas('members', fn ($members) => $members->where('users.id', '!=', $this->id));
+            })
+            ->exists();
     }
 
     public function recreate_personal_team()
@@ -576,6 +602,11 @@ class User extends Authenticatable implements SendsEmail
         return ! empty($this->password);
     }
 
+    /**
+     * Whether destructive actions must be confirmed with the account password.
+     * Users with a linked OAuth identity only confirm with the dialog's typed
+     * confirmation, and users without a password have no way to confirm.
+     */
     public function requiresPasswordConfirmation(): bool
     {
         return $this->hasPassword() && ! $this->hasSsoIdentity();

@@ -1,13 +1,20 @@
 <?php
 
+// 0 or an invalid value would remove the time limit of every remote command.
+$sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
+
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.4',
+        'version' => env('COOLIFY_VERSION') ?: '4.4.0',
         'helper_version' => '1.0.17',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+        // Development only: Docker volumes that the testing-host server mounts at /data/coolify and /data/coolify/backups.
+        // devHostDockerPath() uses them only for that server. The defaults are the legacy docker-compose.dev.yml names.
+        'dev_data_volume' => env('DEV_COOLIFY_DATA_VOLUME', 'coolify_dev_coolify_data'),
+        'dev_backups_volume' => env('DEV_COOLIFY_BACKUPS_VOLUME', 'coolify_dev_backups_data'),
         'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
@@ -55,10 +62,6 @@ return [
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
     ],
 
-    'nightwatch' => [
-        'is_nightwatch_enabled' => env('NIGHTWATCH_ENABLED', false),
-    ],
-
     'docker' => [
         'minimum_required_version' => '24.0',
         'stop_timeout_flag_since' => '28.0.0',
@@ -75,7 +78,7 @@ return [
         'mux_orphan_reap_enabled' => env('SSH_MUX_ORPHAN_REAP_ENABLED', false), // false = dry-run, only log orphans
         'connection_timeout' => 10,
         'server_interval' => 20,
-        'command_timeout' => env('SSH_COMMAND_TIMEOUT', 3600),
+        'command_timeout' => $sshCommandTimeout > 0 ? $sshCommandTimeout : 3600,
         'max_retries' => env('SSH_MAX_RETRIES', 3),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
@@ -112,6 +115,20 @@ return [
         // already connect the proxy on-demand; this only covers gaps (Swarm
         // networks added via UI, proxy crash recovery).
         'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
+    ],
+
+    'github_runner' => [
+        // GitHub stops sending jobs to runners that are more than 30 days behind, so the default follows
+        // "latest" and is pulled for every runner. Users can pin a tag in the runner settings.
+        'image' => env('GITHUB_RUNNER_IMAGE', 'ghcr.io/actions/actions-runner:latest'),
+        'dind_image' => env('GITHUB_RUNNER_DIND_IMAGE', 'docker:29.8-dind'),
+        'sysbox' => [
+            'version' => '0.7.1',
+            'checksums' => [
+                'amd64' => '9d6d5484f980d0a17f86c492c1262015c2afb66280bdb97215b79fde6a0261c5',
+                'arm64' => '04ca894ae0b53f0fa54eaacc173ce40363c9a95ea5450f773716a84ef650a69b',
+            ],
+        ],
     ],
 
     'webhooks' => [

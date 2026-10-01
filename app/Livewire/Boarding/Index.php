@@ -133,12 +133,10 @@ class Index extends Component
             }
 
             if ($this->selectedExistingPrivateKey) {
-                $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)
-                    ->where('id', $this->selectedExistingPrivateKey)
-                    ->first();
+                $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])
+                    ->find($this->selectedExistingPrivateKey);
                 if ($this->createdPrivateKey) {
-                    $this->privateKey = $this->createdPrivateKey->private_key;
-                    $this->publicKey = $this->createdPrivateKey->getPublicKey();
+                    $this->authorize('update', $this->createdPrivateKey);
                 }
             }
 
@@ -249,9 +247,9 @@ class Index extends Component
 
             return;
         }
-        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->selectedExistingPrivateKey);
-        $this->authorize('view', $this->createdPrivateKey);
-        $this->privateKey = $this->createdPrivateKey->private_key;
+        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($this->selectedExistingPrivateKey);
+        $this->authorize('update', $this->createdPrivateKey);
+        $this->privateKey = null;
         $this->currentState = 'create-server';
     }
 
@@ -305,14 +303,13 @@ class Index extends Component
 
         $this->validate();
 
-        $this->privateKey = formatPrivateKey($this->privateKey);
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
             return $this->dispatch('error', 'A server with this IP/Domain already exists.');
         }
         $privateKeyId = $this->createdPrivateKey?->id ?? $this->selectedExistingPrivateKey;
-        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($privateKeyId);
-        $this->authorize('view', $this->createdPrivateKey);
+        $this->createdPrivateKey = PrivateKey::ownedByCurrentTeam(['team_id'])->findOrFail($privateKeyId);
+        $this->authorize('update', $this->createdPrivateKey);
 
         try {
             $this->createdServer = Team::createServerWithinLimit(currentTeam()->id, [

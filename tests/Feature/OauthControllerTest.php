@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Once;
 use Laravel\Fortify\Features;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GitlabProvider;
+use SocialiteProviders\Azure\Provider as AzureProvider;
 use SocialiteProviders\Discord\Provider as DiscordProvider;
+use SocialiteProviders\Google\Provider as GoogleProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
@@ -49,7 +52,7 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
         'email' => 'UserName@example.edu',
         'name' => 'Example User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ]);
 
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
@@ -86,7 +89,7 @@ it('never moves an existing oauth identity when the provider email changes', fun
         'email' => 'new@example.com',
         'name' => 'Example User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ]);
 
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
@@ -154,7 +157,7 @@ it('continues oauth login when another request creates the identity first', func
             'email' => 'race@example.com',
             'name' => 'Race User',
             'id' => 'google-race-id',
-            'user' => ['verified_email' => true, 'hd' => 'example.com'],
+            'user' => ['email_verified' => true, 'hd' => 'example.com'],
         ], OauthSetting::where('provider', 'google')->firstOrFail());
     } finally {
         Event::forget($eventName);
@@ -205,6 +208,171 @@ it('keeps the Discord verified claim in the raw Socialite user payload', functio
     expect($oauthUser->user['verified'])->toBeFalse();
 });
 
+function mapOauthPayloadWithVendorProvider(string $providerClass, array $payload): object
+{
+    $provider = (new ReflectionClass($providerClass))->newInstanceWithoutConstructor();
+
+    return (new ReflectionMethod($providerClass, 'mapUserToObject'))->invoke($provider, $payload);
+}
+
+it('links an existing account on the first login after upgrade from the real provider payload', function (string $provider, string $providerClass, array $payload) {
+    $user = User::factory()->create(['email' => 'existing@example.com']);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+    ]);
+
+    $resolvedUser = app(OauthLoginService::class)->login(
+        $provider,
+        mapOauthPayloadWithVendorProvider($providerClass, $payload),
+        $setting,
+    );
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and(OauthIdentity::where(['user_id' => $user->id, 'provider' => $provider])->exists())->toBeTrue();
+    $this->assertAuthenticatedAs($user);
+})->with([
+    'google userinfo v3' => ['google', GoogleProvider::class, [
+        'sub' => '110169484474386276334',
+        'name' => 'Existing User',
+        'picture' => 'https://lh3.googleusercontent.com/a/photo.jpg',
+        'email' => 'existing@example.com',
+        'email_verified' => true,
+        'hd' => 'example.com',
+    ]],
+    'azure graph me' => ['azure', AzureProvider::class, [
+        'id' => '87d349ed-44d7-43e1-9a83-5f2406dee5bd',
+        'displayName' => 'Existing User',
+        'userPrincipalName' => 'Existing@example.com',
+        'mail' => null,
+    ]],
+    'gitlab user' => ['gitlab', GitlabProvider::class, [
+        'id' => 42,
+        'username' => 'existing',
+        'name' => 'Existing User',
+        'email' => 'existing@example.com',
+        'avatar_url' => null,
+        'confirmed_at' => '2026-01-10T09:05:22Z',
+    ]],
+]);
+
+it('marks only users that exist at upgrade time as created before OAuth identities', function () {
+    $existingUser = User::factory()->create();
+    $migration = require database_path('migrations/2026_09_29_200325_add_created_before_oauth_identities_to_users_table.php');
+    $migration->down();
+    $migration->up();
+
+    $newUser = User::factory()->create();
+
+    expect($existingUser->refresh()->created_before_oauth_identities)->toBeTrue()
+        ->and($newUser->refresh()->created_before_oauth_identities)->toBeFalse();
+});
+
+it('links a user from before the upgrade without an email verification claim', function (string $provider, array $rawClaims, ?string $password) {
+    $user = User::factory()->create([
+        'email' => 'legacy@example.com',
+        'password' => $password,
+        'created_before_oauth_identities' => true,
+    ]);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+    ]);
+
+    $resolvedUser = app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'legacy@example.com',
+        'name' => 'Legacy User',
+        'id' => 'legacy-provider-id',
+        'user' => $rawClaims,
+    ], $setting);
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and(OauthIdentity::where(['user_id' => $user->id, 'provider' => $provider])->exists())->toBeTrue()
+        ->and($user->refresh()->created_before_oauth_identities)->toBeFalse();
+    $this->assertAuthenticatedAs($user);
+})->with([
+    'discord unverified, user created by OAuth' => ['discord', ['verified' => false], null],
+    'authentik default email scope, user created by OAuth' => ['authentik', ['email_verified' => false], null],
+    'discord unverified, user with a password' => ['discord', ['verified' => false], 'password'],
+    'authentik default email scope, user with a password' => ['authentik', ['email_verified' => false], 'password'],
+]);
+
+it('does not link a second provider to a user from before the upgrade', function () {
+    $user = User::factory()->create([
+        'email' => 'legacy@example.com',
+        'password' => null,
+        'created_before_oauth_identities' => true,
+    ]);
+    OauthIdentity::create([
+        'user_id' => $user->id,
+        'provider' => 'github',
+        'issuer' => 'github',
+        'provider_user_id' => 'github-legacy-id',
+        'email' => $user->email,
+    ]);
+    $discordSetting = OauthSetting::create([
+        'provider' => 'discord',
+        'client_id' => 'discord-client-id',
+        'client_secret' => 'discord-client-secret',
+        'enabled' => true,
+    ]);
+
+    expect(fn () => app(OauthLoginService::class)->login('discord', (object) [
+        'email' => 'legacy@example.com',
+        'name' => 'Attacker',
+        'id' => 'discord-attacker-id',
+        'user' => ['verified' => false],
+    ], $discordSetting))->toThrow(HttpException::class, 'OAuth identity cannot be linked to this account');
+
+    $this->assertGuest();
+    expect(OauthIdentity::count())->toBe(1);
+});
+
+it('does not link an existing account when the provider payload does not verify the email', function (string $provider, string $providerClass, array $payload, ?string $unverifiedEmail = null) {
+    User::factory()->create(['email' => 'existing@example.com']);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+    ]);
+    $oauthUser = mapOauthPayloadWithVendorProvider($providerClass, $payload);
+    if ($unverifiedEmail !== null) {
+        $oauthUser->email = $unverifiedEmail;
+    }
+
+    expect(fn () => app(OauthLoginService::class)->login($provider, $oauthUser, $setting))
+        ->toThrow(HttpException::class, 'OAuth provider did not verify the email address');
+
+    $this->assertGuest();
+    expect(OauthIdentity::count())->toBe(0);
+})->with([
+    'google unverified' => ['google', GoogleProvider::class, [
+        'sub' => '110169484474386276334',
+        'name' => 'Existing User',
+        'picture' => null,
+        'email' => 'existing@example.com',
+        'email_verified' => false,
+        'hd' => 'example.com',
+    ]],
+    'azure mail attribute instead of the user principal name' => ['azure', AzureProvider::class, [
+        'id' => '87d349ed-44d7-43e1-9a83-5f2406dee5bd',
+        'displayName' => 'Existing User',
+        'userPrincipalName' => 'someone@other-tenant.onmicrosoft.com',
+        'mail' => 'existing@example.com',
+    ], 'existing@example.com'],
+    'gitlab unconfirmed' => ['gitlab', GitlabProvider::class, [
+        'id' => 42,
+        'username' => 'existing',
+        'name' => 'Existing User',
+        'email' => 'existing@example.com',
+        'avatar_url' => null,
+        'confirmed_at' => null,
+    ]],
+]);
+
 it('registers a new user from a verified provider identity', function () {
     InstanceSettings::findOrFail(0)->update(['is_registration_enabled' => true]);
 
@@ -212,7 +380,7 @@ it('registers a new user from a verified provider identity', function () {
         'email' => 'verified@example.com',
         'name' => 'Verified User',
         'id' => 'verified-google-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ], OauthSetting::where('provider', 'google')->firstOrFail());
 
     expect($user->email)->toBe('verified@example.com');
@@ -246,7 +414,7 @@ it('does not register a new user through a non-OIDC provider when registration i
         ->and(OauthIdentity::count())->toBe(0);
 })->with([
     'github' => ['github', []],
-    'google' => ['google', ['verified_email' => true, 'hd' => 'example.com']],
+    'google' => ['google', ['email_verified' => true, 'hd' => 'example.com']],
 ]);
 
 it('registers a new user through a non-OIDC provider when registration is enabled', function () {
@@ -284,7 +452,7 @@ it('does not link another provider identity to an account by shared email', func
         'email' => 'shared@example.com',
         'name' => 'Other Provider User',
         'id' => 'google-user-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ], OauthSetting::where('provider', 'google')->firstOrFail()))->toThrow(HttpException::class);
 
     $this->assertGuest();
@@ -313,7 +481,7 @@ it('sends an OAuth user with confirmed two factor authentication to the Fortify 
         'email' => $user->email,
         'name' => $user->name,
         'id' => 'two-factor-google-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ]);
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
@@ -341,7 +509,7 @@ it('completes OAuth login without a challenge when two factor authentication is 
         'email' => $user->email,
         'name' => $user->name,
         'id' => 'plain-google-id',
-        'user' => ['verified_email' => true, 'hd' => 'example.com'],
+        'user' => ['email_verified' => true, 'hd' => 'example.com'],
     ]);
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
@@ -436,7 +604,7 @@ it('rejects a Google account outside the configured Workspace even when its emai
         'email' => $user->email,
         'name' => 'Outside User',
         'id' => 'google-outside-id',
-        'user' => ['verified_email' => true, 'hd' => 'outside.example'],
+        'user' => ['email_verified' => true, 'hd' => 'outside.example'],
     ], $setting))->toThrow(HttpException::class);
 
     expect(OauthIdentity::count())->toBe(0);

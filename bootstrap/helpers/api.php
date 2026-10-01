@@ -4,10 +4,12 @@ use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
+use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
@@ -111,7 +113,13 @@ function exposeSensitiveFields(Model $model): Model
     return $model;
 }
 
-function sharedDataApplications()
+/**
+ * Shared validation rules for application create and update API endpoints.
+ *
+ * Pass the existing application on update so unchanged manual webhook secrets
+ * are accepted even when they predate the minimum length.
+ */
+function sharedDataApplications(?Application $application = null): array
 {
     return [
         'git_repository' => 'string',
@@ -192,10 +200,10 @@ function sharedDataApplications()
         'post_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
         'pre_deployment_command_container' => ValidationPatterns::containerNameRules(),
-        'manual_webhook_secret_github' => 'string|nullable',
-        'manual_webhook_secret_gitlab' => 'string|nullable',
-        'manual_webhook_secret_bitbucket' => 'string|nullable',
-        'manual_webhook_secret_gitea' => 'string|nullable',
+        'manual_webhook_secret_github' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_github)],
+        'manual_webhook_secret_gitlab' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitlab)],
+        'manual_webhook_secret_bitbucket' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_bitbucket)],
+        'manual_webhook_secret_gitea' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitea)],
         'dockerfile_location' => ValidationPatterns::filePathRules(),
         'dockerfile_target_build' => ValidationPatterns::dockerTargetRules(),
         'docker_compose_location' => ValidationPatterns::filePathRules(),

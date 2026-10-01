@@ -203,3 +203,28 @@ test('server built-ins are visible to team members but not other teams', functio
         ->assertRedirect(route('dashboard'))
         ->assertDontSee($otherServer->uuid);
 });
+
+test('server shared variable values are only visible to admins', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    SharedEnvironmentVariable::create([
+        'key' => 'SERVER_TOKEN',
+        'value' => 'stored-server-variable-value',
+        'type' => 'server',
+        'server_id' => $server->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSet('variables', 'SERVER_TOKEN=stored-server-variable-value');
+
+    $this->user->teams()->updateExistingPivot($this->team->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    $component = Livewire::test(App\Livewire\SharedVariables\Server\Show::class, ['server_uuid' => $server->uuid])
+        ->assertSet('variables', 'SERVER_TOKEN=(Hidden, only admins can view)')
+        ->call('switch')
+        ->call('refreshEnvs')
+        ->assertSet('variables', 'SERVER_TOKEN=(Hidden, only admins can view)');
+
+    expect(json_encode($component->snapshot).$component->html())->not->toContain('stored-server-variable-value');
+});

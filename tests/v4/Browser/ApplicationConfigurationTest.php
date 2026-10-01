@@ -363,12 +363,3 @@ it('uses compact preview domains and opens only the selected preview settings', 
         ->screenshot(filename: 'preview-domains-mobile');
     expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
 })->with(['regular application' => false, 'Compose application' => true]);
-
-it('declares the compact preview domain layout and shared save bar', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
-    expect($view)->toContain('service-domains-overview-grid')
-        ->toContain('service-domain-mobile-summary')
-        ->toContain('Domain routing summary')
-        ->toContain('<x-unsaved-bar action="updateDomain"')
-        ->toContain('$event.detail.previewId');
-});

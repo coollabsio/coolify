@@ -5,6 +5,7 @@ namespace App\Traits;
 use App\Models\EnvironmentVariable;
 use App\Models\SecretManagerLink;
 use App\Support\RemoteSecretReferences;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use RuntimeException;
 
@@ -15,12 +16,34 @@ trait HasSecretManager
 
     public static function bootHasSecretManager(): void
     {
-        static::deleting(fn ($resource) => $resource->secretManagerLink()->delete());
+        // Return nothing: a non-null result halts the "deleting" event and skips later listeners.
+        static::deleting(function ($resource): void {
+            $resource->secretManagerLink()->delete();
+        });
     }
 
     public function secretManagerLink(): MorphOne
     {
         return $this->morphOne(SecretManagerLink::class, 'resourceable');
+    }
+
+    /**
+     * Give a cloned resource the same secret manager source. The token is team-scoped, so a clone in another team gets no link.
+     */
+    public function cloneSecretManagerLinkTo(Model $target): void
+    {
+        $link = $this->secretManagerLink()->with('integrationToken')->first();
+        // fresh(): a replicated model keeps the relations of its source, such as the old environment.
+        $targetTeamId = $target->fresh()?->team()?->id;
+
+        if (! $link || $targetTeamId === null || (int) $link->integrationToken?->team_id !== (int) $targetTeamId) {
+            return;
+        }
+
+        $target->secretManagerLink()->create([
+            'integration_token_id' => $link->integration_token_id,
+            'settings' => $link->settings,
+        ]);
     }
 
     public function resolveSecretManagerEnvironmentVariable(EnvironmentVariable $environmentVariable): ?string

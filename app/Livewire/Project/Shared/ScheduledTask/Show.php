@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -87,6 +88,15 @@ class Show extends Component
         }
     }
 
+    /**
+     * Timezone of the server the task runs on, used to display its next run.
+     */
+    #[Computed]
+    public function serverTimezone(): ?string
+    {
+        return $this->task->scheduleTimezone();
+    }
+
     private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
@@ -106,7 +116,7 @@ class Show extends Component
         } else {
             $this->isEnabled = $this->task->enabled;
             $this->name = $this->task->name;
-            $this->command = $this->task->command;
+            $this->command = auth()->user()?->can('update', $this->resource) ? $this->task->command : 'Hidden (only admins can view)';
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;

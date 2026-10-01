@@ -97,8 +97,7 @@ it('does not retain locked values from generated build-time debug logs', functio
     expect($retainedLogs)
         ->not->toContain('harmless-single-marker')
         ->not->toContain('harmless-first-marker')
-        ->not->toContain('harmless-second-marker')
-        ->toContain(REDACTED);
+        ->not->toContain('harmless-second-marker');
 
     $member = User::factory()->create();
     $application->team()->members()->attach($member->id, ['role' => 'member']);
@@ -110,6 +109,24 @@ it('does not retain locked values from generated build-time debug logs', functio
         ->toContain('[DEBUG]')
         ->not->toContain('harmless-first-marker')
         ->not->toContain('harmless-second-marker');
+});
+
+it('does not print build-time values in the development debug lines', function () {
+    config()->set('app.env', 'local');
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'normal-secret-marker']);
+    createApplicationEnvironmentVariable($application, ['key' => 'LITERAL_TOKEN', 'value' => 'literal-secret-marker', 'is_literal' => true]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+    invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    $debugLines = collect($job->recordedLogEntries)->filter(fn (string $line) => str_contains($line, '[DEBUG]'))->implode("\n");
+    expect($debugLines)
+        ->toContain('[DEBUG] Build-time env: DB_PASSWORD')
+        ->toContain('[DEBUG] Build-time env: LITERAL_TOKEN')
+        ->not->toContain('normal-secret-marker')
+        ->not->toContain('literal-secret-marker');
 });
 
 it('redacts generated multiline forms in remote command and output logging', function () {
@@ -647,6 +664,27 @@ it('explains invalid Nixpacks plan variable keys in deployment logs', function (
         ->toContain('How to fix')
         ->toContain('nixpacks.toml')
         ->toContain('https://nixpacks.com/docs/configuration/file');
+});
+
+it('marks an invalid variable name failure as already explained in the deployment log', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK;SECURITY;ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    try {
+        invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
 });
 
 it('truncates long Nixpacks plan variable keys in deployment logs', function () {

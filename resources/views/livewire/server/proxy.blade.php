@@ -37,6 +37,10 @@
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
                         <x-callout type="warning" title="Your configuration changed, please restart the proxy." />
+                    @elseif ($server->hasPendingProxyConfiguration())
+                        <x-callout type="warning" title="Restart required">
+                            Restart the proxy to apply TLS certificate changes.
+                        </x-callout>
                     @else
                         <div class="flex items-start gap-3">
                             <div
@@ -82,7 +86,7 @@
                 @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <x-application.settings-section id="server-proxy-certificates-section" title="TLS certificates"
                         x-init="$wire.loadTraefikCertificates()"
-                        helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority.">
+                        helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
                         <x-slot:actions>
                             <x-forms.button type="button" wire:click="loadTraefikCertificates"
                                 wire:loading.attr="disabled" wire:target="loadTraefikCertificates">
@@ -99,7 +103,7 @@
                             @if ($traefikCertificatesLoaded && count($traefikCertificates) === 0)
                                 <x-empty size="sm" title="No TLS certificates found"
                                     description="Traefik's ACME storage does not contain certificate entries."
-                                    icon-name="security" />
+                                    icon-name="shield-star" />
                             @elseif (count($traefikCertificates) > 0)
                                 <div class="overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
                                     <div class="overflow-x-auto">
@@ -150,9 +154,10 @@
                                                                     buttonTitle="Delete"
                                                                     submitAction="deleteTraefikCertificate({{ $certificate['id'] }})"
                                                                     :actions="[
+                                                                        'Save the current acme.json as a backup that you can restore below.',
                                                                         'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
-                                                                        'Restart Traefik before the running proxy stops using the certificate.',
                                                                     ]"
+                                                                    warningMessage="The proxy keeps using the certificate until you restart it. If a route still uses the domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
                                                                     confirmationText="{{ $certificate['main_domain'] }}"
                                                                     confirmationLabel="Confirm by entering the domain"
                                                                     shortConfirmationLabel="Domain"
@@ -168,6 +173,70 @@
                                     </div>
                                 </div>
                             @endif
+
+                            @can('manageProxy', $server)
+                                @if (count($traefikAcmeBackups) > 0)
+                                    <div class="mt-6 flex flex-col gap-2">
+                                        <div>
+                                            <h4 class="text-sm font-medium text-neutral-950 dark:text-fg">acme.json backups</h4>
+                                            <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                Coolify saves a copy of acme.json before it changes the file and keeps the
+                                                last {{ \App\Actions\Proxy\ListTraefikAcmeBackups::KEEP }} copies.
+                                            </p>
+                                        </div>
+                                        <div class="overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
+                                            <div class="overflow-x-auto">
+                                                <table class="w-full min-w-2xl">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Backup</th>
+                                                            <th>Created</th>
+                                                            <th>Size</th>
+                                                            <th><span class="sr-only">Actions</span></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($traefikAcmeBackups as $backup)
+                                                            <tr wire:key="traefik-acme-backup-{{ $backup['name'] }}">
+                                                                <td class="font-mono text-xs text-neutral-950 dark:text-fg">
+                                                                    {{ $backup['name'] }}
+                                                                </td>
+                                                                <td>{{ $backup['created_at'] }}</td>
+                                                                <td>{{ formatBytes($backup['size']) }}</td>
+                                                                <td>
+                                                                    <div class="flex justify-end gap-2">
+                                                                        <x-modal-confirmation title="Restore acme.json Backup?"
+                                                                            buttonTitle="Restore"
+                                                                            submitAction="restoreTraefikAcmeBackup('{{ $backup['name'] }}')"
+                                                                            :checkboxes="[
+                                                                                ['id' => 'restartProxyAfterAcmeRestore', 'label' => 'Restart the proxy now. Sites on this server are unavailable for a few seconds.'],
+                                                                            ]"
+                                                                            :actions="[
+                                                                                'Save the current acme.json as a new backup.',
+                                                                                'Replace acme.json with the backup from '.$backup['created_at'].'.',
+                                                                            ]"
+                                                                            warningMessage="Until the proxy restarts, it keeps its loaded certificates and can write them back to acme.json. Certificates issued after this backup are removed from acme.json."
+                                                                            step2ButtonText="Restore Backup"
+                                                                            :confirmWithPassword="false"
+                                                                            :confirmWithText="false" />
+                                                                        <x-modal-confirmation title="Delete acme.json Backup?"
+                                                                            buttonTitle="Delete"
+                                                                            submitAction="deleteTraefikAcmeBackup('{{ $backup['name'] }}')"
+                                                                            :actions="['Delete the backup '.$backup['name'].'.']"
+                                                                            step2ButtonText="Delete Backup"
+                                                                            isErrorButton :confirmWithPassword="false"
+                                                                            :confirmWithText="false" />
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+                            @endcan
                         </div>
                     </x-application.settings-section>
                 @endif
@@ -223,6 +292,8 @@
                                     changes before upgrading.
                                 </x-callout>
                             @endif
+                        @elseif ($this->outdatedCaddyImage)
+                            <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
                         <div wire:loading.flex wire:target="loadProxyConfiguration"

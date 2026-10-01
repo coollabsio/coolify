@@ -45,5 +45,6 @@
             <x-forms.input id="timeout" type="number" min="60" max="36000" label="Timeout"
                 helper="Maximum backup runtime in seconds." required />
         </div>
+        <x-next-run class="mt-4" :at="$backup?->next_run_at" :timezone="$timezone" :enabled="(bool) $backup?->enabled" :frequency="$backup?->frequency" />
     </x-application.settings-section>
 </form>

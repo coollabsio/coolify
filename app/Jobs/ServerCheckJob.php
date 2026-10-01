@@ -85,7 +85,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                             $shouldStart = CheckProxy::run($this->server);
                             if ($shouldStart) {
                                 StartProxy::run($this->server, async: false);
-                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
                             }
                         } catch (\Throwable $e) {
                         }

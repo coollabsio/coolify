@@ -27,6 +27,7 @@ class Index extends Component
                 'mongodbs',
                 'mysqls',
                 'mariadbs',
+                'sqlites',
             ])
             ->get();
     }
@@ -47,6 +48,7 @@ class Index extends Component
                     $project->mongodbs_count,
                     $project->mysqls_count,
                     $project->mariadbs_count,
+                    $project->sqlites_count,
                 ])->sum();
 
                 return [

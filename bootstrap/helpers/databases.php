@@ -13,6 +13,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -181,6 +182,33 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     return $database;
 }
 
+function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneSqlite
+{
+    $database = new StandaloneSqlite;
+    $database->uuid = new_public_id();
+    $database->name = 'sqlite-database-'.$database->uuid;
+    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+/**
+ * Shell line that pipes $source into $sink and writes the output to $escapedFile. It fails when
+ * either command fails: a plain pipe only reports the exit status of $sink, so a failed dump
+ * would still leave a small, valid archive. POSIX sh (dash, BusyBox ash); no pipefail needed.
+ */
+function pipeToFileKeepingExitStatus(string $source, string $sink, string $escapedFile): string
+{
+    return 'status=$( { { '.$source.'; echo $? >&3; } | '.$sink.' > '.$escapedFile.'; } 3>&1 ) && [ "$status" -eq 0 ]';
+}
+
 function deleteBackupsLocally(string|array|null $filenames, Server $server, bool $throwError = false): void
 {
     if (empty($filenames)) {
@@ -198,12 +226,17 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server, bool
 
 function streamBackupFromServer(Server $server, string $filename, string $contentType): StreamedResponse
 {
+    $privateKey = $server->privateKey;
+    if (! $privateKey || $privateKey->team_id !== $server->team_id) {
+        throw new RuntimeException('Private key not found for this server.');
+    }
+
     $disk = Storage::build([
         'driver' => 'sftp',
         'host' => $server->ip,
         'port' => (int) $server->port,
         'username' => $server->user,
-        'privateKey' => $server->privateKey->getKeyLocation(),
+        'privateKey' => $privateKey->getKeyLocation(),
         'root' => '/',
     ]);
 

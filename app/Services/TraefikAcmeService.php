@@ -113,12 +113,12 @@ class TraefikAcmeService
             return null;
         }
 
-        $der = base64_decode($encodedCertificate, true);
-        if ($der === false) {
+        // Traefik stores the PEM certificate chain as base64. OpenSSL reads the first certificate.
+        $pem = base64_decode($encodedCertificate, true);
+        if ($pem === false) {
             return null;
         }
 
-        $pem = "-----BEGIN CERTIFICATE-----\n".chunk_split(base64_encode($der), 64, "\n")."-----END CERTIFICATE-----\n";
         $details = openssl_x509_parse($pem);
         $expiresAt = data_get($details, 'validTo_time_t');
 
