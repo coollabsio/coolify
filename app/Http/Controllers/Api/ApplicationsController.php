@@ -2481,7 +2481,7 @@ class ApplicationsController extends Controller
             new OA\Parameter(
                 name: 'service_name',
                 in: 'query',
-                description: 'For Docker Compose applications, return logs only from the Compose service with this name. Returns 404 when no running container matches. Ignored for non-Compose applications.',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
                 required: false,
                 schema: new OA\Schema(type: 'string'),
             ),
@@ -2557,6 +2557,13 @@ class ApplicationsController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false),
             ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Preview runtime logs.', content: new OA\JsonContent(
@@ -2615,10 +2622,7 @@ class ApplicationsController extends Controller
             $matchingContainer = $containers->first(function ($container) use ($serviceName) {
                 $labels = data_get($container, 'Labels');
 
-                return $labels !== null && preg_match(
-                    '/(?:^|,)com\.docker\.compose\.service='.preg_quote($serviceName, '/').'(?:,|$)/',
-                    $labels
-                ) === 1;
+                return filled($labels) && format_docker_labels_to_json($labels)->get('com.docker.compose.service') === $serviceName;
             });
 
             if (! $matchingContainer) {
