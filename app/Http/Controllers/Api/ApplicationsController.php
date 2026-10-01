@@ -3245,7 +3245,7 @@ class ApplicationsController extends Controller
             'include_source_commit_in_build' => 'boolean',
             'ports_exposes' => 'nullable|string|regex:/^(\d+)(,\d+)*$/',
         ];
-        $validationRules = array_merge(sharedDataApplications(), $validationRules);
+        $validationRules = array_merge(sharedDataApplications($application), $validationRules);
         $validationMessages = [
             'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
         ];
