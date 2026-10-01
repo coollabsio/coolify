@@ -6,10 +6,13 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Notifications\Application\DeploymentFailed;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null)
@@ -173,13 +176,58 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
         return true;
     });
 
-    if ($started) {
+    if (! $started) {
+        return false;
+    }
+
+    try {
         ApplicationDeploymentJob::dispatch(
             application_deployment_queue_id: $deployment->id,
         );
+    } catch (Throwable $exception) {
+        fail_undispatchable_deployment($deployment, $exception);
+
+        return false;
     }
 
-    return $started;
+    return true;
+}
+
+/**
+ * Fail a deployment whose job could not be created or queued, for example a deployment queued
+ * before an upgrade with a commit that no longer validates. Leaving it in progress would block
+ * every later deployment of the application and stop the queue advancement loop.
+ */
+function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, Throwable $exception): void
+{
+    $failed = ApplicationDeploymentQueue::query()
+        ->whereKey($deployment->id)
+        ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+        ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+
+    if ($failed === 0) {
+        return;
+    }
+
+    Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
+
+    $deployment->refresh();
+    $deployment->addLogEntry('========================================', 'stderr');
+    $deployment->addLogEntry("Deployment could not be started: {$exception->getMessage()}", 'stderr');
+    $deployment->addLogEntry('========================================', 'stderr');
+
+    try {
+        $application = Application::query()->find($deployment->application_id);
+        if (! $application || filled($deployment->parent_deployment_uuid)) {
+            return;
+        }
+        $preview = $deployment->pull_request_id !== 0
+            ? ApplicationPreview::findPreviewByApplicationAndPullId($application->id, $deployment->pull_request_id)
+            : null;
+        $application->environment?->project?->team?->notify(new DeploymentFailed($application, $deployment->deployment_uuid, $preview));
+    } catch (Throwable $notificationException) {
+        Log::warning("Failed to send the failure notification for deployment {$deployment->deployment_uuid}: {$notificationException->getMessage()}");
+    }
 }
 
 function next_queuable(string $server_id, string $application_id, string $commit = 'HEAD', int $pull_request_id = 0): bool

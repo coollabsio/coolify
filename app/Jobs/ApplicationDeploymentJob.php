@@ -5615,8 +5615,31 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $this->updateDeploymentStatus($status);
-        $this->handleStatusTransition($status);
-        queue_next_deployment($this->application);
+
+        // The status is stored. Side effect failures are logged so they cannot flip a finished
+        // deployment to failed or stop the next queued deployment from starting.
+        try {
+            $this->handleStatusTransition($status);
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure("Post-{$status->value} actions failed", $e);
+        }
+
+        try {
+            queue_next_deployment($this->application);
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Starting the next queued deployment failed', $e);
+        }
+    }
+
+    private function logStatusTransitionSideEffectFailure(string $context, Throwable $e): void
+    {
+        \Log::warning("{$context} for deployment {$this->deployment_uuid}: {$e->getMessage()}");
+
+        try {
+            $this->application_deployment_queue->addLogEntry("Warning: {$context}: {$e->getMessage()}", 'stderr');
+        } catch (Throwable) {
+            // The warning is already in the application log.
+        }
     }
 
     /**
@@ -5845,6 +5868,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 if ($this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
                     // do not remove already running container for PR deployments
+                } elseif ($this->newVersionIsHealthy) {
+                    // The new container passed its health check, so the old container may already be removed.
+                    // A later failure (additional destinations, queue advancement, ...) must not remove the only running version.
+                    $this->application_deployment_queue->addLogEntry('Deployment failed after the new version became healthy. Keeping the new version of your application running.', 'stderr');
                 } else {
                     $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
                     $this->removeContainerWithTimeout($this->container_name);
