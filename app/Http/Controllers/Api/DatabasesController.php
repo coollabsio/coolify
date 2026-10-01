@@ -1017,8 +1017,6 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $backupData['databases_to_backup'] = $database->clickhouse_db;
-            } elseif ($database->type() === 'standalone-sqlite') {
-                $backupData['databases_to_backup'] = $database->sqlite_databases;
             }
         }
 
