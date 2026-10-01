@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Component\Yaml\Yaml;
 
 class ProxyPortParser
@@ -31,12 +32,14 @@ class ProxyPortParser
      * a port invalid: a variable with a default is checked as its default, and a port that still
      * depends on a variable (or whose default is not a valid port) is accepted but not returned.
      *
+     * Docker Compose merge tags such as `!reset` and `!override` are accepted; their values are validated.
+     *
      * @return list<int>
      */
     public static function fromConfiguration(string $configuration): array
     {
         try {
-            $parsed = Yaml::parse($configuration);
+            $parsed = self::withoutTags(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS));
         } catch (ParseException $exception) {
             throw new \InvalidArgumentException('The proxy configuration must contain valid YAML.', previous: $exception);
         }
@@ -68,6 +71,19 @@ class ProxyPortParser
         }
 
         return array_values(array_unique($ports));
+    }
+
+    private static function withoutTags(mixed $value): mixed
+    {
+        if ($value instanceof TaggedValue) {
+            return self::withoutTags($value->getValue());
+        }
+
+        if (is_array($value)) {
+            return array_map(self::withoutTags(...), $value);
+        }
+
+        return $value;
     }
 
     private static function publishedPort(mixed $configuredPort): ?int

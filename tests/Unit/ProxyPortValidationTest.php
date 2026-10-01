@@ -113,3 +113,17 @@ it('rejects invalid proxy port collection shapes', function (mixed $ports) {
     'null' => [null],
     'boolean' => [true],
 ]);
+
+it('accepts Docker Compose merge tags in proxy configurations', function (string $configuration, array $expected) {
+    expect(ProxyPortParser::fromConfiguration($configuration))->toBe($expected);
+})->with([
+    'override ports' => ["services:\n  traefik:\n    ports: !override\n      - '80:80'\n      - '443:443'\n", [80, 443]],
+    'reset ports' => ["services:\n  traefik:\n    ports: !reset []\n", []],
+    'reset labels next to ports' => ["services:\n  caddy:\n    labels: !reset []\n    ports: ['8080:80']\n", [8080]],
+    'override a long syntax port' => ["services:\n  traefik:\n    ports: !override\n      - target: 80\n        published: !!str 8080\n", [8080]],
+]);
+
+it('still rejects malformed ports inside Docker Compose merge tags', function () {
+    expect(fn () => ProxyPortParser::fromConfiguration("services:\n  traefik:\n    ports: !override\n      - '\$(id):80'\n"))
+        ->toThrow(InvalidArgumentException::class);
+});
