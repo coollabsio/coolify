@@ -245,7 +245,6 @@ class Advanced extends Component
 
                 return;
             }
-            $customInternalName = $this->customInternalName;
             $server = $this->application->destination->server;
             $allApplications = $server->applications();
 
@@ -253,9 +252,8 @@ class Advanced extends Component
                 return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->customInternalName;
             });
             if ($foundSameInternalName->isNotEmpty()) {
+                $this->customInternalName = $this->application->settings->custom_internal_name;
                 $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
-                $this->customInternalName = $customInternalName;
-                $this->syncData(true);
 
                 return;
             }

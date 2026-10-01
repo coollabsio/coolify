@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -179,7 +180,8 @@ class StackForm extends Component
             $this->service->refresh();
             $this->service->saveComposeConfigs();
 
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(EditCompose::class);
+            $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {

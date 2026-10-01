@@ -40,10 +40,13 @@
                 @endif
                 @if ($execution->isActive())
                     @can('update', $server)
-                        <x-forms.button wire:click="cancel({{ $execution->id }})"
-                            wire:confirm="Cancel this runner? A running job fails.">
-                            Cancel
-                        </x-forms.button>
+                        <x-modal-confirmation title="Cancel this runner?" buttonTitle="Cancel"
+                            submitAction="cancel({{ $execution->id }})" :actions="[
+                                'The runner will be stopped and removed.',
+                                'A running workflow job fails.',
+                            ]"
+                            :confirmWithText="false" :confirmWithPassword="false"
+                            step2ButtonText="Cancel Runner" isErrorButton />
                     @endcan
                 @endif
             </div>

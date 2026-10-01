@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Enums\StaticImageTypes;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
 use App\Services\Dns\ManagedDnsRecordCleanup;
@@ -557,7 +558,7 @@ class General extends Component
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('storageCountsChanged')->to(Storage::class);
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
         } catch (\Throwable $e) {
             // Refresh model to get restored values from Application::loadComposeFile
             $this->application->refresh();

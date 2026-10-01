@@ -93,7 +93,6 @@ class Show extends Component
     public array $problematicVariables = [];
 
     protected $listeners = [
-        'refreshEnvs' => 'refresh',
         'refresh',
         'compose_loaded' => '$refresh',
     ];
@@ -296,8 +295,8 @@ class Show extends Component
         }
         $this->serialize();
         $this->env->save();
-        $this->checkEnvs();
-        $this->dispatch('refreshEnvs');
+        $this->refresh();
+        $this->dispatch('refreshEnvs')->to(All::class);
     }
 
     public function instantSave()
