@@ -6,12 +6,14 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('ssh-keys');
     Storage::fake('ssh-mux');
+    Sleep::fake();
 });
 
 function createServerForFunctionalRecheckTest(array $settings): Server
