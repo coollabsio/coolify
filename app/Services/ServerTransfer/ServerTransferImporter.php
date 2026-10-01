@@ -89,6 +89,13 @@ class ServerTransferImporter
     private array $databaseMap = [];
 
     /**
+     * Imported volumes that mount a SQLite database volume, keyed by volume id. The database may be imported later.
+     *
+     * @var array<int, array{volume: LocalPersistentVolume, sqlite_uuid: string}>
+     */
+    private array $pendingSqliteLinks = [];
+
+    /**
      * @param  array<string, mixed>  $bundle
      * @return array{
      *     dry_run: bool,
@@ -219,6 +226,7 @@ class ServerTransferImporter
             $this->applicationMap = [];
             $this->serviceMap = [];
             $this->databaseMap = [];
+            $this->pendingSqliteLinks = [];
 
             // Import shared dependencies first
             $keyPayloads = data_get($bundle, 'private_keys', []);
@@ -305,6 +313,8 @@ class ServerTransferImporter
                     }
                 }
             }
+
+            $warnings = array_merge($warnings, $this->linkSqliteVolumes());
 
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
@@ -1060,7 +1070,35 @@ class ServerTransferImporter
             if (filled(data_get($volume, 'uuid'))) {
                 $this->volumeMap[(string) data_get($volume, 'uuid')] = $volumeModel;
             }
+            if (filled(data_get($volume, 'standalone_sqlite_uuid'))) {
+                $this->pendingSqliteLinks[$volumeModel->id] = [
+                    'volume' => $volumeModel,
+                    'sqlite_uuid' => (string) data_get($volume, 'standalone_sqlite_uuid'),
+                ];
+            }
         }
+    }
+
+    /**
+     * Connect imported volumes to the imported SQLite database whose data volume they mount.
+     *
+     * @return list<string> warnings for volumes whose database is not in the bundle
+     */
+    private function linkSqliteVolumes(): array
+    {
+        $warnings = [];
+        foreach ($this->pendingSqliteLinks as $link) {
+            $sqlite = $this->databaseMap[$link['sqlite_uuid']] ?? null;
+            if (! $sqlite instanceof StandaloneSqlite) {
+                $warnings[] = "Volume {$link['volume']->name} mounts a SQLite database that is not part of this transfer. Coolify does not protect it when that database or its applications are deleted.";
+
+                continue;
+            }
+
+            $link['volume']->forceFill(['standalone_sqlite_id' => $sqlite->id])->save();
+        }
+
+        return $warnings;
     }
 
     /**

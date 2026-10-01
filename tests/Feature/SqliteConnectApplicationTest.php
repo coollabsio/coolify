@@ -245,6 +245,25 @@ it('keeps a docker volume shared with another resource when the application volu
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'sqlite-data-'.$this->sqlite->uuid));
 });
 
+it('keeps the sqlite data volume when the database volumes are deleted while an application mounts it', function () {
+    Process::fake();
+    connectSqliteVolume($this->application, $this->sqlite);
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    $this->sqlite->deleteVolumes();
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, $databaseVolume->name));
+});
+
+it('removes the sqlite data volume when no application mounts it', function () {
+    Process::fake();
+    $databaseVolume = $this->sqlite->persistentStorages()->sole();
+
+    $this->sqlite->deleteVolumes();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume rm -f '.escapeshellarg($databaseVolume->name)));
+});
+
 function connectSqliteVolume(Application $application, StandaloneSqlite $sqlite): LocalPersistentVolume
 {
     return LocalPersistentVolume::create([

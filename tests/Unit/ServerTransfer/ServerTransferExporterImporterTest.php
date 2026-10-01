@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneSqlite;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferBundle;
@@ -940,3 +941,42 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
     'new volume' => [false, false],
     'bundle without the flag' => [null, true],
 ]);
+
+test('transfer keeps the link between an application volume and its sqlite database', function () {
+    $sqlite = StandaloneSqlite::create([
+        'name' => 'app-sqlite',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    LocalPersistentVolume::create([
+        'name' => 'sqlite-data-'.$sqlite->uuid,
+        'mount_path' => StandaloneSqlite::DATA_DIRECTORY,
+        'standalone_sqlite_id' => $sqlite->id,
+        'resource_type' => $this->application->getMorphClass(),
+        'resource_id' => $this->application->id,
+    ]);
+    $bundle = $this->exporter->export($this->server);
+    $originalAppName = $this->application->name;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $sqlite->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: false, adoptMode: true);
+
+    $importedSqlite = StandaloneSqlite::where('name', 'app-sqlite')->sole();
+    $connectedVolume = Application::where('name', $originalAppName)->sole()
+        ->persistentStorages()->where('mount_path', StandaloneSqlite::DATA_DIRECTORY)->sole();
+
+    expect($connectedVolume->standalone_sqlite_id)->toBe($importedSqlite->id)
+        ->and($connectedVolume->isSharedWithAnotherResource())->toBeTrue()
+        ->and($importedSqlite->hasConnectedApplications())->toBeTrue()
+        ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
+});
