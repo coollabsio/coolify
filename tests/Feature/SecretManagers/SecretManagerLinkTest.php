@@ -475,11 +475,28 @@ test('import creates reference variables for missing keys only', function () {
 
     $imported = $this->application->secretManagerLink->importMissingReferences();
 
-    expect($imported)->toBe(['NEW_KEY']);
+    expect($imported)->toBe(['imported' => ['NEW_KEY'], 'skipped' => []]);
 
     $created = $this->application->environment_variables()->where('key', 'NEW_KEY')->firstOrFail();
     expect($created->value)->toBe('{{vault.NEW_KEY}}')
         ->and($this->application->environment_variables()->where('key', 'EXISTING')->firstOrFail()->value)->toBe('local');
+});
+
+test('import skips remote names that are not valid variable keys and imports the rest', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/apps/web' => Http::response([
+            'data' => ['data' => ['ZED' => 'z', 'db-password' => 'p', 'API_KEY' => 'a']],
+        ]),
+    ]);
+
+    $link = createSecretManagerLink('vault', ['mount' => 'secret', 'path' => 'apps/web'], ['base_url' => 'https://example.com:8200']);
+
+    $result = $link->importMissingReferences();
+
+    expect($result)->toBe(['imported' => ['API_KEY', 'ZED'], 'skipped' => ['db-password']])
+        ->and($this->application->environment_variables()->whereIn('key', ['API_KEY', 'ZED'])->pluck('value', 'key')->sortKeys()->all())
+        ->toBe(['API_KEY' => '{{vault.API_KEY}}', 'ZED' => '{{vault.ZED}}'])
+        ->and($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
 });
 
 test('secret references are not marked as shared variables', function () {

@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\IntegrationToken;
+use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -218,6 +220,12 @@ class SecretManagerLinks extends Component
                 return;
             }
 
+            if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
+                $this->dispatch('error', "{$key} is not a valid variable name.");
+
+                return;
+            }
+
             if ($this->resource->environment_variables()->where('key', $key)->exists()) {
                 $this->dispatch('error', "A variable with the key {$key} already exists.");
 
@@ -230,7 +238,7 @@ class SecretManagerLinks extends Component
             ]);
             $this->auditSecretManagerAction('reference_created', ['secret_key' => $key]);
 
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('success', "Added {$key} as {{vault.{$key}}}.");
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -246,19 +254,45 @@ class SecretManagerLinks extends Component
                 return;
             }
 
-            $imported = $this->link->importMissingReferences();
+            ['imported' => $imported, 'skipped' => $skipped] = $this->link->importMissingReferences();
             $this->auditSecretManagerAction('references_imported', [
                 'key_count' => count($imported),
                 'secret_keys' => $imported,
+                'skipped_key_count' => count($skipped),
             ]);
 
-            $this->dispatch('refreshEnvs');
-            $this->dispatch('success', $imported === []
-                ? 'All remote keys already exist as variables.'
-                : 'Imported '.count($imported).' keys as {{vault.KEY}} references.');
+            $this->dispatch('refreshEnvs')->to(All::class);
+            $this->dispatch('success', $this->importResultMessage($imported, $skipped));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * @param  list<string>  $imported
+     * @param  list<string>  $skipped
+     */
+    private function importResultMessage(array $imported, array $skipped): string
+    {
+        if ($imported === [] && $skipped === []) {
+            return 'All remote keys already exist as variables.';
+        }
+
+        $message = $imported === []
+            ? 'No keys imported.'
+            : 'Imported '.count($imported).' keys as {{vault.KEY}} references.';
+
+        if ($skipped === []) {
+            return $message;
+        }
+
+        $shownNames = array_map(fn (string $key): string => e($key), array_slice($skipped, 0, 10));
+        $moreCount = count($skipped) - count($shownNames);
+        $names = implode(', ', $shownNames).($moreCount > 0 ? " and {$moreCount} more" : '');
+
+        return $message.' '.(count($skipped) === 1
+            ? "Skipped 1 key that is not a valid variable name: {$names}."
+            : 'Skipped '.count($skipped)." keys that are not valid variable names: {$names}.");
     }
 
     private function resetKeys(): void
@@ -297,6 +331,10 @@ class SecretManagerLinks extends Component
         return view('livewire.project.shared.secret-manager-links', [
             'selectedToken' => $this->selectedToken,
             'filteredKeys' => $this->filteredKeys,
+            'invalidKeys' => array_flip(array_filter(
+                $this->keys,
+                fn (string $key) => ! ValidationPatterns::isValidEnvironmentVariableKey($key),
+            )),
         ]);
     }
 }

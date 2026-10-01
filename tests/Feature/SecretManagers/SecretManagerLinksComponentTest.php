@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Project\Shared\SecretManagerLinks;
 use App\Models\Application;
@@ -179,25 +180,45 @@ test('browse keys shows key names only and search filters them', function () {
         ->assertDontSee('API_KEY');
 });
 
-test('browse key actions encode apostrophes and backslashes', function () {
+test('browse keys marks names that are not valid variable keys without an add action', function () {
     Http::fake([
         'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'API_KEY' => 'a',
+            'db-password' => 'b',
             "TEAM'S_KEY" => 'apostrophe-secret',
-            'TEAM\\KEY' => 'backslash-secret',
+            '<b>HTML</b>' => 'html-secret',
         ]),
     ]);
 
     $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
 
-    $apostropheExpression = 'addReference('.Js::from("TEAM'S_KEY").')';
-    $backslashExpression = 'addReference('.Js::from('TEAM\\KEY').')';
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('loadKeys')
+        ->assertSeeHtml('wire:click="addReference('.Js::from('API_KEY').')"')
+        ->assertSee('db-password')
+        ->assertSee('Not a valid variable name')
+        ->assertDontSeeHtml('addReference('.Js::from('db-password').')')
+        ->assertDontSeeHtml('addReference('.Js::from("TEAM'S_KEY").')')
+        ->assertSeeHtml('&lt;b&gt;HTML&lt;/b&gt;')
+        ->assertDontSeeHtml('<b>HTML</b>');
+});
+
+test('add reference rejects a remote name that is not a valid variable key', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'db-password' => 'b',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('loadKeys')
-        ->assertSeeHtml('wire:click="'.$apostropheExpression.'"')
-        ->assertSeeHtml('wire:target="'.$apostropheExpression.'"')
-        ->assertSeeHtml('wire:click="'.$backslashExpression.'"')
-        ->assertSeeHtml('wire:target="'.$backslashExpression.'"');
+        ->call('addReference', 'db-password')
+        ->assertDispatched('error', 'db-password is not a valid variable name.')
+        ->assertNotDispatched('refreshEnvs');
+
+    expect($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
 });
 
 test('add reference creates a variable with a secret reference value', function () {
@@ -212,7 +233,7 @@ test('add reference creates a variable with a secret reference value', function 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('loadKeys')
         ->call('addReference', 'DB_PASSWORD')
-        ->assertDispatched('refreshEnvs')
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
         ->assertDispatched('success');
 
     $created = $this->application->environment_variables()->where('key', 'DB_PASSWORD')->firstOrFail();
@@ -235,8 +256,8 @@ test('import all creates references for missing keys and skips existing ones', f
 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('importAll')
-        ->assertDispatched('refreshEnvs')
-        ->assertDispatched('success');
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
+        ->assertDispatched('success', 'Imported 1 keys as {{vault.KEY}} references.');
 
     expect($this->application->environment_variables()->where('key', 'NEW_KEY')->firstOrFail()->value)
         ->toBe('{{vault.NEW_KEY}}')
@@ -246,6 +267,49 @@ test('import all creates references for missing keys and skips existing ones', f
     $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.references_imported')->sole();
     expect($auditEvent->metadata['key_count'])->toBe(1)
         ->and($auditEvent->metadata['secret_keys'])->toBe('[REDACTED]');
+});
+
+test('import all skips invalid remote names, imports the rest, and reports both', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'API_KEY' => 'a',
+            'db-password' => 'b',
+            'ZED' => 'c',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('importAll')
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
+        ->assertDispatched('success', 'Imported 2 keys as {{vault.KEY}} references. Skipped 1 key that is not a valid variable name: db-password.')
+        ->assertNotDispatched('error');
+
+    expect($this->application->environment_variables()->whereIn('key', ['API_KEY', 'ZED'])->pluck('value', 'key')->sortKeys()->all())
+        ->toBe(['API_KEY' => '{{vault.API_KEY}}', 'ZED' => '{{vault.ZED}}'])
+        ->and($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.references_imported')->sole();
+    expect($auditEvent->metadata['key_count'])->toBe(2)
+        ->and($auditEvent->metadata['skipped_key_count'])->toBe(1);
+});
+
+test('import all reports skipped names when no remote name is a valid variable key', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'db-password' => 'a',
+            '<b>x</b>' => 'b',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('importAll')
+        ->assertDispatched('success', 'No keys imported. Skipped 2 keys that are not valid variable names: &lt;b&gt;x&lt;/b&gt;, db-password.');
+
+    expect($this->application->environment_variables()->whereIn('key', ['db-password', '<b>x</b>'])->exists())->toBeFalse();
 });
 
 test('the source can be removed', function () {
