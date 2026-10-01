@@ -330,6 +330,7 @@ class StartMongodb
 
     /**
      * The shell is chosen when the check runs: images before MongoDB 5 (and some custom images) have only the legacy mongo shell.
+     * The check uses ping, which needs no authentication and passes on members that are not the writable primary (e.g. an uninitiated replica set).
      */
     private function generate_health_check_command(): array
     {
@@ -354,7 +355,7 @@ class StartMongodb
         $command = [
             ...$command,
             '--eval',
-            $legacy ? 'quit(db.isMaster().ismaster === true ? 0 : 1)' : 'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+            'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
         ];
 
         return implode(' ', array_map('escapeshellarg', $command));

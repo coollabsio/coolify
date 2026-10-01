@@ -35,7 +35,7 @@ function runMongodbHealthCheck(array $healthCheck, array $availableShells): stri
     return trim((string) $output);
 }
 
-it('uses mongosh when the image has it and the legacy mongo shell otherwise', function (array $availableShells, bool $enableSsl, ?string $sslMode, array $expectedCall) {
+it('checks liveness with ping using mongosh when the image has it and the legacy mongo shell otherwise', function (array $availableShells, bool $enableSsl, ?string $sslMode, array $expectedCall) {
     $healthCheck = generatedMongodbHealthCheckCommand([
         'uuid' => 'mongodb-test-resource',
         'image' => 'registry.example.com/mongo:any',
@@ -54,32 +54,32 @@ it('uses mongosh when the image has it and the legacy mongo shell otherwise', fu
 })->with([
     'mongosh without TLS' => [['mongosh', 'mongo'], false, null, [
         'mongosh', '--quiet', '--host', 'mongodb-test-resource', '--eval',
-        'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
     'mongosh with TLS require' => [['mongosh'], true, 'require', [
         'mongosh', '--quiet', '--host', 'mongodb-test-resource',
         '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem', '--eval',
-        'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
     'mongosh with TLS verify-full' => [['mongosh'], true, 'verify-full', [
         'mongosh', '--quiet', '--host', 'mongodb-test-resource',
         '--tls', '--tlsCAFile', '/etc/mongo/certs/ca.pem',
         '--tlsCertificateKeyFile', '/etc/mongo/certs/server.pem', '--eval',
-        'quit(db.hello().isWritablePrimary === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
     'legacy mongo without TLS' => [['mongo'], false, null, [
         'mongo', '--quiet', '--host', 'mongodb-test-resource', '--eval',
-        'quit(db.isMaster().ismaster === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
     'legacy mongo with TLS require' => [['mongo'], true, 'require', [
         'mongo', '--quiet', '--host', 'mongodb-test-resource',
         '--ssl', '--sslCAFile', '/etc/mongo/certs/ca.pem', '--eval',
-        'quit(db.isMaster().ismaster === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
     'legacy mongo with TLS verify-full' => [['mongo'], true, 'verify-full', [
         'mongo', '--quiet', '--host', 'mongodb-test-resource',
         '--ssl', '--sslCAFile', '/etc/mongo/certs/ca.pem',
         '--sslPEMKeyFile', '/etc/mongo/certs/server.pem', '--eval',
-        'quit(db.isMaster().ismaster === true ? 0 : 1)',
+        'quit(db.adminCommand({ ping: 1 }).ok === 1 ? 0 : 1)',
     ]],
 ]);
