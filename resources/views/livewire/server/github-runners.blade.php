@@ -22,7 +22,7 @@
                         </a>
                     </x-slot:actions>
                     <x-empty size="sm" title="This server is not enabled for builds"
-                        description="GitHub Actions runners only run on servers with the Build role. Change the server role in the General settings."
+                        description="GitHub Actions runners only run on servers with the Builds only role. Change the server role in the General settings."
                         icon-name="play-circle" />
                 </x-application.settings-section>
             @elseif ($this->githubApps->isEmpty())
