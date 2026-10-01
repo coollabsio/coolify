@@ -54,6 +54,7 @@ class ScheduledJobManager
 
         Log::channel('scheduled')->info('ScheduledJobManager started', ['execution_time' => $this->now->toIso8601String()]);
 
+        $this->runStep('stale enqueued occurrences', fn () => $this->deliveries->recoverStaleEnqueued());
         $this->deliveries->publishPending();
         $this->runStep('database backups', fn () => $this->processDatabaseBackups());
         $this->runStep('scheduled tasks', fn () => $this->processScheduledTasks());
@@ -282,8 +283,11 @@ class ScheduledJobManager
         if ($stored === null) {
             // First run after the upgrade, a timezone change, or a move to another server.
             $first = next_cron_run_at($frequency, $timezone, $this->now, includeCurrentMinute: true);
-            if ($first === null || ! $this->advance($schedule, $column, null, $first)) {
-                return $first === null ? ['invalid_frequency' => $frequency] : [];
+            if ($first === null) {
+                return $this->invalidFrequency($schedule, $column, null, $frequency, $delivery['schedule_key']);
+            }
+            if (! $this->advance($schedule, $column, null, $first)) {
+                return [];
             }
             if ($first->gt($this->now)) {
                 return [];
@@ -294,7 +298,7 @@ class ScheduledJobManager
         $dueAt = CarbonImmutable::instance($schedule->getAttribute($column))->utc();
         $next = next_cron_run_at($frequency, $timezone, $this->now);
         if ($next === null) {
-            return ['invalid_frequency' => $frequency];
+            return $this->invalidFrequency($schedule, $column, $stored, $frequency, $delivery['schedule_key']);
         }
         // When the clocks go back, a local time occurs two times. Run it only once.
         if ($this->sameLocalTime($next, $dueAt, $timezone)) {
@@ -335,9 +339,31 @@ class ScheduledJobManager
     }
 
     /**
+     * Park a schedule whose frequency does not parse: set next_run_at to null, which the UI, the API,
+     * and `scheduled:diagnostics` show as an invalid frequency, and log it once a day instead of
+     * every minute. Saving a valid frequency calculates next_run_at again (HasNextRunAt, ServerSetting).
+     *
+     * @return array<string, mixed>
+     */
+    private function invalidFrequency(Model $schedule, string $column, mixed $stored, string $frequency, string $scheduleKey): array
+    {
+        if ($stored !== null) {
+            $this->advance($schedule, $column, $stored, null);
+        }
+
+        $firstReportToday = rescue(
+            fn () => Cache::add("scheduled-job-manager:invalid-frequency:{$scheduleKey}:".md5($frequency), true, now()->addDay()),
+            true,
+            report: false,
+        );
+
+        return $firstReportToday ? ['invalid_frequency' => $frequency] : [];
+    }
+
+    /**
      * Move next_run_at from the stored value to $to. Only one process can win this update.
      */
-    private function advance(Model $schedule, string $column, mixed $from, CarbonImmutable $to): bool
+    private function advance(Model $schedule, string $column, mixed $from, ?CarbonImmutable $to): bool
     {
         $updated = $schedule->newQuery()
             ->whereKey($schedule->getKey())

@@ -17,6 +17,19 @@ use Illuminate\Support\Facades\Log;
 class ScheduledJobDeliveryService
 {
     /**
+     * An occurrence that is enqueued longer than this has most likely lost its queued job, for
+     * example after a Redis restart. A job that is only waiting in a long queue is safe as well:
+     * the first job that claims the occurrence runs it, and the other job exits.
+     */
+    public const ENQUEUED_STALE_AFTER_MINUTES = 60;
+
+    /**
+     * Job types that run once when they are late, like the dispatcher does. A lost task or Docker
+     * cleanup is logged as missed instead.
+     */
+    private const LATE_RUN_JOB_TYPES = ['database-backup', 'volume-backup'];
+
+    /**
      * Record a pending delivery for one occurrence of a schedule. Returns null when the
      * occurrence already has a delivery.
      *
@@ -44,6 +57,49 @@ class ScheduledJobDeliveryService
                         $this->publish($occurrence);
                     } catch (\Throwable $e) {
                         Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
+                            'occurrence_uuid' => $occurrence->uuid,
+                            'schedule_key' => $occurrence->schedule_key,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            });
+    }
+
+    /**
+     * Publish backups again whose queued job was not started, and log lost tasks and Docker
+     * cleanups as missed. Only one scheduler node can move each occurrence.
+     */
+    public function recoverStaleEnqueued(): void
+    {
+        ScheduledJobDelivery::query()
+            ->where('status', 'enqueued')
+            ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
+            ->chunkById(100, function ($occurrences): void {
+                foreach ($occurrences as $occurrence) {
+                    try {
+                        $runLate = in_array($occurrence->job_type, self::LATE_RUN_JOB_TYPES, true);
+                        $moved = ScheduledJobDelivery::query()
+                            ->whereKey($occurrence->id)
+                            ->where('status', 'enqueued')
+                            ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
+                            ->update(['status' => $runLate ? 'pending' : 'failed', 'updated_at' => now()]) === 1;
+
+                        if (! $moved) {
+                            continue;
+                        }
+
+                        if (! $runLate) {
+                            $this->logOccurrence($occurrence->uuid, 'Scheduled occurrence missed: its queued job was not started', 'warning');
+
+                            continue;
+                        }
+
+                        $occurrence->status = 'pending';
+                        $this->logOccurrence($occurrence->uuid, 'Scheduled occurrence publishing again: its queued job was not started', 'warning');
+                        $this->publish($occurrence);
+                    } catch (\Throwable $e) {
+                        Log::channel('scheduled-errors')->error('Failed to recover enqueued scheduled occurrence', [
                             'occurrence_uuid' => $occurrence->uuid,
                             'schedule_key' => $occurrence->schedule_key,
                             'error' => $e->getMessage(),

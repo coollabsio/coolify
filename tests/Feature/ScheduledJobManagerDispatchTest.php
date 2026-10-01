@@ -466,6 +466,115 @@ it('logs a backup run that ends early, even when it completes before the enqueue
         ->and(ScheduledJobDelivery::query()->where('schedule_key', "scheduled-backup:{$backup->id}")->exists())->toBeFalse();
 });
 
+it('logs an invalid frequency once and runs the schedule again after the frequency is fixed', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $logPath = captureScheduledJobManagerTestLog('scheduled-errors');
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => '* * * * *']);
+    ScheduledTask::query()->whereKey($task->id)->update(['frequency' => 'not a cron', 'next_run_at' => now()->subMinute()]);
+
+    foreach (range(1, 3) as $minute) {
+        Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, $minute, 0, 'UTC'));
+        (new ScheduledJobManager)->handle();
+    }
+
+    $log = file_get_contents($logPath);
+    @unlink($logPath);
+
+    Queue::assertNotPushed(ScheduledTaskJob::class);
+    expect(substr_count($log, 'Task has an invalid frequency'))->toBe(1)
+        ->and($task->fresh()->next_run_at)->toBeNull()
+        ->and($task->fresh()->enabled)->toBeTrue();
+
+    $task->fresh()->update(['frequency' => '* * * * *']);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 4, 0, 'UTC'));
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+});
+
+it('logs an invalid frequency of a schedule without a next run only once', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $logPath = captureScheduledJobManagerTestLog('scheduled-errors');
+    $database = createScheduledBackupDatabase();
+    $backup = createScheduledDatabaseBackup($database, ['frequency' => 'daily']);
+    ScheduledDatabaseBackup::query()->whereKey($backup->id)->update(['frequency' => '61 * * * *', 'next_run_at' => null]);
+
+    foreach (range(1, 3) as $minute) {
+        Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, $minute, 0, 'UTC'));
+        (new ScheduledJobManager)->handle();
+    }
+
+    $log = file_get_contents($logPath);
+    @unlink($logPath);
+
+    expect(substr_count($log, 'Backup has an invalid frequency'))->toBe(1);
+});
+
+it('republishes a backup occurrence whose queued job was lost, and the old job cannot run it again', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $backup = createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => 'daily']);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-backup:{$backup->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'),
+        'job_type' => 'database-backup',
+        'resource_id' => $backup->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job) => $job->occurrenceUuid === $occurrence->uuid);
+    expect($occurrence->fresh()->status)->toBe('enqueued')
+        ->and($occurrence->fresh()->enqueued_at->toDateTimeString())->toBe('2026-09-17 12:00:00');
+
+    $service = app(ScheduledJobDeliveryService::class);
+    expect($service->claim($occurrence->uuid, 'republished-job'))->toBeTrue()
+        ->and($service->claim($occurrence->uuid, 'original-job'))->toBeFalse();
+});
+
+it('logs a lost scheduled task occurrence as missed instead of running it late', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $logPath = captureScheduledJobManagerTestLog('scheduled');
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => 'daily']);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-task:{$task->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'),
+        'job_type' => 'scheduled-task',
+        'resource_id' => $task->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    $log = file_get_contents($logPath);
+    @unlink($logPath);
+
+    Queue::assertNotPushed(ScheduledTaskJob::class);
+    expect($occurrence->fresh()->status)->toBe('failed')
+        ->and(app(ScheduledJobDeliveryService::class)->claim($occurrence->uuid, 'original-job'))->toBeFalse()
+        ->and($log)->toContain('Scheduled occurrence missed: its queued job was not started');
+});
+
+it('leaves recently enqueued occurrences alone', function () {
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    $backup = createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => 'daily']);
+    $occurrence = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-backup:{$backup->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 17, 11, 0, 0, 'UTC'),
+        'job_type' => 'database-backup',
+        'resource_id' => $backup->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES - 1),
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertNotPushed(DatabaseBackupJob::class);
+    expect($occurrence->fresh()->enqueued_at->toDateTimeString())->toBe('2026-09-17 11:01:00');
+});
+
 function captureScheduledJobManagerTestLog(string $channel): string
 {
     $path = tempnam(sys_get_temp_dir(), 'coolify-scheduled-log-');
