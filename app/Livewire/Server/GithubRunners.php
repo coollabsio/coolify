@@ -53,6 +53,8 @@ class GithubRunners extends Component
 
     public bool $isDedicated = false;
 
+    public bool $allowPullRequests = false;
+
     /** Null until checked over SSH. */
     public ?bool $isSysboxInstalled = null;
 
@@ -87,6 +89,7 @@ class GithubRunners extends Component
             'idleTimeout' => ['required', 'integer', 'min:1', 'max:1440'],
             'jobTimeout' => ['required', 'integer', 'min:1', 'max:7200'],
             'isDedicated' => ['required', 'boolean'],
+            'allowPullRequests' => ['required', 'boolean'],
         ];
     }
 
@@ -139,6 +142,7 @@ class GithubRunners extends Component
         $this->idleTimeout = $config->idle_timeout;
         $this->jobTimeout = $config->job_timeout;
         $this->isDedicated = $config->is_dedicated;
+        $this->allowPullRequests = $config->allow_pull_requests;
     }
 
     /**
@@ -199,6 +203,7 @@ class GithubRunners extends Component
                 'idle_timeout' => $this->idleTimeout,
                 'job_timeout' => $this->jobTimeout,
                 'is_dedicated' => $this->isDedicated,
+                'allow_pull_requests' => $this->allowPullRequests,
             ]);
             unset($this->config);
             $this->syncData();

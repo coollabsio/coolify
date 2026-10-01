@@ -107,7 +107,7 @@ function fakeRunnerGroupApi(GithubApp $githubApp, int $createStatus = 201): void
 }
 
 describe('runner settings page', function () {
-    it('saves the configuration and creates a runner group for private repositories only', function () {
+    it('saves the configuration and creates a runner group that public repositories can use', function () {
         fakeRunnerGroupApi($this->githubApp);
 
         Livewire::actingAs($this->owner)
@@ -128,8 +128,46 @@ describe('runner settings page', function () {
             ->and($this->githubApp->fresh()->runner_group_id)->toBe(55);
         Http::assertSent(fn ($request) => $request->method() === 'POST'
             && str_ends_with($request->url(), '/orgs/acme/actions/runner-groups')
-            && $request['allows_public_repositories'] === false
-            && $request['visibility'] === 'private');
+            && $request['allows_public_repositories'] === true
+            && $request['visibility'] === 'all');
+        expect($config->allow_pull_requests)->toBeFalse();
+    });
+
+    it('opens an existing private runner group to public repositories', function () {
+        $this->githubApp->update(['runner_group_id' => 77]);
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+            "https://api.github.com/app/installations/{$this->githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/orgs/acme/actions/runner-groups/77' => fn ($request) => $request->method() === 'PATCH'
+                ? Http::response(['id' => 77, 'default' => false, 'visibility' => 'all', 'allows_public_repositories' => true])
+                : Http::response(['id' => 77, 'default' => false, 'visibility' => 'private', 'allows_public_repositories' => false]),
+        ]);
+
+        Livewire::actingAs($this->owner)
+            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+            ->set('githubAppId', $this->githubApp->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertDispatched('success');
+
+        Http::assertSent(fn ($request) => $request->method() === 'PATCH'
+            && str_ends_with($request->url(), '/orgs/acme/actions/runner-groups/77')
+            && $request['allows_public_repositories'] === true
+            && $request['visibility'] === 'all');
+    });
+
+    it('saves whether runners take pull request jobs', function () {
+        fakeRunnerGroupApi($this->githubApp);
+
+        Livewire::actingAs($this->owner)
+            ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
+            ->set('githubAppId', $this->githubApp->id)
+            ->set('allowPullRequests', true)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('allowPullRequests', true);
+
+        expect(GithubRunnerConfig::sole()->allow_pull_requests)->toBeTrue();
     });
 
     it('does not fall back to the Default runner group when group creation fails', function (int $status) {

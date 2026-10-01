@@ -16,7 +16,9 @@ class GithubRunnerApi
     public function __construct(private GithubApp $githubApp) {}
 
     /**
-     * Finds or creates the runner group of the App. The group is limited to private repositories.
+     * Finds or creates the runner group of the App. Every repository of the organization, public ones too,
+     * can use it; runners refuse pull request jobs unless the runner config allows them.
+     * Groups created before public repositories were allowed are updated.
      * All GitHub plans can create runner groups, so a failed creation is an error. Coolify never falls back
      * to the Default group, because that group can give the runners access to more repositories.
      *
@@ -29,6 +31,10 @@ class GithubRunnerApi
         if ($this->githubApp->runner_group_id) {
             $response = $this->client()->get("/orgs/{$org}/actions/runner-groups/{$this->githubApp->runner_group_id}");
             if ($response->successful()) {
+                if (! $response->json('default') && ($response->json('visibility') !== 'all' || $response->json('allows_public_repositories') !== true)) {
+                    $this->allowAllRepositories((int) $this->githubApp->runner_group_id);
+                }
+
                 return ['id' => (int) $this->githubApp->runner_group_id, 'is_default' => (bool) $response->json('default')];
             }
             if ($response->status() !== 404) {
@@ -38,8 +44,8 @@ class GithubRunnerApi
 
         $response = $this->client()->post("/orgs/{$org}/actions/runner-groups", [
             'name' => 'Coolify '.$this->githubApp->uuid,
-            'visibility' => 'private',
-            'allows_public_repositories' => false,
+            'visibility' => 'all',
+            'allows_public_repositories' => true,
         ]);
         if (! $response->successful() || ! $response->json('id')) {
             throw new RuntimeException('Could not create a runner group: '.$this->errorMessage($response));
@@ -49,6 +55,17 @@ class GithubRunnerApi
         $this->githubApp->update(['runner_group_id' => $group['id']]);
 
         return $group;
+    }
+
+    private function allowAllRepositories(int $runnerGroupId): void
+    {
+        $response = $this->client()->patch("/orgs/{$this->organization()}/actions/runner-groups/{$runnerGroupId}", [
+            'visibility' => 'all',
+            'allows_public_repositories' => true,
+        ]);
+        if (! $response->successful()) {
+            throw new RuntimeException('Could not update the runner group: '.$this->errorMessage($response));
+        }
     }
 
     /**

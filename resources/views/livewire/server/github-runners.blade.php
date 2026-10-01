@@ -50,7 +50,7 @@
             @else
                 <form wire:submit="submit" class="contents">
                     <x-unsaved-bar action="submit"
-                        targets="githubAppId,labels,maxRunners,dockerMode,runnerImage,cpuLimit,memoryLimit,capacityWaitTimeout,idleTimeout,jobTimeout,isDedicated" />
+                        targets="githubAppId,labels,maxRunners,dockerMode,runnerImage,cpuLimit,memoryLimit,capacityWaitTimeout,idleTimeout,jobTimeout,isDedicated,allowPullRequests" />
                     <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
                         helper="Each workflow job runs in a new container that is deleted after the job. Use runs-on: [self-hosted, <your label>] in the workflow.">
                         <x-slot:actions>
@@ -64,10 +64,17 @@
                         </x-slot:actions>
 
                         <div x-cloak x-show="$wire.dockerMode === 'dind'">
-                            <x-callout type="warning" title="Use only for trusted, private repositories">
+                            <x-callout type="warning" title="Use only for trusted repositories">
                                 In the privileged Docker mode, a malicious workflow can take control of this server.
-                                Use Isolated Docker (Sysbox) or No Docker to keep jobs away from the server. Coolify
-                                limits the runner group to private repositories.
+                                Use Isolated Docker (Sysbox) or No Docker to keep jobs away from the server. Every
+                                repository of the organization can use these runners, public ones too.
+                            </x-callout>
+                        </div>
+                        <div x-cloak x-show="$wire.allowPullRequests" class="mt-4">
+                            <x-callout type="warning" title="Pull request jobs run on this server">
+                                In a public repository, anyone can open a pull request and change its workflow. Turn
+                                on approval for fork pull request workflows in the organization's Actions settings on
+                                GitHub, and do not use the privileged Docker mode.
                             </x-callout>
                         </div>
 
@@ -98,6 +105,12 @@
                                     ['value' => true, 'label' => 'Dedicated to runners'],
                                 ]"
                                 helper="Dedicated servers are not used for application builds while runners are enabled." />
+                            <x-forms.listbox id="allowPullRequests" label="Pull request jobs" canGate="update"
+                                :canResource="$server" :options="[
+                                    ['value' => false, 'label' => 'Refuse pull request jobs'],
+                                    ['value' => true, 'label' => 'Run pull request jobs'],
+                                ]"
+                                helper="Runners fail jobs that a pull request started (pull_request, pull_request_target, and review events) before any step runs. Push, schedule, and manual jobs always run. Applies to runners that start after you save." />
                         </div>
                     </x-application.settings-section>
 

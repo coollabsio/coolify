@@ -4,6 +4,7 @@ use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\Server;
 use App\Services\GithubRunner\GithubRunnerContainer;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -44,9 +45,10 @@ it('passes the JIT config through a root-only env file and never mounts the host
         ->toContain(base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n"))
         ->not->toContain('docker.sock:/var/run/docker.sock')
         ->and($commands[2])->toBe('chmod 600 /data/coolify/github-runners/abc123.env')
-        ->and($commands[4])
+        ->and(collect($commands)->first(fn (string $command) => str_starts_with($command, 'docker run -d --name coolify-runner-abc123 ')))
         ->toStartWith('docker run -d --name coolify-runner-abc123 --network coolify-runner-abc123')
-        ->toContain('--env-file /data/coolify/github-runners/abc123.env -e DOCKER_HOST=unix:///var/run/docker.sock')
+        ->toContain('--env-file /data/coolify/github-runners/abc123.env ')
+        ->toContain('-e DOCKER_HOST=unix:///var/run/docker.sock')
         ->toEndWith("'".config('constants.github_runner.image')."' /home/runner/run.sh")
         ->and(end($commands))->toBe('rm -f /data/coolify/github-runners/abc123.env');
 });
@@ -93,7 +95,8 @@ it('quotes a custom runner image', function () {
     $this->config->forceFill(['runner_image' => 'ghcr.io/acme/runner:1.0']);
     $commands = (new GithubRunnerContainer($this->execution, $this->config))->startCommands('SECRET');
 
-    expect($commands[4])->toEndWith("'ghcr.io/acme/runner:1.0' /home/runner/run.sh");
+    expect(collect($commands)->first(fn (string $command) => str_starts_with($command, 'docker run -d --name coolify-runner-abc123 ')))
+        ->toEndWith("'ghcr.io/acme/runner:1.0' /home/runner/run.sh");
 });
 
 it('keeps every command valid for servers with a non-root user', function () {
@@ -112,6 +115,8 @@ it('keeps every command valid for servers with a non-root user', function () {
         ->toContain('sudo docker pull '."'".config('constants.github_runner.image')."'".' || sudo docker image inspect '."'".config('constants.github_runner.image')."'".' > /dev/null')
         ->toContain('echo '.base64_encode("ACTIONS_RUNNER_INPUT_JITCONFIG=SECRET\n").' | sudo base64 -d | sudo tee /data/coolify/github-runners/abc123.env > /dev/null')
         ->toContain('sudo chmod 600 /data/coolify/github-runners/abc123.env')
+        ->toContain('echo '.base64_encode(GithubRunnerContainer::pullRequestHookScript()).' | sudo base64 -d | sudo tee /data/coolify/github-runners/abc123-job-started.sh > /dev/null')
+        ->toContain('sudo chmod 644 /data/coolify/github-runners/abc123-job-started.sh')
         ->toContain('sudo docker rm -f -v coolify-runner-abc123 coolify-runner-abc123-dind > /dev/null 2>&1 || sudo true')
         ->toContain("sudo docker exec coolify-runner-abc123-dind docker version --format '{{.Server.Version}}'")
         ->toContain('sudo docker ps -a --filter label=coolify.githubRunner=true --format \'{{.Label "coolify.githubRunnerExecution"}} {{.Names}} {{.State}}\'');
@@ -119,3 +124,44 @@ it('keeps every command valid for servers with a non-root user', function () {
     $linesWithoutSudo = collect($parsed)->reject(fn (string $line) => str_starts_with($line, 'sudo ') || str_starts_with($line, 'echo '));
     expect($linesWithoutSudo)->toBeEmpty();
 });
+
+it('installs a job-started hook that refuses pull request jobs by default', function () {
+    $commands = (new GithubRunnerContainer($this->execution, $this->config))->startCommands('SECRET');
+    $hookFile = '/data/coolify/github-runners/abc123-job-started.sh';
+
+    expect($commands)->toContain('echo '.base64_encode(GithubRunnerContainer::pullRequestHookScript()).' | base64 -d | tee '.$hookFile.' > /dev/null')
+        ->toContain("chmod 644 {$hookFile}")
+        ->and(collect($commands)->first(fn (string $command) => str_starts_with($command, 'docker run -d --name coolify-runner-abc123 ')))
+        ->toContain("-v {$hookFile}:/home/runner/coolify-job-started.sh:ro -e ACTIONS_RUNNER_HOOK_JOB_STARTED=/home/runner/coolify-job-started.sh")
+        ->and(GithubRunnerContainer::cleanupCommands('abc123'))->toContain("rm -f /data/coolify/github-runners/abc123.env {$hookFile}");
+});
+
+it('does not install the pull request hook when pull request jobs are allowed', function () {
+    $this->config->forceFill(['allow_pull_requests' => true]);
+    $all = implode("\n", (new GithubRunnerContainer($this->execution, $this->config))->startCommands('SECRET'));
+
+    expect($all)->not->toContain('job-started')
+        ->not->toContain('ACTIONS_RUNNER_HOOK_JOB_STARTED');
+});
+
+it('fails pull request jobs in the job-started hook and lets other jobs run', function (?string $eventName, int $expectedExitCode) {
+    $hook = tempnam(sys_get_temp_dir(), 'hook');
+    file_put_contents($hook, GithubRunnerContainer::pullRequestHookScript());
+
+    $environment = $eventName === null ? [] : ['GITHUB_EVENT_NAME' => $eventName];
+    $process = new Process(['bash', $hook], env: ['PATH' => getenv('PATH'), ...$environment]);
+    $process->run();
+    unlink($hook);
+
+    expect($process->getExitCode())->toBe($expectedExitCode);
+})->with([
+    'pull_request' => ['pull_request', 1],
+    'pull_request_target' => ['pull_request_target', 1],
+    'pull_request_review' => ['pull_request_review', 1],
+    'pull_request_review_comment' => ['pull_request_review_comment', 1],
+    'unknown event fails closed' => [null, 1],
+    'push' => ['push', 0],
+    'workflow_dispatch' => ['workflow_dispatch', 0],
+    'schedule' => ['schedule', 0],
+    'merge_group' => ['merge_group', 0],
+]);

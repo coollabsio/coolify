@@ -10,6 +10,7 @@ use App\Models\GithubRunnerExecution;
 /**
  * Builds the remote shell commands for one ephemeral runner. Each runner gets its own network,
  * volumes, and (in dind and sysbox modes) a private Docker daemon. The host Docker socket is never mounted.
+ * Unless the config allows pull request jobs, a job-started hook fails them before any step runs.
  * Every command is a single line that is safe for parseCommandsByLineForSudo().
  */
 class GithubRunnerContainer
@@ -26,6 +27,8 @@ class GithubRunnerContainer
     private const RUNNER_UID = 1001;
 
     private const PIDS_LIMIT = 4096;
+
+    private const HOOK_PATH = '/home/runner/coolify-job-started.sh';
 
     public function __construct(private GithubRunnerExecution $execution, private GithubRunnerConfig $config) {}
 
@@ -110,6 +113,12 @@ class GithubRunnerContainer
         ];
 
         $runnerFlags = "--name {$name} --network {$name} {$this->labelFlags()} {$this->limitFlags()} --env-file {$envFile}";
+        if (! $this->config->allow_pull_requests) {
+            $hookFile = self::hookFileFor($this->execution->uuid);
+            $commands[] = 'echo '.base64_encode(self::pullRequestHookScript())." | base64 -d | tee {$hookFile} > /dev/null";
+            $commands[] = "chmod 644 {$hookFile}";
+            $runnerFlags .= " -v {$hookFile}:".self::HOOK_PATH.':ro -e ACTIONS_RUNNER_HOOK_JOB_STARTED='.self::HOOK_PATH;
+        }
         if ($this->usesDind()) {
             $commands[] = "docker exec {$this->dindName()} chown ".self::RUNNER_UID.':'.self::RUNNER_DOCKER_GID.' /home/runner/_work';
             $runnerFlags .= ' -e DOCKER_HOST=unix:///var/run/docker.sock -e RUNNER_WAIT_FOR_DOCKER_IN_SECONDS=120 '.$this->sharedVolumeFlags();
@@ -133,8 +142,33 @@ class GithubRunnerContainer
             "docker rm -f -v {$name} {$name}-dind > /dev/null 2>&1 || true",
             "docker volume rm {$name}-sock {$name}-work {$name}-externals > /dev/null 2>&1 || true",
             "docker network rm {$name} > /dev/null 2>&1 || true",
-            'rm -f '.self::SECRETS_DIRECTORY."/{$executionUuid}.env",
+            'rm -f '.self::SECRETS_DIRECTORY."/{$executionUuid}.env ".self::hookFileFor($executionUuid),
         ];
+    }
+
+    /**
+     * Job-started hook that fails pull request jobs before any step runs. GitHub gives a runner
+     * any queued job with matching labels, so the check must run in the runner, not when Coolify
+     * starts it. An unknown event fails closed.
+     */
+    public static function pullRequestHookScript(): string
+    {
+        return <<<'BASH'
+            #!/bin/bash
+            case "${GITHUB_EVENT_NAME:-}" in
+              pull_request|pull_request_target|pull_request_review|pull_request_review_comment|"")
+                echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the build server to run them."
+                exit 1
+                ;;
+            esac
+            exit 0
+
+            BASH;
+    }
+
+    private static function hookFileFor(string $executionUuid): string
+    {
+        return self::SECRETS_DIRECTORY."/{$executionUuid}-job-started.sh";
     }
 
     /**
