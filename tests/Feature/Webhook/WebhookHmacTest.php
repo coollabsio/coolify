@@ -38,10 +38,10 @@ test('manual webhook routes are not rate limited per request', function (string 
  * An invalid delivery uses a new random wrong secret unless $wrongSecret is set,
  * so each invalid delivery is a new guess (a new token or a new signature).
  */
-function sendManualWebhookPush(TestCase $test, string $provider, Application $application, bool $validSignature = true, string $ip = '203.0.113.10', string $repository = 'test-org/test-repo', string $branch = 'main', ?string $wrongSecret = null, string $commit = 'abc1234'): TestResponse
+function sendManualWebhookPush(TestCase $test, string $provider, Application $application, bool $validSignature = true, string $ip = '203.0.113.10', string $repository = 'test-org/test-repo', string $branch = 'main', ?string $wrongSecret = null, string $commit = 'abc1234', array $extraServer = []): TestResponse
 {
     $secret = $validSignature ? $application->{"manual_webhook_secret_{$provider}"} : ($wrongSecret ?? 'wrong-secret-'.Str::random(24));
-    $server = ['REMOTE_ADDR' => $ip, 'CONTENT_TYPE' => 'application/json'];
+    $server = $extraServer + ['REMOTE_ADDR' => $ip, 'CONTENT_TYPE' => 'application/json'];
 
     if ($provider === 'gitlab') {
         $payload = json_encode([
@@ -137,6 +137,61 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe(0);
     })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
+    test('a signed delivery is processed while the scope is locked by failed attempts', function (string $provider) {
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
+
+        lockOutManualWebhookRepository($this, $provider, $application);
+
+        $response = sendManualWebhookPush($this, $provider, $application);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Deployment queued');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('a locked scope keeps rejecting invalid signatures without counting them again', function (string $provider) {
+        $application = createApplicationWithWebhook();
+
+        lockOutManualWebhookRepository($this, $provider, $application);
+        $attempts = RateLimiter::attempts(manualWebhookFailureKey($provider));
+
+        sendManualWebhookPush($this, $provider, $application)->assertOk();
+        sendManualWebhookPush($this, $provider, $application, validSignature: false)
+            ->assertStatus(429)
+            ->assertHeader('Retry-After')
+            ->assertJson(['status' => 'failed', 'message' => 'Too many failed webhook authentication attempts. Try again later.']);
+
+        expect(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe($attempts);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('failed attempts are counted per connection address, not per forwarded address', function (string $provider) {
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            $response = sendManualWebhookPush($this, $provider, $application, validSignature: false, extraServer: ['HTTP_X_FORWARDED_FOR' => "198.51.100.{$i}"]);
+
+            $response->assertOk();
+            expect($response->getContent())->toContain('Invalid signature');
+        }
+
+        sendManualWebhookPush($this, $provider, $application, validSignature: false, extraServer: ['HTTP_X_FORWARDED_FOR' => '198.51.100.200'])->assertStatus(429);
+        expect(RateLimiter::tooManyAttempts(manualWebhookFailureKey($provider), 30))->toBeTrue();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('failed attempts use the Cloudflare client address on cloud', function () {
+        config()->set('constants.coolify.self_hosted', false);
+        $application = createApplicationWithWebhook();
+
+        for ($i = 0; $i < 30; $i++) {
+            sendManualWebhookPush($this, 'github', $application, validSignature: false, extraServer: ['HTTP_CF_CONNECTING_IP' => '198.51.100.7'])->assertOk();
+        }
+
+        sendManualWebhookPush($this, 'github', $application, validSignature: false, extraServer: ['HTTP_CF_CONNECTING_IP' => '198.51.100.7'])->assertStatus(429);
+        // Another Cloudflare client behind the same edge address has its own bucket.
+        sendManualWebhookPush($this, 'github', $application, validSignature: false, extraServer: ['HTTP_CF_CONNECTING_IP' => '198.51.100.8'])->assertOk();
+    });
+
     test('repeated invalid signatures are throttled after 30 failures', function (string $provider) {
         $application = createApplicationWithWebhook();
 
@@ -145,16 +200,13 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::tooManyAttempts(manualWebhookFailureKey($provider), 30))->toBeTrue();
     })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
-    test('a locked out repository rejects every delivery for that repository and branch before verification', function (string $provider) {
+    test('a locked out repository rejects failed deliveries for that repository and branch', function (string $provider) {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
 
         lockOutManualWebhookRepository($this, $provider, $application);
 
         sendManualWebhookPush($this, $provider, $application, validSignature: false)->assertStatus(429);
-        // A correct guess during the lockout must not succeed, otherwise the
-        // lockout does not limit how fast a secret can be guessed.
-        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
         sendManualWebhookPush($this, $provider, $application, validSignature: false, repository: 'TEST-ORG/Test-Repo.git')->assertStatus(429);
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
@@ -1270,11 +1322,13 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
         }
 
         sendManualWebhookPush($this, 'gitlab', $application, validSignature: false, wrongSecret: 'guess-30')->assertStatus(429);
-        sendManualWebhookPush($this, 'gitlab', $application)->assertStatus(429);
         // A token that was already counted is also rejected during the lockout.
         sendManualWebhookPush($this, 'gitlab', $application, validSignature: false, wrongSecret: 'guess-0')->assertStatus(429);
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+
+        // The correct token is still processed during the lockout.
+        sendManualWebhookPush($this, 'gitlab', $application)->assertOk()->assertSee('Deployment queued');
     });
 
     test('repeated tokens do not extend the guess limit', function () {
@@ -1353,8 +1407,10 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
         }
 
         sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'guess-30')->assertStatus(429);
-        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+
+        // A correctly signed delivery is still processed during the lockout.
+        sendManualWebhookPush($this, $provider, $application)->assertOk()->assertSee('Deployment queued');
     })->with(['github', 'bitbucket', 'gitea']);
 
     test('the same wrong signature for different payloads counts every payload', function (string $provider) {

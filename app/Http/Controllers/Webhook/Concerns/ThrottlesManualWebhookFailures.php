@@ -11,12 +11,16 @@ use Illuminate\Support\Facades\RateLimiter;
 /**
  * Throttles manual webhook deliveries that fail authentication.
  *
- * Failures are counted per provider, client IP, repository and branch filter.
- * The repository and branch come from the payload and select the applications
- * whose secrets are checked, so a guesser can only exhaust the bucket of the
- * applications it targets. Git hosts deliver from shared egress IPs; one
- * misconfigured repository (wrong secret, deleted application, untracked
- * branch) therefore cannot lock out deliveries for other repositories.
+ * Failures are counted per provider, client address, repository and branch
+ * filter. The repository and branch come from the payload and select the
+ * applications whose secrets are checked, so a guesser can only exhaust the
+ * bucket of the applications it targets. Git hosts deliver from shared egress
+ * IPs; one misconfigured repository (wrong secret, deleted application,
+ * untracked branch) therefore cannot lock out deliveries for other repositories.
+ *
+ * The lockout applies only to deliveries that fail authentication. A delivery
+ * with a valid secret for a matched application is always processed, so failed
+ * attempts from anyone sharing the scope cannot block real deliveries.
  *
  * In one failure window, only distinct failed attempts are counted. An attempt
  * is identified by what the secret check depends on: the GitLab token, or the
@@ -43,7 +47,23 @@ trait ThrottlesManualWebhookFailures
             is_scalar($branch) ? (string) $branch : null,
         ]);
 
-        return "manual-webhook-failures:{$provider}:".auth_rate_limit_ip($request).':'.hash('sha256', (string) $scope);
+        return "manual-webhook-failures:{$provider}:".$this->manualWebhookFailureClientAddress($request).':'.hash('sha256', (string) $scope);
+    }
+
+    /**
+     * The connection address of the client. X-Forwarded-For is ignored, since
+     * any client can set it and rotate it to get a new bucket. On cloud, a
+     * valid CF-Connecting-IP is used, as in auth_rate_limit_ip().
+     */
+    protected function manualWebhookFailureClientAddress(Request $request): string
+    {
+        $cloudflareIp = $request->header('CF-Connecting-IP');
+
+        if (isCloud() && is_string($cloudflareIp) && filter_var($cloudflareIp, FILTER_VALIDATE_IP) !== false) {
+            return $cloudflareIp;
+        }
+
+        return (string) $request->server('REMOTE_ADDR');
     }
 
     /**
