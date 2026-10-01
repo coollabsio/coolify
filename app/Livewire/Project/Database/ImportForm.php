@@ -403,6 +403,8 @@ class ImportForm extends Component
 
     public function checkFile()
     {
+        $this->authorize('update', $this->resource);
+
         if (filled($this->customLocation)) {
             // Validate the custom location to prevent command injection
             if (! $this->validateServerPath($this->customLocation)) {
@@ -524,6 +526,8 @@ class ImportForm extends Component
 
     public function checkS3File()
     {
+        $this->authorize('update', $this->resource);
+
         if (! $this->s3StorageId) {
             $this->dispatch('error', 'Please select an S3 storage.');
 
