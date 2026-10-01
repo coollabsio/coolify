@@ -268,6 +268,8 @@ class CloneMe extends Component
                     ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }
+
+                $database->cloneSecretManagerLinkTo($newDatabase);
             }
 
             foreach ($services as $service) {
@@ -316,6 +318,8 @@ class CloneMe extends Component
                     ]);
                     $newEnvironmentVariable->save();
                 }
+
+                $service->cloneSecretManagerLinkTo($newService);
 
                 foreach ($newService->applications() as $application) {
                     $application->fill([

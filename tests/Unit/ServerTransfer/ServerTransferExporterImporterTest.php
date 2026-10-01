@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\PrivateKey;
@@ -979,4 +980,36 @@ test('transfer keeps the link between an application volume and its sqlite datab
         ->and($connectedVolume->isSharedWithAnotherResource())->toBeTrue()
         ->and($importedSqlite->hasConnectedApplications())->toBeTrue()
         ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
+});
+
+test('export warns about secret manager links without exporting the integration token', function () {
+    $token = IntegrationToken::factory()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'vault',
+        'token' => 'vault-root-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $this->database->secretManagerLink()->create(['integration_token_id' => $token->id]);
+
+    $bundle = $this->exporter->export($this->server);
+    $warning = collect($bundle['warnings'])->first(fn (string $warning) => str_contains($warning, 'secret manager'));
+
+    expect($warning)->not->toBeNull()
+        ->and($warning)->toContain('my-app')
+        ->and($warning)->toContain('app-db')
+        ->and(json_encode($bundle))->not->toContain('vault-root-token');
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect($result['warnings'])->toContain($warning);
 });

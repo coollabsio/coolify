@@ -401,6 +401,8 @@ function clone_application(Application $source, $destination, array $overrides =
         });
     }
 
+    $source->cloneSecretManagerLinkTo($newApplication);
+
     // Clone preview environment variables
     $previewEnvironmentVariables = $source->environment_variables_preview()->get();
     foreach ($previewEnvironmentVariables as $previewEnvironmentVariable) {

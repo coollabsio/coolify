@@ -106,6 +106,9 @@ class ServerTransferExporter
 
         $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
         $warnings = $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl);
+        if ($secretManagerWarning = $this->secretManagerWarning($applications->concat($databases)->concat($services))) {
+            $warnings[] = $secretManagerWarning;
+        }
 
         $payload = ServerTransferBundle::wrap([
             'source_instance' => [
@@ -329,6 +332,27 @@ class ServerTransferExporter
         }
 
         return $warnings;
+    }
+
+    /**
+     * Secret manager links point to integration tokens of this instance, which are not exported.
+     *
+     * @param  Collection<int, Model>  $resources
+     */
+    private function secretManagerWarning(Collection $resources): ?string
+    {
+        $linkedNames = $resources
+            ->filter(fn (Model $resource) => method_exists($resource, 'secretManagerLink') && $resource->secretManagerLink()->exists())
+            ->pluck('name')
+            ->unique()
+            ->values();
+
+        if ($linkedNames->isEmpty()) {
+            return null;
+        }
+
+        return 'Some resources load environment variables from a secret manager: '.$linkedNames->implode(', ').'. '
+            .'Secret manager tokens and links are not exported. After import, add the integration token on the target instance and link the secret manager source again, or deployments of these resources fail.';
     }
 
     /**

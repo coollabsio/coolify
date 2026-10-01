@@ -243,6 +243,8 @@ class ResourceOperations extends Component
                     $newEnvironmentVariable->save();
                 }
 
+                $this->resource->cloneSecretManagerLinkTo($new_resource);
+
                 $route = route('project.database.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
                     'environment_uuid' => $new_environment->uuid,
@@ -298,6 +300,8 @@ class ResourceOperations extends Component
                     ]);
                     $newEnvironmentVariable->save();
                 }
+
+                $this->resource->cloneSecretManagerLinkTo($new_resource);
 
                 foreach ($new_resource->applications() as $application) {
                     $application->fill([
