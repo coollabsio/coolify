@@ -2478,6 +2478,13 @@ class ApplicationsController extends Controller
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false),
             ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'For Docker Compose applications, return logs only from the Compose service with this name. Returns 404 when no running container matches. Ignored for non-Compose applications.',
+                required: false,
+                schema: new OA\Schema(type: 'string'),
+            ),
         ],
         responses: [
             new OA\Response(
@@ -2603,7 +2610,27 @@ class ApplicationsController extends Controller
             ], 400);
         }
 
-        $container = $containers->first();
+        $serviceName = $request->query('service_name');
+        if (filled($serviceName)) {
+            $matchingContainer = $containers->first(function ($container) use ($serviceName) {
+                $labels = data_get($container, 'Labels');
+
+                return $labels !== null && preg_match(
+                    '/(?:^|,)com\.docker\.compose\.service='.preg_quote($serviceName, '/').'(?:,|$)/',
+                    $labels
+                ) === 1;
+            });
+
+            if (! $matchingContainer) {
+                return response()->json([
+                    'message' => "No running container found for service_name '{$serviceName}'.",
+                ], 404);
+            }
+
+            $container = $matchingContainer;
+        } else {
+            $container = $containers->first();
+        }
 
         $status = getContainerStatus($application->destination->server, $container['Names']);
         if ($status !== 'running') {
