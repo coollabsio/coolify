@@ -718,3 +718,91 @@ it('sends the instance callback url without saving it when a forged host starts 
     expect($query['redirect_uri'])->toBe('https://coolify.example.com/auth/github/callback')
         ->and(OauthSetting::where('provider', 'github')->value('redirect_uri'))->toBeNull();
 });
+
+function mockGoogleCallbackUser(array $oauthUser): void
+{
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->andReturnSelf();
+    $provider->shouldReceive('with')->andReturnSelf();
+    $provider->shouldReceive('user')->andReturn((object) $oauthUser);
+    Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
+}
+
+describe('callback error messages', function () {
+    beforeEach(function () {
+        config()->set('app.maintenance.driver', 'file');
+    });
+
+    it('tells a user that the account already uses another sign-in method', function () {
+        $user = User::factory()->create(['email' => 'linked@example.com']);
+        OauthIdentity::create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+            'issuer' => 'github',
+            'provider_user_id' => 'github-user-id',
+            'email' => 'linked@example.com',
+        ]);
+        mockGoogleCallbackUser([
+            'email' => 'linked@example.com',
+            'name' => 'Linked User',
+            'id' => 'google-user-id',
+            'user' => ['email_verified' => true, 'hd' => 'example.com'],
+        ]);
+
+        $this->from('/login')->get(route('auth.callback', 'google'))
+            ->assertRedirect('/login');
+        expect(session('errors')->first())->toBe(__('auth.failed.oauth_already_linked'));
+        $this->assertGuest();
+    });
+
+    it('tells a user that the provider did not verify the email before it reveals a linked account', function () {
+        $user = User::factory()->create(['email' => 'linked@example.com']);
+        OauthIdentity::create([
+            'user_id' => $user->id,
+            'provider' => 'github',
+            'issuer' => 'github',
+            'provider_user_id' => 'github-user-id',
+            'email' => 'linked@example.com',
+        ]);
+        mockGoogleCallbackUser([
+            'email' => 'linked@example.com',
+            'name' => 'Unverified User',
+            'id' => 'google-user-id',
+            'user' => ['email_verified' => false, 'hd' => 'example.com'],
+        ]);
+
+        $this->from('/login')->get(route('auth.callback', 'google'))
+            ->assertRedirect('/login');
+        expect(session('errors')->first())->toBe(__('auth.failed.oauth_email_unverified'));
+        $this->assertGuest();
+    });
+
+    it('tells a new user that registration is disabled', function () {
+        mockGoogleCallbackUser([
+            'email' => 'new@example.com',
+            'name' => 'New User',
+            'id' => 'google-user-id',
+            'user' => ['email_verified' => true, 'hd' => 'example.com'],
+        ]);
+
+        $this->from('/login')->get(route('auth.callback', 'google'))
+            ->assertRedirect('/login');
+        expect(session('errors')->first())->toBe(__('auth.registration_disabled'));
+        $this->assertGuest();
+    });
+
+    it('shows a generic OAuth message instead of the password message for other denied logins', function () {
+        mockGoogleCallbackUser([
+            'email' => 'outside@example.org',
+            'name' => 'Outside User',
+            'id' => 'google-user-id',
+            'user' => ['email_verified' => true, 'hd' => 'example.org'],
+        ]);
+
+        $this->from('/login')->get(route('auth.callback', 'google'))
+            ->assertRedirect('/login');
+        expect(session('errors')->first())->toBe(__('auth.failed.oauth'))
+            ->not->toBe(__('auth.failed'));
+        $this->assertGuest();
+    });
+});

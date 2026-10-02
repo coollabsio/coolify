@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Auth\Oidc\OidcUser;
+use App\Exceptions\OauthLoginException;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\Team;
@@ -130,20 +131,22 @@ class OauthLoginService
                 }
 
                 $user = User::whereEmail($email)->first();
-                if ($user?->oauthIdentities()->exists()) {
-                    throw new HttpException(403, 'OAuth identity cannot be linked to this account');
-                }
 
                 // Before OAuth identities existed, OAuth sign-in matched users by email only.
                 // Users from that time keep signing in without email delivery, so their
-                // first identity links without a provider verification claim.
+                // first identity links without a provider verification claim. This check
+                // runs first, so an unverified email cannot reveal a linked account.
                 if ($user?->created_before_oauth_identities !== true && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
-                    throw new HttpException(403, 'OAuth provider did not verify the email address');
+                    throw new OauthLoginException('OAuth provider did not verify the email address', 'auth.failed.oauth_email_unverified');
+                }
+
+                if ($user?->oauthIdentities()->exists()) {
+                    throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
 
                 if (! $user) {
                     if (! $this->canCreateUser($oauthSetting)) {
-                        throw new HttpException(403, 'Registration is disabled');
+                        throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
                     }
 
                     $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
@@ -202,7 +205,7 @@ class OauthLoginService
         }
 
         if ($oauthSetting->require_email_verified && ! $emailVerified) {
-            throw new HttpException(403, 'OIDC provider did not verify the email address');
+            throw new OauthLoginException('OIDC provider did not verify the email address', 'auth.failed.oauth_email_unverified');
         }
 
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
@@ -234,16 +237,16 @@ class OauthLoginService
                 // guard is independent of the require_email_verified toggle, which
                 // only governs the broader login flow.
                 if ($user && ! $emailVerified) {
-                    throw new HttpException(403, 'OIDC provider must verify the email address before linking to an existing account');
+                    throw new OauthLoginException('OIDC provider must verify the email address before linking to an existing account', 'auth.failed.oauth_email_unverified');
                 }
 
                 if ($user?->oauthIdentities()->exists()) {
-                    throw new HttpException(403, 'OAuth identity cannot be linked to this account');
+                    throw new OauthLoginException('OAuth identity cannot be linked to this account', 'auth.failed.oauth_already_linked');
                 }
 
                 if (! $user) {
                     if (! $this->canCreateUser($oauthSetting)) {
-                        throw new HttpException(403, 'Registration is disabled');
+                        throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
                     }
 
                     $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
