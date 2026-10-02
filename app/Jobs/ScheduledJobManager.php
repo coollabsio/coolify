@@ -34,6 +34,11 @@ class ScheduledJobManager implements ShouldQueue
     private const CHUNK_SIZE = 100;
 
     /**
+     * Pending volume backup recovery is retried at most once in this interval for each execution.
+     */
+    private const VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES = 5;
+
+    /**
      * The schedule types that run as separate dispatchers, with the delivery job types they own.
      * Each type has its own overlap lock, so a slow type cannot make another type skip a run.
      */
@@ -481,7 +486,9 @@ class ScheduledJobManager implements ShouldQueue
                 ->orWhere('s3_cleanup_pending', true))
             ->chunkById(self::CHUNK_SIZE, function ($executions): void {
                 foreach ($executions as $execution) {
-                    VolumeBackupRecoveryJob::dispatch($execution);
+                    if (Cache::add("volume-backup-recovery-dispatched:{$execution->id}", true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {
+                        VolumeBackupRecoveryJob::dispatch($execution);
+                    }
                 }
             });
     }

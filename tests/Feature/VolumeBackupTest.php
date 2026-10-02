@@ -2614,3 +2614,82 @@ it('dispatches pending recovery without starting another volume backup', functio
     );
     Queue::assertNotPushed(VolumeBackupJob::class);
 });
+
+it('dispatches pending recovery for an execution at most once every five minutes', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow('2026-07-15 12:00:00');
+    Queue::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+    ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'failed',
+        'stop_recovery_pending' => true,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+    Carbon::setTestNow('2026-07-15 12:04:00');
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(VolumeBackupRecoveryJob::class, 1);
+
+    Carbon::setTestNow('2026-07-15 12:05:01');
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(VolumeBackupRecoveryJob::class, 2);
+});
+
+it('stops container recovery when the server no longer exists', function () {
+    Process::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'failed',
+        'message' => 'Worker timed out',
+        'stop_recovery_pending' => true,
+    ]);
+    $application->update([
+        'destination_id' => null,
+        'destination_type' => null,
+    ]);
+
+    (new VolumeBackupRecoveryJob($execution))->handle();
+
+    expect($execution->fresh()->stop_recovery_pending)->toBeFalse()
+        ->and($execution->fresh()->message)->toStartWith('Worker timed out')
+        ->and($execution->fresh()->message)->toContain('Container recovery was skipped');
+    Process::assertNothingRan();
+});
+
+it('stops S3 upload cleanup when the S3 storage no longer exists', function () {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        's3_storage_id' => null,
+        'status' => 'failed',
+        'filename' => '/data/coolify/backups/volumes/test/interrupted.tar.gz',
+        's3_cleanup_pending' => true,
+    ]);
+    Storage::shouldReceive('build')->never();
+
+    (new VolumeBackupRecoveryJob($execution))->handle();
+
+    expect($execution->fresh()->s3_cleanup_pending)->toBeFalse()
+        ->and($execution->fresh()->s3_storage_deleted)->toBeFalsy()
+        ->and($execution->fresh()->message)->toContain('S3 upload cleanup was skipped');
+});

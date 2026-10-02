@@ -5,25 +5,35 @@ namespace App\Jobs;
 use App\Models\ScheduledVolumeBackupExecution;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
-class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
+class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 20;
-
-    public int $backoff = 60;
+    /**
+     * ScheduledJobManager dispatches pending recovery again, so this job does not retry by itself.
+     */
+    public int $tries = 1;
 
     public int $timeout = 120;
+
+    public int $uniqueFor = 300;
 
     public function __construct(public ScheduledVolumeBackupExecution $execution)
     {
         $this->onQueue(crons_queue());
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->execution->id;
     }
 
     public function middleware(): array
@@ -62,7 +72,13 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
         $server = $execution->scheduledVolumeBackup?->server();
 
         if (! $server) {
-            throw new \RuntimeException('The server is unavailable for container recovery.');
+            self::skipRecovery(
+                $execution,
+                ['stop_container_ids' => null, 'stop_recovery_pending' => false],
+                'Container recovery was skipped because the server or resource no longer exists.',
+            );
+
+            return;
         }
 
         $stateFile = self::stateFile($execution);
@@ -100,13 +116,34 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
         $s3 = $execution->s3;
 
         if (! $s3 || blank($execution->filename)) {
-            throw new \RuntimeException('The S3 storage or backup filename is unavailable for upload cleanup.');
+            self::skipRecovery(
+                $execution,
+                ['s3_cleanup_pending' => false],
+                'S3 upload cleanup was skipped because the S3 storage or backup filename no longer exists.',
+            );
+
+            return;
         }
 
         deleteBackupsS3($execution->filename, $s3);
         $execution->update([
             's3_cleanup_pending' => false,
             's3_storage_deleted' => true,
+        ]);
+    }
+
+    /**
+     * Clears a pending recovery that cannot succeed, so it does not retry forever and block new backups.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private static function skipRecovery(ScheduledVolumeBackupExecution $execution, array $attributes, string $reason): void
+    {
+        Log::channel('scheduled-errors')->warning($reason, ['execution_id' => $execution->id]);
+
+        $execution->update([
+            ...$attributes,
+            'message' => trim(($execution->message ?? '').' '.$reason),
         ]);
     }
 
