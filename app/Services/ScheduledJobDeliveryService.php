@@ -9,6 +9,7 @@ use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\VolumeBackupJob;
 use App\Models\DockerCleanupExecution;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
@@ -19,7 +20,9 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\Server\DockerCleanupFailed;
+use Closure;
 use Cron\CronExpression;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +38,10 @@ class ScheduledJobDeliveryService
      * safe as well: the first job that claims the occurrence runs it, and the other job exits.
      */
     public const ENQUEUED_STALE_AFTER_MINUTES = 60;
+
+    public const MISSED_OCCURRENCE_NOTIFICATION = 'scheduled-occurrence-missed';
+
+    public const MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES = 60;
 
     /**
      * Job types that run once when they are late. A lost task or Docker cleanup is not run; it is
@@ -265,7 +272,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 ScheduledTaskDone::dispatch($task->team_id);
-                Team::find($task->team_id)?->notify(new TaskFailed($task, $message));
+                $this->notifyMissedOccurrence($task, fn () => Team::find($task->team_id)?->notify(new TaskFailed($task, $message)));
             } elseif ($occurrence->job_type === 'docker-cleanup') {
                 $server = Server::find($occurrence->resource_id);
                 if (! $server) {
@@ -279,7 +286,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 event(new DockerCleanupDone($execution));
-                $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}"));
+                $this->notifyMissedOccurrence($server, fn () => $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}")));
             }
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to report missed scheduled occurrence', [
@@ -288,6 +295,15 @@ class ScheduledJobDeliveryService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Every missed run gets its own failed execution, but the team gets at most one missed-run
+     * notification per schedule each hour, so dead queue workers do not cause a notification storm.
+     */
+    private function notifyMissedOccurrence(Model $schedule, Closure $send): void
+    {
+        NotificationThrottle::sendOnce($schedule, self::MISSED_OCCURRENCE_NOTIFICATION, now()->subMinutes(self::MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES), $send);
     }
 
     public function deleteOldOccurrences(): void

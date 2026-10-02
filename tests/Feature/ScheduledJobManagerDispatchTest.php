@@ -750,6 +750,46 @@ it('records a missed Docker cleanup as a failed execution and notifies the team 
     Event::assertDispatched(DockerCleanupDone::class, 1);
 });
 
+it('sends at most one missed-run notification per hour for the same schedule', function (string $jobType) {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    if ($jobType === 'scheduled-task') {
+        $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => 'daily']);
+        InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
+        $team = Team::find($task->team_id);
+        $team->emailNotificationSettings->update(['smtp_enabled' => true, 'scheduled_task_failure_email_notifications' => true]);
+        [$scheduleKey, $resourceId, $notification] = ["scheduled-task:{$task->id}", $task->id, TaskFailed::class];
+        $executions = fn () => ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->count();
+    } else {
+        $server = createScheduledTaskApplication()->destination->server;
+        $team = $server->team;
+        $team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+        [$scheduleKey, $resourceId, $notification] = ["docker-cleanup:{$server->id}", $server->id, DockerCleanupFailed::class];
+        $executions = fn () => DockerCleanupExecution::query()->where('server_id', $server->id)->count();
+    }
+
+    // Workers are down: three runs of the same schedule were missed.
+    foreach ([0, 1, 2] as $minute) {
+        createStaleEnqueuedOccurrence($scheduleKey, $jobType, $resourceId, Carbon::create(2026, 9, 17, 10, $minute, 0, 'UTC'));
+    }
+    (new ScheduledJobManager)->handle();
+
+    expect($executions())->toBe(3);
+    Notification::assertSentToTimes($team, $notification, 1);
+
+    // More than an hour later, a new missed run is reported again.
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 13, 5, 0, 'UTC'));
+    createStaleEnqueuedOccurrence($scheduleKey, $jobType, $resourceId, Carbon::create(2026, 9, 17, 11, 30, 0, 'UTC'));
+    (new ScheduledJobManager)->handle();
+
+    // Each missed run still gets its own failed execution (Docker cleanup also has its own 12:00 run).
+    expect($executions())->toBeGreaterThanOrEqual(4);
+    Notification::assertSentToTimes($team, $notification, 2);
+})->with(['scheduled task' => 'scheduled-task', 'docker cleanup' => 'docker-cleanup']);
+
 it('leaves recently enqueued occurrences alone', function () {
     config(['constants.coolify.self_hosted' => true]);
     Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
