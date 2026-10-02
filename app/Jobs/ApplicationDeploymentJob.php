@@ -4153,9 +4153,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return $default;
     }
 
+    /**
+     * Older versions accepted any static image through the API, so a stored value can be one that
+     * Coolify no longer supports. Such a value stops the deployment with a clear error instead of
+     * silently building with another web server image.
+     */
     private function staticImage(): string
     {
-        return StaticImageTypes::from($this->application->static_image)->value;
+        $image = StaticImageTypes::tryFrom((string) $this->application->static_image);
+
+        if ($image === null) {
+            $supported = implode(', ', array_column(StaticImageTypes::cases(), 'value'));
+
+            throw new DeploymentException("The static image '{$this->application->static_image}' is not supported. Select a supported web server ({$supported}) in the application settings and deploy again.");
+        }
+
+        return $image->value;
     }
 
     private function pull_latest_image(string $image): void
