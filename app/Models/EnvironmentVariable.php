@@ -39,6 +39,17 @@ class EnvironmentVariable extends BaseModel
 
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
+    /**
+     * Buildpack control variables that the built image reads when the container starts,
+     * e.g. the Nixpacks PHP prestart script renders nginx.conf from NIXPACKS_PHP_ROOT_DIR.
+     */
+    public const RUNTIME_BUILDPACK_CONTROL_VARIABLES = [
+        'NIXPACKS_PHP_ROOT_DIR',
+        'NIXPACKS_PHP_FALLBACK_PATH',
+        'NIXPACKS_SPA_OUTPUT_DIR',
+        'RAILPACK_SKIP_MIGRATIONS',
+    ];
+
     protected $attributes = [
         'is_runtime' => true,
         'is_buildtime' => true,
@@ -143,6 +154,14 @@ class EnvironmentVariable extends BaseModel
         }
 
         return $query;
+    }
+
+    public function scopeWithoutBuildOnlyBuildpackControlVariables(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query) {
+            $query->whereIn('key', self::RUNTIME_BUILDPACK_CONTROL_VARIABLES)
+                ->orWhere(fn (Builder $query) => $query->withoutBuildpackControlVariables());
+        });
     }
 
     public static function isBuildpackControlKey(?string $key): bool
