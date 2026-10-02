@@ -566,10 +566,17 @@ function removeLegacyTraefikDashboardLabels(string $configuration): string
         return $configuration;
     }
 
-    $fixed = preg_replace('/^([ \t]*-[ \t]*([\'"]?))traefik\.enable=true(\2[ \t]*)(?=\R|\z)/m', '$1traefik.enable=false$3', $configuration);
-    foreach (array_slice($legacyLabels, 1) as $label) {
-        $fixed = preg_replace('/^[ \t]*-[ \t]*([\'"]?)'.preg_quote($label, '/').'\1[ \t]*(?:\R|\z)/m', '', $fixed);
+    // Edit only the lines of the traefik service, so equal labels of other services stay unchanged.
+    $block = traefikServiceBlockRange($configuration);
+    if ($block === null) {
+        return $configuration;
     }
+    [$start, $length] = $block;
+    $traefikBlock = preg_replace('/^([ \t]*-[ \t]*([\'"]?))traefik\.enable=true(\2[ \t]*)(?=\R|\z)/m', '$1traefik.enable=false$3', substr($configuration, $start, $length));
+    foreach (array_slice($legacyLabels, 1) as $label) {
+        $traefikBlock = preg_replace('/^[ \t]*-[ \t]*([\'"]?)'.preg_quote($label, '/').'\1[ \t]*(?:\R|\z)/m', '', $traefikBlock);
+    }
+    $fixed = substr($configuration, 0, $start).$traefikBlock.substr($configuration, $start + $length);
 
     // Keep the original when the line edit also changed other parts of the file.
     try {
@@ -577,6 +584,37 @@ function removeLegacyTraefikDashboardLabels(string $configuration): string
     } catch (Throwable) {
         return $configuration;
     }
+}
+
+/**
+ * The byte offset and length of the `traefik` service block under the top-level `services` key,
+ * or null when the block cannot be found in the text.
+ *
+ * @return array{0: int, 1: int}|null
+ */
+function traefikServiceBlockRange(string $configuration): ?array
+{
+    if (! preg_match('/^services:[ \t]*(?:#.*)?$/m', $configuration, $services, PREG_OFFSET_CAPTURE)) {
+        return null;
+    }
+    $offset = $services[0][1] + strlen($services[0][0]);
+
+    // The services are the lines with the indent of the first content line below `services:`.
+    if (! preg_match('/^([ \t]+)[^\s#]/m', $configuration, $firstChild, PREG_OFFSET_CAPTURE, $offset)) {
+        return null;
+    }
+    $indent = preg_quote($firstChild[1][0], '/');
+    if (! preg_match('/^'.$indent.'([\'"]?)traefik\1:[ \t]*(?:#.*)?(?:\R|\z)/m', $configuration, $traefik, PREG_OFFSET_CAPTURE, $offset)) {
+        return null;
+    }
+    $start = $traefik[0][1] + strlen($traefik[0][0]);
+
+    // The block ends at the next content line that is not indented deeper than the service key.
+    $end = preg_match('/^(?!'.$indent.'[ \t])(?=[ \t]*[^\s#])/m', $configuration, $next, PREG_OFFSET_CAPTURE, $start)
+        ? $next[0][1]
+        : strlen($configuration);
+
+    return [$start, $end - $start];
 }
 
 /**
