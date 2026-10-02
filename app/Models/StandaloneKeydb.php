@@ -65,6 +65,8 @@ class StandaloneKeydb extends BaseModel
         'keydb_password',
         'internal_db_url',
         'external_db_url',
+        // Internal start-command state, not part of the API.
+        'legacy_password_quoting',
     ];
 
     protected $casts = [
