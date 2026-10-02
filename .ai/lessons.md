@@ -60,8 +60,8 @@
 ## Make distributed schedules durable
 - Use the database as the correctness source for dynamic cron occurrences shared by multiple scheduler and Horizon nodes; Redis locks are load controls, not a durable execution ledger.
 - Give each schedule occurrence a unique database identity and make queue consumers claim it atomically before external work.
-- Store the next due time on each schedule and select only due rows; claim a run with `UPDATE ... WHERE next_run_at = :old`. Do not evaluate every cron expression each minute: on a remote database the per-row queries alone exceed the one-minute budget.
 - Run a per-minute dispatcher from the scheduler process, not as a queued job, so queue backlog cannot delay it.
+- A Redis instance that holds queues must use `maxmemory-policy noeviction`; an evicting policy deletes queued jobs without an error. Before changing scheduler code for missed runs, check `INFO stats` `evicted_keys`.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
 - Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
 

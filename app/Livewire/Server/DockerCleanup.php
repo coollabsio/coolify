@@ -5,7 +5,9 @@ namespace App\Livewire\Server;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\Server;
+use Cron\CronExpression;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
@@ -37,21 +39,35 @@ class DockerCleanup extends Component
     #[Validate('boolean')]
     public bool $disableApplicationImageRetention = false;
 
-    /**
-     * The scheduled cleanup is stale when its next run is more than 10 minutes overdue,
-     * meaning the scheduled job dispatcher did not run it.
-     */
     #[Computed]
     public function isCleanupStale(): bool
     {
-        // The dispatcher does not run cleanups on servers without a real IP address.
-        if (blank($this->server->ip) || $this->server->hasPlaceholderIp()) {
+        try {
+            $lastExecution = DockerCleanupExecution::where('server_id', $this->server->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (! $lastExecution) {
+                return false;
+            }
+
+            $frequency = $this->server->settings->docker_cleanup_frequency ?? '0 0 * * *';
+            if (isset(VALID_CRON_STRINGS[$frequency])) {
+                $frequency = VALID_CRON_STRINGS[$frequency];
+            }
+
+            $cron = new CronExpression($frequency);
+            $now = Carbon::now();
+            $nextRun = Carbon::parse($cron->getNextRunDate($now));
+            $afterThat = Carbon::parse($cron->getNextRunDate($nextRun));
+            $intervalMinutes = $nextRun->diffInMinutes($afterThat);
+
+            $threshold = max($intervalMinutes * 2, 10);
+
+            return Carbon::parse($lastExecution->created_at)->diffInMinutes($now) > $threshold;
+        } catch (\Throwable) {
             return false;
         }
-
-        $nextRunAt = $this->server->settings->docker_cleanup_next_run_at;
-
-        return $nextRunAt !== null && $nextRunAt->lt(now()->subMinutes(10));
     }
 
     #[Computed]

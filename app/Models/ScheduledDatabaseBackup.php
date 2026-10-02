@@ -2,15 +2,12 @@
 
 namespace App\Models;
 
-use App\Traits\HasNextRunAt;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
-    use HasNextRunAt;
-
     protected function casts(): array
     {
         return [
@@ -19,7 +16,6 @@ class ScheduledDatabaseBackup extends BaseModel
             'database_backup_retention_max_storage_s3' => 'float',
             'missing_backup_notification_days' => 'integer',
             'last_execution_at' => 'datetime',
-            'next_run_at' => 'datetime',
         ];
     }
 

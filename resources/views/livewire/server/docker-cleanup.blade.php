@@ -33,8 +33,6 @@
 
                     @if (!isCloud() && $this->isCleanupStale)
                         <x-callout type="warning" title="Docker cleanup may be stalled">
-                            A scheduled cleanup was due
-                            {{ $server->settings->docker_cleanup_next_run_at?->diffForHumans() }} but has not started.
                             The last cleanup ran {{ $this->lastExecutionTime ?? 'at an unknown time' }}.
                             @if (!$this->isSchedulerHealthy)
                                 The scheduled job manager also appears inactive.
@@ -54,8 +52,6 @@
                                 <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
                                     Cleanup runs automatically using the schedule and threshold configured below.
                                 </p>
-                                <x-next-run class="mt-1" :at="$server->settings->docker_cleanup_next_run_at"
-                                    :timezone="$server->settings->server_timezone" :frequency="$server->settings->docker_cleanup_frequency" />
                             </div>
                         </div>
                     @endif

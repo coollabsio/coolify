@@ -11,9 +11,9 @@ class DispatchScheduledJobs extends Command
 
     protected $description = 'Dispatch the due scheduled backups, tasks, volume backups, and Docker cleanups';
 
-    public function handle(ScheduledJobManager $manager): int
+    public function handle(): int
     {
-        $manager->handle();
+        ScheduledJobManager::dispatchSync();
 
         return self::SUCCESS;
     }

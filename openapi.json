@@ -23565,12 +23565,6 @@
                         "type": "integer",
                         "description": "The timeout of the scheduled task in seconds."
                     },
-                    "next_run_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true,
-                        "description": "The next time the scheduled task runs, in UTC. Null when it is disabled or not calculated yet."
-                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",

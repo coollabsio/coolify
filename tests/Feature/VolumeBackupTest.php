@@ -2519,9 +2519,9 @@ it('dispatches due scheduled volume backups', function () {
         'frequency' => '* * * * *',
         'enabled' => true,
     ]);
+    Cache::forget("scheduled-volume-backup:{$backup->id}");
     expect($backup->server()?->isFunctional())->toBeTrue();
 
-    $this->travel(1)->minutes();
     (new ScheduledJobManager)->handle();
 
     Queue::assertPushed(
@@ -2547,8 +2547,8 @@ it('dispatches due scheduled directory backups', function () {
         'frequency' => '* * * * *',
         'enabled' => true,
     ]);
+    Cache::forget("scheduled-volume-backup:{$backup->id}");
 
-    $this->travel(1)->minutes();
     (new ScheduledJobManager)->handle();
 
     Queue::assertPushed(
@@ -2577,7 +2577,6 @@ it('retains scheduled volume backups and archive metadata when the server is mis
         'destination_type' => null,
     ]);
 
-    $this->travel(1)->minutes();
     (new ScheduledJobManager)->handle();
 
     expect($backup->fresh())->not->toBeNull()
@@ -2607,7 +2606,6 @@ it('dispatches pending recovery without starting another volume backup', functio
         'stop_recovery_pending' => true,
     ]);
 
-    $this->travel(1)->minutes();
     (new ScheduledJobManager)->handle();
 
     Queue::assertPushed(

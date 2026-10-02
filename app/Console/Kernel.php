@@ -78,7 +78,7 @@ class Kernel extends ConsoleKernel
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleScheduledJobs();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();
 
@@ -99,7 +99,7 @@ class Kernel extends ConsoleKernel
             $this->pullImages();
 
             // Scheduled Jobs (Backups & Tasks)
-            $this->scheduleScheduledJobs();
+            $this->scheduleScheduledJobManager();
 
             $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily()->onOneServer();
 
@@ -120,14 +120,15 @@ class Kernel extends ConsoleKernel
     }
 
     /**
-     * Run the dispatcher in the scheduler process, so a busy queue cannot delay it. Parallel runs
-     * are safe because each occurrence is claimed with an atomic update of next_run_at.
+     * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
+     * past the catch-up window, and then due backups and tasks would be skipped.
      */
-    private function scheduleScheduledJobs(): void
+    private function scheduleScheduledJobManager(): void
     {
         $this->scheduleInstance->command('scheduled:dispatch')
             ->everyMinute()
             ->onOneServer()
+            ->withoutOverlapping(5)
             ->runInBackground();
     }
 

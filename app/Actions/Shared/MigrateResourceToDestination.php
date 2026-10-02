@@ -23,7 +23,6 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
-use App\Services\ScheduleNextRunRecalculator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Validation\ValidationException;
@@ -152,7 +151,6 @@ class MigrateResourceToDestination
         }
 
         $resource->fill($payload)->save();
-        app(ScheduleNextRunRecalculator::class)->forResource($resource);
 
         if ($resource instanceof Application) {
             $resource->additional_networks()->detach();

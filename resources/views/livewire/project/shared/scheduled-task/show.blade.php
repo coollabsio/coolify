@@ -44,7 +44,6 @@
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
                     placeholder="php artisan schedule:run" id="command" label="Command" required />
             </div>
-            <x-next-run class="mt-4" :at="$task->next_run_at" :timezone="$this->serverTimezone" :enabled="$task->enabled" :frequency="$task->frequency" />
         </x-application.settings-section>
     </form>
 
