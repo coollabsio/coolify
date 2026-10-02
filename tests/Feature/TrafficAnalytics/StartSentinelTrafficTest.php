@@ -164,6 +164,12 @@ it('creates the access log before starting sentinel with traffic analytics', fun
     'caddy' => ['CADDY', '/data/coolify/proxy/caddy'],
 ]);
 
+it('starts sentinel with a restart policy so Docker restarts it after a crash or reboot', function () {
+    $script = runStartSentinelAndCaptureScript(sentinelTrafficServer($this, 'TRAEFIK', analyticsEnabled: false));
+
+    expect($script)->toContain('--name coolify-sentinel --restart unless-stopped ');
+});
+
 it('does not touch the access log when traffic analytics cannot run', function (?string $proxyType, bool $analyticsEnabled) {
     $server = sentinelTrafficServer($this, $proxyType, $analyticsEnabled);
 

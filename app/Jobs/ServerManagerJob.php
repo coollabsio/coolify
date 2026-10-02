@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
@@ -169,7 +170,9 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        // Sentinel versions that report their version on push are updated by SentinelController.
         if ($server->isSentinelEnabled()
+            && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
             && shouldRunCronNow('0 * * * *', $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
         ) {
             CheckAndStartSentinelJob::dispatch($server);

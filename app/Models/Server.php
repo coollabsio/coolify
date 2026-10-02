@@ -1079,6 +1079,11 @@ $siteAddress {
         return max(30, $this->settings->sentinel_push_interval_seconds + 30);
     }
 
+    public static function sentinelReportedVersionCacheKey(int $serverId): string
+    {
+        return "sentinel:reported-version:{$serverId}";
+    }
+
     public function isSentinelLive()
     {
         return Carbon::parse($this->sentinel_updated_at)->isAfter(now()->subSeconds($this->waitBeforeDoingSshCheck()));

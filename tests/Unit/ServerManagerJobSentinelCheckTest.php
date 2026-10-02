@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -54,6 +55,15 @@ it('dispatches an hourly Sentinel version check for a healthy Sentinel', functio
     Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) use ($server) {
         return $job->server->id === $server->id;
     });
+});
+
+it('skips the hourly SSH version check when Sentinel reports its version on push', function () {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Cache::put(Server::sentinelReportedVersionCacheKey($server->id), '1.0.2', now()->addHours(2));
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
 it('does not schedule periodic Sentinel restart checks', function () {

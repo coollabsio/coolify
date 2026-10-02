@@ -6,18 +6,29 @@ use App\Actions\Server\StartSentinel;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldQueue
+class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 120;
 
+    /**
+     * Only one check per server can wait in the queue, so a slow queue cannot collect copies.
+     */
+    public $uniqueFor = 600;
+
     public function __construct(public Server $server) {}
+
+    public function uniqueId(): string
+    {
+        return $this->server->uuid;
+    }
 
     public function handle(): void
     {
