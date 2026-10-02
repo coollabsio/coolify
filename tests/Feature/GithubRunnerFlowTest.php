@@ -134,6 +134,15 @@ function fakeRunnerGithubApi(GithubApp $githubApp): void
     ]);
 }
 
+function fakeWorkflowRunApi(GithubApp $githubApp, mixed $runResponse): void
+{
+    Http::fake([
+        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+        "https://api.github.com/app/installations/{$githubApp->installation_id}/access_tokens" => Http::response(['token' => 'installation-token'], 201),
+        'https://api.github.com/repos/acme/api/actions/runs/321' => $runResponse,
+    ]);
+}
+
 describe('workflow_job webhook', function () {
     beforeEach(function () {
         Queue::fake();
@@ -164,6 +173,43 @@ describe('workflow_job webhook', function () {
         'unknown label' => [['self-hosted', 'coolify', 'gpu']],
         'github hosted' => [['ubuntu-latest']],
     ]);
+
+    it('does not provision a runner for a pull request job when no matching configuration allows them', function (string $event) {
+        Http::preventStrayRequests();
+        fakeWorkflowRunApi($this->githubApp, Http::response(['id' => 321, 'event' => $event]));
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'queued', ['run_id' => 321])
+            ->assertOk()
+            ->assertSee('does not allow pull request jobs');
+
+        expect(GithubRunnerExecution::count())->toBe(0);
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class);
+    })->with(['pull_request', 'pull_request_target']);
+
+    it('provisions a runner for a job that does not come from a pull request', function (mixed $runResponse) {
+        Http::preventStrayRequests();
+        fakeWorkflowRunApi($this->githubApp, $runResponse);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'queued', ['run_id' => 321])->assertOk();
+
+        expect(GithubRunnerExecution::sole()->status)->toBe(GithubRunnerStatus::Queued);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+    })->with([
+        'push' => fn () => Http::response(['id' => 321, 'event' => 'push']),
+        'workflow run lookup fails' => fn () => Http::response(['message' => 'Server Error'], 500),
+    ]);
+
+    it('provisions a runner for a pull request job without a lookup when a matching configuration allows them', function () {
+        Http::preventStrayRequests();
+        Http::fake();
+        GithubRunnerConfig::query()->update(['allow_pull_requests' => true]);
+
+        sendWorkflowJobWebhook($this, $this->githubApp, 'runner-secret', 'queued', ['run_id' => 321])->assertOk();
+
+        expect(GithubRunnerExecution::count())->toBe(1);
+        Queue::assertPushed(ProvisionGithubRunnerJob::class, 1);
+        Http::assertNothingSent();
+    });
 
     it('rejects an invalid signature', function () {
         sendWorkflowJobWebhook($this, $this->githubApp, 'wrong-secret', 'queued', [])->assertSee('Invalid signature');

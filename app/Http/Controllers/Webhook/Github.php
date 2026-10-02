@@ -17,6 +17,8 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
+use App\Services\GithubRunner\GithubRunnerApi;
+use App\Services\GithubRunner\GithubRunnerContainer;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
@@ -281,12 +283,15 @@ class Github extends Controller
 
         if ($action === 'queued') {
             $labels = array_values(array_filter((array) data_get($payload, 'workflow_job.labels', []), 'is_string'));
-            $matches = $githubApp->runnerConfigs()
+            $matchingConfigs = $githubApp->runnerConfigs()
                 ->where('is_enabled', true)
                 ->get()
-                ->contains(fn (GithubRunnerConfig $config) => $config->matchesLabels($labels));
-            if (! $matches) {
+                ->filter(fn (GithubRunnerConfig $config) => $config->matchesLabels($labels));
+            if ($matchingConfigs->isEmpty()) {
                 return response('Nothing to do. No runner configuration matches the job labels.');
+            }
+            if (! $matchingConfigs->contains('allow_pull_requests', true) && $this->isPullRequestWorkflowJob($githubApp, $payload)) {
+                return response('Nothing to do. The runner configuration does not allow pull request jobs.');
             }
 
             $execution = GithubRunnerExecution::createOrFirst(
@@ -333,6 +338,29 @@ class Github extends Controller
         }
 
         return response('Nothing to do.');
+    }
+
+    /**
+     * Whether a queued job belongs to a workflow run started by a pull request, so no runner is started
+     * for a job that the job-started hook would refuse. The `workflow_job` payload has no event, so the
+     * run is read from GitHub. When that fails, the job counts as no pull request job and the hook still
+     * refuses it in the runner.
+     */
+    private function isPullRequestWorkflowJob(GithubApp $githubApp, Collection $payload): bool
+    {
+        $runId = (int) data_get($payload, 'workflow_job.run_id', 0);
+        $repository = (string) data_get($payload, 'repository.full_name', '');
+        if ($runId <= 0 || ! str_contains($repository, '/')) {
+            return false;
+        }
+
+        try {
+            $event = (new GithubRunnerApi($githubApp))->workflowRunEvent($repository, $runId);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return in_array($event, GithubRunnerContainer::PULL_REQUEST_EVENTS, true);
     }
 
     public function normal(Request $request)

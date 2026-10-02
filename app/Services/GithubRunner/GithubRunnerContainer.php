@@ -30,6 +30,9 @@ class GithubRunnerContainer
 
     private const HOOK_PATH = '/home/runner/coolify-job-started.sh';
 
+    /** Workflow run events that a runner refuses unless the config allows pull request jobs. */
+    public const PULL_REQUEST_EVENTS = ['pull_request', 'pull_request_target', 'pull_request_review', 'pull_request_review_comment'];
+
     public function __construct(private GithubRunnerExecution $execution, private GithubRunnerConfig $config) {}
 
     public static function nameFor(string $executionUuid): string
@@ -153,10 +156,12 @@ class GithubRunnerContainer
      */
     public static function pullRequestHookScript(): string
     {
-        return <<<'BASH'
+        $events = implode('|', self::PULL_REQUEST_EVENTS);
+
+        return <<<BASH
             #!/bin/bash
-            case "${GITHUB_EVENT_NAME:-}" in
-              pull_request|pull_request_target|pull_request_review|pull_request_review_comment|"")
+            case "\${GITHUB_EVENT_NAME:-}" in
+              {$events}|"")
                 echo "::error::This Coolify runner does not run pull request jobs. Allow pull request jobs in the GitHub runner settings of the build server to run them."
                 exit 1
                 ;;

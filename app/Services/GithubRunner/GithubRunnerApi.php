@@ -16,9 +16,9 @@ class GithubRunnerApi
     public function __construct(private GithubApp $githubApp) {}
 
     /**
-     * Finds or creates the runner group of the App. Every repository of the organization, public ones too,
-     * can use it; runners refuse pull request jobs unless the runner config allows them.
-     * Groups created before public repositories were allowed are updated.
+     * Finds or creates the runner group of the App. A new group lets every repository of the organization,
+     * public ones too, use it; runners refuse pull request jobs unless the runner config allows them.
+     * Coolify does not change an existing group, so restrictions an organization admin set on GitHub stay.
      * All GitHub plans can create runner groups, so a failed creation is an error. Coolify never falls back
      * to the Default group, because that group can give the runners access to more repositories.
      *
@@ -31,10 +31,6 @@ class GithubRunnerApi
         if ($this->githubApp->runner_group_id) {
             $response = $this->client()->get("/orgs/{$org}/actions/runner-groups/{$this->githubApp->runner_group_id}");
             if ($response->successful()) {
-                if (! $response->json('default') && ($response->json('visibility') !== 'all' || $response->json('allows_public_repositories') !== true)) {
-                    $this->allowAllRepositories((int) $this->githubApp->runner_group_id);
-                }
-
                 return ['id' => (int) $this->githubApp->runner_group_id, 'is_default' => (bool) $response->json('default')];
             }
             if ($response->status() !== 404) {
@@ -55,17 +51,6 @@ class GithubRunnerApi
         $this->githubApp->update(['runner_group_id' => $group['id']]);
 
         return $group;
-    }
-
-    private function allowAllRepositories(int $runnerGroupId): void
-    {
-        $response = $this->client()->patch("/orgs/{$this->organization()}/actions/runner-groups/{$runnerGroupId}", [
-            'visibility' => 'all',
-            'allows_public_repositories' => true,
-        ]);
-        if (! $response->successful()) {
-            throw new RuntimeException('Could not update the runner group: '.$this->errorMessage($response));
-        }
     }
 
     /**
@@ -89,6 +74,22 @@ class GithubRunnerApi
             'runner_id' => (int) $response->json('runner.id'),
             'encoded_jit_config' => (string) $response->json('encoded_jit_config'),
         ];
+    }
+
+    /**
+     * The event that started a workflow run, for example "push" or "pull_request". The `workflow_job`
+     * webhook does not contain it. A short timeout keeps the webhook response fast.
+     */
+    public function workflowRunEvent(string $repositoryFullName, int $runId): string
+    {
+        $repository = implode('/', array_map('rawurlencode', explode('/', $repositoryFullName, 2)));
+        $response = $this->client()->timeout(5)->get("/repos/{$repository}/actions/runs/{$runId}");
+
+        if (! $response->successful() || ! is_string($response->json('event'))) {
+            throw new RuntimeException('Could not read the workflow run: '.$this->errorMessage($response));
+        }
+
+        return $response->json('event');
     }
 
     /**
