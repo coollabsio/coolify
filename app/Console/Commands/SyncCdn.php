@@ -16,7 +16,7 @@ class SyncCdn extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:cdn';
+    protected $signature = 'sync:cdn {--purge : Purge the Cloudflare cache for the CDN files}';
 
     /**
      * The console command description.
@@ -40,6 +40,49 @@ class SyncCdn extends Command
         }
 
         File::deleteDirectory($temporaryDirectory);
+    }
+
+    /**
+     * Purge the given CDN URLs from the Cloudflare cache.
+     *
+     * @param  array<int, string>  $urls
+     */
+    private function purgeCloudflareCache(array $urls): bool
+    {
+        $apiToken = config('constants.cloudflare.api_token');
+        $zoneId = config('constants.cloudflare.zone_id');
+
+        if (blank($apiToken) || blank($zoneId)) {
+            $this->error('CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID must be set to purge the Cloudflare cache.');
+
+            return false;
+        }
+
+        foreach ($urls as $url) {
+            $this->info('Purging: '.$url);
+        }
+
+        try {
+            $response = Http::withToken($apiToken)
+                ->timeout(30)
+                ->post("https://api.cloudflare.com/client/v4/zones/{$zoneId}/purge_cache", [
+                    'files' => array_values($urls),
+                ]);
+        } catch (\Throwable $e) {
+            $this->error('Failed to purge Cloudflare cache: '.$e->getMessage());
+
+            return false;
+        }
+
+        if (! $response->successful() || $response->json('success') !== true) {
+            $this->error('Failed to purge Cloudflare cache: '.$response->body());
+
+            return false;
+        }
+
+        $this->info('Cloudflare cache purged.');
+
+        return true;
     }
 
     /**
@@ -251,6 +294,7 @@ class SyncCdn extends Command
             ],
             default: 'production',
         ) === 'nightly';
+        $cdn = 'https://cdn.coollabs.io';
 
         $parent_dir = realpath(dirname(__FILE__).'/../../..');
 
@@ -282,9 +326,6 @@ class SyncCdn extends Command
                 $install_script_location = "$parent_dir/other/nightly/$install_script";
                 $versions_location = "$parent_dir/other/nightly/$versions";
             }
-            $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
-            $this->info("About to sync $envLabel releases, versions, compose, and environment files to GitHub repository.");
-
             if ($nightly) {
                 $files = [
                     $versions_location => 'json/coolify/nightly/versions.json',
@@ -310,6 +351,23 @@ class SyncCdn extends Command
             }
 
             $releasesTarget = $nightly ? 'json/coolify/nightly/releases.json' : 'json/coolify/releases.json';
+
+            if ($this->option('purge')) {
+                $urls = array_map(
+                    fn (string $targetPath) => $cdn.'/'.substr($targetPath, strlen('json/')),
+                    [$releasesTarget, ...array_values($files)],
+                );
+                if ($nightly) {
+                    // Nightly scripts still download from the legacy /coolify-nightly/ path, which Cloudflare caches separately.
+                    $urls = [...$urls, ...str_replace('/coolify/nightly/', '/coolify-nightly/', $urls)];
+                }
+
+                return $this->purgeCloudflareCache($urls) ? self::SUCCESS : self::FAILURE;
+            }
+
+            $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+            $this->info("About to sync $envLabel releases, versions, compose, and environment files to GitHub repository.");
+
             $options = [$releasesTarget, ...array_values($files)];
             $selectedFiles = multiselect(
                 label: 'Which files would you like to sync?',
@@ -325,10 +383,12 @@ class SyncCdn extends Command
                 fn (string $targetPath) => in_array($targetPath, $selectedFiles, true),
             );
 
-            if ($includeReleases) {
-                $this->syncReleasesToGitHubRepo($files, $nightly);
-            } else {
-                $this->syncFilesToGitHubRepo($files, $nightly);
+            $synced = $includeReleases
+                ? $this->syncReleasesToGitHubRepo($files, $nightly)
+                : $this->syncFilesToGitHubRepo($files, $nightly);
+
+            if ($synced) {
+                $this->info('After the CDN pull request is merged and deployed, run "php artisan sync:cdn --purge" to purge the Cloudflare cache.');
             }
         } catch (\Throwable $e) {
             $this->error('Error: '.$e->getMessage());

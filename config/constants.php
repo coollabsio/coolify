@@ -136,6 +136,11 @@ return [
         'dev_webhook' => env('SERVEO_URL'),
     ],
 
+    'cloudflare' => [
+        'api_token' => env('CLOUDFLARE_API_TOKEN'),
+        'zone_id' => env('CLOUDFLARE_ZONE_ID'),
+    ],
+
     'server_checks' => [
         // Notification delay configuration for parallel server checks
         // Used for Traefik version checks and other future server check jobs

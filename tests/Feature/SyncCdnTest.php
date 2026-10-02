@@ -150,3 +150,61 @@ SH);
         'service-templates-latest.json',
     ]],
 ]);
+
+it('purges the CDN files from the Cloudflare cache', function (string $environment, array $cdnDirectories) {
+    config()->set('constants.cloudflare.api_token', 'test-token');
+    config()->set('constants.cloudflare.zone_id', 'test-zone');
+
+    Http::fake([
+        'https://api.cloudflare.com/*' => Http::response(['success' => true], 200),
+    ]);
+
+    $this->artisan('sync:cdn --purge')
+        ->expectsChoice('Which environment would you like to sync?', $environment, [
+            'production' => 'Production',
+            'nightly' => 'Nightly',
+        ])
+        ->assertExitCode(0);
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://api.cloudflare.com/client/v4/zones/test-zone/purge_cache'
+        && $request->hasHeader('Authorization', 'Bearer test-token')
+        && $request['files'] === collect($cdnDirectories)->flatMap(fn (string $cdnDirectory) => array_map(fn (string $file) => "https://cdn.coollabs.io/$cdnDirectory/$file", [
+            'releases.json',
+            'versions.json',
+            'docker-compose.yml',
+            'docker-compose.prod.yml',
+            '.env.production',
+            'install.sh',
+            'upgrade.sh',
+            'upgrade-postgres.sh',
+            'service-templates-latest.json',
+        ]))->all());
+})->with([
+    'production' => ['production', ['coolify']],
+    'nightly with legacy path' => ['nightly', ['coolify/nightly', 'coolify-nightly']],
+]);
+
+it('fails the Cloudflare purge without credentials or on an API error', function (?string $apiToken, array $response) {
+    config()->set('constants.cloudflare.api_token', $apiToken);
+    config()->set('constants.cloudflare.zone_id', 'test-zone');
+
+    Http::fake([
+        'https://api.cloudflare.com/*' => Http::response($response, 400),
+    ]);
+
+    $this->artisan('sync:cdn --purge')
+        ->expectsChoice('Which environment would you like to sync?', 'production', [
+            'production' => 'Production',
+            'nightly' => 'Nightly',
+        ])
+        ->assertExitCode(1);
+
+    if ($apiToken === null) {
+        Http::assertNothingSent();
+    }
+})->with([
+    'missing token' => [null, []],
+    'api error' => ['test-token', ['success' => false, 'errors' => [['code' => 10000, 'message' => 'Authentication error']]]],
+]);
