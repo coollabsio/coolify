@@ -3,6 +3,7 @@
 use App\Models\InstanceSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
@@ -171,5 +172,37 @@ describe('confirmation modal', function () {
         expect($html)->toContain('confirmWithPassword: true')
             ->and($html)->toContain('type="password"')
             ->and($html)->not->toContain('Confirm with Google');
+    });
+});
+
+describe('two-factor setup', function () {
+    beforeEach(function () {
+        $this->team = Team::factory()->create(['show_boarding' => false]);
+    });
+
+    it('lets a user with a linked identity and no password enable 2fa without a password confirmation', function () {
+        $user = User::factory()->create();
+        $user->forceFill(['password' => null])->save();
+        $this->team->members()->attach($user, ['role' => 'owner']);
+        linkGoogleIdentity($user, 'google-id');
+
+        $this->actingAs($user)
+            ->withSession(['currentTeam' => $this->team])
+            ->post(route('two-factor.enable'))
+            ->assertSessionHas('status', 'two-factor-authentication-enabled');
+
+        expect($user->fresh()->two_factor_secret)->not->toBeNull();
+    });
+
+    it('still asks a password user without a linked identity to confirm the password', function () {
+        $user = User::factory()->create(['password' => Hash::make('secret-password')]);
+        $this->team->members()->attach($user, ['role' => 'owner']);
+
+        $this->actingAs($user)
+            ->withSession(['currentTeam' => $this->team])
+            ->post(route('two-factor.enable'))
+            ->assertRedirect(route('password.confirm'));
+
+        expect($user->fresh()->two_factor_secret)->toBeNull();
     });
 });
