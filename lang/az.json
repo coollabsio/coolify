@@ -18,6 +18,7 @@
   "auth.logout": "Çıxış",
   "auth.register": "Qeydiyyat",
   "auth.registration_disabled": "Qeydiyyat bağlıdır. Administratorla əlaqə saxlayın.",
+  "auth.register_with_oauth": "Yalnız OAuth ilə qeydiyyat aktivdir.",
   "auth.reset_password": "Şifrənin bərpası",
   "auth.failed": "Bu məlumatlar bizim qeydlərimizlə uyğun gəlmir.",
   "auth.failed.callback": "Giriş təminatçısından geri çağırma işlənə bilmədi.",

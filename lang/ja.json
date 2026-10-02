@@ -17,6 +17,7 @@
     "auth.logout": "ログアウト",
     "auth.register": "登録",
     "auth.registration_disabled": "登録は無効です。管理者に連絡してください。",
+    "auth.register_with_oauth": "OAuth による登録のみ有効です。",
     "auth.reset_password": "パスワードをリセット",
     "auth.failed": "これらの資格情報は記録と一致しません。",
     "auth.failed.callback": "ログインプロバイダーからのコールバックの処理に失敗しました。",

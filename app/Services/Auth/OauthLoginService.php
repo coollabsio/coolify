@@ -147,7 +147,7 @@ class OauthLoginService
                 }
 
                 if (! $user) {
-                    if (! $this->canCreateUser($oauthSetting)) {
+                    if (! $oauthSetting->allowsUserCreation()) {
                         throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
                     }
 
@@ -266,7 +266,7 @@ class OauthLoginService
                 }
 
                 if (! $user) {
-                    if (! $this->canCreateUser($oauthSetting)) {
+                    if (! $oauthSetting->allowsUserCreation()) {
                         throw new OauthLoginException('Registration is disabled', 'auth.registration_disabled');
                     }
 
@@ -288,19 +288,6 @@ class OauthLoginService
         } catch (UniqueConstraintViolationException $exception) {
             return OauthIdentity::where($identityKey)->first()?->user ?? throw $exception;
         }
-    }
-
-    /**
-     * Only OIDC exposes a provider-level user creation setting. Other providers
-     * follow the instance registration setting, as before OIDC support.
-     */
-    private function canCreateUser(OauthSetting $oauthSetting): bool
-    {
-        if (instanceSettings()->is_registration_enabled) {
-            return true;
-        }
-
-        return $oauthSetting->provider === 'oidc' && $oauthSetting->allow_registration;
     }
 
     private function createUser(string $name, string $email, OauthSetting $oauthSetting): User

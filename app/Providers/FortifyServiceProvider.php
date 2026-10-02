@@ -65,6 +65,9 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.login', [
                 'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
+                'can_register_with_oauth' => $enabled_oauth_providers->contains(
+                    fn (OauthSetting $oauthSetting) => $oauthSetting->couldBeEnabled() && $oauthSetting->allowsUserCreation()
+                ),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });

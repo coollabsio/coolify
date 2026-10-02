@@ -17,6 +17,7 @@
     "auth.logout": "登出",
     "auth.register": "註冊",
     "auth.registration_disabled": "註冊已停用，請聯絡管理員。",
+    "auth.register_with_oauth": "僅啟用 OAuth 註冊。",
     "auth.reset_password": "重設密碼",
     "auth.failed": "這些憑證與我們的記錄不符。",
     "auth.failed.callback": "無法處理來自登入提供者的回呼。",

@@ -20,6 +20,7 @@
     "auth.logout": "Wyloguj",
     "auth.register": "Zarejestruj",
     "auth.registration_disabled": "Rejestracja jest wyłączona. Skontaktuj się z administratorem.",
+    "auth.register_with_oauth": "Włączona jest tylko rejestracja przez OAuth.",
     "auth.reset_password": "Zresetuj hasło",
     "auth.failed": "Podane dane nie zgadzają się z naszymi rekordami.",
     "auth.failed.callback": "Nie udało się przeprocesować callbacku od dostawcy logowania.",

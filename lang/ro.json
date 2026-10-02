@@ -17,6 +17,7 @@
     "auth.logout": "Deconectare",
     "auth.register": "Înregistrare",
     "auth.registration_disabled": "Înregistrarea este dezactivată. Vă rugăm să contactați administratorul site-ului.",
+    "auth.register_with_oauth": "Este activată doar înregistrarea prin OAuth.",
     "auth.reset_password": "Resetare parolă",
     "auth.failed": "Autentificare nereușită. Vă rugăm să verificați datele introduse.",
     "auth.failed.callback": "A apărut o eroare în timpul autentificării cu furnizorul extern.",

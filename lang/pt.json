@@ -19,6 +19,7 @@
     "auth.logout": "Sair",
     "auth.register": "Cadastrar",
     "auth.registration_disabled": "Cadastro desativado. Por favor, entre em contato com o administrador.",
+    "auth.register_with_oauth": "Apenas o registo através de OAuth está ativado.",
     "auth.reset_password": "Redefinir senha",
     "auth.failed": "Essas credenciais não correspondem aos nossos registros.",
     "auth.failed.callback": "Falha ao processar o callback do provedor de login.",

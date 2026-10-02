@@ -18,6 +18,7 @@
     "auth.logout": "تسجيل الخروج",
     "auth.register": "تسجيل",
     "auth.registration_disabled": "تم تعطيل التسجيل. يرجى التواصل مع المسؤول.",
+    "auth.register_with_oauth": "التسجيل متاح فقط عبر OAuth.",
     "auth.reset_password": "إعادة تعيين كلمة المرور",
     "auth.failed": "هذه البيانات لا تتطابق مع سجلاتنا.",
     "auth.failed.callback": "فشل في معالجة استدعاء من مزود تسجيل الدخول.",

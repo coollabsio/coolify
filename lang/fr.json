@@ -18,6 +18,7 @@
     "auth.logout": "Déconnexion",
     "auth.register": "S'enregistrer",
     "auth.registration_disabled": "L'enregistrement est désactivé. Merci de contacter l'administrateur.",
+    "auth.register_with_oauth": "Seule l'inscription via OAuth est activée.",
     "auth.reset_password": "Réinitialiser le mot de passe",
     "auth.failed": "Aucune correspondance n'a été trouvée pour les informations d'identification renseignées.",
     "auth.failed.callback": "Erreur lors du processus de retour de la plateforme de connexion.",

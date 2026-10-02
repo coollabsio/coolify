@@ -17,6 +17,7 @@
     "auth.logout": "خروج",
     "auth.register": "ثبت نام",
     "auth.registration_disabled": "ثبت نام غیر فعال است. لطفا با ادمین تماس بگیرید.",
+    "auth.register_with_oauth": "فقط ثبت‌نام از طریق OAuth فعال است.",
     "auth.reset_password": "بازیابی رمز عبور",
     "auth.failed": "این اطلاعات با سوابق ما مطابقت ندارد.",
     "auth.failed.callback": "پردازش بازگشت از ارائه‌دهنده ورود با شکست مواجه شد.",

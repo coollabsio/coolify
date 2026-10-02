@@ -17,6 +17,7 @@
     "auth.logout": "Cerrar sesión",
     "auth.register": "Registrar",
     "auth.registration_disabled": "El registro está desactivado. Por favor contacta con el administrador.",
+    "auth.register_with_oauth": "Solo está habilitado el registro mediante OAuth.",
     "auth.reset_password": "Cambiar contraseña",
     "auth.failed": "Las credenciales no coinciden con nuestro registro..",
     "auth.failed.callback": "Falló el proceso de inicio de sesión con el proveedor.",

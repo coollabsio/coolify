@@ -19,6 +19,7 @@
     "auth.logout": "退出登录",
     "auth.register": "注册",
     "auth.registration_disabled": "注册已禁用，请联系管理员",
+    "auth.register_with_oauth": "仅启用了 OAuth 注册。",
     "auth.reset_password": "重置密码",
     "auth.failed": "这些凭据与我们的记录不符",
     "auth.failed.callback": "处理第三方登录的回调时出错",

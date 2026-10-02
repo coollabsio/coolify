@@ -19,6 +19,7 @@
     "auth.logout": "Çıkış Yap",
     "auth.register": "Kayıt Ol",
     "auth.registration_disabled": "Kayıt devre dışı bırakıldı. Lütfen yöneticiyle iletişime geçin.",
+    "auth.register_with_oauth": "Yalnızca OAuth ile kayıt etkin.",
     "auth.reset_password": "Şifreyi Sıfırla",
     "auth.failed": "Bu kimlik bilgileri kayıtlarımızla eşleşmiyor.",
     "auth.failed.callback": "Giriş sağlayıcıdan gelen istek işlenemedi.",

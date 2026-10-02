@@ -18,6 +18,7 @@
     "auth.logout": "Keluar",
     "auth.register": "Daftar",
     "auth.registration_disabled": "Pendaftaran dinonaktifkan. Harap hubungi administrator.",
+    "auth.register_with_oauth": "Hanya pendaftaran melalui OAuth yang diaktifkan.",
     "auth.reset_password": "Reset kata sandi",
     "auth.failed": "Kredensial ini tidak cocok dengan catatan kami.",
     "auth.failed.callback": "Gagal memproses callback dari penyedia login.",

@@ -18,6 +18,7 @@
     "auth.logout": "Logg ut",
     "auth.register": "Registrer",
     "auth.registration_disabled": "Registrering er deaktivert. Vennligst kontakt administrator.",
+    "auth.register_with_oauth": "Bare registrering via OAuth er aktivert.",
     "auth.reset_password": "Tilbakestill passord",
     "auth.failed": "Disse legitimasjonene samsvarer ikke med våre registre.",
     "auth.failed.callback": "Klarte ikke å behandle tilbakekall fra innloggingsleverandør.",

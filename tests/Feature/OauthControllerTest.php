@@ -863,3 +863,18 @@ it('matches the Google hosted domain without case or spaces and accepts any Work
     'other domain' => ['example.com', 'example.org', false],
     'personal account' => ['example.com', null, false],
 ]);
+
+it('allows OAuth user creation through global registration or the OIDC user creation setting', function (string $provider, bool $isRegistrationEnabled, bool $allowRegistration, bool $expected) {
+    InstanceSettings::query()->whereKey(0)->update(['is_registration_enabled' => $isRegistrationEnabled]);
+    Once::flush();
+
+    $setting = new OauthSetting(['provider' => $provider, 'allow_registration' => $allowRegistration]);
+
+    expect($setting->allowsUserCreation())->toBe($expected);
+})->with([
+    'github, registration on' => ['github', true, false, true],
+    'github, registration off' => ['github', false, true, false],
+    'oidc, registration off, oidc user creation on' => ['oidc', false, true, true],
+    'oidc, registration off, oidc user creation off' => ['oidc', false, false, false],
+    'oidc, registration on, oidc user creation off' => ['oidc', true, false, true],
+]);

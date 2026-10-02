@@ -18,6 +18,7 @@
     "auth.logout": "Esci",
     "auth.register": "Registrati",
     "auth.registration_disabled": "La registrazione è disabilitata. Si prega di contattare l'amministratore.",
+    "auth.register_with_oauth": "È abilitata solo la registrazione tramite OAuth.",
     "auth.reset_password": "Reimposta password",
     "auth.failed": "Queste credenziali non corrispondono ai nostri record.",
     "auth.failed.callback": "Errore durante l'elaborazione del callback dal provider di accesso.",

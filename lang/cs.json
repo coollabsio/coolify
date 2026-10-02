@@ -17,6 +17,7 @@
     "auth.logout": "Odhlásit se",
     "auth.register": "Registrovat se",
     "auth.registration_disabled": "Registrace je zakázána. Kontaktujte prosím administrátora.",
+    "auth.register_with_oauth": "Je povolena pouze registrace přes OAuth.",
     "auth.reset_password": "Obnovit heslo",
     "auth.failed": "Tyto údaje neodpovídají našim záznamům.",
     "auth.failed.callback": "Nepodařilo se zpracovat zpětné volání od poskytovatele přihlášení.",

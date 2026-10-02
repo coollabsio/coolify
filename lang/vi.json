@@ -17,6 +17,7 @@
     "auth.logout": "Đăng xuất",
     "auth.register": "Đăng ký",
     "auth.registration_disabled": "Đăng ký không khả dụng. Vui lòng liên hệ quản trị viên.",
+    "auth.register_with_oauth": "Chỉ cho phép đăng ký qua OAuth.",
     "auth.reset_password": "Đặt lại mật khẩu",
     "auth.failed": "Thông tin đăng nhập không khớp với bất kỳ tài khoản nào.",
     "auth.failed.callback": "Xử lý thông tin từ nhà cung cấp đăng nhập thất bại.",

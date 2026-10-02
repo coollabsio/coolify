@@ -19,6 +19,7 @@
     "auth.logout": "Abmelden",
     "auth.register": "Registrieren",
     "auth.registration_disabled": "Registrierung ist deaktiviert. Bitte kontaktiere einen Administrator.",
+    "auth.register_with_oauth": "Nur die Registrierung über OAuth ist aktiviert.",
     "auth.reset_password": "Passwort zurücksetzen",
     "auth.failed": "Diese Anmeldedaten wurden nicht gefunden.",
     "auth.failed.callback": "Fehlerhafte Verarbeitung der Antwort des Anmeldeanbieters.",
