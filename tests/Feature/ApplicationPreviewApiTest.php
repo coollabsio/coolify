@@ -164,6 +164,34 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
             ->assertJson(['logs' => 'preview runtime log']);
     });
 
+    test('does not return logs of a preview whose pull request id starts with the requested one', function () {
+        createPreview($this->application, 4);
+        $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+        $this->server->update(['private_key_id' => $privateKey->id]);
+        Process::fake(function ($process) {
+            if (str_contains($process->command, 'docker ps -a')) {
+                return Process::result(output: collect([42, 4])->map(fn (int $pullRequestId) => json_encode([
+                    'ID' => "preview-container-{$pullRequestId}",
+                    'Names' => "{$this->application->uuid}-pr-{$pullRequestId}",
+                    'Labels' => "coolify.applicationId={$this->application->id},coolify.pullRequestId={$pullRequestId}",
+                ]))->implode("\n"));
+            }
+            if (str_contains($process->command, 'docker inspect')) {
+                return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
+            }
+            if (preg_match('/docker logs .*(preview-container-\d+)/', $process->command, $matches)) {
+                return Process::result(output: "logs of {$matches[1]}");
+            }
+
+            return Process::result();
+        });
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/previews/4/logs")
+            ->assertOk()
+            ->assertJson(['logs' => 'logs of preview-container-4']);
+    });
+
     test('returns 404 when the preview does not exist', function () {
         $this->withHeaders(previewAuthHeaders($this->bearerToken))
             ->getJson("/api/v1/applications/{$this->application->uuid}/previews/42/logs")
