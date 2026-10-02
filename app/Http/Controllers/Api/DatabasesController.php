@@ -279,10 +279,10 @@ class DatabasesController extends Controller
         $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
             ->whereIn('database_id', $databaseIds)
             ->get()
-            ->groupBy('database_id');
+            ->groupBy(fn (ScheduledDatabaseBackup $backup) => $backup->database_type.':'.$backup->database_id);
 
         $databases = $databases->map(function ($database) use ($backupConfigs) {
-            $database->backup_configs = $backupConfigs->get($database->id, collect())->values();
+            $database->backup_configs = $backupConfigs->get($database->getMorphClass().':'.$database->id, collect())->values();
 
             return $this->removeSensitiveData($database);
         });
