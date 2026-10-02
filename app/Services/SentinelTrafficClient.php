@@ -769,33 +769,41 @@ class SentinelTrafficClient
     /**
      * Build the `docker exec ... curl` command run inside the Sentinel container.
      *
-     * The URL is double-quoted inside the inner `sh -c` string so the literal `&`
-     * between the `from`/`to` (and `limit`) query params is not interpreted as a
-     * shell background operator — which would background curl after `from=...` and
-     * truncate every multi-param request. The app key and dimension are validated
-     * (assertSafeKey/assertSafeDimension) before reaching here, so the URL cannot
-     * contain shell metacharacters that break out of the quoting.
+     * The token reaches curl on stdin (`-H @-`) from a heredoc, so it is never a process argument
+     * that other users on the server can read in /proc. The URL is double-quoted so the literal `&`
+     * between the `from`/`to` (and `limit`) query params is not a shell background operator. The
+     * app key and dimension are validated (assertSafeKey/assertSafeDimension) before reaching here,
+     * so the URL cannot contain shell metacharacters that break out of the quoting.
      */
     protected function buildFetchCommand(string $token, string $url): string
     {
-        return "docker exec coolify-sentinel sh -c 'curl -sS -H \"Authorization: Bearer {$token}\" \"{$url}\"'";
+        return "docker exec -i coolify-sentinel curl -sS -H @- \"{$url}\"".$this->authorizationHeredoc($token);
     }
 
     /**
      * Build one `docker exec` that curls every URL in order and separates the responses
-     * with a 0x1E record separator, so warm() can split them back apart. escapeshellarg
-     * safely wraps the whole script; each URL stays double-quoted so its `&` is literal.
+     * with a 0x1E record separator, so warm() can split them back apart. The container shell
+     * reads the script, which holds the token, from stdin; each curl reads the header from stdin.
+     * No pipe or `sh -c` is used, so the non-root sudo parser only puts sudo in front of the line.
      *
      * @param  array<int, string>  $urls
      */
     protected function buildBatchCommand(string $token, array $urls): string
     {
-        $script = implode(' ; ', array_map(
-            fn ($url) => "curl -s -H \"Authorization: Bearer {$token}\" \"{$url}\" ; printf '\\036'",
+        $script = implode("\n", array_map(
+            fn ($url) => "curl -s -H @- \"{$url}\"".$this->authorizationHeredoc($token)."\nprintf '\\036'",
             $urls
         ));
 
-        return 'docker exec coolify-sentinel sh -c '.escapeshellarg($script);
+        return "docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT";
+    }
+
+    /**
+     * The token only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it cannot end the heredoc.
+     */
+    private function authorizationHeredoc(string $token): string
+    {
+        return " <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
     }
 
     private function guard(string $response): string
