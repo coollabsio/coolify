@@ -136,6 +136,20 @@
     box-shadow: var(--button-depth-hover), 0 0 0 1px var(--color-red-500);
 }
 
+/* Highlighted buttons share the accent hue, so a flush ring reads as a stray
+   border. Offset the indicator with an outline to leave a clear gap. */
+.button.button-highlighted:not(:disabled):focus-visible,
+.button[isHighlighted]:not(:disabled):focus-visible {
+    box-shadow: var(--button-depth);
+    outline: 1px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+.button.button-highlighted:not(:disabled):hover:focus-visible,
+.button[isHighlighted]:not(:disabled):hover:focus-visible {
+    box-shadow: var(--button-depth-hover);
+}
+
 /* Other button-like controls retain the lighter scale feedback. */
 .button,
 .icon-button,
