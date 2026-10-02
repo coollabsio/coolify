@@ -231,7 +231,10 @@ class Gitlab extends Controller
                     'skip_deploy' => $skip_deploy_pr,
                 ] = $this->readMergeRequestPayload($payload);
 
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $applications->get();
 
                 foreach ($applications as $application) {
                     if (! $application->destination->server->isFunctional()) {
@@ -444,7 +447,10 @@ class Gitlab extends Controller
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
