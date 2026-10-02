@@ -272,13 +272,13 @@ class ServicesController extends Controller
             : [];
 
         foreach ($projects as $project) {
-            $services->push($project->services()->with($serviceRelations)->get());
-        }
-        foreach ($services as $service) {
-            $service = $this->removeSensitiveData($service);
+            $services = $services->merge(
+                $project->services()->with($serviceRelations)->get()
+                    ->map(fn (Service $service) => $this->removeSensitiveData($service))
+            );
         }
 
-        return response()->json($services->flatten());
+        return response()->json($services->values());
     }
 
     #[OA\Post(

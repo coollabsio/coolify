@@ -184,42 +184,54 @@ class EnvironmentVariable extends BaseModel
     public function realValue(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                if (! $this->relationLoaded('resourceable')) {
-                    $this->load('resourceable');
-                }
-                $resource = $this->resourceable;
-                if (! $resource) {
-                    return null;
-                }
-
-                // Load relationships needed for shared variable resolution
-                if (! $resource->relationLoaded('environment')) {
-                    $resource->load('environment');
-                }
-                if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
-                    $resource->load('server');
-                }
-                if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
-                    $resource->load('destination.server');
-                }
-
-                $real_value = $this->get_real_environment_variables($this->value, $resource);
-
-                // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
-                if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
-                    return $real_value;
-                }
-
-                if ($this->is_literal || $this->is_multiline) {
-                    $real_value = '\''.$real_value.'\'';
-                } else {
-                    $real_value = escapeEnvVariables($real_value);
-                }
-
-                return $real_value;
-            }
+            get: fn () => $this->resolveRealValue(),
         );
+    }
+
+    /**
+     * Resolved value for display and copy. References to locked shared variables keep their
+     * reference text, so the UI never reveals a value that is only shown once.
+     */
+    public function displayRealValue(): ?string
+    {
+        return $this->resolveRealValue(revealLockedSharedVariables: false);
+    }
+
+    private function resolveRealValue(bool $revealLockedSharedVariables = true): ?string
+    {
+        if (! $this->relationLoaded('resourceable')) {
+            $this->load('resourceable');
+        }
+        $resource = $this->resourceable;
+        if (! $resource) {
+            return null;
+        }
+
+        // Load relationships needed for shared variable resolution
+        if (! $resource->relationLoaded('environment')) {
+            $resource->load('environment');
+        }
+        if (! $resource->relationLoaded('server') && method_exists($resource, 'server')) {
+            $resource->load('server');
+        }
+        if (! $resource->relationLoaded('destination') && method_exists($resource, 'destination')) {
+            $resource->load('destination.server');
+        }
+
+        $real_value = $this->get_real_environment_variables_internal($this->value, $resource, null, $revealLockedSharedVariables);
+
+        // Skip escaping for valid JSON objects/arrays to prevent quote corruption (see #6160)
+        if (json_validate($real_value) && (str_starts_with($real_value, '{') || str_starts_with($real_value, '['))) {
+            return $real_value;
+        }
+
+        if ($this->is_literal || $this->is_multiline) {
+            $real_value = '\''.$real_value.'\'';
+        } else {
+            $real_value = escapeEnvVariables($real_value);
+        }
+
+        return $real_value;
     }
 
     protected function isReallyRequired(): Attribute
@@ -267,9 +279,9 @@ class EnvironmentVariable extends BaseModel
         return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
-    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
+    public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null, bool $revealLockedSharedVariables = true)
     {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server);
+        return $this->get_real_environment_variables_internal($environment_variable, $resource, $server, $revealLockedSharedVariables);
     }
 
     public function getResolvedValueWithServer($server = null)
@@ -351,12 +363,7 @@ class EnvironmentVariable extends BaseModel
             ->first()?->value ?? $value;
     }
 
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
-    {
-        return $this->get_real_environment_variables_internal($environment_variable, $resource);
-    }
-
-    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null)
+    private function get_real_environment_variables_internal(?string $environment_variable = null, $resource = null, $serverOverride = null, bool $revealLockedSharedVariables = true)
     {
         if (is_null($environment_variable) || $environment_variable === '' || is_null($resource)) {
             return $environment_variable;
@@ -396,7 +403,7 @@ class EnvironmentVariable extends BaseModel
                 ->where('team_id', $resource->team()->id)
                 ->where("{$type}_id", $id)
                 ->first();
-            if ($found) {
+            if ($found && ($revealLockedSharedVariables || ! $found->is_shown_once)) {
                 $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $found->value);
             }
         }

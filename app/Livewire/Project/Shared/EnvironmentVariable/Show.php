@@ -184,6 +184,7 @@ class Show extends Component
         return $this->env->get_real_environment_variables_with_server(
             $this->env->resolveReferencedValue(),
             $this->env->resourceable,
+            revealLockedSharedVariables: false,
         );
     }
 
@@ -250,7 +251,9 @@ class Show extends Component
         $this->is_shared = (bool) ($this->env->is_shared ?? false);
 
         if ($this->is_shared) {
-            $this->real_value = $this->env->real_value;
+            $this->real_value = $this->env instanceof ModelsEnvironmentVariable
+                ? $this->env->displayRealValue()
+                : $this->env->real_value;
             $this->is_really_required = $this->is_required && blank($this->real_value);
         } else {
             $this->real_value = null;

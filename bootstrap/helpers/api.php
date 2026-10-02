@@ -7,6 +7,7 @@ use App\Enums\StaticImageTypes;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
+use App\Models\EnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -42,7 +44,7 @@ function serializeApiResponse($data)
 {
     if ($data instanceof Collection) {
         return $data->map(function ($d) {
-            $d = collect($d)->sortKeys();
+            $d = collect(apiEnvironmentVariableDisplayValue($d))->sortKeys();
             $created_at = data_get($d, 'created_at');
             $updated_at = data_get($d, 'updated_at');
             if ($created_at) {
@@ -67,10 +69,10 @@ function serializeApiResponse($data)
                 $d = $d->prepend($d['id'], 'id');
             }
 
-            return $d;
+            return removeServerProxySecretsFromApiPayload($d);
         });
     } else {
-        $d = collect($data)->sortKeys();
+        $d = collect(apiEnvironmentVariableDisplayValue($data))->sortKeys();
         $created_at = data_get($d, 'created_at');
         $updated_at = data_get($d, 'updated_at');
         if ($created_at) {
@@ -95,8 +97,69 @@ function serializeApiResponse($data)
             $d = $d->prepend($d['id'], 'id');
         }
 
-        return $d;
+        return removeServerProxySecretsFromApiPayload($d);
     }
+}
+
+/**
+ * Serialize an environment variable with its display value, so a reference to a
+ * locked shared variable keeps its reference text instead of the locked value.
+ */
+function apiEnvironmentVariableDisplayValue(mixed $data): mixed
+{
+    if (! $data instanceof EnvironmentVariable || in_array('real_value', $data->getHidden(), true)) {
+        return $data;
+    }
+
+    return [...$data->toArray(), 'real_value' => $data->displayRealValue()];
+}
+
+/**
+ * Remove the saved proxy configuration and validation logs from every
+ * serialized server in an API payload, including nested ones such as
+ * `destination.server`, unless the token can read sensitive data.
+ * The saved proxy configuration often contains DNS provider API tokens.
+ *
+ * @template T
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return $payload;
+    }
+
+    return removeServerProxySecrets($payload);
+}
+
+/**
+ * @template T
+ *
+ * @param  T  $value
+ * @return T
+ */
+function removeServerProxySecrets(mixed $value): mixed
+{
+    if (! is_array($value) && ! $value instanceof SupportCollection) {
+        return $value;
+    }
+
+    $proxy = $value['proxy'] ?? null;
+    if (is_array($proxy)) {
+        unset($proxy['last_saved_proxy_configuration']);
+        $value['proxy'] = $proxy;
+        unset($value['validation_logs']);
+    }
+
+    foreach ($value as $key => $item) {
+        if (is_array($item) || $item instanceof SupportCollection) {
+            $value[$key] = removeServerProxySecrets($item);
+        }
+    }
+
+    return $value;
 }
 
 /**
