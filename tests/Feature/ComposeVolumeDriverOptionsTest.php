@@ -90,6 +90,21 @@ volumes:
   app-data: {}
 YAML;
 
+const DRIVER_OPTIONS_TMPFS_COMPOSE = <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - 'opts:/data'
+volumes:
+  opts:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=100m
+YAML;
+
 beforeEach(function () {
     Server::flushIdentityMap();
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
@@ -173,6 +188,22 @@ function expectedDriverOptionsVolume(string $name): array
 }
 
 /**
+ * The declaration of a preview volume: the bind device of the production volume is not shared.
+ *
+ * @return array<string, mixed>
+ */
+function expectedPreviewDriverOptionsVolume(string $name): array
+{
+    return [
+        'driver' => 'local',
+        'labels' => [
+            'com.example.purpose' => 'host-folder',
+        ],
+        'name' => $name,
+    ];
+}
+
+/**
  * @param  array<int, mixed>  $volumes
  * @return list<string>
  */
@@ -208,7 +239,8 @@ describe('applicationParser', function () {
         'long syntax' => [DRIVER_OPTIONS_LONG_COMPOSE],
     ]);
 
-    it('keeps driver options on the preview volume', function () {
+    it('does not bind the preview volume to the host folder of the production volume', function () {
+        // A preview volume with the same bind device would mount the production data.
         $application = driverOptionsApplication(DRIVER_OPTIONS_SHORT_COMPOSE);
         $uuid = $application->uuid;
         $preview = driverOptionsPreview($application);
@@ -217,7 +249,21 @@ describe('applicationParser', function () {
         $name = addPreviewDeploymentSuffix("{$uuid}_opts", 42);
 
         expect(driverOptionsVolumeSources($parsed['services']['web-pr-42']['volumes']))->toBe([$name])
-            ->and($parsed['volumes'][$name])->toBe(expectedDriverOptionsVolume($name));
+            ->and($parsed['volumes'][$name])->toBe(expectedPreviewDriverOptionsVolume($name));
+    });
+
+    it('keeps tmpfs driver options on the preview volume', function () {
+        $application = driverOptionsApplication(DRIVER_OPTIONS_TMPFS_COMPOSE);
+        $preview = driverOptionsPreview($application);
+        $name = addPreviewDeploymentSuffix("{$application->uuid}_opts", 42);
+
+        $parsed = applicationParser($application, 42, $preview->id)->toArray();
+
+        expect($parsed['volumes'][$name])->toBe([
+            'driver' => 'local',
+            'driver_opts' => ['type' => 'tmpfs', 'device' => 'tmpfs', 'o' => 'size=100m'],
+            'name' => $name,
+        ]);
     });
 
     it('replaces the name of the declaration with the renamed volume', function () {
@@ -349,7 +395,9 @@ describe('volumes created before driver options were kept', function () {
         expect($parsed['volumes'][$name])->toBe(['name' => $name]);
     });
 
-    it('keeps driver options on a new preview volume of an existing application', function () {
+    it('applies the preview driver options to a new preview volume of an existing application', function () {
+        // The new preview volume is a new Docker volume, so the flag of the production volume does not apply;
+        // the bind device of the production volume is still not shared with the preview.
         $application = driverOptionsApplication(DRIVER_OPTIONS_SHORT_COMPOSE);
         applicationParser($application);
         markVolumesAsCreatedBeforeDriverOptions();
@@ -358,7 +406,7 @@ describe('volumes created before driver options were kept', function () {
 
         $parsed = applicationParser($application->fresh(), 42, $preview->id)->toArray();
 
-        expect($parsed['volumes'][$name])->toBe(expectedDriverOptionsVolume($name));
+        expect($parsed['volumes'][$name])->toBe(expectedPreviewDriverOptionsVolume($name));
     });
 
     it('keeps the name-only declaration of an existing service volume', function () {
