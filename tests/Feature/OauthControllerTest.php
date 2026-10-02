@@ -386,8 +386,36 @@ it('links a user from before the upgrade without an email verification claim', f
 })->with([
     'discord unverified, user created by OAuth' => ['discord', ['verified' => false], null],
     'authentik default email scope, user created by OAuth' => ['authentik', ['email_verified' => false], null],
-    'discord unverified, user with a password' => ['discord', ['verified' => false], 'password'],
-    'authentik default email scope, user with a password' => ['authentik', ['email_verified' => false], 'password'],
+]);
+
+it('does not link an unverified provider email to a flagged user who has a password', function (string $provider, array $rawClaims) {
+    // A pre-upgrade OAuth user who set a password (for example through a password
+    // reset) before the first OAuth login, or a password user on an instance that
+    // ran the first version of the migration.
+    $user = User::factory()->create([
+        'email' => 'legacy@example.com',
+        'password' => 'password',
+        'created_before_oauth_identities' => true,
+    ]);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+    ]);
+
+    expect(fn () => app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'legacy@example.com',
+        'name' => 'Attacker',
+        'id' => 'attacker-provider-id',
+        'user' => $rawClaims,
+    ], $setting))->toThrow(HttpException::class, 'OAuth provider did not verify the email address');
+
+    expect(OauthIdentity::count())->toBe(0);
+    $this->assertGuest();
+})->with([
+    'discord unverified' => ['discord', ['verified' => false]],
+    'authentik default email scope' => ['authentik', ['email_verified' => false]],
 ]);
 
 it('does not link a second provider to a user from before the upgrade', function () {
@@ -806,3 +834,32 @@ describe('callback error messages', function () {
         $this->assertGuest();
     });
 });
+
+it('matches the Google hosted domain without case or spaces and accepts any Workspace for a wildcard', function (string $tenant, ?string $hostedDomain, bool $allowed) {
+    $user = User::factory()->create(['email' => 'user@example.com']);
+    $setting = OauthSetting::where('provider', 'google')->firstOrFail();
+    $setting->update(['tenant' => $tenant]);
+    $claims = array_filter(['email_verified' => true, 'hd' => $hostedDomain], fn ($value) => $value !== null);
+
+    $login = fn () => app(OauthLoginService::class)->login('google', (object) [
+        'email' => $user->email,
+        'name' => 'Workspace User',
+        'id' => 'google-workspace-id',
+        'user' => $claims,
+    ], $setting);
+
+    if ($allowed) {
+        expect($login()->is($user))->toBeTrue();
+    } else {
+        expect($login)->toThrow(HttpException::class, 'Google account is not in the configured Workspace');
+        $this->assertGuest();
+    }
+})->with([
+    'mixed-case tenant' => ['Example.com', 'example.com', true],
+    'tenant with spaces' => [' example.com ', 'example.com', true],
+    'mixed-case hd claim' => ['example.com', 'EXAMPLE.com', true],
+    'wildcard with a Workspace account' => ['*', 'any-company.example', true],
+    'wildcard with a personal account' => ['*', null, false],
+    'other domain' => ['example.com', 'example.org', false],
+    'personal account' => ['example.com', null, false],
+]);

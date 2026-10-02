@@ -101,7 +101,7 @@ class OauthLoginService
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
 
-        if ($provider === 'google' && filled($oauthSetting->tenant) && data_get($rawClaims, 'hd') !== $oauthSetting->tenant) {
+        if ($provider === 'google' && ! $this->isInGoogleWorkspace($oauthSetting->tenant, data_get($rawClaims, 'hd'))) {
             throw new HttpException(403, 'Google account is not in the configured Workspace');
         }
 
@@ -134,9 +134,11 @@ class OauthLoginService
 
                 // Before OAuth identities existed, OAuth sign-in matched users by email only.
                 // Users from that time keep signing in without email delivery, so their
-                // first identity links without a provider verification claim. This check
-                // runs first, so an unverified email cannot reveal a linked account.
-                if ($user?->created_before_oauth_identities !== true && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
+                // first identity links without a provider verification claim. A user who
+                // has a password never gets this exemption. This check runs first, so an
+                // unverified email cannot reveal a linked account.
+                $isPreUpgradeOauthUser = $user?->created_before_oauth_identities === true && ! $user->hasPassword();
+                if (! $isPreUpgradeOauthUser && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
                     throw new OauthLoginException('OAuth provider did not verify the email address', 'auth.failed.oauth_email_unverified');
                 }
 
@@ -171,6 +173,25 @@ class OauthLoginService
         } catch (UniqueConstraintViolationException $exception) {
             return OauthIdentity::where($identityKey)->first()?->user ?? throw $exception;
         }
+    }
+
+    /**
+     * An empty hosted domain allows every Google account. A "*" allows any
+     * Workspace account. Domains are compared without case and spaces.
+     */
+    private function isInGoogleWorkspace(?string $hostedDomain, mixed $hdClaim): bool
+    {
+        $hostedDomain = strtolower(trim((string) $hostedDomain));
+        if ($hostedDomain === '') {
+            return true;
+        }
+
+        $hdClaim = is_string($hdClaim) ? strtolower(trim($hdClaim)) : '';
+        if ($hdClaim === '') {
+            return false;
+        }
+
+        return $hostedDomain === '*' || $hdClaim === $hostedDomain;
     }
 
     /**

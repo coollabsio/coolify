@@ -97,7 +97,7 @@
                         @if ($provider === 'google')
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.tenant"
-                                helper="Optional hosted domain supplied to Google as a login hint."
+                                helper="Optional Google Workspace domain, for example example.com. Only accounts from this domain can sign in. Use * to allow any Workspace account but no personal Google accounts."
                                 label="Hosted domain" />
                         @endif
 
