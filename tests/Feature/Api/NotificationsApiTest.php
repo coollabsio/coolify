@@ -192,6 +192,31 @@ describe('PATCH /api/v1/notifications/*', function () {
             ->and($settings->deployment_failure_email_notifications)->toBeFalse();
     });
 
+    test('updates the deployment commit details email setting', function () {
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->getJson('/api/v1/notifications/email')
+            ->assertSuccessful()
+            ->assertJsonPath('deployment_commit_details_email_notifications', false);
+
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/email', [
+                'deployment_commit_details_email_notifications' => true,
+            ])
+            ->assertSuccessful()
+            ->assertJsonPath('deployment_commit_details_email_notifications', true);
+
+        expect(EmailNotificationSettings::query()->where('team_id', $this->team->id)->value('deployment_commit_details_email_notifications'))->toBeTruthy();
+    });
+
+    test('validates the deployment commit details email setting', function () {
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/email', [
+                'deployment_commit_details_email_notifications' => 'not-a-boolean',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('deployment_commit_details_email_notifications');
+    });
+
     test('validates the smtp ehlo domain', function () {
         $this->withHeaders(authHeaders($this->bearerToken))
             ->patchJson('/api/v1/notifications/email', [

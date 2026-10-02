@@ -6,6 +6,7 @@ Pull request #{{ $pull_request_id }} of {{ $name }} deployed successfully
 [{{ $fqdn }}]({{ $fqdn }}).
 @endif
 
+<x-emails.deployment-commit :commit="$commit ?? null" />
 [View Deployment Logs]({{ $deployment_url }})
 
 </x-emails.layout>
