@@ -78,7 +78,7 @@ class Create extends Component
                 ]);
             }
             if ($type->startsWith('one-click-service-')) {
-                $oneClickServiceName = $type->after('one-click-service-')->value();
+                $oneClickServiceName = resolve_service_template_key($type->after('one-click-service-')->value(), $services);
                 $oneClickService = data_get($services, "$oneClickServiceName.compose");
                 $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
                 if ($oneClickDotEnvs) {

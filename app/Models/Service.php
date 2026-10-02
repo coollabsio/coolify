@@ -1463,7 +1463,7 @@ class Service extends BaseModel
     public function documentation()
     {
         $services = get_service_templates();
-        $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+        $service = data_get($services, resolve_service_template_key(str($this->name)->beforeLast('-')->value, $services), []);
 
         return data_get($service, 'documentation', config('constants.urls.docs'));
     }
@@ -1478,7 +1478,7 @@ class Service extends BaseModel
             if (blank($this->service_type)) {
                 return null;
             }
-            $serviceName = $this->service_type;
+            $serviceName = resolve_service_template_key($this->service_type, $services);
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 

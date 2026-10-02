@@ -507,6 +507,9 @@ class ServicesController extends Controller
             }
         }
         $services = get_service_templates();
+        if (filled($request->type)) {
+            $request->offsetSet('type', resolve_service_template_key($request->type, $services));
+        }
         $serviceKeys = $services->keys();
         if ($serviceKeys->contains($request->type)) {
             $oneClickServiceName = $request->type;

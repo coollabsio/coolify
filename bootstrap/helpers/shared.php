@@ -1568,6 +1568,24 @@ function get_service_templates(bool $force = false): Collection
     });
 }
 
+/**
+ * The template key for a service type. A renamed template keeps its old key as an alias, so API callers
+ * and services stored with the old key still find the template. A key that the templates contain is
+ * returned as is.
+ */
+function resolve_service_template_key(?string $type, ?Collection $templates = null): ?string
+{
+    $aliases = [
+        'denoKV' => 'deno-kv',
+    ];
+    if (blank($type) || ! isset($aliases[$type])) {
+        return $type;
+    }
+    $templates ??= get_service_templates();
+
+    return $templates->has($type) ? $type : $aliases[$type];
+}
+
 function getResourceByUuid(string $uuid, ?int $teamId = null)
 {
     if (is_null($teamId)) {
