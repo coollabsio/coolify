@@ -38,12 +38,12 @@ for COOLIFY_DIRECTORY in /data/coolify /data/coolify/{applications,databases,bac
         chmod 700 "$COOLIFY_DIRECTORY"
     fi
 done
-mkdir -p /data/coolify/source /data/coolify/ssh/{keys,mux}
+mkdir -p /data/coolify/source /data/coolify/images /data/coolify/ssh/{keys,mux}
 
 # Coolify's own directories, used by the coolify container (UID 9999)
 set_coolify_directory_permissions() {
-    chown -R 9999:root /data/coolify/{source,ssh}
-    chmod -R 700 /data/coolify/{source,ssh}
+    chown -R 9999:root /data/coolify/{source,ssh,images}
+    chmod -R 700 /data/coolify/{source,ssh,images}
 }
 
 set_coolify_directory_permissions
@@ -289,11 +289,21 @@ if [ -n "${DOCKER_ADDRESS_POOL_SIZE+x}" ]; then
     DOCKER_POOL_SIZE_PROVIDED=true
 fi
 
+# OpenRC (Alpine) returns from "service docker start" before the daemon accepts connections
+wait_for_docker_daemon() {
+    for _ in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 restart_docker_service() {
     # Check if systemctl is available
     if command -v systemctl >/dev/null 2>&1; then
-        systemctl restart docker
-        if [ $? -eq 0 ]; then
+        if systemctl restart docker && wait_for_docker_daemon; then
             echo " - Docker daemon restarted successfully"
         else
             echo " - Failed to restart Docker daemon"
@@ -301,8 +311,7 @@ restart_docker_service() {
         fi
     # Check if service command is available
     elif command -v service >/dev/null 2>&1; then
-        service docker restart
-        if [ $? -eq 0 ]; then
+        if service docker restart && wait_for_docker_daemon; then
             echo " - Docker daemon restarted successfully"
         else
             echo " - Failed to restart Docker daemon"
@@ -803,7 +812,8 @@ fi
 
 # Verify minimum Docker version
 MIN_DOCKER_VERSION=24
-INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1)
+wait_for_docker_daemon || true
+INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1 || true)
 if [ -z "$INSTALLED_DOCKER_VERSION" ]; then
     warn "Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
 elif [ "$INSTALLED_DOCKER_VERSION" -lt "$MIN_DOCKER_VERSION" ]; then
