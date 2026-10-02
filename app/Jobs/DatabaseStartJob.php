@@ -14,6 +14,7 @@ use App\Actions\Database\StartSqlite;
 use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
 use App\Exceptions\DatabaseStartException;
+use App\Exceptions\RemoteSecretException;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -142,7 +143,9 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
 
             ResourceStartActivity::markFailed(
                 $activity,
-                $exception instanceof DatabaseStartException ? $exception->getMessage() : 'Database start failed.',
+                $exception instanceof DatabaseStartException || $exception instanceof RemoteSecretException
+                    ? $exception->getMessage()
+                    : 'Database start failed.',
             );
         } finally {
             event(new DatabaseStatusChanged($this->userId));

@@ -1605,7 +1605,7 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$this->resolveSecretManagerEnvironmentVariable($env)}");
+            $envs->push("{$env->key}={$this->resolveSecretManagerDotenvValue($env)}");
         }
         if ($envs->count() === 0) {
             $commands[] = "touch {$environmentFile}";

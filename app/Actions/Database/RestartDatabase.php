@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\RemoteSecretException;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -48,6 +49,12 @@ class RestartDatabase
             $prerequisiteError = StartDatabase::prerequisiteError($database);
             if ($prerequisiteError !== null) {
                 return $prerequisiteError;
+            }
+            // Check remote secrets before stopping: if the secret manager fails, the database keeps running.
+            try {
+                $database->ensureRemoteSecretsResolvable($database->runtime_environment_variables()->get());
+            } catch (RemoteSecretException $e) {
+                return $e->getMessage();
             }
             StopDatabase::run($database, dockerCleanup: false);
             // The stop can take a while; keep the reservation for the start that follows.

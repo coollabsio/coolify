@@ -24,6 +24,9 @@ class StartService
     public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
         $service->parse();
+        // Fetch remote secrets before stopping: if the secret manager fails, the service keeps running.
+        // saveComposeConfigs() below reuses the fetched secrets.
+        $service->ensureRemoteSecretsResolvable($service->environment_variables()->get());
         if ($this->shouldStopBeforeStarting($pullLatestImages, $stopBeforeStart)) {
             StopService::run(service: $service, dockerCleanup: false);
         }

@@ -22,6 +22,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Support\RemoteSecretReferences;
+use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -1632,12 +1633,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function format_remote_secret_value(string $value): string
     {
-        if (! str_contains($value, "'")) {
-            return "'".$value."'";
-        }
-
-        // Fall back to double quotes; $$ escapes compose interpolation.
-        return '"'.str_replace(['\\', '"', '$'], ['\\\\', '\\"', '$$'], $value).'"';
+        return RemoteSecretValueFormatter::dotenv($value);
     }
 
     private function generate_runtime_environment_variables()

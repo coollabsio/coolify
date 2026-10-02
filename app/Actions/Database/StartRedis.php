@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
+use App\Models\EnvironmentVariable;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
 use App\Traits\ExecutesDatabaseStartCommands;
@@ -252,7 +253,7 @@ class StartRedis
                 $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->resolvedRedisPassword = $this->redisPasswordForComposeFile($env);
 
                     if (! $usesSecretManager) {
                         $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
@@ -274,7 +275,7 @@ class StartRedis
                 }
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->resolvedRedisPassword = $this->redisPasswordForComposeFile($env);
                 } elseif ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
                 }
@@ -286,6 +287,17 @@ class StartRedis
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
+    }
+
+    /**
+     * The password is placed directly in the compose command, so a remote secret value is escaped
+     * the same way as its environment entry. Other values stay unchanged.
+     */
+    private function redisPasswordForComposeFile(EnvironmentVariable $env): ?string
+    {
+        $value = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+        return $value === null ? null : $this->database->formatComposeFileValue($env, $value);
     }
 
     private function buildStartCommand(): string

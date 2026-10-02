@@ -158,11 +158,13 @@ class StartClickhouse
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'CLICKHOUSE_USER') {
-                $this->resolvedClickhouseUser = $rawValue;
+                $this->resolvedClickhouseUser = $composeFileValue;
             } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
-                $this->resolvedClickhousePassword = $rawValue;
+                $this->resolvedClickhousePassword = $composeFileValue;
             }
         }
 
