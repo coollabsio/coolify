@@ -1,0 +1,25 @@
+# documentation: https://altcha.org/docs/v2/sentinel/install/docker
+# slogan: ALTCHA Sentinel protects websites and APIs from spam, bots, and abuse.
+# category: security
+# tags: captcha, anti-spam, bot protection, privacy, security
+# logo: svgs/altcha.svg
+# port: 8080
+
+services:
+  altcha:
+    image: 'ghcr.io/altcha-org/sentinel:${ALTCHA_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_ALTCHA_8080
+    volumes:
+      - altcha-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "grep -q ':1F90 ' /proc/net/tcp /proc/net/tcp6"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  altcha-data:
