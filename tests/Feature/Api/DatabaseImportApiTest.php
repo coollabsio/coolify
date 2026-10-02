@@ -26,7 +26,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user, ['role' => 'owner']);
     session(['currentTeam' => $this->team]);
-    $this->token = $this->user->tokens()->create(['name' => 'imports', 'token' => hash('sha256', 'secret'), 'abilities' => ['deploy', 'read'], 'team_id' => $this->team->id]);
+    $this->token = $this->user->tokens()->create(['name' => 'imports', 'token' => hash('sha256', 'secret'), 'abilities' => ['write', 'read'], 'team_id' => $this->team->id]);
     $this->headers = ['Authorization' => 'Bearer '.$this->token->id.'|secret'];
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
     $this->destination = StandaloneDocker::firstOrCreate(['server_id' => $this->server->id, 'network' => 'coolify'], ['uuid' => (string) Str::uuid(), 'name' => 'docker']);
@@ -48,7 +48,7 @@ test('validates standalone import source and hides foreign databases', function 
     $this->withHeaders($this->headers)->postJson("/api/v1/databases/{$foreign->uuid}/imports", ['source' => 'server', 'path' => '/tmp/a.sql'])->assertNotFound();
 });
 
-test('requires deploy ability to start standalone import', function () {
+test('requires write ability to start standalone import', function () {
     $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
     $read = $this->user->createToken('read', ['read']);
 
@@ -149,7 +149,7 @@ test('returns invalid token when the access token team is not a member team', fu
     $token = $this->user->tokens()->create([
         'name' => 'imports-foreign-team',
         'token' => hash('sha256', $plainTextToken),
-        'abilities' => ['deploy', 'read'],
+        'abilities' => ['write', 'read'],
         'team_id' => $foreignTeam->id,
     ]);
 
