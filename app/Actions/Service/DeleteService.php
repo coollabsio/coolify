@@ -20,29 +20,60 @@ class DeleteService
 
         $this->removeContainers($service);
 
-        if ($deleteVolumes) {
-            $commands = [];
-            foreach ($service->applications()->get() as $application) {
-                foreach ($application->persistentStorages()->get() as $storage) {
-                    $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
-                }
-            }
-            foreach ($service->databases()->get() as $database) {
-                foreach ($database->persistentStorages()->get() as $storage) {
-                    $commands[] = 'docker volume rm -f '.escapeshellarg($storage->name);
-                }
-            }
-            foreach ($commands as $command) {
-                instant_remote_process([$command], $server);
-            }
-        }
+        $failedVolumes = $deleteVolumes ? $this->removeVolumes($service) : [];
 
         if ($deleteConnectedNetworks) {
             $service->deleteConnectedNetworks();
         }
+        // The configuration directory holds the .env file with plaintext secrets, so it is removed
+        // also when a volume could not be removed.
         if ($deleteConfigurations) {
             $service->deleteConfigurations();
         }
+
+        if ($failedVolumes !== []) {
+            Log::warning('Could not remove all volumes of a deleted service.', [
+                'service_uuid' => $service->uuid,
+                'server_uuid' => $server->uuid,
+                'volumes' => $failedVolumes,
+            ]);
+
+            throw new RuntimeException('Could not remove these volumes: '.collect($failedVolumes)
+                ->map(fn (string $error, string $volume): string => "{$volume} ({$error})")
+                ->implode(', '));
+        }
+    }
+
+    /**
+     * Removes every volume of the service. A volume that cannot be removed (for example because
+     * another container still uses it) does not stop the removal of the others.
+     *
+     * @return array<string, string> The error message of each volume that could not be removed.
+     */
+    private function removeVolumes(Service $service): array
+    {
+        $volumeNames = [];
+        foreach ($service->applications()->get() as $application) {
+            foreach ($application->persistentStorages()->get() as $storage) {
+                $volumeNames[] = $storage->name;
+            }
+        }
+        foreach ($service->databases()->get() as $database) {
+            foreach ($database->persistentStorages()->get() as $storage) {
+                $volumeNames[] = $storage->name;
+            }
+        }
+
+        $failedVolumes = [];
+        foreach ($volumeNames as $volumeName) {
+            try {
+                instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $service->server);
+            } catch (Throwable $e) {
+                $failedVolumes[$volumeName] = $e->getMessage();
+            }
+        }
+
+        return $failedVolumes;
     }
 
     /**

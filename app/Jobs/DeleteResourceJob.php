@@ -11,6 +11,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -28,6 +29,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -55,6 +57,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->deleteFromCoolifyOnly && $this->resource instanceof Service) {
+            // No remote calls on this path: remove only the schedule records, so the scheduler does
+            // not keep running backups of volumes that no longer exist in Coolify.
+            $this->volumeBackupSchedules()->each->delete();
             $this->deleteLocalResource();
 
             return;
@@ -170,19 +175,24 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     private function deleteScheduledVolumeBackups(): void
     {
         $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+
+        foreach ($this->volumeBackupSchedules() as $backup) {
+            DeleteScheduledVolumeBackup::run($backup, $server);
+        }
+    }
+
+    /**
+     * @return Collection<int, ScheduledVolumeBackup>
+     */
+    private function volumeBackupSchedules(): Collection
+    {
         $resources = $this->resource instanceof Service
             ? $this->resource->applications()->get()->concat($this->resource->databases()->get())
             : collect([$this->resource]);
 
-        foreach ($resources as $resource) {
-            $storages = $resource->persistentStorages()->get()->concat($resource->fileStorages()->get());
-
-            foreach ($storages as $storage) {
-                foreach ($storage->scheduledBackups()->get() as $backup) {
-                    DeleteScheduledVolumeBackup::run($backup, $server);
-                }
-            }
-        }
+        return $resources->flatMap(fn ($resource) => $resource->persistentStorages()->get()
+            ->concat($resource->fileStorages()->get())
+            ->flatMap(fn ($storage) => $storage->scheduledBackups()->get()));
     }
 
     private function deleteApplicationPreview(): void

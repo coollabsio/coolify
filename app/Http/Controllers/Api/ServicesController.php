@@ -1054,7 +1054,8 @@ class ServicesController extends Controller
 
         $service->delete();
 
-        $deleteFromCoolifyOnly = $request->boolean('delete_from_coolify_only') || ! $service->server?->isFunctional();
+        $deleteFromCoolifyOnlyRequested = $request->boolean('delete_from_coolify_only');
+        $deleteFromCoolifyOnly = $deleteFromCoolifyOnlyRequested || ! $service->server?->isFunctional();
 
         DeleteResourceJob::dispatch(
             resource: $service,
@@ -1072,11 +1073,13 @@ class ServicesController extends Controller
             'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
-        return response()->json([
-            'message' => $deleteFromCoolifyOnly
-                ? 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.'
-                : 'Service deletion request queued.',
-        ]);
+        $message = match (true) {
+            $deleteFromCoolifyOnlyRequested => 'The service will be removed from Coolify only; Docker resources will remain.',
+            $deleteFromCoolifyOnly => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+            default => 'Service deletion request queued.',
+        };
+
+        return response()->json(['message' => $message]);
     }
 
     #[OA\Patch(
