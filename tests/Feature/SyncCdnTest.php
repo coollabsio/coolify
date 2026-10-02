@@ -1,19 +1,19 @@
 <?php
 
-use App\Console\Commands\SyncBunny;
+use App\Console\Commands\SyncCdn;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 
-function createFakeSyncBunnyBinary(string $binDir, string $name, string $contents): void
+function createFakeSyncCdnBinary(string $binDir, string $name, string $contents): void
 {
     file_put_contents("{$binDir}/{$name}", $contents);
     chmod("{$binDir}/{$name}", 0755);
 }
 
-it('only exposes the BunnyCDN legacy sync option', function () {
-    $definition = Artisan::all()['sync:bunny']->getDefinition();
+it('does not expose the removed sync options', function () {
+    $definition = Artisan::all()['sync:cdn']->getDefinition();
 
-    expect($definition->hasOption('bunny'))->toBeTrue()
+    expect($definition->hasOption('bunny'))->toBeFalse()
         ->and($definition->hasOption('github-releases'))->toBeFalse()
         ->and($definition->hasOption('release'))->toBeFalse()
         ->and($definition->hasOption('nightly'))->toBeFalse()
@@ -26,7 +26,7 @@ it('loads service templates from the Coollabs CDN', function () {
 });
 
 it('only removes validated Coolify CDN temporary directories', function () {
-    $command = new class extends SyncBunny
+    $command = new class extends SyncCdn
     {
         public function removeDirectory(string $path): void
         {
@@ -49,89 +49,28 @@ it('only removes validated Coolify CDN temporary directories', function () {
     rmdir($invalidDirectory);
 });
 
-it('syncs full files to BunnyCDN only when explicitly requested', function () {
-    Http::fake([
-        'https://cdn.coollabs.io/coolify/*' => Http::response('', 404),
-        'https://storage.bunnycdn.com/*' => Http::response([], 201),
-        'https://api.bunny.net/purge*' => Http::response([], 200),
-    ]);
-
-    $binDir = sys_get_temp_dir().'/sync-bunny-bin-'.uniqid();
-    $logFile = sys_get_temp_dir().'/sync-bunny-'.uniqid().'.log';
-
-    mkdir($binDir, 0755, true);
-
-    createFakeSyncBunnyBinary($binDir, 'gh', <<<'SH'
-#!/bin/sh
-printf 'gh %s\n' "$*" >> "$SYNC_BUNNY_TEST_LOG"
-if [ "$1" = "repo" ] && [ "$2" = "clone" ]; then
-    mkdir -p "$4/scripts"
-fi
-exit 0
-SH);
-
-    createFakeSyncBunnyBinary($binDir, 'git', <<<'SH'
-#!/bin/sh
-printf 'git %s\n' "$*" >> "$SYNC_BUNNY_TEST_LOG"
-if [ "$1" = "status" ]; then
-    printf 'M scripts/upgrade-postgres.sh\n'
-fi
-exit 0
-SH);
-
-    $originalPath = getenv('PATH') ?: '';
-    putenv("PATH={$binDir}:{$originalPath}");
-    putenv("SYNC_BUNNY_TEST_LOG={$logFile}");
-
-    try {
-        $this->artisan('sync:bunny --bunny')
-            ->expectsChoice('Which environment would you like to sync?', 'production', [
-                'production' => 'Production',
-                'nightly' => 'Nightly',
-            ])
-            ->expectsConfirmation('Are you sure you want to sync?', 'yes')
-            ->assertExitCode(0);
-    } finally {
-        putenv("PATH={$originalPath}");
-        putenv('SYNC_BUNNY_TEST_LOG');
-    }
-
-    $log = file_exists($logFile) ? file_get_contents($logFile) : '';
-
-    expect($log)
-        ->not->toContain('gh repo clone')
-        ->not->toContain('gh pr create')
-        ->not->toContain('coollabsio/coolify-cdn');
-
-    Http::assertSent(fn ($request) => $request->method() === 'PUT'
-        && $request->url() === 'https://storage.bunnycdn.com/coolcdn/coolify/upgrade-postgres.sh');
-
-    Http::assertSent(fn ($request) => str_starts_with($request->url(), 'https://api.bunny.net/purge')
-        && $request['url'] === 'https://cdn.coollabs.io/coolify/upgrade-postgres.sh');
-});
-
 it('selects the environment and release files to sync to GitHub', function (string $targetDirectory, string $environment, array $selectedBasenames) {
     Http::fake([
         'api.github.com/repos/coollabsio/coolify/releases*' => Http::response([], 200),
     ]);
 
-    $binDir = sys_get_temp_dir().'/sync-bunny-bin-'.uniqid();
-    $logFile = sys_get_temp_dir().'/sync-bunny-'.uniqid().'.log';
+    $binDir = sys_get_temp_dir().'/sync-cdn-bin-'.uniqid();
+    $logFile = sys_get_temp_dir().'/sync-cdn-'.uniqid().'.log';
 
     mkdir($binDir, 0755, true);
 
-    createFakeSyncBunnyBinary($binDir, 'gh', <<<'SH'
+    createFakeSyncCdnBinary($binDir, 'gh', <<<'SH'
 #!/bin/sh
-printf 'gh %s\n' "$*" >> "$SYNC_BUNNY_TEST_LOG"
+printf 'gh %s\n' "$*" >> "$SYNC_CDN_TEST_LOG"
 if [ "$1" = "repo" ] && [ "$2" = "clone" ]; then
     mkdir -p "$4"
 fi
 exit 0
 SH);
 
-    createFakeSyncBunnyBinary($binDir, 'git', <<<'SH'
+    createFakeSyncCdnBinary($binDir, 'git', <<<'SH'
 #!/bin/sh
-printf 'git %s\n' "$*" >> "$SYNC_BUNNY_TEST_LOG"
+printf 'git %s\n' "$*" >> "$SYNC_CDN_TEST_LOG"
 if [ "$1" = "status" ]; then
     printf 'M json/releases.json\n'
 fi
@@ -147,7 +86,7 @@ SH);
 
     $originalPath = getenv('PATH') ?: '';
     putenv("PATH={$binDir}:{$originalPath}");
-    putenv("SYNC_BUNNY_TEST_LOG={$logFile}");
+    putenv("SYNC_CDN_TEST_LOG={$logFile}");
 
     $allBasenames = [
         'releases.json',
@@ -164,7 +103,7 @@ SH);
     $selectedTargets = array_map(fn (string $file) => "$targetDirectory/$file", $selectedBasenames);
 
     try {
-        $this->artisan('sync:bunny')
+        $this->artisan('sync:cdn')
             ->expectsChoice('Which environment would you like to sync?', $environment, [
                 'production' => 'Production',
                 'nightly' => 'Nightly',
@@ -173,7 +112,7 @@ SH);
             ->assertExitCode(0);
     } finally {
         putenv("PATH={$originalPath}");
-        putenv('SYNC_BUNNY_TEST_LOG');
+        putenv('SYNC_CDN_TEST_LOG');
     }
 
     $log = file_get_contents($logFile);

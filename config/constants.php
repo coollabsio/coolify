@@ -136,11 +136,6 @@ return [
         'dev_webhook' => env('SERVEO_URL'),
     ],
 
-    'bunny' => [
-        'storage_api_key' => env('BUNNY_STORAGE_API_KEY'),
-        'api_key' => env('BUNNY_API_KEY'),
-    ],
-
     'server_checks' => [
         // Notification delay configuration for parallel server checks
         // Used for Traefik version checks and other future server check jobs
