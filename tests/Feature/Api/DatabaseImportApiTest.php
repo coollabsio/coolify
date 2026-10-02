@@ -8,6 +8,8 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -122,6 +124,7 @@ test('rejects unknown fields on standalone import', function () {
 });
 
 test('returns only a team and resource scoped import activity', function () {
+    $this->token->update(['abilities' => ['read', 'read:sensitive']]);
     $database = StandalonePostgresql::create(['uuid' => (string) Str::uuid(), 'name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
     $activity = Activity::create(['log_name' => 'default', 'description' => json_encode([['order' => 1, 'output' => 'restored', 'type' => 'stdout']]), 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $database->uuid, 'operation' => 'database_import', 'status' => 'finished', 'exitCode' => 0]]);
 
@@ -161,4 +164,57 @@ test('returns invalid token when the access token team is not a member team', fu
     'upload' => ['postJson', '/api/v1/databases/%s/imports/uploads'],
     'create' => ['postJson', '/api/v1/databases/%s/imports'],
     'show' => ['getJson', '/api/v1/databases/%s/imports/1'],
+]);
+
+test('restricts database import output to authorized sensitive readers', function (string $resourceType, string $role, array $abilities, bool $bypassAbilityMiddleware, int $expectedStatus, bool $canReadOutput) {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => $role]);
+    $this->token->update(['abilities' => $abilities]);
+    if ($bypassAbilityMiddleware) {
+        $this->withoutMiddleware([ApiAbility::class, EnsureTokenBelongsToCurrentTeamMember::class]);
+    }
+
+    if ($resourceType === 'service') {
+        $service = Service::factory()->create(['environment_id' => $this->environment->id, 'server_id' => $this->server->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass(), 'docker_compose_raw' => "services: {}\n"]);
+        $database = ServiceDatabase::create(['name' => 'postgres', 'service_id' => $service->id, 'image' => 'postgres:17']);
+        $url = "/api/v1/services/{$service->uuid}/databases/{$database->uuid}/imports";
+    } else {
+        $database = StandalonePostgresql::create(['name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db', 'image' => 'postgres:17', 'status' => 'running', 'environment_id' => $this->environment->id, 'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass()]);
+        $url = "/api/v1/databases/{$database->uuid}/imports";
+    }
+
+    $privateOutput = 'ERROR: Key (token)=(private-api-token) already exists.';
+    $activity = Activity::create([
+        'log_name' => 'default',
+        'description' => json_encode([['order' => 1, 'output' => $privateOutput, 'type' => 'stdout']]),
+        'properties' => ['team_id' => $this->team->id, 'type_uuid' => $database->uuid, 'operation' => 'database_import', 'status' => 'error', 'exitCode' => 1],
+    ]);
+
+    $response = $this->withHeaders($this->headers)->getJson("{$url}/{$activity->id}")
+        ->assertStatus($expectedStatus);
+
+    if ($expectedStatus !== 200) {
+        $response->assertDontSee($privateOutput);
+
+        return;
+    }
+
+    $response->assertJsonPath('status', 'error')
+        ->assertJsonPath('exit_code', 1)
+        ->assertJsonPath('output', $canReadOutput ? $privateOutput : null);
+    if (! $canReadOutput) {
+        $response->assertDontSee($privateOutput);
+    }
+
+    $foreignTeam = Team::factory()->create();
+    $activity->properties = $activity->properties->merge(['team_id' => $foreignTeam->id]);
+    $activity->save();
+    $this->withHeaders($this->headers)->getJson("{$url}/{$activity->id}")
+        ->assertNotFound()->assertDontSee($privateOutput);
+})->with(['standalone', 'service'])->with([
+    'admin read only' => ['admin', ['read'], false, 200, false],
+    'admin sensitive' => ['admin', ['read', 'read:sensitive'], false, 200, true],
+    'owner root' => ['owner', ['root'], false, 200, true],
+    'member read only' => ['member', ['read'], false, 200, false],
+    'member legacy sensitive token' => ['member', ['read', 'read:sensitive'], false, 403, false],
+    'member sensitive without ability middleware' => ['member', ['read', 'read:sensitive'], true, 200, false],
 ]);

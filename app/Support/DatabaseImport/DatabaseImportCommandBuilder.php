@@ -187,18 +187,19 @@ SH;
         // current data as it was, also when --clean dropped objects first.
         $owners = $keepOwners ? '' : ' --no-owner --no-acl';
         $clean = $replaceExisting ? ' --clean --if-exists' : '';
-        $sqlRestore = $replaceExisting ? <<<'SH'
+        $suffix = bin2hex(random_bytes(16));
+        $sqlRestore = $replaceExisting ? "\n  new=coolify_restore_new_{$suffix}\n  old=coolify_restore_old_{$suffix}\n".<<<'SH'
 
   echo 'SQL backups cannot replace single objects. The backup is restored into a new database first; the current database is replaced only when that restore succeeds.'
-  new=coolify_restore_new
-  old=coolify_restore_old
-  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new" || exit 1
+  if ! existing=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname IN (:'new', :'old');" | psql -v ON_ERROR_STOP=1 -At -v new="$new" -v old="$old" -U $POSTGRES_USER -d template1); then
+    fail 'The temporary database names could not be checked. Nothing was changed.'
+  fi
+  [ -z "$existing" ] || fail 'A temporary database name is already in use. Nothing was changed.'
   createdb -U $POSTGRES_USER "$new" || exit 1
   if ! stream | psql -v ON_ERROR_STOP=1 --single-transaction -U $POSTGRES_USER -d "$new"; then
     PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$new"
     fail 'The SQL restore failed. The current database was not changed.'
   fi
-  PGOPTIONS='-c client_min_messages=warning' dropdb --maintenance-db=template1 -U $POSTGRES_USER --if-exists "$old" || exit 1
   if ! printf '%s\n' "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :'db' AND pid <> pg_backend_pid();" 'ALTER DATABASE :"db" RENAME TO :"old";' 'ALTER DATABASE :"new" RENAME TO :"db";' | psql -v ON_ERROR_STOP=1 -v db="$db" -v old="$old" -v new="$new" -U $POSTGRES_USER -d template1 >/dev/null; then
     # Undo a half-done swap: the current database keeps its name and data.
     printf '%s\n' 'ALTER DATABASE :"old" RENAME TO :"db";' | psql -v db="$db" -v old="$old" -U $POSTGRES_USER -d template1 >/dev/null 2>&1

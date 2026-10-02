@@ -346,6 +346,120 @@ function restoreScriptNormalize(string $contents): array
     }
 }
 
+/**
+ * Runs a SQL replacement against stateful PostgreSQL client stubs. Database values represent
+ * their data, so accidental drops and a failed swap are visible in the final database state.
+ *
+ * @return array{exit: int, stdout: string, stderr: string, databases: array<string, string>}
+ */
+function postgresReplacementScriptRun(string $target = 'app', string $failure = '', bool $gzip = false): array
+{
+    $dir = restoreScriptTempDir();
+
+    try {
+        $backup = $dir.'/backup.sql';
+        file_put_contents($backup, $gzip ? gzencode('SELECT 1;') : 'SELECT 1;');
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource('postgresql'), $backup, false, true);
+        preg_match('/new=(\w+)/', $script, $new);
+        preg_match('/old=(\w+)/', $script, $old);
+        $databases = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'original'];
+        if (in_array($failure, ['new_collision', 'old_collision'], true)) {
+            $databases[$failure === 'new_collision' ? $new[1] : $old[1]] = 'collision';
+        }
+        $state = $dir.'/databases.json';
+        file_put_contents($state, json_encode($databases));
+        mkdir($dir.'/bin');
+
+        $client = <<<'PHP'
+<?php
+$state = getenv('PG_STATE');
+$databases = json_decode(file_get_contents($state), true);
+$name = basename($argv[0]);
+$args = array_slice($argv, 1);
+$sql = stream_get_contents(STDIN);
+$failure = getenv('PG_FAILURE');
+$save = static function () use ($state, &$databases): void { file_put_contents($state, json_encode($databases)); };
+if ($name === 'dropdb') {
+    unset($databases[end($args)]);
+} elseif ($name === 'createdb') {
+    $database = end($args);
+    if (isset($databases[$database])) { exit(1); }
+    $databases[$database] = 'empty';
+} else {
+    $variables = [];
+    foreach ($args as $index => $arg) {
+        if ($arg === '-v') {
+            [$key, $value] = explode('=', $args[$index + 1], 2);
+            $variables[$key] = $value;
+        }
+    }
+    if (str_contains($sql, 'SELECT 1 FROM pg_database')) {
+        if (isset($databases[$variables['new']]) || isset($databases[$variables['old']])) { echo "1\n"; }
+    } elseif (str_contains($sql, 'ALTER DATABASE')) {
+        preg_match_all('/ALTER DATABASE :"(\w+)" RENAME TO :"(\w+)";/', $sql, $renames, PREG_SET_ORDER);
+        foreach ($renames as $rename) {
+            $from = $variables[$rename[1]];
+            $to = $variables[$rename[2]];
+            if (! isset($databases[$from]) || isset($databases[$to]) || ($failure === 'swap' && $rename[1] === 'new')) {
+                $save();
+                exit(1);
+            }
+            $databases[$to] = $databases[$from];
+            unset($databases[$from]);
+        }
+    } else {
+        if ($failure === 'restore') { exit(1); }
+        $database = $args[array_search('-d', $args, true) + 1];
+        if (! isset($databases[$database])) { exit(1); }
+        $databases[$database] = 'restored';
+    }
+}
+$save();
+PHP;
+
+        foreach (['psql', 'createdb', 'dropdb'] as $name) {
+            file_put_contents($dir.'/bin/'.$name, '#!'.PHP_BINARY."\n".$client);
+            chmod($dir.'/bin/'.$name, 0755);
+        }
+
+        return restoreScriptProcess(['sh', '-c', $script], $dir, [
+            'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
+            'POSTGRES_USER' => 'postgres',
+            'POSTGRES_DB' => $target,
+            'PG_STATE' => $state,
+            'PG_FAILURE' => $failure,
+        ]) + ['databases' => json_decode(file_get_contents($state), true)];
+    } finally {
+        restoreScriptRemoveDir($dir);
+    }
+}
+
+test('SQL replacement preserves unrelated PostgreSQL databases with the former scratch names', function (string $target, bool $gzip) {
+    $run = postgresReplacementScriptRun($target, gzip: $gzip);
+    $expected = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'restored'];
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($run['databases'])->toEqual($expected);
+})->with(['app', 'coolify_restore_new', 'coolify_restore_old'])->with([false, true]);
+
+test('failed SQL replacement preserves every existing PostgreSQL database and removes only its own scratch database', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
+})->with(['restore', 'swap']);
+
+test('SQL replacement refuses scratch database name collisions without changing existing data', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toHaveCount(4)
+        ->and($run['databases']['app'])->toBe('original')
+        ->and($run['databases']['coolify_restore_new'])->toBe('unrelated-new')
+        ->and($run['databases']['coolify_restore_old'])->toBe('unrelated-old')
+        ->and(array_values($run['databases']))->toContain('collision');
+})->with(['new_collision', 'old_collision']);
+
 test('restores single PostgreSQL archives with pg_restore and SQL with psql', function (string $fixture, bool $replaceExisting, array $expectedCalls) {
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), false, $replaceExisting);
 
@@ -363,20 +477,18 @@ test('restores single PostgreSQL archives with pg_restore and SQL with psql', fu
     // SQL cannot replace single objects: it restores into a new database, and only a
     // successful restore replaces the current one, so a failure changes nothing.
     'plain SQL replacing existing objects' => ['pg-sql', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
     'gzip SQL replacing existing objects' => ['pg-sql-gz', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
 ]);
 
