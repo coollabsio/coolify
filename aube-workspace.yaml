@@ -1,0 +1,12 @@
+paranoid: true
+
+allowBuilds:
+  node-pty: true
+jailBuildExclusions:
+  - node-pty
+
+minimumReleaseAge: 4320 # 3 days
+advisoryCheckEveryInstall: true
+
+nodeLinker: isolated
+enableGlobalVirtualStore: false

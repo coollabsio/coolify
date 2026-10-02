@@ -47,7 +47,7 @@ All detailed documentation lives in `.ai/` with the following organization:
 
 ### Running Commands
 → `.ai/development/development-workflow.md`
-- `npm run dev` / `npm run build` - Frontend
+- `aube run dev` / `aube run build` - Frontend
 - `php artisan serve` / `php artisan migrate` - Backend
 - `docker exec coolify php artisan test` - Feature tests (requires Docker)
 - `./vendor/bin/pest tests/Unit` - Unit tests (no Docker needed)
