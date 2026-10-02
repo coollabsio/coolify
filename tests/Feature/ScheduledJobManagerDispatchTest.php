@@ -1,18 +1,22 @@
 <?php
 
 use App\Events\BackupCreated;
+use App\Events\DockerCleanupDone;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
+use App\Models\DockerCleanupExecution;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Service;
@@ -20,6 +24,8 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Notifications\ScheduledTask\TaskFailed;
+use App\Notifications\Server\DockerCleanupFailed;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -29,6 +35,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -689,6 +696,58 @@ it('logs a lost scheduled task occurrence as missed instead of running it late',
     expect($occurrence->fresh()->status)->toBe('failed')
         ->and(app(ScheduledJobDeliveryService::class)->claim($occurrence->uuid, 'original-job'))->toBeFalse()
         ->and($log)->toContain('Scheduled occurrence missed: its queued job was not started');
+});
+
+it('records a missed scheduled task as a failed execution and notifies the team once', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => 'daily']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
+    Team::find($task->team_id)->emailNotificationSettings->update(['smtp_enabled' => true, 'scheduled_task_failure_email_notifications' => true]);
+    $occurrence = createStaleEnqueuedOccurrence("scheduled-task:{$task->id}", 'scheduled-task', $task->id, Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+
+    (new ScheduledJobManager)->handle();
+    (new ScheduledJobManager)->handle();
+
+    $executions = ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->get();
+    expect($executions)->toHaveCount(1)
+        ->and($executions->first()->status)->toBe('failed')
+        ->and($executions->first()->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($executions->first()->finished_at)->not->toBeNull();
+    Notification::assertSentToTimes(Team::find($task->team_id), TaskFailed::class, 1);
+    Notification::assertSentTo(Team::find($task->team_id), TaskFailed::class, fn (TaskFailed $notification) => $notification->task->is($task)
+        && $notification->output === 'Skipped: the queued job did not start within 60 minutes.');
+
+    $lateJob = new ScheduledTaskJob($task, $occurrence->uuid);
+    $lateJob->handle();
+
+    expect(ScheduledTaskExecution::query()->where('scheduled_task_id', $task->id)->count())->toBe(1);
+});
+
+it('records a missed Docker cleanup as a failed execution and notifies the team once', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fake();
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = createScheduledTaskApplication()->destination->server;
+    $server->team->emailNotificationSettings->update(['smtp_enabled' => true, 'docker_cleanup_failure_email_notifications' => true]);
+    $occurrence = createStaleEnqueuedOccurrence("docker-cleanup:{$server->id}", 'docker-cleanup', $server->id, Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+
+    (new ScheduledJobManager)->handle();
+    (new ScheduledJobManager)->handle();
+
+    $executions = DockerCleanupExecution::query()->where('server_id', $server->id)->get();
+    expect($executions)->toHaveCount(1)
+        ->and($executions->first()->status)->toBe('failed')
+        ->and($executions->first()->message)->toBe('Skipped: the queued job did not start within 60 minutes.')
+        ->and($executions->first()->finished_at)->not->toBeNull()
+        ->and($occurrence->fresh()->status)->toBe('failed')
+        ->and(app(ScheduledJobDeliveryService::class)->claim($occurrence->uuid, 'original-job'))->toBeFalse();
+    Notification::assertSentToTimes($server->team, DockerCleanupFailed::class, 1);
+    Event::assertDispatched(DockerCleanupDone::class, 1);
 });
 
 it('leaves recently enqueued occurrences alone', function () {
