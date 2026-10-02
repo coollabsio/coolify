@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c63a0eb3eba5796a90b73f27268f8288",
+    "content-hash": "657807c3680ec0ee72d6d70446605d39",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -14658,6 +14658,82 @@
                 "source": "https://github.com/laravel/roster"
             },
             "time": "2026-07-18T17:53:15+00:00"
+        },
+        {
+            "name": "laravel/vet",
+            "version": "v0.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/vet.git",
+                "reference": "7b10fd2beecf9f386c92731729c9f33a152b213b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/vet/zipball/7b10fd2beecf9f386c92731729c9f33a152b213b",
+                "reference": "7b10fd2beecf9f386c92731729c9f33a152b213b",
+                "shasum": ""
+            },
+            "require": {
+                "composer-plugin-api": "^2.0",
+                "ext-dom": "*",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
+                "ext-phar": "*",
+                "ext-tokenizer": "*",
+                "ext-zip": "*",
+                "php": "^8.4"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.15.5|^8.0",
+                "laravel-zero/foundation": "^13.25",
+                "laravel-zero/framework": "^13.0",
+                "laravel/pint": "^1.32.1",
+                "mockery/mockery": "^1.6.15",
+                "pestphp/pest": "^5.2.1",
+                "pestphp/pest-plugin-phpstan": "^5.2.1",
+                "pestphp/pest-plugin-rector": "^5.0.4",
+                "phpstan/phpstan": "^2.2.16",
+                "rector/rector": "^2.6.7"
+            },
+            "bin": [
+                "builds/vet"
+            ],
+            "type": "composer-plugin",
+            "extra": {
+                "class": "Laravel\\Vet\\Composer\\Plugin"
+            },
+            "autoload": {
+                "psr-4": {
+                    "App\\": "app/",
+                    "Laravel\\Vet\\Composer\\": "src/Composer/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Nuno Maduro",
+                    "email": "enunomaduro@gmail.com"
+                }
+            ],
+            "description": "A dependency audit trust file for PHP.",
+            "keywords": [
+                "Audit",
+                "cli",
+                "composer",
+                "console",
+                "dev",
+                "php",
+                "security",
+                "supply chain"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/vet/issues",
+                "source": "https://github.com/laravel/vet/tree/v0.2.1"
+            },
+            "time": "2026-09-27T14:39:48+00:00"
         },
         {
             "name": "league/uri-components",

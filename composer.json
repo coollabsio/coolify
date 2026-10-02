@@ -65,6 +65,7 @@
         "fakerphp/faker": "^1.24.1",
         "laravel/boost": "^2.10.0",
         "laravel/pint": "^1.30.4",
+        "laravel/vet": "^0.2.1",
         "mockery/mockery": "^1.6.12",
         "nunomaduro/collision": "^8.9.5",
         "pestphp/pest": "^4.7.8",
@@ -94,7 +95,8 @@
     "config": {
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "laravel/vet": true
         },
         "optimize-autoloader": true,
         "preferred-install": "dist",
