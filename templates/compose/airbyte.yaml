@@ -1,0 +1,1007 @@
+# documentation: https://docs.airbyte.com
+# slogan: Open-source data movement for ELT pipelines and AI agents.
+# category: analytics
+# tags: analytics, data, elt, pipeline
+# logo: svgs/airbyte.svg
+# port: 8001
+
+services:
+  db:
+    image: airbyte/db:2.2.0
+    environment:
+      - POSTGRES_DB=${DATABASE_DB:-db-airbyte}
+      - POSTGRES_USER=${DATABASE_USER:-airbyte}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    command: [server, /storage]
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - minio-data:/storage
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          /bin/mc alias set health http://127.0.0.1:9000
+          "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1
+          && /bin/mc ready health >/dev/null 2>&1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  minio-init:
+    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    exclude_from_hc: true
+    entrypoint: [/bin/sh, /scripts/init-minio.sh]
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - type: bind
+        read_only: true
+        source: ./scripts/init-minio.sh
+        target: /scripts/init-minio.sh
+        content: |
+          #!/bin/sh
+
+          set -eu
+
+          until /bin/mc alias set airbyte "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; do
+            sleep 2
+          done
+
+          for bucket in airbyte-bucket state-storage airbyte-dev-logs; do
+            /bin/mc mb --ignore-existing "airbyte/$bucket"
+          done
+    depends_on:
+      minio:
+        condition: service_started
+    restart: on-failure
+
+  temporal:
+    image: temporalio/auto-setup:1.27.2
+    environment:
+      - AUTO_SETUP=true
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_SEEDS=db
+      - POSTGRES_USER=${DATABASE_USER:-airbyte}
+      - POSTGRES_PWD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_TLS_ENABLED=false
+      - POSTGRES_TLS_DISABLE_HOST_VERIFICATION=false
+      - SQL_TLS_ENABLED=false
+      - SQL_TLS_DISABLE_HOST_VERIFICATION=false
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+      - PROMETHEUS_ENDPOINT=0.0.0.0:9090
+      - BIND_ON_IP=0.0.0.0
+      - TEMPORAL_BROADCAST_ADDRESS=0.0.0.0
+    volumes:
+      - type: bind
+        read_only: true
+        source: ./config/temporal-dynamicconfig.yaml
+        target: /etc/temporal/config/dynamicconfig/development.yaml
+        content: |
+          frontend.enableClientVersionCheck:
+            - value: true
+              constraints: {}
+          history.persistenceMaxQPS:
+            - value: 3000
+              constraints: {}
+          frontend.persistenceMaxQPS:
+            - value: 3000
+              constraints: {}
+          frontend.historyMgrNumConns:
+            - value: 30
+              constraints: {}
+          frontend.throttledLogRPS:
+            - value: 20
+              constraints: {}
+          frontend.enableUpdateWorkflowExecution:
+            - value: true
+          frontend.enableUpdateWorkflowExecutionAsyncAccepted:
+            - value: true
+          history.historyMgrNumConns:
+            - value: 50
+              constraints: {}
+          system.advancedVisibilityWritingMode:
+            - value: "off"
+              constraints: {}
+          history.defaultActivityRetryPolicy:
+            - value:
+                InitialIntervalInSeconds: 1
+                MaximumIntervalCoefficient: 100.0
+                BackoffCoefficient: 2.0
+                MaximumAttempts: 0
+          history.defaultWorkflowRetryPolicy:
+            - value:
+                InitialIntervalInSeconds: 1
+                MaximumIntervalCoefficient: 100.0
+                BackoffCoefficient: 2.0
+                MaximumAttempts: 0
+          limit.blobSize.error:
+            - value: 15728640
+              constraints: {}
+          limit.blobSize.warn:
+            - value: 10485760
+              constraints: {}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - exec 3<>/dev/tcp/127.0.0.1/7233
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  k3s:
+    image: rancher/k3s:v1.36.3-k3s1
+    command:
+      - server
+      - --node-name=airbyte-k3s
+      - --disable=traefik
+      - --disable=servicelb
+      - --disable=metrics-server
+      - --disable=coredns
+      - --tls-san=k3s
+    privileged: true
+    environment:
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+      - K3S_KUBECONFIG_MODE=0644
+    tmpfs:
+      - /run
+      - /var/run
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      - k3s-kubeconfig:/output
+    healthcheck:
+      test: [CMD, /bin/kubectl, get, --raw=/readyz]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    restart: unless-stopped
+
+  docker-dns:
+    image: rancher/mirrored-coredns-coredns:1.14.7
+    command: [-conf, /etc/coredns/Corefile]
+    volumes:
+      - type: bind
+        read_only: true
+        source: ./config/docker-dns.Corefile
+        target: /etc/coredns/Corefile
+        content: |
+          .:53 {
+            bind eth0
+            errors
+            cache 30
+            forward . 127.0.0.11
+          }
+    network_mode: service:k3s
+    depends_on:
+      k3s:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, /coredns, -version]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  k3s-bootstrap:
+    image: rancher/k3s:v1.36.3-k3s1
+    exclude_from_hc: true
+    entrypoint: [/bin/sh, /scripts/bootstrap-k3s.sh]
+    environment:
+      - AIRBYTE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AIRBYTE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AIRBYTE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AIRBYTE_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - k3s-kubeconfig:/kube
+      - type: bind
+        read_only: true
+        source: ./config/k3s-resources.yaml
+        target: /config/k3s-resources.yaml
+        content: |
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: airbyte-admin
+            namespace: default
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata:
+            name: airbyte-admin-role
+            namespace: default
+          rules:
+            - apiGroups: ["*"]
+              resources:
+                - configmaps
+                - endpoints
+                - jobs
+                - pods
+                - pods/log
+                - pods/exec
+                - pods/attach
+                - secrets
+              verbs: [get, list, watch, create, update, patch, delete]
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: airbyte-admin-binding
+            namespace: default
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: airbyte-admin-role
+          subjects:
+            - kind: ServiceAccount
+              name: airbyte-admin
+              namespace: default
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-db-svc
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: db
+            ports:
+              - name: postgresql
+                port: 5432
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-minio-svc
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: minio
+            ports:
+              - name: api
+                port: 9000
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-temporal
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: temporal
+            ports:
+              - name: grpc
+                port: 7233
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-airbyte-server-svc
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: server
+            ports:
+              - name: http
+                port: 8001
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-workload-api-server-svc
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: workload-api-server
+            ports:
+              - name: http
+                port: 8007
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: airbyte-airbyte-manifest-server-svc
+            namespace: default
+          spec:
+            type: ExternalName
+            externalName: manifest-server
+            ports:
+              - name: http
+                port: 8080
+                protocol: TCP
+          ---
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: coredns
+            namespace: kube-system
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: system:coredns
+          rules:
+            - apiGroups: [""]
+              resources: [endpoints, services, pods, namespaces]
+              verbs: [list, watch]
+            - apiGroups: [discovery.k8s.io]
+              resources: [endpointslices]
+              verbs: [list, watch]
+          ---
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: system:coredns
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: system:coredns
+          subjects:
+            - kind: ServiceAccount
+              name: coredns
+              namespace: kube-system
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: coredns
+            namespace: kube-system
+          data:
+            Corefile: |
+              .:53 {
+                  errors
+                  health
+                  ready
+                  kubernetes cluster.local in-addr.arpa ip6.arpa {
+                      pods insecure
+                      fallthrough
+                  }
+                  cache 30
+                  loop
+                  reload
+                  loadbalance
+                  forward . 127.0.0.1:1053
+              }
+              .:1053 {
+                  bind 127.0.0.1
+                  errors
+                  rewrite stop name regex ^(.+?)(\.[^.]+\.svc\.cluster\.local|\.svc\.cluster\.local|\.cluster\.local)\.$ {1} answer auto
+                  forward . {$AIRBYTE_K3S_IP}
+              }
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: coredns
+            namespace: kube-system
+            labels:
+              k8s-app: kube-dns
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                k8s-app: kube-dns
+            template:
+              metadata:
+                labels:
+                  k8s-app: kube-dns
+              spec:
+                priorityClassName: system-cluster-critical
+                serviceAccountName: coredns
+                nodeSelector:
+                  kubernetes.io/os: linux
+                tolerations:
+                  - key: CriticalAddonsOnly
+                    operator: Exists
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+                    effect: NoSchedule
+                containers:
+                  - name: coredns
+                    image: rancher/mirrored-coredns-coredns:1.14.7
+                    imagePullPolicy: IfNotPresent
+                    args: [-conf, /etc/coredns/Corefile]
+                    env:
+                      - name: AIRBYTE_K3S_IP
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: status.hostIP
+                    resources:
+                      limits:
+                        memory: 170Mi
+                      requests:
+                        cpu: 100m
+                        memory: 70Mi
+                    ports:
+                      - name: dns
+                        containerPort: 53
+                        protocol: UDP
+                      - name: dns-tcp
+                        containerPort: 53
+                        protocol: TCP
+                    volumeMounts:
+                      - name: config
+                        mountPath: /etc/coredns
+                        readOnly: true
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        add: [NET_BIND_SERVICE]
+                        drop: [ALL]
+                      readOnlyRootFilesystem: true
+                    livenessProbe:
+                      httpGet:
+                        path: /health
+                        port: 8080
+                      initialDelaySeconds: 60
+                      periodSeconds: 10
+                    readinessProbe:
+                      httpGet:
+                        path: /ready
+                        port: 8181
+                      periodSeconds: 2
+                dnsPolicy: Default
+                volumes:
+                  - name: config
+                    configMap:
+                      name: coredns
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: kube-dns
+            namespace: kube-system
+            labels:
+              k8s-app: kube-dns
+              kubernetes.io/cluster-service: "true"
+              kubernetes.io/name: CoreDNS
+          spec:
+            selector:
+              k8s-app: kube-dns
+            clusterIP: 10.43.0.10
+            ports:
+              - name: dns
+                port: 53
+                protocol: UDP
+              - name: dns-tcp
+                port: 53
+                protocol: TCP
+      - type: bind
+        read_only: true
+        source: ./scripts/bootstrap-k3s.sh
+        target: /scripts/bootstrap-k3s.sh
+        content: |
+          #!/bin/sh
+
+          set -eu
+
+          source_config=/kube/kubeconfig.yaml
+          client_config=/kube/config.yaml
+
+          until [ -s "$source_config" ]; do
+            sleep 1
+          done
+
+          sed 's|server: https://127.0.0.1:6443|server: https://k3s:6443|' \
+            "$source_config" > "$client_config"
+          chmod 0644 "$client_config"
+
+          /bin/kubectl --kubeconfig "$client_config" \
+            config set-context --current --namespace=default >/dev/null
+
+          until /bin/kubectl --kubeconfig "$client_config" get --raw=/readyz >/dev/null 2>&1; do
+            sleep 2
+          done
+
+          /bin/kubectl --kubeconfig "$client_config" apply -f /config/k3s-resources.yaml
+
+          /bin/kubectl --kubeconfig "$client_config" \
+            --namespace kube-system rollout status deployment/coredns --timeout=180s
+
+          /bin/kubectl --kubeconfig "$client_config" create secret generic airbyte-auth-secrets \
+            --namespace default \
+            --from-literal=instance-admin-password="$AIRBYTE_ADMIN_PASSWORD" \
+            --from-literal=instance-admin-client-id="$AIRBYTE_ADMIN_CLIENT_ID" \
+            --from-literal=instance-admin-client-secret="$AIRBYTE_ADMIN_CLIENT_SECRET" \
+            --from-literal=jwt-signature-secret="$AIRBYTE_JWT_SIGNATURE_SECRET" \
+            --from-literal=dataplane-client-id= \
+            --from-literal=dataplane-client-secret= \
+            --dry-run=client -o yaml | \
+            /bin/kubectl --kubeconfig "$client_config" apply -f -
+
+          /bin/kubectl --kubeconfig "$client_config" create secret generic airbyte-airbyte-secrets \
+            --namespace default \
+            --from-literal=AIRBYTE_DUMMY_SECRET=dummy \
+            --from-literal=AB_INSTANCE_ADMIN_PASSWORD="$AIRBYTE_ADMIN_PASSWORD" \
+            --from-literal=AB_INSTANCE_ADMIN_CLIENT_ID="$AIRBYTE_ADMIN_CLIENT_ID" \
+            --from-literal=AB_INSTANCE_ADMIN_CLIENT_SECRET="$AIRBYTE_ADMIN_CLIENT_SECRET" \
+            --from-literal=AB_JWT_SIGNATURE_SECRET="$AIRBYTE_JWT_SIGNATURE_SECRET" \
+            --from-literal=DATABASE_USER="$DATABASE_USER" \
+            --from-literal=DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+            --from-literal=CONFIG_DATABASE_REPLICA_USER="$DATABASE_USER" \
+            --from-literal=CONFIG_DATABASE_REPLICA_PASSWORD="$DATABASE_PASSWORD" \
+            --from-literal=AWS_ACCESS_KEY_ID="$MINIO_ROOT_USER" \
+            --from-literal=AWS_SECRET_ACCESS_KEY="$MINIO_ROOT_PASSWORD" \
+            --from-literal=DATAPLANE_CLIENT_ID= \
+            --from-literal=DATAPLANE_CLIENT_SECRET= \
+            --dry-run=client -o yaml | \
+            /bin/kubectl --kubeconfig "$client_config" apply -f -
+    depends_on:
+      k3s:
+        condition: service_healthy
+      docker-dns:
+        condition: service_started
+    restart: on-failure
+
+  dataplane-credentials:
+    image: rancher/k3s:v1.36.3-k3s1
+    exclude_from_hc: true
+    entrypoint: [/bin/sh, /scripts/export-dataplane-credentials.sh]
+    volumes:
+      - k3s-kubeconfig:/kube:ro
+      - dataplane-credentials:/credentials
+      - type: bind
+        read_only: true
+        source: ./scripts/export-dataplane-credentials.sh
+        target: /scripts/export-dataplane-credentials.sh
+        content: |
+          #!/bin/sh
+
+          set -eu
+
+          kubeconfig=/kube/config.yaml
+          namespace=default
+          secret_name=airbyte-auth-secrets
+          credentials_dir=/credentials
+          client_id_file="$credentials_dir/dataplane-client-id"
+          client_secret_file="$credentials_dir/dataplane-client-secret"
+          client_id_tmp="$credentials_dir/.dataplane-client-id.$$"
+          client_secret_tmp="$credentials_dir/.dataplane-client-secret.$$"
+
+          umask 022
+          mkdir -p "$credentials_dir"
+          trap 'rm -f "$client_id_tmp" "$client_secret_tmp"' 0 1 2 15
+
+          client_id_b64=$(
+            /bin/kubectl --kubeconfig "$kubeconfig" \
+              --namespace "$namespace" \
+              get secret "$secret_name" \
+              -o 'jsonpath={.data.dataplane-client-id}'
+          )
+          client_secret_b64=$(
+            /bin/kubectl --kubeconfig "$kubeconfig" \
+              --namespace "$namespace" \
+              get secret "$secret_name" \
+              -o 'jsonpath={.data.dataplane-client-secret}'
+          )
+
+          [ -n "$client_id_b64" ] || {
+            echo "The bootloader did not create a data-plane client ID." >&2
+            exit 1
+          }
+          [ -n "$client_secret_b64" ] || {
+            echo "The bootloader did not create a data-plane client secret." >&2
+            exit 1
+          }
+
+          printf '%s' "$client_id_b64" | base64 -d > "$client_id_tmp"
+          printf '%s' "$client_secret_b64" | base64 -d > "$client_secret_tmp"
+
+          client_id=$(cat "$client_id_tmp")
+          if ! printf '%s' "$client_id" | grep -Eq \
+            '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "The bootloader returned an invalid data-plane client ID." >&2
+            exit 1
+          fi
+
+          mv -f "$client_id_tmp" "$client_id_file"
+          mv -f "$client_secret_tmp" "$client_secret_file"
+          trap - 0 1 2 15
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  bootloader:
+    image: airbyte/bootloader:2.2.0
+    exclude_from_hc: true
+    environment:
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_AUTH_SECRET_CREATION_ENABLED=true
+      - AB_KUBERNETES_SECRET_NAME=airbyte-auth-secrets
+      - AB_INSTANCE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AB_INSTANCE_ADMIN_PASSWORD_SECRET_KEY=instance-admin-password
+      - AB_INSTANCE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AB_INSTANCE_ADMIN_CLIENT_ID_SECRET_KEY=instance-admin-client-id
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET_SECRET_KEY=instance-admin-client-secret
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AB_JWT_SIGNATURE_SECRET_KEY=jwt-signature-secret
+      - DATAPLANE_CLIENT_ID_SECRET_KEY=dataplane-client-id
+      - DATAPLANE_CLIENT_SECRET_SECRET_KEY=dataplane-client-secret
+      - AIRBYTE_VERSION=2.2.0
+      - CONNECTOR_REGISTRY_SEED_PROVIDER=remote
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - RUN_DATABASE_MIGRATION_ON_STARTUP=true
+      - LOG_LEVEL=info
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - JOB_KUBE_NAMESPACE=default
+      - KUBECONFIG=/kube/config.yaml
+    volumes:
+      - k3s-kubeconfig:/kube:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      k3s-bootstrap:
+        condition: service_completed_successfully
+    restart: on-failure
+
+  server:
+    image: airbyte/server:2.2.0
+    environment:
+      - SERVICE_URL_AIRBYTE_8001
+      - AB_INSTANCE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AB_INSTANCE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AB_COOKIE_SECURE=false
+      - AB_COOKIE_SAME_SITE=Lax
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - AIRBYTE_API_HOST=${SERVICE_URL_AIRBYTE_8001}/api/public
+      - API_AUTHORIZATION_ENABLED=true
+      - MANIFEST_SERVER_API_HOST=http://manifest-server:8080
+      - ENTERPRISE_SOURCE_STUBS_URL=https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIG_DATABASE_REPLICA_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - CONFIG_DATABASE_REPLICA_USER=${DATABASE_USER:-airbyte}
+      - CONFIG_DATABASE_REPLICA_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.35.15.001
+      - JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.29.15.001
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - AUDIT_LOGGING_ENABLED=false
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - TEMPORAL_HOST=temporal:7233
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
+    expose:
+      - 8001
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8001
+          printf 'GET /api/v1/health HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+
+  manifest-server:
+    image: airbyte/manifest-server:7.23.7
+    environment:
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_ENABLE_UNSAFE_CODE=${AIRBYTE_ENABLE_UNSAFE_CODE:-false}
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8080/health/", timeout=5); assert response.status == 200
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  workload-api-server:
+    image: airbyte/workload-api-server:2.2.0
+    environment:
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - API_AUTHORIZATION_ENABLED=true
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - MICROMETER_METRICS_ENABLED=false
+      - LOG_LEVEL=info
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health/liveness HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    image: airbyte/worker:2.2.0
+    environment:
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - API_AUTHORIZATION_ENABLED=true
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - TEMPORAL_HOST=temporal:7233
+      - MAX_CHECK_WORKERS=30
+      - MAX_NOTIFY_WORKERS=30
+      - MAX_SYNC_WORKERS=5
+      - SYNC_JOB_MAX_ATTEMPTS=3
+      - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+      - SYNC_JOB_INIT_RETRY_TIMEOUT_MINUTES=5
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+      workload-api-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          printf 'GET / HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  cron:
+    image: airbyte/cron:2.2.0
+    environment:
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - INTERNAL_API_HOST=http://server:8001
+      - CONNECTOR_REGISTRY_SEED_PROVIDER=remote
+      - UPDATE_DEFINITIONS_CRON_ENABLED=true
+      - RUN_DECLARATIVE_SOURCES_UPDATER=false
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.35.15.001
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - TEMPORAL_HOST=temporal:7233
+      - WORKSPACE_ROOT=/workspace
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
+    depends_on:
+      bootloader:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+      workload-api-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  workload-launcher:
+    image: airbyte/workload-launcher:2.2.0
+    entrypoint: [/bin/sh, /scripts/start-workload-launcher.sh]
+    command: [/bin/bash, -c, 'airbyte-app/bin/$${APPLICATION}']
+    environment:
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - AIRBYTE_ENABLE_UNSAFE_CODE=${AIRBYTE_ENABLE_UNSAFE_CODE:-false}
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - JOB_KUBE_SERVICEACCOUNT=airbyte-admin
+      - JOB_KUBE_NAMESPACE=default
+      - JOB_KUBE_LOCAL_VOLUME_ENABLED=false
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - S3_PATH_STYLE_ACCESS=true
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
+      - KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS=100
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
+      - FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT=5G
+      - FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST=5G
+      - CONTROL_PLANE_TOKEN_ENDPOINT=http://server:8001/api/v1/dataplanes/token
+      - WORKLOAD_LAUNCHER_PARALLELISM=10
+      - DATAPLANE_CLIENT_ID_SECRET_NAME=airbyte-auth-secrets
+      - DATAPLANE_CLIENT_ID_SECRET_KEY=dataplane-client-id
+      - DATAPLANE_CLIENT_SECRET_SECRET_NAME=airbyte-auth-secrets
+      - DATAPLANE_CLIENT_SECRET_SECRET_KEY=dataplane-client-secret
+      - CONNECTOR_PROFILER_IMAGE=airbyte/async-profiler:2.2.0
+      - CONNECTOR_SIDECAR_IMAGE=airbyte/connector-sidecar:2.2.0
+      - CONTAINER_ORCHESTRATOR_IMAGE=airbyte/container-orchestrator:2.2.0
+      - WORKLOAD_INIT_IMAGE=airbyte/workload-init-container:2.2.0
+      - KUBECONFIG=/kube/config.yaml
+    volumes:
+      - k3s-kubeconfig:/kube:ro
+      - dataplane-credentials:/credentials:ro
+      - type: bind
+        read_only: true
+        source: ./scripts/start-workload-launcher.sh
+        target: /scripts/start-workload-launcher.sh
+        content: |
+          #!/bin/sh
+
+          set -eu
+
+          client_id_file=/credentials/dataplane-client-id
+          client_secret_file=/credentials/dataplane-client-secret
+
+          [ -s "$client_id_file" ] || {
+            echo "Missing generated data-plane client ID." >&2
+            exit 1
+          }
+
+          [ -s "$client_secret_file" ] || {
+            echo "Missing generated data-plane client secret." >&2
+            exit 1
+          }
+
+          DATAPLANE_CLIENT_ID=$(cat "$client_id_file")
+          DATAPLANE_CLIENT_SECRET=$(cat "$client_secret_file")
+          export DATAPLANE_CLIENT_ID DATAPLANE_CLIENT_SECRET
+
+          exec /entrypoint.sh "$@"
+    depends_on:
+      dataplane-credentials:
+        condition: service_completed_successfully
+      k3s-bootstrap:
+        condition: service_completed_successfully
+      server:
+        condition: service_healthy
+      workload-api-server:
+        condition: service_started
+      temporal:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health/readiness HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
