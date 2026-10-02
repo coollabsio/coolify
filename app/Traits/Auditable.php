@@ -10,6 +10,41 @@ use Illuminate\Support\Str;
 
 trait Auditable
 {
+    /**
+     * Fields that status checks, Sentinel pushes and server checks write as a side effect.
+     * They can change inside a user's request (for example GetContainersStatus::run()),
+     * so they must not appear as changes made by that user.
+     */
+    private const AUDIT_IGNORED_FIELDS = [
+        'updated_at',
+        'order',
+        // Container status and restart tracking (GetContainersStatus, PushServerUpdateJob).
+        'status',
+        'last_online_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'restart_limit_reached',
+        'container_present',
+        'started_at',
+        'config_hash',
+        'custom_healthcheck_found',
+        'domain_dns_statuses',
+        // Server heartbeat and check state (Sentinel push, ServerConnectionCheckJob, validation, proxy checks).
+        'sentinel_updated_at',
+        'sentinel_waiting_since',
+        'unreachable_count',
+        'high_disk_usage_notification_sent',
+        'log_drain_notification_sent',
+        'validation_logs',
+        'is_validating',
+        'detected_traefik_version',
+        'traefik_outdated_info',
+        'hetzner_server_status',
+        'vultr_instance_status',
+        'digitalocean_droplet_status',
+    ];
+
     private bool $auditLoggingEnabled = true;
 
     public static function bootAuditable(): void
@@ -33,9 +68,7 @@ trait Auditable
         $changedFields = $action === 'updated'
             ? collect(array_keys($this->getChanges()))
                 ->reject(fn (string $field): bool => in_array($field, [
-                    'updated_at',
-                    'order',
-                    'status',
+                    ...self::AUDIT_IGNORED_FIELDS,
                     ...($this->auditExclude ?? []),
                 ], true))
                 ->values()
