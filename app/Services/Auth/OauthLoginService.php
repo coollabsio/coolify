@@ -220,7 +220,7 @@ class OauthLoginService
     {
         [$issuer, $subject] = $this->oidcIssuerAndSubject($oauthUser);
         $emailVerified = ($oauthUser instanceof OidcUser && $oauthUser->emailVerified)
-            || data_get($oauthUser->user, 'email_verified') === true;
+            || OidcUser::claimsVerifyEmail(is_array($oauthUser->user ?? null) ? $oauthUser->user : []);
 
         if (! is_string($issuer) || $issuer === '' || ! is_string($subject) || $subject === '') {
             throw new HttpException(403, 'OIDC provider did not return issuer and subject claims');
