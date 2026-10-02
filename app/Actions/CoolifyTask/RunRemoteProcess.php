@@ -9,6 +9,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\RemoteProcessCommand;
+use App\Support\ResourceStartActivity;
 use App\Traits\BroadcastsToTeam;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +93,28 @@ class RunRemoteProcess
         $this->activity->save();
 
         $processResult = $process->wait();
+
+        // A database import whose SSH command ended without the restore result keeps blocking the
+        // database until its restore is stopped. The stop event also cleans up, so the normal
+        // finish event must not run first.
+        if (array_key_exists($processResult->exitCode(), DatabaseImportCleanup::TRANSPORT_FAILURE_REASONS)
+            && $this->activity->properties->get('operation') === ResourceStartActivity::DATABASE_IMPORT_OPERATION
+            && blank(Activity::query()->whereKey($this->activity->getKey())->first()?->properties?->get(DatabaseImportCleanup::STOP_REQUESTED_PROPERTY))
+            && DatabaseImportCleanup::stopAfterTransportFailure($this->activity, $processResult->exitCode())) {
+            $this->activity->properties = $this->activity->properties->merge([
+                'exitCode' => $processResult->exitCode(),
+                'stdout' => $processResult->output(),
+                'stderr' => $processResult->errorOutput(),
+            ]);
+            $this->activity->save();
+
+            if (! $this->ignore_errors) {
+                throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
+            }
+
+            return $processResult;
+        }
+
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {

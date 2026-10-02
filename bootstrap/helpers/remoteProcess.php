@@ -28,6 +28,7 @@ function remote_process(
     $callEventOnFinish = null,
     $callEventData = null,
     array $properties = [],
+    ?int $timeout = null,
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -72,6 +73,7 @@ function remote_process(
         ignore_errors: $ignore_errors,
         call_event_on_finish: $callEventOnFinish,
         call_event_data: $callEventData,
+        timeout: $timeout,
     ));
 
     $activity->refresh();

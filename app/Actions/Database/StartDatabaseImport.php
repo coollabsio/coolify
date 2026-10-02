@@ -31,7 +31,26 @@ class StartDatabaseImport
 
     public const LOCK_SECONDS = 1800;
 
+    /**
+     * Added to the SSH command timeout, so the remote restore ends (or times out) before the job.
+     * The job stays this far below the Horizon worker timeout too.
+     */
+    public const JOB_TIMEOUT_MARGIN_SECONDS = 300;
+
     public function __construct(private readonly DatabaseImportCommandBuilder $commands) {}
+
+    /**
+     * The CoolifyTask timeout of an import. A restore can run until the SSH command timeout, so the
+     * job must not time out before it. It stays below the Horizon worker timeout, which is below the
+     * queue retry_after, so the worker does not kill or run the job again while it runs.
+     */
+    public static function jobTimeoutSeconds(): int
+    {
+        $timeout = (int) config('constants.ssh.command_timeout') + self::JOB_TIMEOUT_MARGIN_SECONDS;
+        $workerTimeout = (int) config('horizon.defaults.s6.timeout');
+
+        return $workerTimeout > 0 ? min($timeout, $workerTimeout - self::JOB_TIMEOUT_MARGIN_SECONDS) : $timeout;
+    }
 
     public static function lockKey(string $resourceUuid): string
     {
@@ -157,13 +176,15 @@ class StartDatabaseImport
         $commandList[] = 'chmod +x '.escapeshellarg($scriptPath);
         $commandList[] = 'docker cp '.escapeshellarg($scriptPath).' '.escapeshellarg("{$container}:{$scriptPath}");
         $commandList[] = 'rm -f '.escapeshellarg($scriptPath);
-        $commandList[] = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg($scriptPath);
+        // The restore reports its own 124 and 255 as 1: Coolify reads those exit codes of the SSH
+        // command as a local timeout or a lost connection and then stops the restore.
+        $commandList[] = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg('"$0"; status=$?; [ "$status" -ne 124 ] && [ "$status" -ne 255 ] || status=1; exit "$status"').' '.escapeshellarg($scriptPath);
 
         // The operation properties are set when the activity is created: the CoolifyTask job can
         // load and save the activity before a later update, which would drop them again.
         // The cleanup data (names and paths only, no credentials) lets Coolify stop and clean up
         // an import that it fails after a restart or because it is stale.
-        return remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup, properties: [
+        return remote_process($commandList, $server, type_uuid: $resource->uuid, model: $resource, callEventOnFinish: 'DatabaseImportFinished', callEventData: $cleanup, timeout: self::jobTimeoutSeconds(), properties: [
             'operation' => ResourceStartActivity::DATABASE_IMPORT_OPERATION,
             'resource_kind' => $resource instanceof ServiceDatabase ? 'service_database' : 'standalone_database',
             'operation_uuid' => $operation,
