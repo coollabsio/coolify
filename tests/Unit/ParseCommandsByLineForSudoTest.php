@@ -798,3 +798,32 @@ test('parseLineForSudo adds sudo to each pipe stage without doubling it', functi
         ->and(parseLineForSudo('docker ps | sudo grep app', $this->server))
         ->toBe('sudo docker ps | sudo grep app');
 });
+
+test('parseLineForSudo keeps pipes inside quoted strings unchanged', function (string $line, string $expected) {
+    expect(parseLineForSudo($line, $this->server))->toBe($expected);
+})->with([
+    'single-quoted go template' => [
+        "docker inspect --format '{{a | b}}' coolify-proxy | grep x",
+        "sudo docker inspect --format '{{a | b}}' coolify-proxy | sudo grep x",
+    ],
+    'double-quoted sh -c script' => [
+        'sh -c "x | y"',
+        'sudo sh -c "x | y"',
+    ],
+    'escaped double quote inside double quotes' => [
+        'echo "a \" | b" | tee /tmp/coolify/file',
+        'sudo echo "a \" | b" | sudo tee /tmp/coolify/file',
+    ],
+    'single quote inside double quotes' => [
+        "echo \"it's | here\" | tee /tmp/coolify/file",
+        "sudo echo \"it's | here\" | sudo tee /tmp/coolify/file",
+    ],
+]);
+
+test('parseCommandsByLineForSudo keeps pipes inside quoted strings unchanged', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        "docker ps --format '{{.Names}} | {{.Image}}' | grep app",
+    ]), $this->server);
+
+    expect($result[0])->toBe("sudo docker ps --format '{{.Names}} | {{.Image}}' | sudo grep app");
+});
