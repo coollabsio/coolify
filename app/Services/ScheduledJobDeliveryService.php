@@ -123,10 +123,14 @@ class ScheduledJobDeliveryService
         });
     }
 
-    public function publishPending(): void
+    /**
+     * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
+     */
+    public function publishPending(?array $jobTypes = null): void
     {
         ScheduledJobDelivery::query()
             ->where('status', 'pending')
+            ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
             ->orderBy('id')
             ->chunkById(100, function ($occurrences): void {
                 foreach ($occurrences as $occurrence) {
@@ -166,11 +170,14 @@ class ScheduledJobDeliveryService
      * Publish backups again whose queued job was not started, and log lost tasks and Docker
      * cleanups as missed. A lost backup is not run when a newer occurrence of the same schedule
      * exists, so a backup that runs longer than its interval does not build up a backlog.
+     *
+     * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
      */
-    public function recoverStaleEnqueued(): void
+    public function recoverStaleEnqueued(?array $jobTypes = null): void
     {
         ScheduledJobDelivery::query()
             ->where('status', 'enqueued')
+            ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
             ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
             ->chunkById(100, function ($occurrences): void {
                 foreach ($occurrences as $occurrence) {

@@ -2,6 +2,7 @@
 
 use App\Events\BackupCreated;
 use App\Jobs\DatabaseBackupJob;
+use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
@@ -21,6 +22,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -700,6 +702,90 @@ it('leaves recently enqueued occurrences alone', function () {
 
     Queue::assertNotPushed(DatabaseBackupJob::class);
     expect($occurrence->fresh()->enqueued_at->toDateTimeString())->toBe('2026-09-17 11:01:00');
+});
+
+it('dispatches only the schedules of its own type', function (string $type, array $expected) {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 1, 0, 0, 'UTC'));
+    Queue::fakeExcept(ScheduledJobManager::class);
+    $application = createScheduledTaskApplication();
+    createScheduledApplicationTask($application, ['frequency' => '* * * * *']);
+    createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => '* * * * *']);
+
+    $this->artisan('scheduled:dispatch', ['--type' => $type])->assertSuccessful();
+
+    Queue::assertPushed(DatabaseBackupJob::class, $expected['backups']);
+    Queue::assertPushed(ScheduledTaskJob::class, $expected['tasks']);
+    Queue::assertPushed(DockerCleanupJob::class, $expected['docker-cleanups']);
+})->with([
+    'backups' => ['backups', ['backups' => 1, 'tasks' => 0, 'docker-cleanups' => 0]],
+    'tasks' => ['tasks', ['backups' => 0, 'tasks' => 1, 'docker-cleanups' => 0]],
+    // Two servers: the task application and the backup database are on separate test servers.
+    'docker cleanups' => ['docker-cleanups', ['backups' => 0, 'tasks' => 0, 'docker-cleanups' => 2]],
+]);
+
+it('dispatches each occurrence once when the type dispatchers run after each other', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 1, 0, 0, 'UTC'));
+    Queue::fakeExcept(ScheduledJobManager::class);
+    createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => '* * * * *']);
+    createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => '* * * * *']);
+
+    foreach (array_keys(ScheduledJobManager::TYPES) as $type) {
+        $this->artisan('scheduled:dispatch', ['--type' => $type])->assertSuccessful();
+    }
+    (new ScheduledJobManager)->handle();
+
+    Queue::assertPushed(DatabaseBackupJob::class, 1);
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+    Queue::assertPushed(DockerCleanupJob::class, 2);
+});
+
+it('publishes and recovers only the deliveries of its own type', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Carbon::setTestNow(Carbon::create(2026, 9, 17, 12, 0, 0, 'UTC'));
+    Queue::fakeExcept(ScheduledJobManager::class);
+    $task = createScheduledApplicationTask(createScheduledTaskApplication(), ['frequency' => 'daily']);
+    $backup = createScheduledDatabaseBackup(createScheduledBackupDatabase(), ['frequency' => 'daily']);
+    $pendingTask = ScheduledJobDelivery::create([
+        'schedule_key' => "scheduled-task:{$task->id}",
+        'scheduled_for' => Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'),
+        'job_type' => 'scheduled-task',
+        'resource_id' => $task->id,
+    ]);
+    $lostBackup = createStaleEnqueuedOccurrence("scheduled-backup:{$backup->id}", 'database-backup', $backup->id, Carbon::create(2026, 9, 17, 0, 0, 0, 'UTC'));
+
+    $this->artisan('scheduled:dispatch', ['--type' => 'tasks'])->assertSuccessful();
+
+    Queue::assertPushed(ScheduledTaskJob::class, 1);
+    Queue::assertNotPushed(DatabaseBackupJob::class);
+    expect($pendingTask->fresh()->status)->toBe('enqueued')
+        ->and($lostBackup->fresh()->status)->toBe('enqueued');
+
+    $this->artisan('scheduled:dispatch', ['--type' => 'backups'])->assertSuccessful();
+
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job) => $job->occurrenceUuid === $lostBackup->uuid);
+});
+
+it('uses a separate overlap lock for each type', function () {
+    $lockKeys = collect([null, ...array_keys(ScheduledJobManager::TYPES)])
+        ->map(fn (?string $type) => (new ReflectionProperty(WithoutOverlapping::class, 'key'))->getValue((new ScheduledJobManager($type))->middleware()[0]));
+
+    expect($lockKeys->all())->toBe([
+        'scheduled-job-manager',
+        'scheduled-job-manager:backups',
+        'scheduled-job-manager:tasks',
+        'scheduled-job-manager:volume-backups',
+        'scheduled-job-manager:docker-cleanups',
+    ]);
+});
+
+it('rejects an unknown schedule type', function () {
+    Queue::fake();
+
+    $this->artisan('scheduled:dispatch', ['--type' => 'invalid'])->assertFailed();
+
+    Queue::assertNothingPushed();
 });
 
 function createStaleEnqueuedOccurrence(string $scheduleKey, string $jobType, int $resourceId, Carbon $scheduledFor, int $minutesAgo = ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1): ScheduledJobDelivery

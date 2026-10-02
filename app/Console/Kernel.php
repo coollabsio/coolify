@@ -14,6 +14,7 @@ use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\RevalidateUnusableS3StoragesJob;
+use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
@@ -122,14 +123,18 @@ class Kernel extends ConsoleKernel
     /**
      * Run the manager from the scheduler, not from a queue worker. A busy queue could delay it
      * past the catch-up window, and then due backups and tasks would be skipped.
+     * Each schedule type runs in its own process with its own overlap lock, so the types run in
+     * parallel and a slow type cannot make another type skip a run.
      */
     private function scheduleScheduledJobManager(): void
     {
-        $this->scheduleInstance->command('scheduled:dispatch')
-            ->everyMinute()
-            ->onOneServer()
-            ->withoutOverlapping(5)
-            ->runInBackground();
+        foreach (array_keys(ScheduledJobManager::TYPES) as $type) {
+            $this->scheduleInstance->command("scheduled:dispatch --type={$type}")
+                ->everyMinute()
+                ->onOneServer()
+                ->withoutOverlapping(5)
+                ->runInBackground();
+        }
     }
 
     private function scheduleUpdates(): void

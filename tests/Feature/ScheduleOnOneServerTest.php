@@ -74,15 +74,21 @@ it('schedules stuck resource cleanup in the background once per day', function (
         ->and($event->runInBackground)->toBeTrue();
 });
 
-it('runs the scheduled job dispatcher from the scheduler instead of a queue', function () {
+it('runs one scheduled job dispatcher for each schedule type from the scheduler instead of a queue', function () {
     $events = collect(app(Schedule::class)->events());
 
-    $event = $events->first(fn ($event) => str_contains((string) $event->command, 'scheduled:dispatch'));
+    $dispatchers = $events->filter(fn ($event) => str_contains((string) $event->command, 'scheduled:dispatch'));
 
-    expect($event)->not->toBeNull()
-        ->and($event->expression)->toBe('* * * * *')
-        ->and($event->onOneServer)->toBeTrue()
-        ->and($event->runInBackground)->toBeTrue()
+    expect($dispatchers->map(fn ($event) => str((string) $event->command)->after('--type=')->value())->values()->all())
+        ->toBe(['backups', 'tasks', 'volume-backups', 'docker-cleanups']);
+    $dispatchers->each(function ($event) {
+        expect($event->expression)->toBe('* * * * *')
+            ->and($event->onOneServer)->toBeTrue()
+            ->and($event->withoutOverlapping)->toBeTrue()
+            ->and($event->runInBackground)->toBeTrue();
+    });
+    // Each type has its own overlap lock.
+    expect($dispatchers->map->mutexName()->unique())->toHaveCount(4)
         ->and($events->contains(fn ($event) => str_contains((string) $event->description, 'ScheduledJobManager')))->toBeFalse();
 });
 
