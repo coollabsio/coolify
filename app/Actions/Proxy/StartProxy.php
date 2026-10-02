@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
@@ -71,6 +72,10 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
+            if ($proxyType !== ProxyTypes::TRAEFIK->value) {
+                // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
+                $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
+            }
             // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
             $commands = $commands->merge(ensureProxyNetworksExist($server));
             $commands = $commands->merge([

@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Component\Yaml\Yaml;
 
 function traefikAccessLogCommands(bool $enabled): array
@@ -35,7 +36,7 @@ function traefikAccessLogCommands(bool $enabled): array
 
 function applyTrafficAnalyticsToProxyConfiguration(Server $server, string $configuration): string
 {
-    $config = Yaml::parse($configuration);
+    $config = parseProxyComposeYaml($configuration);
 
     if (! is_array($config)) {
         throw new RuntimeException('Proxy configuration must be a YAML mapping.');
@@ -43,7 +44,75 @@ function applyTrafficAnalyticsToProxyConfiguration(Server $server, string $confi
 
     $config = applyTrafficAnalyticsToProxyConfigArray($server, $config);
 
-    return Yaml::dump($config, 12, 2);
+    return Yaml::dump($config, 12, 2, Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+}
+
+/**
+ * Parses a proxy Compose file so that it can be written back with Yaml::DUMP_OBJECT_AS_MAP and
+ * Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE without changes: Docker Compose merge tags such as `!reset`
+ * and `!override` stay TaggedValue objects, and an empty map stays a stdClass so that `{}` and `[]`
+ * keep their type (Compose rejects `!override {}` for a list such as `volumes`).
+ */
+function parseProxyComposeYaml(string $configuration): mixed
+{
+    return proxyComposeMapsToArrays(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS | Yaml::PARSE_OBJECT_FOR_MAP));
+}
+
+function proxyComposeMapsToArrays(mixed $value): mixed
+{
+    if ($value instanceof TaggedValue) {
+        return new TaggedValue($value->getTag(), proxyComposeMapsToArrays($value->getValue()));
+    }
+
+    if ($value instanceof stdClass) {
+        $value = get_object_vars($value);
+        if ($value === []) {
+            return new stdClass;
+        }
+    }
+
+    return is_array($value) ? array_map(proxyComposeMapsToArrays(...), $value) : $value;
+}
+
+/**
+ * The value of a proxy Compose file without Docker Compose merge tags, for reading only.
+ */
+function withoutProxyComposeTags(mixed $value): mixed
+{
+    if ($value instanceof TaggedValue) {
+        return withoutProxyComposeTags($value->getValue());
+    }
+
+    return is_array($value) ? array_map(withoutProxyComposeTags(...), $value) : $value;
+}
+
+/**
+ * Changes a Compose list that may have a merge tag. The tag is kept when the list is unchanged or
+ * the tag is `!override`. Other tags such as `!reset` make Compose ignore the value, so a changed
+ * list is written without its tag.
+ */
+function updateTaggedProxyComposeList(mixed $value, Closure $update, string $error): mixed
+{
+    $list = $value instanceof TaggedValue ? $value->getValue() : $value;
+    if ($list instanceof stdClass && get_object_vars($list) === []) {
+        $list = [];
+    }
+
+    if (! is_array($list)) {
+        throw new RuntimeException($error);
+    }
+
+    $updated = $update($list);
+
+    if (! $value instanceof TaggedValue) {
+        return $updated;
+    }
+
+    if ($updated === $list) {
+        return $value;
+    }
+
+    return $value->getTag() === 'override' ? new TaggedValue('override', $updated) : $updated;
 }
 
 /**
@@ -150,24 +219,27 @@ function applyTraefikAccessLogCommands(Server $server, array $commands, bool $en
     return array_values($commands);
 }
 
+/**
+ * Container of the Traefik access log rotation sidecar that traffic analytics adds to the proxy.
+ */
+const TRAEFIK_LOGROTATE_CONTAINER = 'coolify-proxy-logrotate';
+
 function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config): array
 {
     $enabled = $server->isTrafficAnalyticsEnabled();
 
     if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
-        $commands = data_get($config, 'services.traefik.command', []);
-
-        if (! is_array($commands)) {
-            throw new RuntimeException('Traefik commands must be a YAML list.');
-        }
-
-        data_set($config, 'services.traefik.command', applyTraefikAccessLogCommands($server, $commands, $enabled));
+        data_set($config, 'services.traefik.command', updateTaggedProxyComposeList(
+            data_get($config, 'services.traefik.command', []),
+            fn (array $commands): array => applyTraefikAccessLogCommands($server, $commands, $enabled),
+            'Traefik commands must be a YAML list.',
+        ));
         unset($config['services']['traefik-logrotate']);
 
         if ($enabled && ! $server->isSwarm()) {
             $proxyPath = devHostDockerPath($server, $server->proxyPath());
             $config['services']['traefik-logrotate'] = [
-                'container_name' => 'coolify-proxy-logrotate',
+                'container_name' => TRAEFIK_LOGROTATE_CONTAINER,
                 'image' => 'alpine:3.24',
                 'restart' => RESTART_MODE,
                 'network_mode' => 'none',
@@ -184,19 +256,19 @@ function applyTrafficAnalyticsToProxyConfigArray(Server $server, array $config):
     } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
         // Caddy writes /traffic/access.log and Sentinel reads <trafficLogDirectory>/access.log, so both use one path.
         $trafficVolume = StartSentinel::trafficLogDirectory($server).':/traffic';
-        $volumes = data_get($config, 'services.caddy.volumes', []);
+        data_set($config, 'services.caddy.volumes', updateTaggedProxyComposeList(
+            data_get($config, 'services.caddy.volumes', []),
+            function (array $volumes) use ($enabled, $trafficVolume): array {
+                // Coolify owns /traffic: replace an older mount with a different source path.
+                $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => ! isCaddyTrafficVolume($volume)));
+                if ($enabled) {
+                    $volumes[] = $trafficVolume;
+                }
 
-        if (! is_array($volumes)) {
-            throw new RuntimeException('Caddy volumes must be a YAML list.');
-        }
-
-        // Coolify owns /traffic: replace an older mount with a different source path.
-        $volumes = array_values(array_filter($volumes, fn (mixed $volume): bool => ! isCaddyTrafficVolume($volume)));
-        if ($enabled) {
-            $volumes[] = $trafficVolume;
-        }
-
-        data_set($config, 'services.caddy.volumes', $volumes);
+                return $volumes;
+            },
+            'Caddy volumes must be a YAML list.',
+        ));
     }
 
     return $config;
@@ -397,10 +469,10 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
     }
 
     try {
-        $yaml = Yaml::parse($existing_config);
+        $yaml = withoutProxyComposeTags(Yaml::parse($existing_config, Yaml::PARSE_CUSTOM_TAGS));
         $existing_commands = data_get($yaml, 'services.traefik.command', []);
 
-        if (empty($existing_commands)) {
+        if (empty($existing_commands) || ! is_array($existing_commands)) {
             return $custom_commands;
         }
 
@@ -459,7 +531,8 @@ function removeLegacyTraefikDashboardLabels(string $configuration): string
     ];
 
     try {
-        $yaml = Yaml::parse($configuration);
+        // Merge tags such as `!override` are kept in the text; the comparison below ignores them.
+        $yaml = withoutProxyComposeTags(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS));
     } catch (Throwable) {
         return $configuration;
     }
@@ -500,7 +573,7 @@ function removeLegacyTraefikDashboardLabels(string $configuration): string
 
     // Keep the original when the line edit also changed other parts of the file.
     try {
-        return Yaml::parse($fixed) === $expected ? $fixed : $configuration;
+        return withoutProxyComposeTags(Yaml::parse($fixed, Yaml::PARSE_CUSTOM_TAGS)) === $expected ? $fixed : $configuration;
     } catch (Throwable) {
         return $configuration;
     }
