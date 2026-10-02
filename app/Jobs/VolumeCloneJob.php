@@ -55,10 +55,13 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $sourceConfiguration = $this->sourceVolumeConfiguration();
-        $createTargetVolume = $this->createTargetVolumeCommand($sourceConfiguration);
+        $isBindVolume = $this->isBindVolume($sourceConfiguration);
+        $targetConfiguration = $isBindVolume ? ['driver' => 'local', 'options' => []] : $sourceConfiguration;
+        $createTargetVolume = $this->createTargetVolumeCommand($targetConfiguration);
 
-        if ($this->isBindVolume($sourceConfiguration)) {
+        if ($isBindVolume) {
             instant_remote_process([$createTargetVolume], $this->sourceServer);
+            $this->rememberTargetVolumeWithoutDriverOptions($targetConfiguration);
             $this->logSkippedBindVolumeCopy($sourceConfiguration);
 
             return;
@@ -76,10 +79,13 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         $srcVol = escapeshellarg($this->sourceVolume);
         $tgtVol = escapeshellarg($this->targetVolume);
         $sourceConfiguration = $this->sourceVolumeConfiguration();
-        $createTargetVolume = $this->createTargetVolumeCommand($sourceConfiguration);
+        $isBindVolume = $this->isBindVolume($sourceConfiguration);
+        $targetConfiguration = $isBindVolume ? ['driver' => 'local', 'options' => []] : $sourceConfiguration;
+        $createTargetVolume = $this->createTargetVolumeCommand($targetConfiguration);
 
-        if ($this->isBindVolume($sourceConfiguration)) {
+        if ($isBindVolume) {
             instant_remote_process([$createTargetVolume], $this->targetServer);
+            $this->rememberTargetVolumeWithoutDriverOptions($targetConfiguration);
             $this->logSkippedBindVolumeCopy($sourceConfiguration);
 
             return;
@@ -164,8 +170,8 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Creates the target volume like the source volume. The Compose file of the copy declares the same
-     * `driver` and `driver_opts`, and Docker Compose does not change the options of an existing volume.
+     * Creates the target volume with its selected driver and options. A bind clone uses a plain local
+     * volume and a name-only Compose declaration, so it never mounts the source host directory.
      * One `sh -c` line, so the non-root sudo parser only puts sudo in front of it and never changes
      * an option value.
      *
@@ -187,8 +193,8 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * A `local` volume with `type: none` and `o: bind` is a host folder. Copying the data would write
-     * into that folder (on the same server, the folder of the source volume itself), so the job only
-     * creates the volume.
+     * into that folder (on the same server, the folder of the source volume itself), so the clone gets
+     * an empty Docker-managed volume without copying the host folder.
      *
      * @param  array{driver: string, options: array<string, string>}  $configuration
      */
@@ -205,7 +211,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
     protected function logSkippedBindVolumeCopy(array $configuration): void
     {
         $device = $configuration['options']['device'] ?? 'unknown';
-        \Log::info("Volume {$this->sourceVolume} is a bind mount of the host folder {$device}. Created {$this->targetVolume} with the same options and did not copy the data.");
+        \Log::info("Volume {$this->sourceVolume} is a bind mount of the host folder {$device}. Created independent empty volume {$this->targetVolume} and did not copy the data.");
     }
 
     /**

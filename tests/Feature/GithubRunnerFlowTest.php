@@ -418,6 +418,101 @@ describe('provisioning', function () {
         Queue::assertNotPushed(CleanupGithubRunnerJob::class);
     });
 
+    it('preserves a terminal execution when provisioning fails', function (GithubRunnerStatus $status, int $attempts) {
+        Queue::fake();
+        Process::fake(['*' => Process::result(output: '29.8.0')]);
+        runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp, ['provision_attempts' => $attempts]);
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+            'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
+            'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution, $status) {
+                $execution->finish($status, 'Stopped externally');
+
+                return Http::response(['message' => 'Resource not accessible by integration'], 403);
+            },
+        ]);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->status)->toBe($status)
+            ->and($execution->fresh()->error_message)->toBe('Stopped externally');
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
+    })->with([
+        'cancelled during first attempt' => [GithubRunnerStatus::Cancelled, 0],
+        'cancelled during last attempt' => [GithubRunnerStatus::Cancelled, 2],
+        'timed out' => [GithubRunnerStatus::TimedOut, 0],
+        'completed' => [GithubRunnerStatus::Completed, 0],
+    ]);
+
+    it('does not start a runner cancelled while GitHub registers it', function () {
+        Queue::fake();
+        Process::fake(['*' => Process::result(output: '29.8.0')]);
+        runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp);
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
+            'https://api.github.com/app/installations/*' => Http::response(['token' => 'installation-token'], 201),
+            'https://api.github.com/orgs/acme/actions/runners/42' => Http::response(null, 204),
+            'https://api.github.com/orgs/acme/actions/runners/generate-jitconfig' => function () use ($execution) {
+                $execution->finish(GithubRunnerStatus::Cancelled);
+
+                return Http::response(['runner' => ['id' => 42], 'encoded_jit_config' => 'SECRET-JIT-CONFIG'], 201);
+            },
+        ]);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
+            ->and($execution->fresh()->ready_at)->toBeNull();
+        Process::assertDidntRun(fn (PendingProcess $process) => str_contains($process->command, '/home/runner/run.sh'));
+        Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
+    });
+
+    it('cleans up cancellation during remote provisioning without marking the runner ready', function (bool $duringStart) {
+        Queue::fake();
+        runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp);
+        fakeRunnerGithubApi($this->githubApp);
+        Process::fake(['*' => function (PendingProcess $process) use ($execution, $duringStart) {
+            if (! $duringStart || str_contains($process->command, '/home/runner/run.sh')) {
+                $execution->finish(GithubRunnerStatus::Cancelled);
+            }
+
+            return Process::result(output: '29.8.0');
+        }]);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
+            ->and($execution->fresh()->ready_at)->toBeNull();
+        Queue::assertPushed(CleanupGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
+        if (! $duringStart) {
+            Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/generate-jitconfig'));
+        }
+    })->with(['during preparation' => false, 'during start' => true]);
+
+    it('does not retry an execution cancelled while failed resources are removed', function () {
+        Queue::fake();
+        runnerTestConfig(runnerTestServer($this->team), $this->githubApp);
+        $execution = runnerTestExecution($this->githubApp);
+        fakeRejectedJitConfig();
+        Process::fake(['*' => function (PendingProcess $process) use ($execution) {
+            if (str_contains($process->command, 'docker rm -f -v')) {
+                $execution->finish(GithubRunnerStatus::Cancelled, 'Stopped externally');
+            }
+
+            return Process::result(output: '29.8.0');
+        }]);
+
+        (new ProvisionGithubRunnerJob($execution->id))->handle();
+
+        expect($execution->fresh()->status)->toBe(GithubRunnerStatus::Cancelled)
+            ->and($execution->fresh()->error_message)->toBe('Stopped externally');
+        Queue::assertNotPushed(ProvisionGithubRunnerJob::class, fn ($job) => $job->executionId === $execution->id);
+    });
+
     it('marks the execution failed and cleans up after the last attempt', function () {
         Queue::fake();
         Process::fake(['*' => Process::result(output: '29.8.0')]);

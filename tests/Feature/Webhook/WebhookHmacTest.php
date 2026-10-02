@@ -124,7 +124,26 @@ function makeWebhookApplicationServerFunctional(Application $application): Appli
 }
 
 describe('Manual Webhook Failed Authentication Rate Limiting', function () {
-    test('valid signed deliveries are never throttled', function (string $provider) {
+    test('a locked failure scope rejects deliveries before reading application secrets', function (string $provider, bool $validSignature) {
+        $application = createApplicationWithWebhook();
+
+        lockOutManualWebhookRepository($this, $provider, $application);
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        sendManualWebhookPush($this, $provider, $application, validSignature: $validSignature)
+            ->assertStatus(429)
+            ->assertHeader('Retry-After');
+
+        $applicationQueries = collect(DB::getQueryLog())
+            ->filter(fn (array $query): bool => str_contains($query['query'], '"applications"'));
+        DB::disableQueryLog();
+
+        expect($applicationQueries)->toBeEmpty();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([false, true]);
+
+    test('valid signed deliveries do not consume the failure limit', function (string $provider) {
         $application = createApplicationWithWebhook();
 
         for ($i = 0; $i < 80; $i++) {
@@ -137,11 +156,18 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe(0);
     })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
-    test('a signed delivery is processed while the scope is locked by failed attempts', function (string $provider) {
+    test('a signed delivery is blocked during lockout and processed after the failure window expires', function (string $provider) {
         Queue::fake();
         $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook());
 
         lockOutManualWebhookRepository($this, $provider, $application);
+
+        sendManualWebhookPush($this, $provider, $application)
+            ->assertStatus(429)
+            ->assertHeader('Retry-After');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+
+        $this->travel(61)->seconds();
 
         $response = sendManualWebhookPush($this, $provider, $application);
 
@@ -156,7 +182,7 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         lockOutManualWebhookRepository($this, $provider, $application);
         $attempts = RateLimiter::attempts(manualWebhookFailureKey($provider));
 
-        sendManualWebhookPush($this, $provider, $application)->assertOk();
+        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
         sendManualWebhookPush($this, $provider, $application, validSignature: false)
             ->assertStatus(429)
             ->assertHeader('Retry-After')
@@ -1327,8 +1353,8 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
 
-        // The correct token is still processed during the lockout.
-        sendManualWebhookPush($this, 'gitlab', $application)->assertOk()->assertSee('Deployment queued');
+        sendManualWebhookPush($this, 'gitlab', $application)->assertStatus(429);
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
     });
 
     test('repeated tokens do not extend the guess limit', function () {
@@ -1409,8 +1435,8 @@ describe('Manual Webhook Repeated Failed Deliveries', function () {
         sendManualWebhookPush($this, $provider, $application, validSignature: false, wrongSecret: 'guess-30')->assertStatus(429);
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
 
-        // A correctly signed delivery is still processed during the lockout.
-        sendManualWebhookPush($this, $provider, $application)->assertOk()->assertSee('Deployment queued');
+        sendManualWebhookPush($this, $provider, $application)->assertStatus(429);
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
     })->with(['github', 'bitbucket', 'gitea']);
 
     test('the same wrong signature for different payloads counts every payload', function (string $provider) {

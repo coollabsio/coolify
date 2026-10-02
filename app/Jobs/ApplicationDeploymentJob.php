@@ -676,7 +676,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             [
                 "docker pull {$image}",
                 'hidden' => true,
-                'ignore_errors' => true,
             ],
             [
                 "docker images -q {$image} 2>/dev/null",

@@ -76,11 +76,24 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
                 $this->waitForDocker($container, $server);
             }
 
+            if ($this->stopIfFinished($execution)) {
+                return;
+            }
+
             $runner = $api->generateJitConfig($container->name(), $config->registeredLabels(), $runnerGroupId);
             $execution->update(['runner_id' => $runner['runner_id']]);
+            if ($this->stopIfFinished($execution)) {
+                return;
+            }
             instant_remote_process($container->startCommands($runner['encoded_jit_config']), $server);
 
-            $execution->update(['ready_at' => now()]);
+            if ($this->stopIfFinished($execution)) {
+                return;
+            }
+            GithubRunnerExecution::query()
+                ->whereKey($execution->id)
+                ->whereIn('status', GithubRunnerStatus::occupying())
+                ->update(['ready_at' => now()]);
             GithubRunnerExecution::query()
                 ->whereKey($execution->id)
                 ->where('status', GithubRunnerStatus::Provisioning)
@@ -96,9 +109,20 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function handleFailure(GithubRunnerExecution $execution, \Throwable $e): void
     {
+        if ($this->stopIfFinished($execution)) {
+            return;
+        }
+
         $attempt = $execution->provision_attempts;
         if ($attempt >= self::MAX_ATTEMPTS) {
-            $execution->finish(GithubRunnerStatus::Failed, "Could not start a runner after {$attempt} attempts: {$e->getMessage()}");
+            GithubRunnerExecution::query()
+                ->whereKey($execution->id)
+                ->where('status', GithubRunnerStatus::Provisioning)
+                ->update([
+                    'status' => GithubRunnerStatus::Failed,
+                    'error_message' => "Could not start a runner after {$attempt} attempts: {$e->getMessage()}",
+                    'completed_at' => now(),
+                ]);
             CleanupGithubRunnerJob::dispatch($execution->id);
 
             return;
@@ -106,16 +130,34 @@ class ProvisionGithubRunnerJob implements ShouldBeEncrypted, ShouldQueue
 
         // The retry keeps the execution uuid, so its Docker resources must be gone before it starts again.
         (new CleanupGithubRunnerJob($execution->id))->handle();
-        $execution->update([
-            'status' => GithubRunnerStatus::Queued,
-            'github_runner_config_id' => null,
-            'server_id' => null,
-            'runner_name' => null,
-            'runner_id' => null,
-            'ready_at' => null,
-            'error_message' => "Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}",
-        ]);
+        $retried = GithubRunnerExecution::query()
+            ->whereKey($execution->id)
+            ->where('status', GithubRunnerStatus::Provisioning)
+            ->update([
+                'status' => GithubRunnerStatus::Queued,
+                'github_runner_config_id' => null,
+                'server_id' => null,
+                'runner_name' => null,
+                'runner_id' => null,
+                'ready_at' => null,
+                'error_message' => "Attempt {$attempt} of ".self::MAX_ATTEMPTS." failed: {$e->getMessage()}",
+            ]);
+        if (! $retried) {
+            return;
+        }
         self::dispatch($execution->id)->delay(now()->addSeconds(self::RETRY_DELAY_SECONDS * $attempt));
+    }
+
+    private function stopIfFinished(GithubRunnerExecution $execution): bool
+    {
+        $execution->refresh();
+        if ($execution->isActive()) {
+            return false;
+        }
+
+        CleanupGithubRunnerJob::dispatch($execution->id);
+
+        return true;
     }
 
     /**

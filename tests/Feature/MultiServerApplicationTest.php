@@ -340,10 +340,16 @@ class MultiServerRecordingDeploymentJob extends ApplicationDeploymentJob
     /** Output that `docker images -q` returns; empty means the image is missing. */
     public string $localImageOutput = 'sha256:0123456789ab';
 
+    public bool $failImagePull = false;
+
     public function execute_remote_command(...$commands): void
     {
         foreach ($commands as $command) {
-            $this->recordedCommands[] = $command['command'] ?? $command[0];
+            $remoteCommand = $command['command'] ?? $command[0];
+            $this->recordedCommands[] = $remoteCommand;
+            if ($this->failImagePull && str_starts_with($remoteCommand, 'docker pull ') && ! ($command['ignore_errors'] ?? false)) {
+                throw new RuntimeException('Registry image pull failed.');
+            }
             if (isset($command['save'])) {
                 (new ReflectionProperty(ApplicationDeploymentJob::class, 'saved_outputs'))->getValue($this)->put($command['save'], $this->localImageOutput);
             }
@@ -388,6 +394,18 @@ describe('inline Dockerfile image on additional servers', function () {
                 "docker pull 'registry.example.com/nginx-multi:latest'",
                 "docker images -q 'registry.example.com/nginx-multi:latest' 2>/dev/null",
             ]);
+    });
+
+    test('an additional server fails when pulling the image fails even if an old image is cached', function () {
+        [$job, $reflection] = makeInlineDockerfileJob($this->application->fresh(), true);
+        $job->failImagePull = true;
+        $job->localImageOutput = 'sha256:stale-cached-image';
+
+        expect(fn () => $reflection->getMethod('pull_image_for_additional_server')->invoke($job))
+            ->toThrow(RuntimeException::class, 'Registry image pull failed.');
+        expect($job->recordedCommands)->toBe([
+            "docker pull 'registry.example.com/nginx-multi:latest'",
+        ]);
     });
 
     test('a deployments only server explains that the main server must push a missing image', function () {

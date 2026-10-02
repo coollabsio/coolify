@@ -430,6 +430,10 @@ class Gitlab extends Controller
             }
             $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
+            if ($this->hasTooManyManualWebhookFailures($failure_key)) {
+                return $this->tooManyManualWebhookFailuresResponse($failure_key);
+            }
+
             // GitLab sends a static token. A repeated wrong token is one guess.
             $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);
             $applications = Application::query();
