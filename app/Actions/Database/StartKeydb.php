@@ -25,6 +25,8 @@ class StartKeydb
 
     private string $resolvedRedisPassword;
 
+    private bool $redisPasswordFromSecretManager = false;
+
     public function handle(StandaloneKeydb $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -251,9 +253,12 @@ class StartKeydb
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $rawValue;
+                $this->resolvedRedisPassword = $composeFileValue;
+                $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
             }
         }
 
@@ -281,7 +286,7 @@ class StartKeydb
     {
         $hasKeydbConf = ! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf);
         $keydbConfPath = '/etc/keydb/keydb.conf';
-        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
+        $passwordArgument = $this->requirePassArgument();
 
         if ($hasKeydbConf) {
             $confContent = $this->database->keydb_conf;
@@ -290,10 +295,10 @@ class StartKeydb
             if ($hasRequirePass) {
                 $command = "keydb-server $keydbConfPath";
             } else {
-                $command = "keydb-server $keydbConfPath --requirepass {$escapedRedisPassword}";
+                $command = "keydb-server $keydbConfPath --requirepass {$passwordArgument}";
             }
         } else {
-            $command = "keydb-server --requirepass {$escapedRedisPassword} --appendonly yes";
+            $command = "keydb-server --requirepass {$passwordArgument} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {
@@ -308,5 +313,20 @@ class StartKeydb
         }
 
         return $command;
+    }
+
+    /**
+     * The password argument of the start command. Docker Compose splits the command like a shell, so the
+     * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
+     * quoting would change the password the server receives (backslashes and quotes), so their server
+     * password stays the same.
+     */
+    private function requirePassArgument(): string
+    {
+        $keepsUnquotedPassword = $this->database->legacy_password_quoting
+            && ! $this->redisPasswordFromSecretManager
+            && strpbrk($this->resolvedRedisPassword, '\\\'"') !== false;
+
+        return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }
 }

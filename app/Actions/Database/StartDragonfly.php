@@ -25,6 +25,8 @@ class StartDragonfly
 
     private string $resolvedRedisPassword;
 
+    private bool $redisPasswordFromSecretManager = false;
+
     public function handle(StandaloneDragonfly $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -196,8 +198,8 @@ class StartDragonfly
 
     private function buildStartCommand(): string
     {
-        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
-        $command = "dragonfly --requirepass {$escapedRedisPassword}";
+        $passwordArgument = $this->requirePassArgument();
+        $command = "dragonfly --requirepass {$passwordArgument}";
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
@@ -251,9 +253,12 @@ class StartDragonfly
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $rawValue;
+                $this->resolvedRedisPassword = $composeFileValue;
+                $this->redisPasswordFromSecretManager = $this->database->environmentVariableUsesSecretManager($env);
             }
         }
 
@@ -262,5 +267,20 @@ class StartDragonfly
         }
 
         return $environment_variables->all();
+    }
+
+    /**
+     * The password argument of the start command. Docker Compose splits the command like a shell, so the
+     * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
+     * quoting would change the password the server receives (backslashes and quotes), so their server
+     * password stays the same.
+     */
+    private function requirePassArgument(): string
+    {
+        $keepsUnquotedPassword = $this->database->legacy_password_quoting
+            && ! $this->redisPasswordFromSecretManager
+            && strpbrk($this->resolvedRedisPassword, '\\\'"') !== false;
+
+        return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }
 }

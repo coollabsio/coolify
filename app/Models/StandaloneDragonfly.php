@@ -73,6 +73,7 @@ class StandaloneDragonfly extends BaseModel
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
         'dragonfly_password' => 'encrypted',
+        'legacy_password_quoting' => 'boolean',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -99,6 +100,9 @@ class StandaloneDragonfly extends BaseModel
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
                 $database->last_online_at = now();
+            }
+            if ($database->exists && $database->isDirty('dragonfly_password')) {
+                $database->legacy_password_quoting = false;
             }
         });
     }
