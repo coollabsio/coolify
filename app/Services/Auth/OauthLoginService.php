@@ -132,13 +132,14 @@ class OauthLoginService
 
                 $user = User::whereEmail($email)->first();
 
-                // Before OAuth identities existed, OAuth sign-in matched users by email only.
-                // Users from that time keep signing in without email delivery, so their
-                // first identity links without a provider verification claim. A user who
-                // has a password never gets this exemption. This check runs first, so an
-                // unverified email cannot reveal a linked account.
+                // Linking to an existing account needs a verified email. A new account
+                // follows the registration settings, like password registration, which
+                // does not verify the email either. Password-less users from before OAuth
+                // identities existed (OAuth matched by email only) link their first
+                // identity without a verification claim. This check runs before the
+                // linked-account check, so an unverified email cannot reveal one.
                 $isPreUpgradeOauthUser = $user?->created_before_oauth_identities === true && ! $user->hasPassword();
-                if (! $isPreUpgradeOauthUser && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
+                if ($user && ! $isPreUpgradeOauthUser && ! $this->hasVerifiedEmail($provider, $rawClaims, $email)) {
                     throw new OauthLoginException('OAuth provider did not verify the email address', 'auth.failed.oauth_email_unverified');
                 }
 

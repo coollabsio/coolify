@@ -878,3 +878,47 @@ it('allows OAuth user creation through global registration or the OIDC user crea
     'oidc, registration off, oidc user creation off' => ['oidc', false, false, false],
     'oidc, registration on, oidc user creation off' => ['oidc', true, false, true],
 ]);
+
+it('registers a new user from an unverified provider email when registration is enabled', function (string $provider, array $rawClaims) {
+    InstanceSettings::findOrFail(0)->update(['is_registration_enabled' => true]);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+    ]);
+
+    $user = app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'new-user@example.com',
+        'name' => 'New User',
+        'id' => 'new-provider-id',
+        'user' => $rawClaims,
+    ], $setting);
+
+    expect($user->email)->toBe('new-user@example.com')
+        ->and(OauthIdentity::where(['user_id' => $user->id, 'provider' => $provider])->exists())->toBeTrue();
+    $this->assertAuthenticatedAs($user);
+})->with([
+    'authentik default email scope' => ['authentik', ['email_verified' => false]],
+    'discord unverified' => ['discord', ['verified' => false]],
+    'gitlab unconfirmed' => ['gitlab', ['confirmed_at' => null]],
+]);
+
+it('tells a new user with an unverified provider email that registration is disabled', function () {
+    $setting = OauthSetting::updateOrCreate(['provider' => 'authentik'], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+    ]);
+
+    expect(fn () => app(OauthLoginService::class)->login('authentik', (object) [
+        'email' => 'new-user@example.com',
+        'name' => 'New User',
+        'id' => 'new-provider-id',
+        'user' => ['email_verified' => false],
+    ], $setting))->toThrow(HttpException::class, 'Registration is disabled');
+
+    expect(User::count())->toBe(0);
+    $this->assertGuest();
+});
