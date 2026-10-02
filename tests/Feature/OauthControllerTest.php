@@ -257,16 +257,106 @@ it('links an existing account on the first login after upgrade from the real pro
     ]],
 ]);
 
-it('marks only users that exist at upgrade time as created before OAuth identities', function () {
-    $existingUser = User::factory()->create();
+function rerunCreatedBeforeOauthIdentitiesMigration(): void
+{
     $migration = require database_path('migrations/2026_09_29_200325_add_created_before_oauth_identities_to_users_table.php');
     $migration->down();
     $migration->up();
+}
 
-    $newUser = User::factory()->create();
+/**
+ * Brings the users into the state after an upgrade from v4.3.23.
+ */
+function upgradeUsersToOauthIdentities(): void
+{
+    rerunCreatedBeforeOauthIdentitiesMigration();
+}
 
-    expect($existingUser->refresh()->created_before_oauth_identities)->toBeTrue()
+it('marks only password-less users that exist at upgrade time as created before OAuth identities', function () {
+    $rootUser = User::factory()->create(['id' => 0]);
+    $passwordUser = User::factory()->create();
+    $oauthCreatedUser = User::factory()->create(['password' => null]);
+
+    rerunCreatedBeforeOauthIdentitiesMigration();
+
+    $newUser = User::factory()->create(['password' => null]);
+
+    expect($oauthCreatedUser->refresh()->created_before_oauth_identities)->toBeTrue()
+        ->and($rootUser->refresh()->created_before_oauth_identities)->toBeFalse()
+        ->and($passwordUser->refresh()->created_before_oauth_identities)->toBeFalse()
         ->and($newUser->refresh()->created_before_oauth_identities)->toBeFalse();
+});
+
+it('does not link an unverified provider email to a password user after the upgrade', function (string $provider, array $rawClaims) {
+    $user = User::factory()->create(['id' => 0, 'email' => 'root@example.com']);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'base_url' => 'https://auth.example.com',
+        'enabled' => true,
+    ]);
+    upgradeUsersToOauthIdentities();
+
+    expect(fn () => app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'root@example.com',
+        'name' => 'Attacker',
+        'id' => 'attacker-provider-id',
+        'user' => $rawClaims,
+    ], $setting))->toThrow(HttpException::class, 'OAuth provider did not verify the email address');
+
+    $this->assertGuest();
+    expect(OauthIdentity::count())->toBe(0)
+        ->and($user->refresh()->created_before_oauth_identities)->toBeFalse();
+})->with([
+    'discord unverified' => ['discord', ['verified' => false]],
+    'authentik default email scope' => ['authentik', ['email_verified' => false]],
+]);
+
+it('links a verified provider email to a password user after the upgrade', function (string $provider, array $rawClaims) {
+    $user = User::factory()->create(['email' => 'member@example.com']);
+    $setting = OauthSetting::updateOrCreate(['provider' => $provider], [
+        'client_id' => 'client-id',
+        'client_secret' => 'client-secret',
+        'enabled' => true,
+    ]);
+    upgradeUsersToOauthIdentities();
+
+    $resolvedUser = app(OauthLoginService::class)->login($provider, (object) [
+        'email' => 'member@example.com',
+        'name' => 'Member',
+        'id' => 'member-provider-id',
+        'user' => $rawClaims,
+    ], $setting);
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and(OauthIdentity::where(['user_id' => $user->id, 'provider' => $provider])->exists())->toBeTrue();
+    $this->assertAuthenticatedAs($user);
+})->with([
+    'github' => ['github', []],
+    'google verified' => ['google', ['email_verified' => true, 'hd' => 'example.com']],
+    'discord verified' => ['discord', ['verified' => true]],
+]);
+
+it('links a password-less user from before the upgrade without an email verification claim', function () {
+    $user = User::factory()->create(['email' => 'legacy@example.com', 'password' => null]);
+    $setting = OauthSetting::create([
+        'provider' => 'discord',
+        'client_id' => 'discord-client-id',
+        'client_secret' => 'discord-client-secret',
+        'enabled' => true,
+    ]);
+    upgradeUsersToOauthIdentities();
+
+    $resolvedUser = app(OauthLoginService::class)->login('discord', (object) [
+        'email' => 'legacy@example.com',
+        'name' => 'Legacy User',
+        'id' => 'legacy-discord-id',
+        'user' => ['verified' => false],
+    ], $setting);
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and($user->refresh()->created_before_oauth_identities)->toBeFalse();
+    $this->assertAuthenticatedAs($user);
 });
 
 it('links a user from before the upgrade without an email verification claim', function (string $provider, array $rawClaims, ?string $password) {
@@ -609,4 +699,22 @@ it('rejects a Google account outside the configured Workspace even when its emai
 
     expect(OauthIdentity::count())->toBe(0);
     $this->assertGuest();
+});
+
+it('sends the instance callback url without saving it when a forged host starts an oauth login', function () {
+    InstanceSettings::query()->whereKey(0)->update(['fqdn' => 'https://coolify.example.com']);
+    Once::flush();
+    OauthSetting::create([
+        'provider' => 'github',
+        'client_id' => 'github-client-id',
+        'client_secret' => 'github-client-secret',
+        'enabled' => true,
+    ]);
+
+    $response = $this->get('http://attacker.example/auth/github/redirect');
+
+    $response->assertRedirect();
+    parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+    expect($query['redirect_uri'])->toBe('https://coolify.example.com/auth/github/callback')
+        ->and(OauthSetting::where('provider', 'github')->value('redirect_uri'))->toBeNull();
 });

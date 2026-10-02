@@ -58,7 +58,7 @@
                         @if ($provider === 'oidc')
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.redirect_uri"
-                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                                placeholder="{{ oauth_default_redirect_uri($provider) }}" label="Redirect URI" />
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.base_url" label="Issuer URL" required
                                 helper="OpenID Provider issuer URL, for example https://example.okta.com. Coolify uses it to discover the authorization, token, userinfo, and JWKS endpoints." />
@@ -81,7 +81,7 @@
                         @else
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.redirect_uri"
-                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                                placeholder="{{ oauth_default_redirect_uri($provider) }}" label="Redirect URI" />
                             <x-forms.input canGate="update" :canResource="$settings"
                                 id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
                             <x-forms.input canGate="update" :canResource="$settings"

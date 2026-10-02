@@ -8,9 +8,12 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Before OAuth identities existed, OAuth sign-in matched users by email only.
-     * Mark every user that exists at upgrade time so their first OAuth identity
-     * links without a provider email verification claim.
+     * Before OAuth identities existed, OAuth sign-in matched users by email only
+     * and created users without a password. Mark those password-less users so
+     * their first OAuth identity links without a provider email verification
+     * claim. Users with a password (including root) never get this exemption:
+     * otherwise anyone with an unverified provider account with their email
+     * could sign in as them.
      */
     public function up(): void
     {
@@ -18,7 +21,9 @@ return new class extends Migration
             $table->boolean('created_before_oauth_identities')->default(false);
         });
 
-        DB::table('users')->update(['created_before_oauth_identities' => true]);
+        DB::table('users')
+            ->whereNull('password')
+            ->update(['created_before_oauth_identities' => true]);
     }
 
     public function down(): void
