@@ -153,8 +153,8 @@
             "hash": "tree-v2:935f438d7fd622b867b4752ae68b906f120cd770c126d4c2f6dbfc49eaec4dbb"
         },
         "laravel/tinker": {
-            "version": "v2.11.1",
-            "hash": "tree-v2:dbf0a4e6982ec1eb10731c20edaca53829317d294b9a61432b3832a0ef5270fe"
+            "version": "v3.0.2",
+            "hash": "tree-v2:07c01215fec4bef8c1a223bba86119b769ab70dd45d7013834d3dfcdf8046fea"
         },
         "laravel/ui": {
             "version": "v4.6.3",
@@ -649,16 +649,16 @@
             "hash": "tree-v2:6cf1763f4c700d9ead924182f1176ee815be6414cb1ea67bc6e92d13fc3461b2"
         },
         "symfony/yaml": {
-            "version": "v7.4.20",
-            "hash": "tree-v2:6df48f1dc34ac760427993457ed35021434f1ae3d5ebfd610dfffee57bc7cfe9"
+            "version": "v8.1.8",
+            "hash": "tree-v2:8d990fa9be574dec0fbb19199b855c71c40515b9feebaa996d44de7c954143ee"
         },
         "tijsverkoyen/css-to-inline-styles": {
             "version": "v2.4.0",
             "hash": "tree-v2:ac5b86c6dee0dc8f5c5f7f98d250d378d8c65dde04156022650e4776734f7fcb"
         },
         "visus/cuid2": {
-            "version": "6.0.0",
-            "hash": "tree-v2:e96d37d3b83f67809d1ea0fb7f4e33f9879d7aeb2dc5b4fa2135b84177e651c9"
+            "version": "7.0.0",
+            "hash": "tree-v2:9558deceb662c50e421e5e42402f973d6cdf72af45322f5274337f6fb741ad2a"
         },
         "vlucas/phpdotenv": {
             "version": "v5.7.0",
@@ -963,8 +963,8 @@
             "hash": "tree-v2:26d964435c381c94abd5dbadf497d7888b5a811f0693b66aa7976a3d01c545ba"
         },
         "symfony/http-client": {
-            "version": "v7.4.20",
-            "hash": "tree-v2:01cdb0293ea860ec2a8a73a855d8a05ed611e0f71cdaad02699782a8f47f5ccc"
+            "version": "v8.1.8",
+            "hash": "tree-v2:4ef9be0a8af777834c59a7d18c442cbb950b4e5e4d725c22250d301d1ffb7ccb"
         },
         "symfony/http-client-contracts": {
             "version": "v3.7.3",
