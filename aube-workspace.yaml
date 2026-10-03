@@ -8,5 +8,7 @@ jailBuildExclusions:
 minimumReleaseAge: 4320 # 3 days
 advisoryCheckEveryInstall: true
 
+securityScanner: "@socketsecurity/bun-security-scanner"
+
 nodeLinker: isolated
 enableGlobalVirtualStore: false

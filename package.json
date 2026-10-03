@@ -8,6 +8,7 @@
         "clean": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans"
     },
     "devDependencies": {
+        "@socketsecurity/bun-security-scanner": "^1.1.3",
         "@tailwindcss/forms": "0.5.11",
         "@tailwindcss/postcss": "4.3.3",
         "@tailwindcss/typography": "0.5.20",
