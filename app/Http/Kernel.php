@@ -10,6 +10,7 @@ use App\Http\Middleware\CanAccessTerminal;
 use App\Http\Middleware\CanCreateResources;
 use App\Http\Middleware\CanUpdateResource;
 use App\Http\Middleware\CheckForcePasswordReset;
+use App\Http\Middleware\CheckMigrationStatus;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
@@ -55,6 +56,7 @@ class Kernel extends HttpKernel
         TrustProxies::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
+        CheckMigrationStatus::class,
         ValidatePostSize::class,
         TrimStrings::class,
         ConvertEmptyStringsToNull::class,
