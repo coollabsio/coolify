@@ -16,7 +16,6 @@ use App\Models\ServiceDatabase;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
 use App\Services\RestartCountTracker;
-use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +24,6 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GetContainersStatus
 {
     use AsAction;
-    use CalculatesExcludedStatus;
 
     public string $jobQueue = 'high';
 
@@ -121,17 +119,7 @@ class GetContainersStatus
             } else {
                 $labels = data_get($container, 'Config.Labels');
             }
-            $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status');
-            if ($containerStatus === 'restarting') {
-                $healthSuffix = $containerHealth ?? 'unknown';
-                $containerStatus = "restarting:$healthSuffix";
-            } elseif ($containerStatus === 'exited') {
-                // Keep as-is, no health suffix for exited containers
-            } else {
-                $healthSuffix = $containerHealth ?? 'unknown';
-                $containerStatus = "$containerStatus:$healthSuffix";
-            }
+            $containerStatus = ContainerStatusAggregator::containerStatus($container);
             $flatLabels = format_docker_labels_to_json($labels);
             $labels = Arr::undot($flatLabels);
             if (filter_var(data_get($labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
@@ -538,25 +526,7 @@ class GetContainersStatus
 
     private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
     {
-        // Parse docker compose to check for excluded containers
-        $dockerComposeRaw = data_get($application, 'docker_compose_raw');
-        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
-
-        // Filter out excluded containers
-        $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
-            return ! $excludedContainers->contains($containerName);
-        });
-
-        // If all containers are excluded, calculate status from excluded containers
-        if ($relevantStatuses->isEmpty()) {
-            return $this->calculateExcludedStatusFromStrings($containerStatuses);
-        }
-
-        // Use ContainerStatusAggregator service for state machine logic
-        // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
-        $aggregator = new ContainerStatusAggregator;
-
-        return $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
+        return (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($application, 'docker_compose_raw'), $maxRestartCount);
     }
 
     private function aggregateServiceContainerStatuses($services)
@@ -596,34 +566,7 @@ class GetContainersStatus
                 continue;
             }
 
-            // Parse docker compose from service to check for excluded containers
-            $dockerComposeRaw = data_get($service, 'docker_compose_raw');
-            $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
-
-            // Filter out excluded containers
-            $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
-                return ! $excludedContainers->contains($containerName);
-            });
-
-            // If all containers are excluded, calculate status from excluded containers
-            if ($relevantStatuses->isEmpty()) {
-                $aggregatedStatus = $this->calculateExcludedStatusFromStrings($containerStatuses);
-                if ($aggregatedStatus) {
-                    $statusFromDb = $subResource->status;
-                    if ($statusFromDb !== $aggregatedStatus) {
-                        $subResource->update(['status' => $aggregatedStatus]);
-                    } else {
-                        $subResource->update(['last_online_at' => now()]);
-                    }
-                }
-
-                continue;
-            }
-
-            // Use ContainerStatusAggregator service for state machine logic
-            // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
-            $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, preserveRestarting: true);
+            $aggregatedStatus = (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($service, 'docker_compose_raw'));
 
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus) {
