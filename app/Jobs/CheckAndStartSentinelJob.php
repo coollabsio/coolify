@@ -32,16 +32,15 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 
     public function handle(): void
     {
-        if (! $this->sentinelIsEnabled()) {
+        if (! $this->sentinelIsEnabled() || ! $this->server->isFunctional()) {
             return;
         }
 
         $latestVersion = get_latest_sentinel_version();
 
-        // Check if sentinel is running
-        $sentinelFound = instant_remote_process_with_timeout(['docker inspect coolify-sentinel'], $this->server, false, 10);
-        $sentinelFoundJson = json_decode($sentinelFound, true);
-        $sentinelStatus = data_get($sentinelFoundJson, '0.State.Status', 'exited');
+        // An SSH failure throws here, so it is never mistaken for a missing container.
+        // A missing container gives empty output and exit code 0.
+        $sentinelStatus = instant_remote_process_with_timeout(["docker ps -a --filter 'name=^coolify-sentinel$' --format '{{.State}}'"], $this->server);
         if ($sentinelStatus !== 'running') {
             $this->startSentinel($latestVersion);
 

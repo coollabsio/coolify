@@ -30,6 +30,8 @@ beforeEach(function () {
     $this->server->settings->update([
         'is_sentinel_enabled' => true,
         'server_timezone' => 'UTC',
+        'is_reachable' => true,
+        'is_usable' => true,
     ]);
 
     $this->server->refresh();
@@ -169,6 +171,8 @@ it('handles multiple servers with different sentinel eligibility', function () {
     $server3->settings->update([
         'is_sentinel_enabled' => true,
         'server_timezone' => 'UTC',
+        'is_reachable' => true,
+        'is_usable' => true,
     ]);
 
     $instanceSettings = InstanceSettings::first();

@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
@@ -208,24 +207,17 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     );
 }
 
-function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
+/**
+ * Throws the remote command error. Handler::register() never sends RuntimeException to Sentry,
+ * so SSH key, DNS, and timeout failures on user servers are not reported.
+ */
+function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
 {
-    $ignoredErrors = collect([
-        'Permission denied (publickey',
-        'Could not resolve hostname',
-    ]);
-    $ignored = $ignoredErrors->contains(fn ($error) => Str::contains($errorOutput, $error));
-
-    // Ensure we always have a meaningful error message
     $errorMessage = trim($errorOutput);
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
     }
 
-    if ($ignored) {
-        // TODO: Create new exception and disable in sentry
-        throw new RuntimeException($errorMessage, $exitCode);
-    }
     throw new RuntimeException($errorMessage, $exitCode);
 }
 

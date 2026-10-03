@@ -10,18 +10,19 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
 | `crons`       | `crons`       | `HORIZON_CRONS_PROCESSES`       | 60               |
 | `high`        | `high`        | `HORIZON_HIGH_PROCESSES`        | 60               |
 | `default`     | `default`     | `HORIZON_DEFAULT_PROCESSES`     | 40               |
-| `maintenance` | `maintenance` | `HORIZON_MAINTENANCE_PROCESSES` | 10               |
+| `maintenance` | `maintenance` | `HORIZON_MAINTENANCE_PROCESSES` | 60               |
 | `webhooks`    | `webhooks`    | `HORIZON_WEBHOOKS_PROCESSES`    | 10               |
 
-- Counts apply to **each node**. Two nodes with the defaults run 480 workers.
+- Counts apply to **each node**. Two nodes with the defaults run 580 workers.
 - `maintenance` runs Docker cleanups (scheduled, manual, and the cleanup
-  that runs after a resource stops). Remote prunes can be slow, so this pool
-  is small on purpose: it limits how many cleanups run at the same time and
-  keeps them away from the `high` workers. It is added on top of the other
+  that runs after a resource stops) and the weekly server patch checks.
+  Remote prunes and package checks can be slow, so this pool limits how many
+  of them run at the same time and keeps them away from the `high` workers. It is added on top of the other
   pools. Each cleanup has a 600 s timeout, and only one cleanup runs per
   server at a time. Self-hosted instances keep cleanups on `high`.
-- `webhooks` processes GitHub pull request webhooks and Stripe events, so a
-  full `high` queue cannot delay them. These jobs are short (60 s timeout or
+- `webhooks` processes GitHub pull request webhooks, Stripe events, and the
+  server limit checks that follow subscription changes, so a full `high`
+  queue cannot delay them. These jobs are short (60 s timeout or
   less). Self-hosted instances keep them on `high`.
 - Each pool has `minProcesses = maxProcesses` and `balance = false`. Horizon
   does not scale them.
@@ -48,7 +49,7 @@ HORIZON_DEPLOYMENTS_PROCESSES=60
 HORIZON_CRONS_PROCESSES=60
 HORIZON_HIGH_PROCESSES=60
 HORIZON_DEFAULT_PROCESSES=40
-HORIZON_MAINTENANCE_PROCESSES=10
+HORIZON_MAINTENANCE_PROCESSES=60
 HORIZON_WEBHOOKS_PROCESSES=10
 # Worker timeout. Must stay above the longest job timeout (36000 s) and below
 # retry_after (86400 s). The config clamps it to 36600..85800.

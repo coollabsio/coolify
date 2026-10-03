@@ -1055,7 +1055,7 @@ function crons_queue(): string
 
 /**
  * Resolve the queue used for slow server maintenance — scheduled, manual and stop-triggered
- * Docker cleanups.
+ * Docker cleanups, and weekly server patch checks.
  *
  * On cloud these jobs run on a dedicated `maintenance` queue so a small, bounded Horizon pool
  * drains them and slow remote prunes cannot occupy the `high` workers; self-hosted keeps them
@@ -1071,8 +1071,8 @@ function maintenance_queue(): string
 }
 
 /**
- * Resolve the queue used for incoming webhook processing — GitHub pull request webhooks and
- * Stripe events.
+ * Resolve the queue used for incoming webhook processing — GitHub pull request webhooks,
+ * Stripe events, and the server limit checks that follow subscription changes.
  *
  * On cloud these jobs run on a dedicated `webhooks` queue so a busy `high` queue cannot delay
  * them; self-hosted keeps them on the shared `high` queue, so a custom `HORIZON_QUEUES` does

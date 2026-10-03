@@ -39,12 +39,13 @@ $selfHostedSupervisor = $workerOptions + [
 | positive integer) fall back to the default.
 |
 | The `maintenance` pool (see maintenance_queue()) runs slow remote Docker
-| cleanups. It is small on purpose: it bounds how many cleanups run at once
-| per node, and it comes on top of the other pools, so cleanups never take
+| cleanups and server patch checks. It bounds how many of them run at once
+| per node, and it comes on top of the other pools, so they never take
 | deployment, cron or high workers.
 |
 | The `webhooks` pool (see webhooks_queue()) processes GitHub pull request
-| webhooks and Stripe events, so other jobs cannot delay them.
+| webhooks, Stripe events, and server limit checks, so other jobs cannot
+| delay them.
 */
 $cloudSupervisors = [];
 
@@ -53,7 +54,7 @@ foreach ([
     'crons' => ['HORIZON_CRONS_PROCESSES', 60],
     'high' => ['HORIZON_HIGH_PROCESSES', 60],
     'default' => ['HORIZON_DEFAULT_PROCESSES', 40],
-    'maintenance' => ['HORIZON_MAINTENANCE_PROCESSES', 10],
+    'maintenance' => ['HORIZON_MAINTENANCE_PROCESSES', 60],
     'webhooks' => ['HORIZON_WEBHOOKS_PROCESSES', 10],
 ] as $queue => [$processesEnv, $defaultProcesses]) {
     $processes = filter_var(env($processesEnv), FILTER_VALIDATE_INT, [

@@ -60,6 +60,16 @@ it('dispatches an hourly Sentinel version check for a healthy Sentinel', functio
     });
 });
 
+it('skips the hourly Sentinel version check when the server is unreachable or unusable', function (string $flag) {
+    $server = createSentinelCheckServer($this->team, Carbon::now());
+    Carbon::setTestNow(Carbon::now()->setMinute($server->id % 60));
+    $server->settings->update([$flag => false]);
+
+    (new ServerManagerJob)->handle();
+
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class);
+})->with(['is_reachable', 'is_usable']);
+
 it('skips the hourly SSH version check when Sentinel reports its version on push', function () {
     $server = createSentinelCheckServer($this->team, Carbon::now());
     Cache::put(Server::sentinelReportedVersionCacheKey($server->id), '1.0.2', now()->addHours(2));

@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -26,7 +27,10 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping('server-patch-check-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue(maintenance_queue());
+    }
 
     public function handle(): void
     {
@@ -57,7 +61,7 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             // Log error but don't fail the job
-            \Illuminate\Support\Facades\Log::error('ServerPatchCheckJob failed: '.$e->getMessage(), [
+            Log::error('ServerPatchCheckJob failed: '.$e->getMessage(), [
                 'server_id' => $this->server->id,
                 'server_name' => $this->server->name,
                 'error' => $e->getMessage(),

@@ -1,7 +1,11 @@
 <?php
 
 use App\Jobs\ProcessGithubPullRequestWebhook;
+use App\Jobs\ServerLimitCheckJob;
+use App\Jobs\ServerPatchCheckJob;
 use App\Jobs\StripeProcessJob;
+use App\Models\Server;
+use App\Models\Team;
 use Laravel\Horizon\ProvisioningPlan;
 use Laravel\Horizon\SupervisorOptions;
 
@@ -99,7 +103,7 @@ test('cloud production runs one fixed-size pool per queue with default process c
     $production = $parsed['production'];
     expect(array_keys($production))->toBe(['deployments', 'crons', 'high', 'default', 'maintenance', 'webhooks']);
 
-    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 10, 'webhooks' => 10] as $queue => $processes) {
+    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 60, 'webhooks' => 10] as $queue => $processes) {
         $pool = $production[$queue];
         expect($pool->queue)->toBe($queue)
             ->and($pool->balancing())->toBeFalse()
@@ -140,7 +144,7 @@ test('cloud pool sizes come from env and invalid values fall back to defaults', 
         'HORIZON_MAINTENANCE_PROCESSES' => 'ten',
     ]))['production'];
 
-    expect($fallback['maintenance']->maxProcesses)->toBe(10);
+    expect($fallback['maintenance']->maxProcesses)->toBe(60);
 });
 
 test('cloud queue helpers route to queues that have a dedicated pool', function () {
@@ -185,9 +189,21 @@ test('webhook jobs run on the webhooks queue on cloud and on high on self-hosted
         fullName: 'coollabsio/coolify',
     );
 
+    $serverLimitJob = new ServerLimitCheckJob(new Team);
+
     expect($stripeJob->queue)->toBe($queue)
-        ->and($githubJob->queue)->toBe($queue);
+        ->and($githubJob->queue)->toBe($queue)
+        ->and($serverLimitJob->queue)->toBe($queue);
 })->with([
     'cloud' => [false, 'webhooks'],
+    'self-hosted' => [true, 'high'],
+]);
+
+test('server patch checks run on the maintenance queue on cloud and on high on self-hosted', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+
+    expect((new ServerPatchCheckJob(new Server))->queue)->toBe($queue);
+})->with([
+    'cloud' => [false, 'maintenance'],
     'self-hosted' => [true, 'high'],
 ]);

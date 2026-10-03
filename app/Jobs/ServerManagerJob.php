@@ -171,9 +171,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Sentinel versions that report their version on push are updated by SentinelController.
+        // Unreachable servers are skipped: the SSH check would only fail. The connection check recovers them.
         if ($server->isSentinelEnabled()
             && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
             && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
+            && $server->isFunctional()
         ) {
             CheckAndStartSentinelJob::dispatch($server);
         }
