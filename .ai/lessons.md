@@ -65,6 +65,7 @@
 - A Redis instance that holds queues must use `maxmemory-policy noeviction`; an evicting policy deletes queued jobs without an error. Before changing scheduler code for missed runs, check `INFO stats` `evicted_keys`.
 - Keep pending occurrences recoverable across publisher interruptions, and define an explicit bounded policy for late or offline schedules.
 - Horizon workers are long-lived: flush every static or `once()` cache (for example `Server::flushIdentityMap()`) in `Queue::before`, or later jobs decide with stale state.
+- A job of a killed worker comes back after `retry_after` (one day) as attempt 2. With `tries > 1` it runs again a day late; queued jobs that must not run late need `tries = 1` or an attempt guard, and `failed()` must not guess its execution row from "the latest" record.
 
 ## Fail closed at public webhook boundaries
 - Reject missing or blank secrets before signature verification, and return generic errors without logging secrets, signatures, or payloads.

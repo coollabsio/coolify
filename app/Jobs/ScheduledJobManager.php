@@ -136,15 +136,20 @@ class ScheduledJobManager implements ShouldQueue
         $this->logStart();
         $jobTypes = $this->type === null ? null : self::TYPES[$this->type];
 
-        try {
-            app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued($jobTypes);
-        } catch (\Throwable $e) {
-            Log::channel('scheduled-errors')->error('Failed to recover stale enqueued occurrences', [
-                'error' => $e->getMessage(),
-            ]);
+        $deliveries = app(ScheduledJobDeliveryService::class);
+        foreach ([
+            'Failed to recover stale enqueued occurrences' => fn () => $deliveries->recoverStaleEnqueued($jobTypes),
+            'Failed to recover interrupted occurrences' => fn () => $deliveries->failInterruptedClaims($jobTypes),
+            'Failed to publish pending occurrences' => fn () => $deliveries->publishPending($jobTypes),
+        ] as $errorMessage => $recover) {
+            try {
+                $recover();
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error($errorMessage, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
-
-        app(ScheduledJobDeliveryService::class)->publishPending($jobTypes);
 
         // Process scheduled backups and tasks together so neither type starves the other.
         try {

@@ -107,6 +107,15 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        // maxExceptions = 1 fails the job on its first error, so a second attempt only happens
+        // when Redis hands the job out again after its worker was killed (retry_after, about a
+        // day later). The command may have run already, so it is not run again late.
+        if ($this->attempts() > 1) {
+            $this->fail(new \RuntimeException('The worker stopped while this task was running. The task is not run again late.'));
+
+            return;
+        }
+
         if ($this->occurrenceUuid && ! app(ScheduledJobDeliveryService::class)->claim($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid)) {
             return;
         }
@@ -266,10 +275,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             $execution = ScheduledTaskExecution::find($this->executionId);
         }
 
-        // If no stored ID or not found, query for the most recent execution log for this task
+        // If no stored ID or not found, query for the most recent unfinished execution log for this
+        // task. A finished execution belongs to another run and must keep its result.
         if (! $execution) {
             $execution = ScheduledTaskExecution::query()
                 ->where('scheduled_task_id', $this->task->id)
+                ->whereNull('finished_at')
                 ->orderBy('created_at', 'desc')
                 ->first();
         }
