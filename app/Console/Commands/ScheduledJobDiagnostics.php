@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ServerManagerJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
@@ -210,7 +211,8 @@ class ScheduledJobDiagnostics extends Command
             }
 
             $dedupKeys = [
-                "server-patch-check:{$server->id}" => '0 0 * * 0',
+                "server-patch-check:{$server->id}" => ServerManagerJob::patchCheckCron($server),
+                "sentinel-version-check:{$server->id}" => ServerManagerJob::sentinelVersionCheckCron($server),
                 "server-check:{$server->id}" => isCloud() ? '*/5 * * * *' : '* * * * *',
                 "server-storage-check:{$server->id}" => data_get($server->settings, 'server_disk_usage_check_frequency', '0 23 * * *'),
             ];

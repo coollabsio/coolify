@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Server::flushIdentityMap();
     Queue::fake();
     InstanceSettings::forceCreate(['id' => 0]);
 
@@ -32,6 +33,9 @@ beforeEach(function () {
     ]);
 
     $this->server->refresh();
+
+    // The hourly Sentinel check runs at a stable per-server minute.
+    $this->minute = sprintf('%02d', $this->server->id % 60);
 });
 
 afterEach(function () {
@@ -46,8 +50,8 @@ it('dispatches sentinel check hourly regardless of instance update_check_frequen
         'instance_timezone' => 'UTC',
     ]);
 
-    // Set time to top of any hour (sentinel should check every hour)
-    Carbon::setTestNow('2025-06-15 14:00:00'); // Random hour, not January 1st
+    // Set time to the server minute of any hour (sentinel should check every hour)
+    Carbon::setTestNow("2025-06-15 14:{$this->minute}:00"); // Random hour, not January 1st
 
     // Run ServerManagerJob
     $job = new ServerManagerJob;
@@ -59,7 +63,7 @@ it('dispatches sentinel check hourly regardless of instance update_check_frequen
     });
 });
 
-it('does not dispatch sentinel check when not at top of hour', function () {
+it('does not dispatch sentinel check when not at the server minute', function () {
     // Set instance update_check_frequency to hourly (most frequent)
     $instanceSettings = InstanceSettings::first();
     $instanceSettings->update([
@@ -67,14 +71,15 @@ it('does not dispatch sentinel check when not at top of hour', function () {
         'instance_timezone' => 'UTC',
     ]);
 
-    // Set time to middle of the hour (sentinel check cron won't match)
-    Carbon::setTestNow('2025-06-15 14:30:00'); // 30 minutes past the hour
+    // Set time to another minute of the hour (sentinel check cron won't match)
+    $otherMinute = sprintf('%02d', ($this->server->id + 30) % 60);
+    Carbon::setTestNow("2025-06-15 14:{$otherMinute}:00");
 
     // Run ServerManagerJob
     $job = new ServerManagerJob;
     $job->handle();
 
-    // Assert that CheckAndStartSentinelJob was NOT dispatched (not top of hour)
+    // Assert that CheckAndStartSentinelJob was NOT dispatched (not the server minute)
     Queue::assertNotPushed(CheckAndStartSentinelJob::class);
 });
 
@@ -91,7 +96,7 @@ it('dispatches sentinel check at every hour mark throughout the day', function (
     foreach ($hoursToTest as $hour) {
         Queue::fake(); // Reset queue for each test
 
-        Carbon::setTestNow("2025-06-15 {$hour}:00:00");
+        Carbon::setTestNow("2025-06-15 {$hour}:{$this->minute}:00");
 
         $job = new ServerManagerJob;
         $job->handle();
@@ -113,13 +118,13 @@ it('respects server timezone when checking sentinel updates', function () {
         'instance_timezone' => 'UTC',
     ]);
 
-    // Set time to 17:00 UTC which is 12:00 PM EST (top of hour in server's timezone)
-    Carbon::setTestNow('2025-01-15 17:00:00');
+    // Set time to 17:xx UTC which is 12:xx PM EST (server minute in server's timezone)
+    Carbon::setTestNow("2025-01-15 17:{$this->minute}:00");
 
     $job = new ServerManagerJob;
     $job->handle();
 
-    // Should dispatch because it's top of hour in server's timezone (America/New_York)
+    // Should dispatch because it's the server minute in server's timezone (America/New_York)
     Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) {
         return $job->server->id === $this->server->id;
     });
@@ -137,7 +142,7 @@ it('does not dispatch sentinel check for build servers', function () {
         'instance_timezone' => 'UTC',
     ]);
 
-    Carbon::setTestNow('2025-06-15 14:00:00');
+    Carbon::setTestNow("2025-06-15 14:{$this->minute}:00");
 
     $job = new ServerManagerJob;
     $job->handle();
@@ -171,13 +176,17 @@ it('handles multiple servers with different sentinel eligibility', function () {
         'instance_timezone' => 'UTC',
     ]);
 
-    Carbon::setTestNow('2025-06-15 14:00:00');
+    // Each server is checked at its own minute
+    Carbon::setTestNow("2025-06-15 14:{$this->minute}:00");
+    (new ServerManagerJob)->handle();
 
-    $job = new ServerManagerJob;
-    $job->handle();
+    Carbon::setTestNow(sprintf('2025-06-15 15:%02d:00', $server3->id % 60));
+    (new ServerManagerJob)->handle();
 
-    // Should dispatch for server1 (sentinel enabled) and server3 (sentinel enabled)
-    Queue::assertPushed(CheckAndStartSentinelJob::class, 2);
+    // Should dispatch for server1 (sentinel enabled) and server3 (sentinel enabled), never for server2
+    Queue::assertNotPushed(CheckAndStartSentinelJob::class, function ($job) use ($server2) {
+        return $job->server->id === $server2->id;
+    });
 
     // Verify it was dispatched for the correct servers
     Queue::assertPushed(CheckAndStartSentinelJob::class, function ($job) {

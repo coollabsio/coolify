@@ -173,7 +173,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         // Sentinel versions that report their version on push are updated by SentinelController.
         if ($server->isSentinelEnabled()
             && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
-            && shouldRunCronNow('0 * * * *', $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
+            && shouldRunCronNow(self::sentinelVersionCheckCron($server), $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
         ) {
             CheckAndStartSentinelJob::dispatch($server);
         }
@@ -192,14 +192,37 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Dispatch ServerPatchCheckJob if due (weekly)
-        $shouldRunPatchCheck = shouldRunCronNow('0 0 * * 0', $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
+        // Dispatch ServerPatchCheckJob if due (weekly, staggered per server on Sunday)
+        $shouldRunPatchCheck = shouldRunCronNow(self::patchCheckCron($server), $serverTimezone, "server-patch-check:{$server->id}", $this->executionTime);
 
-        if ($shouldRunPatchCheck) { // Weekly on Sunday at midnight
+        if ($shouldRunPatchCheck) {
             ServerPatchCheckJob::dispatch($server);
         }
 
         // Crash recovery is handled by sentinelOutOfSync → ServerCheckJob → CheckAndStartSentinelJob.
+    }
+
+    /**
+     * Hourly Sentinel version check at a stable per-server minute, so servers do not all SSH at minute 0.
+     *
+     * ServerManagerJob evaluates this every minute and shouldRunCronNow() catches up a missed minute
+     * on the next run, so every minute of the hour is a safe slot.
+     */
+    public static function sentinelVersionCheckCron(Server $server): string
+    {
+        return sprintf('%d * * * *', $server->id % 60);
+    }
+
+    /**
+     * Weekly patch check at a stable per-server time on Sunday between 04:00 and 23:59.
+     *
+     * The early hours are skipped because most daylight saving transitions happen there.
+     */
+    public static function patchCheckCron(Server $server): string
+    {
+        $slot = $server->id % (20 * 60);
+
+        return sprintf('%d %d * * 0', $slot % 60, 4 + intdiv($slot, 60));
     }
 
     /**
