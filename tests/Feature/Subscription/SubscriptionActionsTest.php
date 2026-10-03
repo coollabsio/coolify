@@ -3,6 +3,7 @@
 use App\Actions\Stripe\RefundSubscription;
 use App\Livewire\Subscription\Actions;
 use App\Models\InstanceSettings;
+use App\Models\OauthIdentity;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
@@ -65,6 +66,35 @@ describe('cancelImmediately with refund option', function () {
 
         Livewire::test(Actions::class)
             ->call('cancelImmediately', 'wrong-password', ['refundLatestPayment'])
+            ->assertReturned('Invalid password.');
+    });
+});
+
+describe('password confirmation', function () {
+    test('a user with a linked oauth identity cancels without a password', function () {
+        OauthIdentity::create([
+            'user_id' => $this->user->id,
+            'provider' => 'oidc',
+            'issuer' => 'https://idp.example.com',
+            'provider_user_id' => 'oauth-user-id',
+        ]);
+        $mock = Mockery::mock(RefundSubscription::class);
+        $mock->shouldReceive('execute')->once()->andReturn(['success' => true, 'error' => null]);
+        $this->instance(RefundSubscription::class, $mock);
+
+        Livewire::test(Actions::class)
+            ->call('cancelImmediately', '', ['refundLatestPayment'])
+            ->assertDispatched('success')
+            ->assertRedirect(route('subscription.index'));
+    });
+
+    test('a user without a linked oauth identity is rejected with an empty password', function () {
+        $mock = Mockery::mock(RefundSubscription::class);
+        $mock->shouldNotReceive('execute');
+        $this->instance(RefundSubscription::class, $mock);
+
+        Livewire::test(Actions::class)
+            ->call('refundSubscription', '')
             ->assertReturned('Invalid password.');
     });
 });

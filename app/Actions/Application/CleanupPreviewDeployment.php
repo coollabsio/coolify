@@ -157,7 +157,7 @@ class CleanupPreviewDeployment
             } else {
                 $containers = getCurrentApplicationContainerStatus(
                     $server,
-                    $application->id,
+                    $application,
                     $pull_request_id
                 );
 

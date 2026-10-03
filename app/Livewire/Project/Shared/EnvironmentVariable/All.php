@@ -753,7 +753,14 @@ class All extends Component
         }
         // Otherwise keep order from docker-compose file
 
-        return $hardcodedVars;
+        // Compose content is visible only to users who can edit the resource.
+        $canViewValues = auth()->user()?->can('update', $this->resource) ?? false;
+
+        return $hardcodedVars->map(fn (array $variable): array => [
+            ...$variable,
+            'value' => $canViewValues ? $variable['value'] : null,
+            'is_value_hidden' => ! $canViewValues,
+        ]);
     }
 
     /** @return list<string> */

@@ -34,7 +34,7 @@
     use Illuminate\View\ComponentSlot;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
-    // Skip ONLY password confirmation for OAuth users (they have no password)
+    // Skip ONLY the password step (disabled globally, OAuth users, users without a password, or recently confirmed)
     $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
@@ -102,9 +102,7 @@
             return Promise.resolve(true);
         }
 
-        const methodName = this.submitAction.split('(')[0];
-        const paramsMatch = this.submitAction.match(/\((.*?)\)/);
-        const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
+        const { method: methodName, params } = window.parseModalSubmitAction(this.submitAction);
 
         // Always pass password parameter (empty string if password confirmation is skipped)
         // This ensures consistent method signature for backend Livewire methods
@@ -263,21 +261,21 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                    <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                    <span class="shrink-0" aria-hidden="true">-</span>
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                        <span class="shrink-0" aria-hidden="true">-</span>
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                            <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
+                                            <span class="shrink-0" aria-hidden="true">-</span>
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>

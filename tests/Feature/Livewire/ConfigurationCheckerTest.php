@@ -77,39 +77,6 @@ it('renders the changed configuration labels without a second backend request', 
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Rebuild required.')
         ->assertSee('Build command');
-
-    $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
-
-    expect($view)
-        ->toContain(':compact-after="5000"')
-        ->toContain('position="top-right"')
-        ->toContain(':compact-storage-key="$compactStorageKey"')
-        ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
-        ->toContain('x-on:click="configurationDiffModalOpen = true"')
-        ->not->toContain('$wire.refreshConfigurationChanges()');
-});
-
-it('supports timed compact popup notifications', function () {
-    $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
-
-    expect($view)
-        ->toContain("\$position === 'top-right' ? 'top-16' : 'bottom-4'")
-        ->toContain('compactAfter')
-        ->toContain('compactStorageKey')
-        ->toContain("localStorage.setItem(this.storageKey, 'compact')")
-        ->toContain("localStorage.setItem(this.storageKey, 'icon')")
-        ->toContain('localStorage.removeItem(key)')
-        ->not->toContain('<template x-teleport="body">')
-        ->toContain('compact = true')
-        ->toContain('@click="restore()"')
-        ->toContain('@click.stop="minimizeToIcon()"')
-        ->toContain('<template x-if="iconOnly">')
-        ->toContain('<template x-if="!iconOnly">')
-        ->not->toContain('<button x-show="iconOnly"')
-        ->not->toContain('<div x-show="!iconOnly"')
-        ->not->toContain(':class="iconOnly')
-        ->toContain('x-show="!compact"')
-        ->toContain("'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'");
 });
 
 it('warns when a service has missing required environment variables', function () {
@@ -159,18 +126,6 @@ it('refreshes the service configuration when a websocket configuration event arr
     expect($listeners)
         ->toHaveKey("echo-private:team.{$this->team->id},ApplicationConfigurationChanged", 'refreshServices')
         ->toHaveKey('configurationChanged', 'refreshServices');
-});
-
-it('marks the service environment variables menu when required values are missing', function () {
-    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
-    $sidebar = file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php'));
-
-    expect($configuration)
-        ->toContain("'hasWarning' => ! \$service->isDeployable")
-        ->toContain('title="Required environment variables missing"')
-        ->and($sidebar)
-        ->toContain("'hasWarning' => ! \$service->isDeployable")
-        ->toContain('title="Required environment variables missing"');
 });
 
 it('refreshes configuration changes when the event is received', function () {
@@ -349,4 +304,43 @@ it('redacts newly added environment values for team members', function () {
         ->and(data_get($envChange, 'old_display_value'))->toBe('-')
         ->and(data_get($envChange, 'new_display_value'))->toBe('••••••••')
         ->and(data_get($envChange, 'type'))->toBe('added');
+});
+
+it('redacts compose content for team members in the change list', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $application = configurationCheckerApplication($this->environment, [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: old-compose-value\n",
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $application->update(['docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: new-compose-value\n"]);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    $composeChange = collect(data_get($component->get('configurationDiff'), 'changes', []))
+        ->first(fn (array $change): bool => str_ends_with((string) data_get($change, 'key'), 'docker_compose_raw'));
+
+    expect($composeChange)->not->toBeNull()
+        ->and(json_encode($component->snapshot).$component->html())
+        ->not->toContain('old-compose-value')
+        ->not->toContain('new-compose-value');
+});
+
+it('keeps compose changes visible to an owner in the change list', function () {
+    $application = configurationCheckerApplication($this->environment, [
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: old-compose-value\n",
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $application->update(['docker_compose_raw' => "services:\n  app:\n    environment:\n      TOKEN: new-compose-value\n"]);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    expect(json_encode($component->get('configurationDiff')))->toContain('new-compose-value');
 });

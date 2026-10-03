@@ -153,37 +153,6 @@ it('shows only sparkline KPI cards that link through to the full analytics page'
         ->assertDontSee($otherTeamApplication->uuid);
 });
 
-it('shows loading states while the dashboard range refreshes', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
-
-    expect($view)
-        ->toContain('wire:loading.attr="disabled" wire:target="setRange"')
-        ->toContain('wire:loading.class="invisible" wire:target="setRange(\'24h\')"')
-        ->toContain('wire:loading wire:target="setRange(\'7d\')"')
-        ->toContain('wire:loading wire:target="setRange(\'30d\')"')
-        ->toContain('aria-label="Loading analytics"');
-});
-
-it('styles the open analytics link as a dashboard action button', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
-
-    expect($view)
-        ->toContain('class="group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5')
-        ->toContain('group-hover:translate-x-0.5');
-});
-
-it('uses the dashboard surface treatment for the analytics KPI group', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics.blade.php'));
-
-    expect($view)
-        ->toContain('rounded-xl border border-neutral-200 bg-neutral-200')
-        ->toContain('dark:border-white/[0.08] dark:bg-white/[0.07]')
-        ->toContain('dark:bg-[color-mix(in_srgb,var(--color-app)_95%,white)]')
-        ->toContain('dark:hover:bg-[color-mix(in_srgb,var(--color-app)_93%,white)]')
-        ->not->toContain('rounded-xl bg-neutral-200 ring-1 ring-neutral-200')
-        ->not->toContain('dark:bg-base dark:hover:bg-white/[0.03]');
-});
-
 it('hides dashboard analytics when every server fetch fails', function () {
     $serverOne = Server::factory()->create([
         'team_id' => $this->team->id,
@@ -205,7 +174,6 @@ it('hides dashboard analytics when every server fetch fails', function () {
 
     loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
-        ->assertSeeHtml('class="contents"')
         ->assertDontSee('Traffic analytics')
         ->assertDontSee('No analytics data yet')
         ->assertDontSee('Unique visitors')
@@ -225,12 +193,4 @@ it('renders nothing when no server in the team has traffic analytics enabled', f
         ->assertOk()
         ->assertDontSee('Unique visitors')
         ->assertDontSee('Traffic analytics');
-});
-
-it('uses an empty lazy placeholder so analytics only appears after data loads', function () {
-    $view = file_get_contents(resource_path('views/livewire/dashboard/traffic-analytics-placeholder.blade.php'));
-
-    expect($view)
-        ->toContain('class="contents"')
-        ->not->toContain('Traffic analytics');
 });

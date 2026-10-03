@@ -106,6 +106,14 @@ class GetContainersStatus
         $foundDatabases = [];
         $foundServices = [];
 
+        // Owners of preview containers outside this server's applications, in one query.
+        $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
+            $this->applications,
+            $this->containers
+                ->map(fn ($container) => format_docker_labels_to_json(data_get($container, $this->server->isSwarm() ? 'Spec.Labels' : 'Config.Labels') ?? []))
+                ->filter(fn (Collection $labels) => (bool) $labels->get('coolify.pullRequestId') && isContainerOfType($labels, 'application'))
+        );
+
         foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
                 $labels = data_get($container, 'Spec.Labels');
@@ -124,18 +132,22 @@ class GetContainersStatus
                 $healthSuffix = $containerHealth ?? 'unknown';
                 $containerStatus = "$containerStatus:$healthSuffix";
             }
-            $labels = Arr::undot(format_docker_labels_to_json($labels));
+            $flatLabels = format_docker_labels_to_json($labels);
+            $labels = Arr::undot($flatLabels);
             if (filter_var(data_get($labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
                 continue;
             }
-            $applicationId = data_get($labels, 'coolify.applicationId');
-            if ($applicationId) {
+            // Containers are matched by owner UUID; numeric ids differ between instances.
+            $isApplicationContainer = isContainerOfType($flatLabels, 'application');
+            $isServiceContainer = isContainerOfType($flatLabels, 'service');
+            [$parentService, $serviceSubType, $serviceSubResource] = resolveServiceContainerOwner($services, $flatLabels);
+            if ($isApplicationContainer) {
                 $pullRequestId = data_get($labels, 'coolify.pullRequestId');
                 if ($pullRequestId) {
-                    if (str($applicationId)->contains('-')) {
-                        $applicationId = str($applicationId)->before('-');
-                    }
-                    $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
+                    $applicationId = resolveContainerApplicationId($this->applications, $flatLabels, $foreignApplicationIdsByUuid);
+                    $preview = $applicationId
+                        ? ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first()
+                        : null;
                     if ($preview) {
                         $foundApplicationPreviews[] = $preview->id;
                         $statusFromDb = $preview->status;
@@ -154,7 +166,8 @@ class GetContainersStatus
                         // Notify user that this container should not be there.
                     }
                 } else {
-                    $application = $this->applications->where('id', $applicationId)->first();
+                    $application = resolveContainerOwner($this->applications, $flatLabels, 'application');
+                    $applicationId = $application?->id;
                     if ($application) {
                         $foundApplications[] = $application->id;
                         if ($application->container_present !== true) {
@@ -199,9 +212,8 @@ class GetContainersStatus
 
                 if ($uuid) {
                     if ($type === 'service') {
-                        $database_id = data_get($labels, 'coolify.service.subId');
-                        if ($database_id) {
-                            $service_db = ServiceDatabase::where('id', $database_id)->first();
+                        if ($serviceSubResource instanceof ServiceDatabase) {
+                            $service_db = $serviceSubResource;
                             if ($service_db) {
                                 $proxyUuid = $service_db->uuid;
                                 $isPublic = data_get($service_db, 'is_public');
@@ -289,14 +301,13 @@ class GetContainersStatus
                     $foundDatabases[] = 0;
                 }
             }
-            $serviceLabelId = data_get($labels, 'coolify.serviceId');
-            if ($serviceLabelId) {
-                $subType = data_get($labels, 'coolify.service.subType');
-                $subId = data_get($labels, 'coolify.service.subId');
-                $parentService = $services->where('id', $serviceLabelId)->first();
+            if ($isServiceContainer) {
                 if (! $parentService) {
                     continue;
                 }
+                $serviceLabelId = $parentService->id;
+                $subType = $serviceSubType;
+                $subId = $serviceSubResource?->id;
 
                 // Store container status for aggregation
                 if (! isset($this->serviceContainerStatuses)) {
@@ -319,11 +330,7 @@ class GetContainersStatus
                 }
 
                 // Mark service as found
-                if ($subType === 'application') {
-                    $service = $parentService->applications()->where('id', $subId)->first();
-                } else {
-                    $service = $parentService->databases()->where('id', $subId)->first();
-                }
+                $service = $serviceSubResource;
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
                 }

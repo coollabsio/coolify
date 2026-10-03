@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -16,12 +17,18 @@ class LocalPersistentVolume extends BaseModel
                 throw new \RuntimeException('Delete this volume backup schedule and its archives before deleting the volume.');
             }
         });
+
+        // A copy is a new Docker volume, so Docker Compose creates it with the driver options.
+        static::replicating(function (LocalPersistentVolume $volume): void {
+            $volume->ignores_compose_driver_options = false;
+        });
     }
 
     protected $fillable = [
         'name',
         'mount_path',
         'host_path',
+        'standalone_sqlite_id',
         'container_id',
         'resource_type',
         'resource_id',
@@ -30,6 +37,7 @@ class LocalPersistentVolume extends BaseModel
 
     protected $casts = [
         'is_preview_suffix_enabled' => 'boolean',
+        'ignores_compose_driver_options' => 'boolean',
     ];
 
     public function resource()
@@ -57,11 +65,41 @@ class LocalPersistentVolume extends BaseModel
         return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 
+    /**
+     * The SQLite database this volume was connected from, if any.
+     */
+    public function standaloneSqlite(): BelongsTo
+    {
+        return $this->belongsTo(StandaloneSqlite::class);
+    }
+
     public function abortIfScheduledBackupsExist(): void
     {
         if ($this->scheduledBackups()->exists()) {
             abort(422, 'Delete this volume backup schedule and its archives before deleting the volume.');
         }
+    }
+
+    /**
+     * Whether another resource mounts the same Docker volume, e.g. an application that uses a SQLite database volume.
+     */
+    public function isSharedWithAnotherResource(): bool
+    {
+        if ($this->standalone_sqlite_id !== null) {
+            return true;
+        }
+
+        if ($this->resource_type !== StandaloneSqlite::class) {
+            return false;
+        }
+
+        $isConnected = static::query()
+            ->where('standalone_sqlite_id', $this->resource_id)
+            ->where('name', $this->name)
+            ->exists();
+
+        return $isConnected
+            || ($this->resource instanceof StandaloneSqlite && $this->resource->composeApplicationsUsingDataVolume($this->name)->isNotEmpty());
     }
 
     protected function customizeName($value)
@@ -155,6 +193,7 @@ class LocalPersistentVolume extends BaseModel
 
             $compose = Yaml::parse($composeContent);
             $services = data_get($compose, 'services', []);
+            $topLevelVolumes = collect(data_get($compose, 'volumes') ?? []);
 
             if ($this->isServiceResource()) {
                 $services = array_intersect_key($services, [$resource->name => true]);
@@ -165,6 +204,11 @@ class LocalPersistentVolume extends BaseModel
                     $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
+                    if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
+                        // The parsers use an external volume as written. A storage entry with the generated
+                        // name is an old entry that the user can delete (see replacedExternalComposeVolume()).
+                        continue;
+                    }
                     $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
                     $generatedName = $source ? $resourceUuid.'_'.Str::slug($source, '-') : null;
 
@@ -177,6 +221,95 @@ class LocalPersistentVolume extends BaseModel
             return false;
         } catch (\Throwable) {
             return true;
+        }
+    }
+
+    /**
+     * The external Compose volume that this storage entry still replaces, or null. Before Coolify
+     * used external volumes as written, the parsers gave them a generated name, for example
+     * "{uuid}_{volume}" or "{uuid}_{volume}-pr-{id}". While this storage entry exists, the parsers
+     * keep that name so that the resource keeps its data (see useComposeExternalVolumeAsWritten()).
+     */
+    public function replacedExternalComposeVolume(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return null;
+            }
+
+            $composeContent = $resource instanceof Application
+                ? $resource->docker_compose_raw
+                : data_get($resource, 'service.docker_compose_raw');
+            if (blank($composeContent)) {
+                return null;
+            }
+
+            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+                $key = (string) $key;
+                if (! isComposeExternalVolume($declaration)) {
+                    continue;
+                }
+
+                $legacyName = match (true) {
+                    $resource instanceof Application && (int) $resource->compose_parsing_version < 3 => legacyApplicationComposeVolumeName($resource, $key, 0),
+                    $resource instanceof Application => $resource->uuid.'_'.Str::slug($key, '-'),
+                    default => data_get($resource, 'service.uuid').'_'.Str::slug($key, '-'),
+                };
+                $isLegacyName = $legacyName !== $key && $this->name === $legacyName;
+                if ($isLegacyName || preg_match('/^'.preg_quote($legacyName, '/').'-pr-\d+$/', $this->name) === 1) {
+                    return $key;
+                }
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether the Compose file gives this volume `driver`, `driver_opts` or `labels` that the parsers
+     * do not apply, because the volume was created before Coolify kept them. Docker Compose would ask
+     * to recreate such a volume, so the parsers keep its old name-only declaration.
+     */
+    public function ignoresComposeDriverOptionsOfDeclaration(): bool
+    {
+        if (! $this->ignores_compose_driver_options) {
+            return false;
+        }
+
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return false;
+            }
+
+            $composeContent = $resource instanceof Application
+                ? $resource->docker_compose_raw
+                : data_get($resource, 'service.docker_compose_raw');
+            if (blank($composeContent)) {
+                return false;
+            }
+
+            $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
+            foreach (data_get(Yaml::parse($composeContent), 'volumes') ?? [] as $key => $declaration) {
+                if (! is_array($declaration) || isComposeExternalVolume($declaration)) {
+                    continue;
+                }
+                $generatedName = $resourceUuid.'_'.Str::slug((string) $key, '-');
+                if ($this->name !== $generatedName && preg_match('/^'.preg_quote($generatedName, '/').'-pr-\d+$/', $this->name) !== 1) {
+                    continue;
+                }
+
+                return filled(data_get($declaration, 'driver'))
+                    || filled(data_get($declaration, 'driver_opts'))
+                    || filled(data_get($declaration, 'labels'));
+            }
+
+            return false;
+        } catch (\Throwable) {
+            return false;
         }
     }
 

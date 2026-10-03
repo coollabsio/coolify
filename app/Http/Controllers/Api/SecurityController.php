@@ -225,7 +225,7 @@ class SecurityController extends Controller
             ], 422);
         }
         $fingerPrint = PrivateKey::generateFingerprint($request->private_key);
-        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint);
+        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint, teamId: $teamId);
         if ($isFingerPrintExists) {
             return response()->json([
                 'message' => 'Private key already exists.',

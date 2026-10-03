@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     MAX_TERMINAL_SESSION_TIMEOUT_SECONDS,
+    TERMINAL_CLOSE_CODES,
+    authenticateTerminalUpgrade,
+    createTerminalUpgradeHandler,
     extractSshArgs,
     extractTargetHost,
     getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAuthorizedTargetHost,
     normalizeHostForAuthorization,
+    rejectTerminalSocket,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
@@ -179,4 +183,278 @@ test('getTerminalSessionTimeout always enforces the maximum terminal session lif
     assert.equal(getTerminalSessionTimeout(null), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
     assert.equal(getTerminalSessionTimeout(60), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
     assert.equal(getTerminalSessionTimeout(MAX_TERMINAL_SESSION_TIMEOUT_SECONDS + 60), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
+});
+
+function createFakeSocket() {
+    const listeners = {};
+
+    return {
+        destroyed: false,
+        on(event, listener) {
+            (listeners[event] ??= []).push(listener);
+        },
+        removeListener(event, listener) {
+            listeners[event] = (listeners[event] ?? []).filter((candidate) => candidate !== listener);
+        },
+        emit(event, ...args) {
+            (listeners[event] ?? []).forEach((listener) => listener(...args));
+        },
+        destroy() {
+            this.destroyed = true;
+        },
+        listenerCount(event) {
+            return (listeners[event] ?? []).length;
+        },
+    };
+}
+
+function createFakeWebSocket() {
+    const closeListeners = [];
+    const errorListeners = [];
+
+    return {
+        events: [],
+        terminated: false,
+        on(event, listener) {
+            if (event === 'error') {
+                errorListeners.push(listener);
+            }
+        },
+        emitError(error) {
+            if (errorListeners.length === 0) {
+                throw error;
+            }
+            errorListeners.forEach((listener) => listener(error));
+        },
+        send(message) {
+            this.events.push(['send', message]);
+        },
+        close(code, reason) {
+            this.events.push(['close', code, reason]);
+        },
+        terminate() {
+            this.terminated = true;
+        },
+        once(event, listener) {
+            if (event === 'close') {
+                closeListeners.push(listener);
+            }
+        },
+        peerClosed() {
+            closeListeners.forEach((listener) => listener());
+        },
+    };
+}
+
+function createFakeWebSocketServer({ handles = true } = {}) {
+    return {
+        connections: [],
+        upgrades: [],
+        sockets: [],
+        shouldHandle() {
+            return handles;
+        },
+        handleUpgrade(req, socket, head, callback) {
+            this.upgrades.push(req);
+            if (!handles) {
+                return;
+            }
+            const ws = createFakeWebSocket();
+            this.sockets.push(ws);
+            callback(ws);
+        },
+        emit(event, ws, req) {
+            if (event === 'connection') {
+                this.connections.push([ws, req]);
+            }
+        },
+    };
+}
+
+const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
+
+test('authenticateTerminalUpgrade rejects missing session cookies with the auth close code without calling Coolify', async () => {
+    let requests = 0;
+    const postToCoolify = async () => {
+        requests++;
+        return { status: 200 };
+    };
+
+    for (const session of [
+        { sessionCookieName: 'coolify_session', laravelSession: undefined, xsrfToken: 'xsrf' },
+        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: undefined },
+    ]) {
+        assert.deepEqual(await authenticateTerminalUpgrade(session, postToCoolify), {
+            authenticated: false,
+            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+            reason: 'Unauthorized: Missing required tokens',
+        });
+    }
+
+    assert.equal(requests, 0);
+    assert.equal(TERMINAL_CLOSE_CODES.AUTH_REJECTED, 4401);
+    assert.equal(TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 4403);
+});
+
+test('authenticateTerminalUpgrade checks the Laravel session exactly like the previous verifyClient', async () => {
+    const requests = [];
+    const result = await authenticateTerminalUpgrade(
+        { sessionCookieName: 'coolify_session', laravelSession: 'session-value', xsrfToken: 'xsrf-value' },
+        async (path, headers) => {
+            requests.push([path, headers]);
+            return { status: 200 };
+        },
+    );
+
+    assert.deepEqual(result, { authenticated: true });
+    assert.deepEqual(requests, [[
+        '/terminal/auth',
+        { 'Cookie': 'coolify_session=session-value', 'X-XSRF-TOKEN': 'xsrf-value' },
+    ]]);
+});
+
+test('authenticateTerminalUpgrade rejects every non-200 Coolify response', async () => {
+    for (const status of [201, 204, 302, 401, 403, 419, 500]) {
+        const result = await authenticateTerminalUpgrade(
+            { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+            async () => ({ status }),
+        );
+
+        assert.equal(result.authenticated, false, `status ${status} must not authenticate`);
+        assert.equal(result.closeCode, TERMINAL_CLOSE_CODES.AUTH_REJECTED);
+        assert.equal(result.reason, 'Unauthorized: Invalid credentials');
+    }
+});
+
+test('authenticateTerminalUpgrade does not authenticate when Coolify is unreachable', async () => {
+    const result = await authenticateTerminalUpgrade(
+        { sessionCookieName: 'coolify_session', laravelSession: 'session', xsrfToken: 'xsrf' },
+        async () => {
+            throw new Error('connect ECONNREFUSED');
+        },
+    );
+
+    assert.equal(result.authenticated, false);
+    assert.equal(result.closeCode, TERMINAL_CLOSE_CODES.AUTH_UNAVAILABLE);
+    assert.equal(result.error.message, 'connect ECONNREFUSED');
+});
+
+test('rejectTerminalSocket sends the legacy message before closing with a readable code', () => {
+    const ws = createFakeWebSocket();
+
+    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.TOKEN_REJECTED, 'Unauthorized: Terminal token was rejected', {
+        message: 'Unauthorized: Terminal token was rejected',
+    });
+    ws.peerClosed();
+
+    assert.deepEqual(ws.events, [
+        ['send', 'Unauthorized: Terminal token was rejected'],
+        ['close', 4403, 'Unauthorized: Terminal token was rejected'],
+    ]);
+});
+
+test('rejectTerminalSocket terminates peers that ignore the close handshake', async () => {
+    const ws = createFakeWebSocket();
+
+    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.AUTH_REJECTED, 'Unauthorized: Invalid credentials', { terminateAfterMs: 5 });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    assert.deepEqual(ws.events, [['close', 4401, 'Unauthorized: Invalid credentials']]);
+    assert.equal(ws.terminated, true);
+});
+
+test('createTerminalUpgradeHandler only emits connection for authenticated upgrades', async () => {
+    const wss = createFakeWebSocketServer();
+    const req = { url: '/terminal/ws' };
+    const handler = createTerminalUpgradeHandler({ wss, authenticate: async () => ({ authenticated: true }) });
+
+    handler(req, createFakeSocket(), Buffer.alloc(0));
+    await flushPromises();
+
+    assert.equal(wss.connections.length, 1);
+    assert.equal(wss.connections[0][1], req);
+    assert.deepEqual(wss.sockets[0].events, []);
+});
+
+test('createTerminalUpgradeHandler closes rejected upgrades with the auth close code and never emits connection', async () => {
+    const wss = createFakeWebSocketServer();
+    const rejected = [];
+    const handler = createTerminalUpgradeHandler({
+        wss,
+        authenticate: async () => ({
+            authenticated: false,
+            closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED,
+            reason: 'Unauthorized: Invalid credentials',
+        }),
+        onRejected: (result) => rejected.push(result.closeCode),
+    });
+
+    handler({ url: '/terminal/ws' }, createFakeSocket(), Buffer.alloc(0));
+    await flushPromises();
+
+    assert.equal(wss.connections.length, 0);
+    assert.deepEqual(rejected, [4401]);
+    assert.deepEqual(wss.sockets[0].events, [['close', 4401, 'Unauthorized: Invalid credentials']]);
+});
+
+test('createTerminalUpgradeHandler treats authentication errors and malformed results as rejections', async () => {
+    for (const authenticate of [
+        async () => {
+            throw new Error('boom');
+        },
+        async () => ({ authenticated: 'yes', closeCode: TERMINAL_CLOSE_CODES.AUTH_REJECTED, reason: 'Unauthorized' }),
+    ]) {
+        const wss = createFakeWebSocketServer();
+        createTerminalUpgradeHandler({ wss, authenticate })({ url: '/terminal/ws' }, createFakeSocket(), Buffer.alloc(0));
+        await flushPromises();
+
+        assert.equal(wss.connections.length, 0);
+        assert.equal(wss.sockets[0].events[0][0], 'close');
+        assert.notEqual(wss.sockets[0].events[0][1], 1000);
+    }
+});
+
+test('createTerminalUpgradeHandler does not authenticate requests for other paths', async () => {
+    const wss = createFakeWebSocketServer({ handles: false });
+    let authenticated = 0;
+
+    createTerminalUpgradeHandler({ wss, authenticate: async () => ++authenticated })({ url: '/other' }, createFakeSocket(), Buffer.alloc(0));
+    await flushPromises();
+
+    assert.equal(authenticated, 0);
+    assert.equal(wss.upgrades.length, 1);
+    assert.equal(wss.connections.length, 0);
+});
+
+test('createTerminalUpgradeHandler drops sockets that disconnect while authentication is pending', async () => {
+    const wss = createFakeWebSocketServer();
+    const socket = createFakeSocket();
+    let finishAuthentication;
+
+    createTerminalUpgradeHandler({
+        wss,
+        authenticate: () => new Promise((resolve) => {
+            finishAuthentication = resolve;
+        }),
+    })({ url: '/terminal/ws' }, socket, Buffer.alloc(0));
+
+    socket.emit('error', new Error('ECONNRESET'));
+    await flushPromises();
+    finishAuthentication({ authenticated: true });
+    await flushPromises();
+
+    assert.equal(socket.destroyed, true);
+    assert.equal(socket.listenerCount('error'), 0);
+    assert.equal(wss.upgrades.length, 0);
+    assert.equal(wss.connections.length, 0);
+});
+
+test('rejectTerminalSocket handles socket errors so unauthenticated clients cannot crash the server', () => {
+    const ws = createFakeWebSocket();
+
+    rejectTerminalSocket(ws, TERMINAL_CLOSE_CODES.AUTH_REJECTED, 'Unauthorized: Invalid credentials');
+
+    assert.doesNotThrow(() => ws.emitError(new Error('Invalid WebSocket frame: RSV1 must be clear')));
+    assert.equal(ws.terminated, true);
+    ws.peerClosed();
 });

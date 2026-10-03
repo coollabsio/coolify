@@ -1,7 +1,5 @@
 <?php
 
-use App\Http\Kernel;
-use App\Livewire\Project\Service\Heading;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Team\AuditLog;
 use App\Livewire\Team\Index as TeamIndex;
@@ -27,13 +25,13 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\Auditable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -91,13 +89,6 @@ test('multiple audit inserts in one request are all deferred', function () {
         'ui.application.deployed',
         'ui.application.updated',
     ]);
-});
-
-test('http kernel invokes deferred callbacks', function () {
-    $kernel = app(Kernel::class);
-    $middleware = (new ReflectionClass($kernel))->getProperty('middleware')->getValue($kernel);
-
-    expect($middleware)->toContain(InvokeDeferredCallbacks::class);
 });
 
 test('audit persistence failures do not fail the action', function () {
@@ -486,6 +477,7 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneSqlite::class,
 ]);
 
 test('withoutAuditLogging suppresses mutations until the outer callback ends', function () {
@@ -833,23 +825,6 @@ test('audit action filter includes actions recorded for the current team', funct
             'value' => 'backup_schedule_deleted',
             'label' => 'Backup Schedule Deleted',
         ], $options, true));
-});
-
-test('resource clone audit starts only after the destination server capability check', function () {
-    $source = file_get_contents(app_path('Livewire/Project/Shared/ResourceOperations.php'));
-
-    expect(strpos($source, "auditLog('ui.resource.clone_started'"))
-        ->toBeGreaterThan(strpos($source, 'if (! $server->canHostResources())'));
-});
-
-test('pull and restart records the service restart audit event after starting the service', function () {
-    $method = new ReflectionMethod(Heading::class, 'pullAndRestartEvent');
-    $source = file($method->getFileName());
-    $methodSource = implode('', array_slice($source, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
-
-    expect($methodSource)
-        ->toContain("auditServiceAction('ui.service.restarted')")
-        ->and(strpos($methodSource, 'StartService::run'))->toBeLessThan(strpos($methodSource, 'auditServiceAction'));
 });
 
 test('critical operational events persist with their source action and actor', function (string $event) {

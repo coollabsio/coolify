@@ -6,9 +6,11 @@
 
         <div class="grid gap-4 sm:grid-cols-2">
             <x-forms.input id="name" label="Name" required />
-            <x-forms.input id="organization" label="Organization"
-                helper="If empty, your GitHub user will be used."
-                placeholder="Personal account when empty" />
+            <x-forms.input id="organization" label="Organization" :required="$use_for_github_runners"
+                :helper="$use_for_github_runners
+                    ? 'GitHub Actions runners are registered at organization level.'
+                    : 'If empty, your GitHub user will be used. GitHub Actions runners need an organization.'"
+                :placeholder="$use_for_github_runners ? 'GitHub organization, for example coollabsio' : 'Personal account when empty'" />
         </div>
 
         @if (! isCloud())
@@ -24,6 +26,20 @@
                 </div>
             </div>
         @endif
+
+        <div>
+            <p class="text-[12px] font-medium text-neutral-700 dark:text-fg-dim">Use this App for</p>
+            <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                Deploying applications from private repositories is always included. The choices below select the
+                permissions and webhook events on the next page.
+            </p>
+            <div class="mt-2 flex max-w-xs flex-col gap-1">
+                <x-forms.checkbox id="use_for_pull_request_previews" label="Pull request previews"
+                    helper="Deploys pull requests and posts deployment status on them." />
+                <x-forms.checkbox id="use_for_github_runners" live label="GitHub Actions runners"
+                    helper="Runs workflow jobs on your build servers. Needs an organization." />
+            </div>
+        </div>
 
         <div x-data="{
             open: false,

@@ -57,8 +57,9 @@ class EditCompose extends Component
             $this->service->docker_compose = $this->dockerCompose;
             $this->service->is_container_label_escape_enabled = $this->isContainerLabelEscapeEnabled;
         } else {
-            $this->dockerComposeRaw = $this->service->docker_compose_raw;
-            $this->dockerCompose = $this->service->docker_compose;
+            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
+            $this->dockerCompose = $canViewCompose ? $this->service->docker_compose : null;
             $this->isContainerLabelEscapeEnabled = $this->service->is_container_label_escape_enabled ?? false;
         }
     }
@@ -91,8 +92,9 @@ class EditCompose extends Component
             $this->validate([
                 'isContainerLabelEscapeEnabled' => 'required',
             ]);
-            $this->syncData(true);
-            $this->service->save(['is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled]);
+            $this->service->refresh()->update([
+                'is_container_label_escape_enabled' => $this->isContainerLabelEscapeEnabled,
+            ]);
             $this->dispatch('success', 'Service updated successfully');
         } catch (\Throwable $e) {
             return handleError($e, $this);

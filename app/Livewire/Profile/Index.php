@@ -2,15 +2,19 @@
 
 namespace App\Livewire\Profile;
 
+use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public int $userId;
 
     public string $email;
@@ -218,6 +222,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
                 auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');

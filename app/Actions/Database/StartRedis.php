@@ -2,7 +2,9 @@
 
 namespace App\Actions\Database;
 
+use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
+use App\Models\EnvironmentVariable;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
 use App\Traits\ExecutesDatabaseStartCommands;
@@ -61,18 +63,8 @@ class StartRedis
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-
-            if (! $caCert) {
-                $server->generateCaCertificate();
-                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
-            }
-
-            if (! $caCert) {
-                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
-
-                return;
-            }
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -201,8 +193,8 @@ class StartRedis
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
@@ -261,7 +253,7 @@ class StartRedis
                 $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->resolvedRedisPassword = $this->redisPasswordForComposeFile($env);
 
                     if (! $usesSecretManager) {
                         $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
@@ -283,7 +275,7 @@ class StartRedis
                 }
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                    $this->resolvedRedisPassword = $this->redisPasswordForComposeFile($env);
                 } elseif ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
                 }
@@ -295,6 +287,17 @@ class StartRedis
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();
+    }
+
+    /**
+     * The password is placed directly in the compose command, so a remote secret value is escaped
+     * the same way as its environment entry. Other values stay unchanged.
+     */
+    private function redisPasswordForComposeFile(EnvironmentVariable $env): ?string
+    {
+        $value = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+        return $value === null ? null : $this->database->formatComposeFileValue($env, $value);
     }
 
     private function buildStartCommand(): string

@@ -116,9 +116,9 @@ class AuditEvent extends Model
     private static function attributesFor(string $event, array $context, string $level): array
     {
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
-            ?? data_get($context, 'team_id')
-            ?? currentTeam()?->id
-            ?? self::teamIdFromContext($context);
+            ?? (array_key_exists('team_id', $context)
+                ? $context['team_id']
+                : currentTeam()?->id ?? self::teamIdFromContext($context));
 
         $parts = explode('.', $event);
         $source = $parts[0] ?? 'system';

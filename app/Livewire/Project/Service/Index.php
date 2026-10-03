@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -255,9 +256,11 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
-            app(DeleteService::class)->removeSubresourceContainer($this->serviceDatabase);
+            $containerRemoved = app(DeleteService::class)->removeSubresourceContainer($this->serviceDatabase);
             $this->serviceDatabase->delete();
-            $this->dispatch('success', 'Database deleted.');
+            $containerRemoved
+                ? $this->dispatch('success', 'Database deleted.')
+                : $this->dispatch('warning', 'Database deleted from Coolify. The server does not respond, so its container is removed when the service starts again.');
 
             return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
@@ -503,9 +506,11 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
-            app(DeleteService::class)->removeSubresourceContainer($this->serviceApplication);
+            $containerRemoved = app(DeleteService::class)->removeSubresourceContainer($this->serviceApplication);
             $this->serviceApplication->delete();
-            $this->dispatch('success', 'Application deleted.');
+            $containerRemoved
+                ? $this->dispatch('success', 'Application deleted.')
+                : $this->dispatch('warning', 'Application deleted from Coolify. The server does not respond, so its container is removed when the service starts again.');
 
             return redirectRoute($this, 'project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
@@ -571,6 +576,7 @@ class Index extends Component
     {
         try {
             $persistedApplication = $this->serviceApplication->fresh();
+            $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
             $previousEditableUrls = $persistedApplication->url;
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
@@ -626,6 +632,7 @@ class Index extends Component
             $this->validate();
             $this->serviceApplication->save();
             $this->serviceApplication->refresh();
+            app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, currentTeam()->id);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {

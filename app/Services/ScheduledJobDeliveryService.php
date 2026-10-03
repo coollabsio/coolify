@@ -2,23 +2,52 @@
 
 namespace App\Services;
 
+use App\Events\DockerCleanupDone;
+use App\Events\ScheduledTaskDone;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\VolumeBackupJob;
+use App\Models\DockerCleanupExecution;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledJobDelivery;
 use App\Models\ScheduledJobState;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledTaskExecution;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
+use App\Models\Team;
+use App\Notifications\ScheduledTask\TaskFailed;
+use App\Notifications\Server\DockerCleanupFailed;
+use Closure;
 use Cron\CronExpression;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ScheduledJobDeliveryService
 {
     public const CATCH_UP_WINDOW_MINUTES = 10;
+
+    /**
+     * An occurrence that is enqueued longer than this has most likely lost its queued job, for
+     * example when Redis evicted or lost the queue. A job that is only waiting in a long queue is
+     * safe as well: the first job that claims the occurrence runs it, and the other job exits.
+     */
+    public const ENQUEUED_STALE_AFTER_MINUTES = 60;
+
+    public const MISSED_OCCURRENCE_NOTIFICATION = 'scheduled-occurrence-missed';
+
+    public const MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES = 60;
+
+    /**
+     * Job types that run once when they are late. A lost task or Docker cleanup is not run; it is
+     * recorded as a failed execution and the team is notified.
+     */
+    private const LATE_RUN_JOB_TYPES = ['database-backup', 'volume-backup'];
 
     public function recordAndPublish(
         string $scheduleKey,
@@ -110,16 +139,171 @@ class ScheduledJobDeliveryService
         });
     }
 
-    public function publishPending(): void
+    /**
+     * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
+     */
+    public function publishPending(?array $jobTypes = null): void
     {
         ScheduledJobDelivery::query()
             ->where('status', 'pending')
+            ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
             ->orderBy('id')
             ->chunkById(100, function ($occurrences): void {
                 foreach ($occurrences as $occurrence) {
-                    $this->publish($occurrence);
+                    try {
+                        $this->logOccurrence($occurrence, 'Scheduled occurrence publishing again', 'warning');
+                        $this->publish($occurrence);
+                    } catch (\Throwable $e) {
+                        Log::channel('scheduled-errors')->error('Failed to publish pending scheduled occurrence', [
+                            'occurrence_uuid' => $occurrence->uuid,
+                            'schedule_key' => $occurrence->schedule_key,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
+    }
+
+    /**
+     * Count occurrences that are still open 15 minutes after they were created. Pending or
+     * enqueued rows here never started; claimed rows are still running or their worker died.
+     *
+     * @return array<string, int>
+     */
+    public function staleOpenOccurrenceCounts(): array
+    {
+        return ScheduledJobDelivery::query()
+            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
+            ->where('created_at', '<', now()->subMinutes(15))
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+    }
+
+    /**
+     * Publish backups again whose queued job was not started, and report lost tasks and Docker
+     * cleanups as missed. A lost backup is not run when a newer occurrence of the same schedule
+     * exists, so a backup that runs longer than its interval does not build up a backlog.
+     *
+     * @param  array<int, string>|null  $jobTypes  Only these job types, or all when null.
+     */
+    public function recoverStaleEnqueued(?array $jobTypes = null): void
+    {
+        ScheduledJobDelivery::query()
+            ->where('status', 'enqueued')
+            ->when($jobTypes !== null, fn ($query) => $query->whereIn('job_type', $jobTypes))
+            ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
+            ->chunkById(100, function ($occurrences): void {
+                foreach ($occurrences as $occurrence) {
+                    try {
+                        $this->recoverStaleEnqueuedOccurrence($occurrence);
+                    } catch (\Throwable $e) {
+                        Log::channel('scheduled-errors')->error('Failed to recover enqueued scheduled occurrence', [
+                            'occurrence_uuid' => $occurrence->uuid,
+                            'schedule_key' => $occurrence->schedule_key,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            });
+    }
+
+    private function recoverStaleEnqueuedOccurrence(ScheduledJobDelivery $occurrence): void
+    {
+        // complete() deletes the row of a finished occurrence, so the schedule state also counts.
+        $hasNewerOccurrence = ScheduledJobState::query()
+            ->where('schedule_key', $occurrence->schedule_key)
+            ->where('last_scheduled_for', '>', $occurrence->scheduled_for)
+            ->exists()
+            || ScheduledJobDelivery::query()
+                ->where('schedule_key', $occurrence->schedule_key)
+                ->where('scheduled_for', '>', $occurrence->scheduled_for)
+                ->exists();
+        $runLate = in_array($occurrence->job_type, self::LATE_RUN_JOB_TYPES, true) && ! $hasNewerOccurrence;
+
+        // Only one scheduler node can move each occurrence.
+        $moved = ScheduledJobDelivery::query()
+            ->whereKey($occurrence->id)
+            ->where('status', 'enqueued')
+            ->where('enqueued_at', '<', now()->subMinutes(self::ENQUEUED_STALE_AFTER_MINUTES))
+            ->update(['status' => $runLate ? 'pending' : 'failed', 'updated_at' => now()]) === 1;
+
+        if (! $moved) {
+            return;
+        }
+
+        if (! $runLate) {
+            $this->logOccurrence($occurrence->uuid, $hasNewerOccurrence
+                ? 'Scheduled occurrence skipped: its queued job was not started and a newer occurrence exists'
+                : 'Scheduled occurrence missed: its queued job was not started', 'warning');
+            $this->reportMissedOccurrence($occurrence);
+
+            return;
+        }
+
+        $occurrence->status = 'pending';
+        $this->logOccurrence($occurrence->uuid, 'Scheduled occurrence publishing again: its queued job was not started', 'warning');
+        $this->publish($occurrence);
+    }
+
+    /**
+     * Show a missed task or Docker cleanup as a failed execution and send the failure notification.
+     * The caller moved the occurrence out of `enqueued` atomically, so this runs once per occurrence,
+     * and claim() rejects the late job if it starts afterwards.
+     */
+    private function reportMissedOccurrence(ScheduledJobDelivery $occurrence): void
+    {
+        $message = 'Skipped: the queued job did not start within '.self::ENQUEUED_STALE_AFTER_MINUTES.' minutes.';
+
+        try {
+            if ($occurrence->job_type === 'scheduled-task') {
+                $task = ScheduledTask::find($occurrence->resource_id);
+                if (! $task) {
+                    return;
+                }
+
+                ScheduledTaskExecution::create([
+                    'scheduled_task_id' => $task->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'retry_count' => 0,
+                    'finished_at' => now(),
+                ]);
+                ScheduledTaskDone::dispatch($task->team_id);
+                $this->notifyMissedOccurrence($task, fn () => Team::find($task->team_id)?->notify(new TaskFailed($task, $message)));
+            } elseif ($occurrence->job_type === 'docker-cleanup') {
+                $server = Server::find($occurrence->resource_id);
+                if (! $server) {
+                    return;
+                }
+
+                $execution = DockerCleanupExecution::create([
+                    'server_id' => $server->id,
+                    'status' => 'failed',
+                    'message' => $message,
+                    'finished_at' => now(),
+                ]);
+                event(new DockerCleanupDone($execution));
+                $this->notifyMissedOccurrence($server, fn () => $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}")));
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Failed to report missed scheduled occurrence', [
+                'occurrence_uuid' => $occurrence->uuid,
+                'schedule_key' => $occurrence->schedule_key,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Every missed run gets its own failed execution, but the team gets at most one missed-run
+     * notification per schedule each hour, so dead queue workers do not cause a notification storm.
+     */
+    private function notifyMissedOccurrence(Model $schedule, Closure $send): void
+    {
+        NotificationThrottle::sendOnce($schedule, self::MISSED_OCCURRENCE_NOTIFICATION, now()->subMinutes(self::MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES), $send);
     }
 
     public function deleteOldOccurrences(): void
@@ -150,25 +334,73 @@ class ScheduledJobDeliveryService
                 'claim_token' => $claimToken,
                 'started_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ]) === 1
+            || ScheduledJobDelivery::query()
+                ->where('uuid', $uuid)
+                ->where('status', 'claimed')
+                ->where('claim_token', $claimToken)
+                ->exists();
 
-        if ($claimed === 1) {
-            return true;
-        }
+        $this->logOccurrence($uuid, $claimed ? 'Scheduled occurrence claimed' : 'Scheduled occurrence claim rejected', $claimed ? 'info' : 'warning');
 
-        return ScheduledJobDelivery::query()
-            ->where('uuid', $uuid)
-            ->where('status', 'claimed')
-            ->where('claim_token', $claimToken)
-            ->exists();
+        return $claimed;
     }
 
     public function complete(string $uuid, string $claimToken): void
     {
+        $this->logOccurrence($uuid, 'Scheduled occurrence completed', context: ['status' => 'completed']);
+
         ScheduledJobDelivery::query()
             ->where('uuid', $uuid)
             ->where('claim_token', $claimToken)
             ->delete();
+    }
+
+    /**
+     * Skip an occurrence that no job has claimed, so stale recovery does not publish it again.
+     */
+    public function skip(string $uuid, string $reason): void
+    {
+        $skipped = ScheduledJobDelivery::query()
+            ->where('uuid', $uuid)
+            ->whereIn('status', ['pending', 'enqueued'])
+            ->update([
+                'status' => 'skipped',
+                'updated_at' => now(),
+            ]) === 1;
+
+        if ($skipped) {
+            $this->logOccurrence($uuid, "Scheduled occurrence skipped: {$reason}", 'warning');
+        }
+    }
+
+    /**
+     * WithoutOverlapping for the job of a scheduled occurrence. When another run holds the lock,
+     * the job does not run and its occurrence is skipped, so stale recovery does not run it later.
+     */
+    public static function withoutOverlapping(string $key, ?string $occurrenceUuid): WithoutOverlapping
+    {
+        return new class($key, $occurrenceUuid) extends WithoutOverlapping
+        {
+            public function __construct(string $key, private ?string $occurrenceUuid)
+            {
+                parent::__construct($key);
+            }
+
+            public function handle($job, $next)
+            {
+                $started = false;
+                parent::handle($job, function ($job) use ($next, &$started) {
+                    $started = true;
+
+                    return $next($job);
+                });
+
+                if (! $started && $this->occurrenceUuid !== null) {
+                    app(ScheduledJobDeliveryService::class)->skip($this->occurrenceUuid, 'the previous run of this schedule is still running');
+                }
+            }
+        };
     }
 
     public function fail(string $uuid, string $claimToken): void
@@ -180,6 +412,39 @@ class ScheduledJobDeliveryService
                 'status' => 'failed',
                 'updated_at' => now(),
             ]);
+
+        $this->logOccurrence($uuid, 'Scheduled occurrence failed', 'warning');
+    }
+
+    /**
+     * Log one step of an occurrence. Search scheduled.log for its schedule_key to see when it
+     * was due, when a worker started it, and how it ended.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function logOccurrence(ScheduledJobDelivery|string $occurrence, string $message, string $level = 'info', array $context = []): void
+    {
+        try {
+            $uuid = is_string($occurrence) ? $occurrence : $occurrence->uuid;
+            if (is_string($occurrence)) {
+                $occurrence = ScheduledJobDelivery::query()->where('uuid', $uuid)->first();
+            }
+
+            Log::channel('scheduled')->log($level, $message, [
+                'occurrence_uuid' => $uuid,
+                'schedule_key' => $occurrence?->schedule_key,
+                'status' => $occurrence?->status,
+                'scheduled_for' => $occurrence?->scheduled_for?->toIso8601String(),
+                'enqueued_at' => $occurrence?->enqueued_at?->toIso8601String(),
+                'started_at' => $occurrence?->started_at?->toIso8601String(),
+                'seconds_since_due' => $occurrence ? (int) $occurrence->scheduled_for->diffInSeconds(now()) : null,
+                'host' => gethostname(),
+                'pid' => getmypid(),
+                ...$context,
+            ]);
+        } catch (\Throwable) {
+            // Debug logging must never change the job result.
+        }
     }
 
     private function publish(ScheduledJobDelivery $occurrence): bool
@@ -212,9 +477,23 @@ class ScheduledJobDeliveryService
 
         if ($job === null) {
             ScheduledJobDelivery::query()->whereKey($occurrence->id)->update(['status' => 'skipped']);
+            Log::channel('scheduled')->warning('Scheduled occurrence skipped: resource not found', [
+                'occurrence_uuid' => $occurrence->uuid,
+                'schedule_key' => $occurrence->schedule_key,
+                'scheduled_for' => $occurrence->scheduled_for->toIso8601String(),
+            ]);
 
             return false;
         }
+
+        // An open previous occurrence usually means the previous run is still running. Backup jobs
+        // then skip this one without running it (see withoutOverlapping()).
+        $previousOpen = ScheduledJobDelivery::query()
+            ->where('schedule_key', $occurrence->schedule_key)
+            ->where('scheduled_for', '<', $occurrence->scheduled_for)
+            ->whereIn('status', ['pending', 'enqueued', 'claimed'])
+            ->orderByDesc('scheduled_for')
+            ->first(['uuid', 'status', 'scheduled_for']);
 
         dispatch($job);
 
@@ -226,6 +505,19 @@ class ScheduledJobDeliveryService
                 'enqueued_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        // Log from the loaded row: a fast worker can complete and delete the occurrence already.
+        $enqueued = ['status' => 'enqueued', 'enqueued_at' => now()->toIso8601String()];
+        if ($previousOpen) {
+            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued while the previous occurrence is still open', 'warning', [
+                ...$enqueued,
+                'previous_occurrence_uuid' => $previousOpen->uuid,
+                'previous_status' => $previousOpen->status,
+                'previous_scheduled_for' => $previousOpen->scheduled_for->toIso8601String(),
+            ]);
+        } else {
+            $this->logOccurrence($occurrence, 'Scheduled occurrence enqueued', context: $enqueued);
+        }
 
         return true;
     }

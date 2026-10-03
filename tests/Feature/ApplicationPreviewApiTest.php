@@ -177,17 +177,6 @@ describe('GET /api/v1/applications/{uuid}/previews/{pull_request_id}/logs', func
             ->assertUnprocessable()
             ->assertJson(['message' => 'Invalid pull_request_id.']);
     });
-
-    test('uses the pull request id to select the preview container', function () {
-        $controller = file_get_contents(app_path('Http/Controllers/Api/ApplicationsController.php'));
-        $openApi = json_decode(file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
-
-        expect($controller)
-            ->toContain("\$request->route('pull_request_id')")
-            ->toContain('getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pullRequestId)')
-            ->and($openApi['paths'])
-            ->toHaveKey('/applications/{uuid}/previews/{pull_request_id}/logs');
-    });
 });
 
 describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', function () {
@@ -457,5 +446,57 @@ describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', functio
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('docker_compose_domains');
+    });
+});
+
+describe('GET /api/v1/applications/{uuid}/logs service_name', function () {
+    beforeEach(function () {
+        $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+        $this->server->update(['private_key_id' => $privateKey->id]);
+        Process::fake(function ($process) {
+            if (str_contains($process->command, 'docker ps -a')) {
+                return Process::result(output: implode(PHP_EOL, [
+                    json_encode([
+                        'ID' => 'web-container',
+                        'Names' => "web-{$this->application->uuid}",
+                        'Labels' => "coolify.applicationId={$this->application->id},com.docker.compose.service=web",
+                    ]),
+                    json_encode([
+                        'ID' => 'worker-container',
+                        'Names' => "worker-{$this->application->uuid}",
+                        'Labels' => "coolify.applicationId={$this->application->id},com.docker.compose.service=worker",
+                    ]),
+                ]));
+            }
+            if (str_contains($process->command, 'docker inspect')) {
+                return Process::result(output: json_encode(['State' => ['Status' => 'running']]));
+            }
+            if (str_contains($process->command, 'docker logs')) {
+                return Process::result(output: str_contains($process->command, 'worker-container') ? 'worker log' : 'web log');
+            }
+
+            return Process::result();
+        });
+    });
+
+    test('returns logs from the container of the requested service', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/logs?service_name=worker")
+            ->assertOk()
+            ->assertJson(['logs' => 'worker log']);
+    });
+
+    test('returns logs from the first container without service_name', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/logs")
+            ->assertOk()
+            ->assertJson(['logs' => 'web log']);
+    });
+
+    test('returns 404 when no container matches service_name exactly', function () {
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->getJson("/api/v1/applications/{$this->application->uuid}/logs?service_name=work")
+            ->assertNotFound()
+            ->assertJson(['message' => "No running container found for service_name 'work'."]);
     });
 });

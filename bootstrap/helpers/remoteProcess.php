@@ -9,6 +9,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Support\RemoteProcessCommand;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -25,7 +26,9 @@ function remote_process(
     ?Model $model = null,
     bool $ignore_errors = false,
     $callEventOnFinish = null,
-    $callEventData = null
+    $callEventData = null,
+    array $properties = [],
+    ?int $timeout = null,
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -46,8 +49,9 @@ function remote_process(
     SshMultiplexingHelper::ensureMultiplexedConnection($server);
 
     $properties = [
+        ...$properties,
         'server_uuid' => $server->uuid,
-        'command' => $command_string,
+        ...RemoteProcessCommand::properties($command_string),
         'type' => $type,
         'type_uuid' => $type_uuid,
         'status' => ProcessStatus::QUEUED->value,
@@ -69,6 +73,7 @@ function remote_process(
         ignore_errors: $ignore_errors,
         call_event_on_finish: $callEventOnFinish,
         call_event_data: $callEventData,
+        timeout: $timeout,
     ));
 
     $activity->refresh();

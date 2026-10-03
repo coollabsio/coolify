@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Enums\ProcessStatus;
+use App\Support\DatabaseImport\DatabaseImportCleanup;
+use App\Support\RemoteProcessCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,13 +36,19 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * Create a new job instance.
+     *
+     * @param  int|null  $timeout  Job timeout in seconds; null keeps the default above.
      */
     public function __construct(
         public Activity $activity,
         public bool $ignore_errors,
         public $call_event_on_finish,
         public $call_event_data,
+        ?int $timeout = null,
     ) {
+        if ($timeout !== null) {
+            $this->timeout = $timeout;
+        }
 
         $this->onQueue('high');
     }
@@ -50,6 +58,14 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
+        // A database import that Coolify stopped after a restart must not run again when
+        // the queue retries this job. Its cleanup is already queued.
+        if (DatabaseImportCleanup::stopRequested($this->activity)) {
+            RemoteProcessCommand::forget($this->activity);
+
+            return;
+        }
+
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'ignore_errors' => $this->ignore_errors,
@@ -58,6 +74,10 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         ]);
 
         $remote_process();
+
+        // The task is finished. A failed run throws before this line and is removed in failed(),
+        // because a retry of the job must still be able to read the command.
+        RemoteProcessCommand::forget($this->activity);
     }
 
     /**
@@ -77,29 +97,37 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
             'job' => 'CoolifyTask',
             'activity_id' => $this->activity->id,
             'server_uuid' => $this->activity->getExtraProperty('server_uuid'),
-            'command_preview' => substr($this->activity->getExtraProperty('command') ?? '', 0, 200),
             'error' => $exception?->getMessage(),
             'total_attempts' => $this->attempts(),
             'trace' => $exception?->getTraceAsString(),
         ]);
 
+        // A database import whose restore can still run in the database container stays in progress
+        // until its stop has run, so it keeps blocking other operations on the database.
+        if (DatabaseImportCleanup::stopAfterTaskFailure($this->activity, $exception?->getMessage() ?: 'Job permanently failed')) {
+            RemoteProcessCommand::forget($this->activity);
+
+            return;
+        }
+
         // Update activity status to reflect permanent failure
-        $this->activity->properties = $this->activity->properties->merge([
+        // A stopped database import already has the message that explains the stop; the process
+        // error ("Terminated") would hide it.
+        $stopRequested = DatabaseImportCleanup::stopRequested($this->activity);
+        $this->activity->properties = $this->activity->properties->merge(array_filter([
             'status' => ProcessStatus::ERROR->value,
-            'error' => $exception?->getMessage() ?? 'Job permanently failed',
+            'error' => $stopRequested ? null : ($exception?->getMessage() ?? 'Job permanently failed'),
             'failed_at' => now()->toIso8601String(),
-        ]);
+        ], fn ($value) => $value !== null));
         $this->activity->save();
+
+        // No attempt is left, so the command (which can contain secrets) is no longer needed.
+        RemoteProcessCommand::forget($this->activity);
 
         // Dispatch cleanup event on failure (same as on success)
         if ($this->call_event_on_finish) {
             try {
-                $eventClass = "App\\Events\\$this->call_event_on_finish";
-                if (! is_null($this->call_event_data)) {
-                    event(new $eventClass($this->call_event_data));
-                } else {
-                    event(new $eventClass($this->activity->causer_id));
-                }
+                RunRemoteProcess::dispatchFinishEvent($this->activity, $this->call_event_on_finish, $this->call_event_data);
                 Log::info('Cleanup event dispatched after job failure', [
                     'event' => $this->call_event_on_finish,
                 ]);

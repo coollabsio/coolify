@@ -14,8 +14,10 @@ use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -112,6 +114,33 @@ class ServicesController extends Controller
                 'logdrain_custom_config_parser',
             ]);
         }
+    }
+
+    /**
+     * Hostnames of every service application before an update, keyed by service application id.
+     *
+     * @return array<int, array<int, string>>
+     */
+    private function serviceApplicationDnsHostnames(Service $service): array
+    {
+        $cleanup = app(ManagedDnsRecordCleanup::class);
+
+        return $service->applications()->get()
+            ->mapWithKeys(fn (ServiceApplication $application): array => [$application->id => $cleanup->hostnamesOf($application)])
+            ->all();
+    }
+
+    /**
+     * Queues the release of managed DNS records for hostnames that a service application no longer uses.
+     *
+     * @param  array<int, array<int, string>>  $previousHostnames
+     */
+    private function queueReleaseOfRemovedServiceHostnames(Service $service, array $previousHostnames, int $teamId): void
+    {
+        $cleanup = app(ManagedDnsRecordCleanup::class);
+        $service->applications()->get()
+            ->filter(fn (ServiceApplication $application): bool => isset($previousHostnames[$application->id]))
+            ->each(fn (ServiceApplication $application) => $cleanup->queueReleaseOfRemovedHostnames($application, $previousHostnames[$application->id], $teamId));
     }
 
     private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
@@ -243,13 +272,13 @@ class ServicesController extends Controller
             : [];
 
         foreach ($projects as $project) {
-            $services->push($project->services()->with($serviceRelations)->get());
-        }
-        foreach ($services as $service) {
-            $service = $this->removeSensitiveData($service);
+            $services = $services->merge(
+                $project->services()->with($serviceRelations)->get()
+                    ->map(fn (Service $service) => $this->removeSensitiveData($service))
+            );
         }
 
-        return response()->json($services->flatten());
+        return response()->json($services->values());
     }
 
     #[OA\Post(
@@ -368,6 +397,10 @@ class ServicesController extends Controller
 
         $this->authorize('create', Service::class);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+        }
+
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -474,6 +507,9 @@ class ServicesController extends Controller
             }
         }
         $services = get_service_templates();
+        if (filled($request->type)) {
+            $request->offsetSet('type', resolve_service_template_key($request->type, $services));
+        }
         $serviceKeys = $services->keys();
         if ($serviceKeys->contains($request->type)) {
             $oneClickServiceName = $request->type;
@@ -692,8 +728,7 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            Yaml::parse($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {
@@ -841,7 +876,7 @@ class ServicesController extends Controller
 
     #[OA\Get(
         summary: 'Get service logs.',
-        description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`.',
+        description: 'Get logs for a specific service sub-resource by service UUID. The `sub_service_name` query parameter must match the `name` field of one of the service applications or databases returned by `GET /services/{uuid}`. Requires the `read:sensitive` or `root` token ability.',
         path: '/services/{uuid}/logs',
         operationId: 'get-service-logs-by-uuid',
         security: [
@@ -934,7 +969,7 @@ class ServicesController extends Controller
         }
 
         $name = "{$subServiceName}-{$service->uuid}";
-        $containers = getCurrentServiceSubContainerStatus($service->destination->server, $service->id, $name);
+        $containers = getCurrentServiceSubContainerStatus($service->destination->server, $service, $name);
         $container = $containers->first();
 
         if (! $container) {
@@ -1022,7 +1057,8 @@ class ServicesController extends Controller
 
         $service->delete();
 
-        $deleteFromCoolifyOnly = $request->boolean('delete_from_coolify_only') || ! $service->server?->isFunctional();
+        $deleteFromCoolifyOnlyRequested = $request->boolean('delete_from_coolify_only');
+        $deleteFromCoolifyOnly = $deleteFromCoolifyOnlyRequested || ! $service->server?->isFunctional();
 
         DeleteResourceJob::dispatch(
             resource: $service,
@@ -1040,11 +1076,13 @@ class ServicesController extends Controller
             'delete_from_coolify_only' => $deleteFromCoolifyOnly,
         ]);
 
-        return response()->json([
-            'message' => $deleteFromCoolifyOnly
-                ? 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.'
-                : 'Service deletion request queued.',
-        ]);
+        $message = match (true) {
+            $deleteFromCoolifyOnlyRequested => 'The service will be removed from Coolify only; Docker resources will remain.',
+            $deleteFromCoolifyOnly => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+            default => 'Service deletion request queued.',
+        };
+
+        return response()->json(['message' => $message]);
     }
 
     #[OA\Patch(
@@ -1182,6 +1220,11 @@ class ServicesController extends Controller
 
         $this->authorize('update', $service);
 
+        if ($request->boolean('instant_deploy')) {
+            abort_unless($request->user()->tokenCan('deploy') || $request->user()->tokenCan('root'), 403, 'Missing required permissions: deploy');
+            $this->authorize('deploy', $service);
+        }
+
         $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled'];
 
         $validationRules = [
@@ -1234,12 +1277,11 @@ class ServicesController extends Controller
                     ],
                 ], 422);
             }
-            $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            Yaml::parse($dockerComposeRaw);
 
             // Validate for command injection BEFORE saving to database
             try {
-                validateDockerComposeForInjection($dockerComposeRaw);
+                validateDockerComposeForInjection($dockerComposeRaw, composeResourceDirectory($service));
             } catch (\Exception $e) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1264,26 +1306,30 @@ class ServicesController extends Controller
         if ($request->has('is_container_label_escape_enabled')) {
             $service->is_container_label_escape_enabled = $request->boolean('is_container_label_escape_enabled');
         }
+        $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
         $service->save();
 
         $service->parse();
 
+        $urlResult = null;
         if ($request->has('urls') && is_array($request->urls)) {
             $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-            if ($urlResult !== null) {
-                if (isset($urlResult['errors'])) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => $urlResult['errors'],
-                    ], 422);
-                }
-                if (isset($urlResult['conflicts'])) {
-                    return response()->json([
-                        'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                        'conflicts' => $urlResult['conflicts'],
-                        'warning' => $urlResult['warning'],
-                    ], 409);
-                }
+        }
+        // URLs of some containers can be saved before a later container fails, so release before any error response.
+        $this->queueReleaseOfRemovedServiceHostnames($service, $previousDnsHostnames, (int) $teamId);
+        if ($urlResult !== null) {
+            if (isset($urlResult['errors'])) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $urlResult['errors'],
+                ], 422);
+            }
+            if (isset($urlResult['conflicts'])) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $urlResult['conflicts'],
+                    'warning' => $urlResult['warning'],
+                ], 409);
             }
         }
 
@@ -1419,7 +1465,7 @@ class ServicesController extends Controller
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                            'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                            'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                         ],
                     ),
                 ),
@@ -1561,7 +1607,7 @@ class ServicesController extends Controller
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                                     ],
                                 ),
                             ],
@@ -1693,7 +1739,7 @@ class ServicesController extends Controller
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
-                        'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
+                        'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. MCP never returns environment variable values.'],
                     ],
                 ),
             ),

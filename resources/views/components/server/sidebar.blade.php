@@ -3,6 +3,7 @@
 @php
     $serverRouteParameters = ['server_uuid' => $server->uuid];
     $sentinelStatus = $server->sentinelStatus();
+    $proxyNotRunning = $server->proxySet() && ($server->proxy->status ?? 'unknown') !== 'running';
     $sentinelStatusStartedAt = $server->sentinel_waiting_since ?? \Illuminate\Support\Carbon::parse($server->sentinel_updated_at);
     $sentinelTimeoutSeconds = $server->sentinel_waiting_since !== null
         ? $server->firstSentinelReportTimeoutSeconds()
@@ -119,12 +120,37 @@
             'visible' => $server->team->usesSwarm() && ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
         ],
         [
+            'label' => 'Images',
+            'route' => 'server.docker-images',
+            'active' => $activeMenu === 'docker-images',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => $server->isFunctional(),
+        ],
+        [
             'label' => 'Docker Cleanup',
             'route' => 'server.docker-cleanup',
             'active' => $activeMenu === 'docker-cleanup',
             'icon' => 'broom',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
+        ],
+        [
+            'label' => 'GitHub Runners',
+            'route' => 'server.github-runners',
+            'active' => $activeMenu === 'github-runners',
+            'icon' => 'play-circle',
+            'group' => 'Operations',
+            'visible' => ! $server->isLocalhost(),
+            'beta' => true,
+        ],
+        [
+            'label' => 'Registries',
+            'route' => 'server.registries',
+            'active' => $activeMenu === 'registries',
+            'icon' => 'layers',
+            'group' => 'Operations',
+            'visible' => auth()->user()?->can('update', $server),
         ],
         [
             'label' => 'Log Drains',
@@ -187,8 +213,8 @@
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
 
-    // Group that holds the current page (item or nested child) — the only one
-    // expanded by default.
+    // Group that holds the current page (item or nested child) — always kept
+    // open, even if collapsed before.
     $activeGroup = (string) $groupedServerMenuItems->search(fn ($items) => $items->contains(
         fn ($item) => ($item['active'] ?? false)
             || collect($item['children'] ?? [])->contains(fn ($child) => $child['active'] ?? false)
@@ -199,6 +225,7 @@
     x-data="{
         proxyConfigurationPending: @js($server->hasPendingProxyConfiguration()),
         traefikOutdated: @js($server->hasCurrentTraefikOutdatedInfo()),
+        proxyNotRunning: @js($proxyNotRunning),
         sentinelOutOfSync: @js($server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync'),
         sentinelExpiryTimer: null,
         scheduleSentinelExpiry(delay) {
@@ -212,6 +239,7 @@
     @proxy-configuration-state-changed.window="
         proxyConfigurationPending = $event.detail.pending;
         traefikOutdated = $event.detail.traefikOutdated;
+        proxyNotRunning = $event.detail.proxyNotRunning;
     "
     @sentinel-status-changed.window="
         sentinelOutOfSync = $event.detail.outOfSync;
@@ -247,7 +275,7 @@
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     @if ($menuItem['tracks_proxy_configuration'] ?? false)
                         <x-reicon name="alert-triangle" x-cloak
-                            x-show="proxyConfigurationPending || traefikOutdated"
+                            x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
                     @elseif ($menuItem['tracks_sentinel_status'] ?? false)
                         <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
@@ -255,6 +283,8 @@
                     @elseif ($menuItem['warning'] ?? false)
                         <x-reicon name="alert-triangle"
                             class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                    @elseif ($menuItem['beta'] ?? false)
+                        <x-beta-badge class="ml-auto shrink-0" />
                     @endif
                 </a>
                 @if ($menuItem['active'] && isset($menuItem['children']))

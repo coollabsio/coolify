@@ -66,9 +66,9 @@ test('constrains additional properties on each database import source branch', f
     expect($schema)->not->toHaveKey('additionalProperties');
 
     $expectedProperties = [
-        ['source', 'upload_id', 'dump_all', 'replace_existing'],
-        ['source', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing'],
-        ['source', 'path', 'dump_all', 'replace_existing'],
+        ['source', 'upload_id', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
+        ['source', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
+        ['source', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'],
     ];
 
     expect($schema['oneOf'])->toHaveCount(count($expectedProperties));
@@ -77,6 +77,26 @@ test('constrains additional properties on each database import source branch', f
         expect($source['additionalProperties'])->toBeFalse()
             ->and($source['properties'])->toHaveKeys($expectedProperties[$index])
             ->and($source['properties']['replace_existing'])
-            ->toMatchArray(['type' => 'boolean', 'default' => false]);
+            ->toMatchArray(['type' => 'boolean', 'default' => false])
+            ->and($source['properties']['keep_owners'])
+            ->toMatchArray(['type' => 'boolean', 'default' => false])
+            ->and($source['properties']['restore_mysql_users'])
+            ->toMatchArray(['type' => 'boolean', 'default' => false])
+            ->and($source['properties']['sqlite_database'])
+            ->toMatchArray(['type' => 'string']);
+    }
+});
+
+test('documents the 409 response of database start, restart, and import endpoints', function () {
+    $document = json_decode((string) file_get_contents(__DIR__.'/../../openapi.json'), true, flags: JSON_THROW_ON_ERROR);
+    $inProgress = 'Another start, restart or import of this database is already in progress.';
+
+    foreach ([
+        ['/databases/{uuid}/start', 'post'],
+        ['/databases/{uuid}/restart', 'post'],
+        ['/databases/{uuid}/imports', 'post'],
+        ['/services/{uuid}/databases/{database_uuid}/imports', 'post'],
+    ] as [$path, $method]) {
+        expect($document['paths'][$path][$method]['responses']['409']['description'] ?? null)->toBe($inProgress);
     }
 });

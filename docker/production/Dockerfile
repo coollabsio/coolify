@@ -8,6 +8,8 @@ ARG CLOUDFLARED_VERSION=2026.7.3
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.0
 
 # Add user/group
 ARG USER_ID=9999
@@ -74,6 +76,7 @@ ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 ARG COOLIFY_VERSION
 ARG CI=true
 
@@ -119,6 +122,10 @@ RUN --mount=type=cache,target=/var/cache/apk \
     jq \
     lsof \
     vim
+
+# Install PHP extensions
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \

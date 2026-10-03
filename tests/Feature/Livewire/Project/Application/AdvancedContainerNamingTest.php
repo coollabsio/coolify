@@ -148,3 +148,37 @@ it('rejects a container name prefix already used on the server', function () {
 
     expect($application->settings()->first()->custom_container_name_prefix)->toBeNull();
 });
+
+it('does not save a custom container name already used on the server', function () {
+    $application = createApplicationForContainerNamingTest();
+    $application->settings->update(['custom_internal_name' => 'original-name']);
+    Application::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ])->settings->update(['custom_internal_name' => 'taken-name']);
+
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('customInternalName', 'taken-name')
+        ->call('saveCustomName')
+        ->assertDispatched('error', 'This custom container name is already in use by another application on this server.')
+        ->assertNotDispatched('success')
+        ->assertSet('customInternalName', 'original-name');
+
+    expect($application->settings()->first()->custom_internal_name)->toBe('original-name');
+});
+
+it('saves a unique custom container name', function () {
+    $application = createApplicationForContainerNamingTest();
+    $application = $application->fresh(['environment.project', 'settings', 'destination']);
+
+    Livewire::test(Advanced::class, ['application' => $application])
+        ->set('customInternalName', 'Unique Name')
+        ->call('saveCustomName')
+        ->assertDispatched('success', 'Custom name saved.')
+        ->assertSet('customInternalName', 'unique-name');
+
+    expect($application->settings()->first()->custom_internal_name)->toBe('unique-name');
+});

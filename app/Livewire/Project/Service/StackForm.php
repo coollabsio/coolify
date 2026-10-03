@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -26,7 +27,7 @@ class StackForm extends Component
 
     public ?string $description = null;
 
-    public string $dockerComposeRaw;
+    public ?string $dockerComposeRaw = null;
 
     public ?string $dockerCompose = null;
 
@@ -83,8 +84,9 @@ class StackForm extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->service->name;
             $this->description = $this->service->description;
-            $this->dockerComposeRaw = $this->service->docker_compose_raw;
-            $this->dockerCompose = $this->service->docker_compose;
+            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
+            $this->dockerCompose = $canViewCompose ? $this->service->docker_compose : null;
             $this->connectToDockerNetwork = $this->service->connect_to_docker_network;
         }
     }
@@ -149,8 +151,9 @@ class StackForm extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->syncData(true);
-            $this->service->save();
+            $this->service->refresh()->update([
+                'connect_to_docker_network' => $this->connectToDockerNetwork,
+            ]);
             $this->dispatch('success', 'Service settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -165,7 +168,7 @@ class StackForm extends Component
             $this->syncData(true);
 
             // Validate for command injection BEFORE any database operations
-            validateDockerComposeForInjection($this->service->docker_compose_raw);
+            validateDockerComposeForInjection($this->service->docker_compose_raw, composeResourceDirectory($this->service));
 
             // Use transaction to ensure atomicity - if parse fails, save is rolled back
             DB::transaction(function () {
@@ -177,7 +180,8 @@ class StackForm extends Component
             $this->service->refresh();
             $this->service->saveComposeConfigs();
 
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(EditCompose::class);
+            $this->dispatch('refreshEnvs')->to(All::class);
             $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {

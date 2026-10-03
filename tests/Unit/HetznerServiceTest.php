@@ -2,6 +2,9 @@
 
 use App\Services\HetznerService;
 use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 beforeEach(function () {
     Http::preventStrayRequests();

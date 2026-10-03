@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Controller;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Server;
 use Exception;
@@ -103,11 +104,37 @@ class SentinelController extends Controller
             SentinelSynchronized::dispatch($server);
         }
 
+        $this->updateSentinelIfOutdated($server, $request->header('X-Sentinel-Version'));
+
         if ($this->shouldDispatchUpdate($server, $data)) {
             PushServerUpdateJob::dispatch($server, $data);
         }
 
         return response()->json(['message' => 'ok'], 200);
+    }
+
+    /**
+     * Sentinel sends its version on every push, so an outdated Sentinel is found without SSH.
+     * The reported version also tells ServerManagerJob to skip its hourly SSH version check.
+     * Old Sentinel versions do not send the header and keep the hourly SSH check.
+     */
+    private function updateSentinelIfOutdated(Server $server, ?string $runningVersion): void
+    {
+        if (! is_string($runningVersion) || preg_match('/^\d+\.\d+\.\d+$/', $runningVersion) !== 1) {
+            return;
+        }
+
+        Cache::put(Server::sentinelReportedVersionCacheKey($server->id), $runningVersion, now()->addHours(2));
+
+        $latestVersion = data_get(get_versions_data(), 'coolify.sentinel.version');
+        if (blank($latestVersion) || version_compare($runningVersion, $latestVersion, '>=')) {
+            return;
+        }
+
+        // Retry at most hourly if an update fails.
+        if (Cache::add("sentinel:update-dispatched:{$server->id}", true, 3600)) {
+            CheckAndStartSentinelJob::dispatch($server);
+        }
     }
 
     /**

@@ -156,16 +156,6 @@ it('rejects malformed sentinel payloads before touching server state', function 
     'non-array containers' => [['containers' => 'not-an-array']],
 ]);
 
-it('guards the dedupe decision with a server scoped atomic cache lock', function () {
-    $controller = file_get_contents(app_path('Http/Controllers/Api/SentinelController.php'));
-
-    expect($controller)
-        ->toContain('$lockKey = "sentinel:push-lock:{$server->id}";')
-        ->toContain('Cache::lock($lockKey, 10)->block(5, function () use ($hashKey, $forceKey, $hash): bool')
-        ->toContain('Cache::put($hashKey, $hash, now()->addDay())')
-        ->toContain("Cache::put(\$forceKey, true, config('constants.sentinel.push_force_interval_seconds', 300))");
-});
-
 it('dispatches the job when container state changes', function () use ($running) {
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 

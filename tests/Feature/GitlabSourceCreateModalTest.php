@@ -21,7 +21,7 @@ beforeEach(function () {
 describe('GitLab source create modal', function () {
     test('matches github create modal structure', function () {
         Livewire::test(Create::class)
-            ->assertSee('This is required if you would like to get full integration')
+            ->assertSee('Connect a GitLab OAuth application for private repositories, webhooks, and deployments.')
             ->assertSee('Self-hosted GitLab')
             ->assertSee('Continue')
             ->assertDontSee('>Save</', false)

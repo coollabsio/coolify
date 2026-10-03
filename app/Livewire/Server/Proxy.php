@@ -2,17 +2,26 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Proxy\DeleteTraefikAcmeBackup;
+use App\Actions\Proxy\DeleteTraefikCertificate;
 use App\Actions\Proxy\GetProxyConfiguration;
+use App\Actions\Proxy\GetTraefikCertificates;
+use App\Actions\Proxy\ListTraefikAcmeBackups;
+use App\Actions\Proxy\RestoreTraefikAcmeBackup;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
+use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class Proxy extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -26,6 +35,13 @@ class Proxy extends Component
 
     public bool $generateExactLabels = false;
 
+    public array $traefikCertificates = [];
+
+    public bool $traefikCertificatesLoaded = false;
+
+    /** @var array<int, array{name: string, created_at: string, size: int}> */
+    public array $traefikAcmeBackups = [];
+
     /**
      * Cache the versions.json file data in memory for this component instance.
      * This avoids multiple file reads during a single request/render cycle.
@@ -34,11 +50,11 @@ class Proxy extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
             'saveConfiguration' => 'submit',
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => '$refresh',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => '$refresh',
+            ]),
         ];
     }
 
@@ -189,8 +205,143 @@ class Proxy extends Component
     {
         try {
             $this->proxySettings = GetProxyConfiguration::run($this->server);
+            $this->clearAppliedTraefikBranchWarning();
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function getTraefikVersionForWarningProperty(): ?string
+    {
+        if ($this->server->detected_traefik_version) {
+            return $this->server->detected_traefik_version;
+        }
+
+        if ($this->server->proxy->get('status') !== 'running' || $this->server->hasPendingProxyConfiguration()) {
+            return null;
+        }
+
+        $configuration = $this->server->proxy->get('last_saved_proxy_configuration');
+        if (! is_string($configuration) || ! preg_match('/^\s*image:\s*[\'\"]?traefik:(v?\d+\.\d+(?:\.\d+)?|latest)[\'\"]?\s*$/mi', $configuration, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * The saved caddy-docker-proxy image when it is older than 2.9 (Caddy 2.7), else null.
+     */
+    public function getOutdatedCaddyImageProperty(): ?string
+    {
+        return $this->server->outdatedCaddyProxyImage();
+    }
+
+    public function loadTraefikCertificates(): void
+    {
+        $this->traefikCertificates = [];
+
+        try {
+            $this->authorize('view', $this->server);
+            $this->traefikCertificates = GetTraefikCertificates::run($this->server);
+            $this->traefikCertificatesLoaded = true;
+        } catch (\Throwable $e) {
+            $this->traefikCertificatesLoaded = true;
+            handleError($e, $this);
+        }
+
+        $this->loadTraefikAcmeBackups();
+    }
+
+    private function loadTraefikAcmeBackups(): void
+    {
+        $this->traefikAcmeBackups = [];
+
+        try {
+            if (Gate::allows('manageProxy', $this->server)) {
+                $this->traefikAcmeBackups = ListTraefikAcmeBackups::run($this->server);
+            }
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** Default of the "Restart the proxy now" option in the acme.json restore dialog. */
+    public bool $restartProxyAfterAcmeRestore = true;
+
+    /**
+     * @param  array<int, string>  $selectedActions  checkbox ids selected in the restore dialog
+     */
+    public function restoreTraefikAcmeBackup(string $backupName, string $password = '', array $selectedActions = []): void
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+            RestoreTraefikAcmeBackup::run($this->server, $backupName);
+            auditLog('ui.proxy.acme_backup_restored', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'backup' => $backupName,
+            ]);
+            $this->loadTraefikCertificates();
+
+            // A running Traefik keeps its certificates in memory and can write them back to acme.json.
+            if (in_array('restartProxyAfterAcmeRestore', $selectedActions, true)) {
+                RestartProxyJob::dispatch($this->server);
+                auditLog('ui.proxy.restarted', [
+                    'team_id' => $this->server->team_id,
+                    'server_uuid' => $this->server->uuid,
+                    'server_name' => $this->server->name,
+                ]);
+                $this->dispatch('refreshServerShow');
+                $this->dispatch('success', 'acme.json restored. The proxy is restarting to load the restored certificates.');
+
+                return;
+            }
+
+            $this->dispatch('refreshServerShow');
+            $this->dispatch('success', 'acme.json restored. Restart the proxy to load the restored certificates.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function deleteTraefikAcmeBackup(string $backupName, string $password = ''): void
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+            DeleteTraefikAcmeBackup::run($this->server, $backupName);
+            auditLog('ui.proxy.acme_backup_deleted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'backup' => $backupName,
+            ]);
+            $this->loadTraefikAcmeBackups();
+            $this->dispatch('success', 'acme.json backup deleted.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function deleteTraefikCertificate(string $certificateId, string $password = ''): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $certificate = DeleteTraefikCertificate::run($this->server, $certificateId);
+            auditLog('ui.proxy.certificate_deleted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'domain' => $certificate['main_domain'],
+                'resolver' => $certificate['resolver'],
+            ]);
+            $this->traefikCertificates = GetTraefikCertificates::run($this->server);
+            $this->loadTraefikAcmeBackups();
+            $this->dispatch('refreshServerShow');
+            $this->dispatch('success', 'TLS certificate deleted. Restart Traefik to remove it from the running proxy.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -211,7 +362,7 @@ class Proxy extends Component
             }
 
             // Get this server's current version
-            $currentVersion = $this->server->detected_traefik_version;
+            $currentVersion = $this->traefikVersionForWarning;
 
             // If we have a current version, try to find matching branch
             if ($currentVersion && $currentVersion !== 'latest') {
@@ -244,7 +395,7 @@ class Proxy extends Component
             return false;
         }
 
-        $currentVersion = $this->server->detected_traefik_version;
+        $currentVersion = $this->traefikVersionForWarning;
         if (! $currentVersion || $currentVersion === 'latest') {
             return false;
         }
@@ -273,7 +424,7 @@ class Proxy extends Component
             }
 
             // Get this server's current version
-            $currentVersion = $this->server->detected_traefik_version;
+            $currentVersion = $this->traefikVersionForWarning;
             if (! $currentVersion || $currentVersion === 'latest') {
                 return null;
             }
@@ -333,6 +484,14 @@ class Proxy extends Component
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    public function getLatestNewerTraefikVersionProperty(): ?string
+    {
+        $branch = $this->newerTraefikBranchAvailable;
+        $version = $branch ? ($this->getTraefikVersions()[$branch] ?? null) : null;
+
+        return $version ? 'v'.ltrim($version, 'v') : null;
     }
 
     private function getConfiguredTraefikBranch(): ?string

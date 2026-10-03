@@ -19,18 +19,22 @@ services:
       - PHP_FPM_PM_START_SERVERS=${PHP_FPM_PM_START_SERVERS:-1}
       - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
       - PHP_FPM_PM_MAX_SPARE_SERVERS=${PHP_FPM_PM_MAX_SPARE_SERVERS:-10}
-      - PUSHER_PORT=${PUSHER_PORT:-6001}
       - PUSHER_BACKEND_PORT=${PUSHER_BACKEND_PORT:-6001}
     env_file:
       - /data/coolify/source/.env
     ports:
       - "${APP_PORT:-8000}:8080"
       - "${REVERB_PORT:-${SOKETI_PORT:-6001}}:6001"
-      - "${TERMINAL_PORT:-6002}:6002"
+      - "6002:6002"
     expose:
       - "${APP_PORT:-8000}"
       - "6001"
-      - "${TERMINAL_PORT:-6002}"
+      - "6002"
+    networks:
+      coolify:
+        # Realtime ran in the coolify-realtime container before 4.4; keep the name for existing proxy upstreams.
+        aliases:
+          - coolify-realtime
     healthcheck:
       test: curl --fail http://127.0.0.1:8080/api/health && curl --fail http://127.0.0.1:${PUSHER_BACKEND_PORT:-6001}/up || exit 1
       interval: 5s

@@ -5,8 +5,10 @@ namespace App\Livewire\Project\Shared;
 use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ApplicationStatusChanged;
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -14,6 +16,7 @@ use Livewire\Component;
 class Destination extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public $resource;
 
@@ -21,12 +24,12 @@ class Destination extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'mount',
             'refresh' => 'mount',
+            ...$this->teamChannelListeners([
+                'ApplicationStatusChanged' => 'loadData',
+                'ServiceStatusChanged' => 'mount',
+            ]),
         ];
     }
 
@@ -156,6 +159,14 @@ class Destination extends Component
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
+            $reason = $this->resource instanceof Application
+                ? $this->resource->additionalServersUnavailableReason($server)
+                : 'Only applications can use multiple servers.';
+            if ($reason) {
+                $this->dispatch('error', 'Failed to add server.', $reason);
+
+                return;
+            }
 
             $this->resource->additional_networks()->syncWithoutDetaching([
                 $network->id => ['server_id' => $server->id],

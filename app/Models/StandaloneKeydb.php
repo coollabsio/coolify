@@ -65,6 +65,8 @@ class StandaloneKeydb extends BaseModel
         'keydb_password',
         'internal_db_url',
         'external_db_url',
+        // Internal start-command state, not part of the API.
+        'legacy_password_quoting',
     ];
 
     protected $casts = [
@@ -74,6 +76,7 @@ class StandaloneKeydb extends BaseModel
         'health_check_retries' => 'integer',
         'health_check_start_period' => 'integer',
         'keydb_password' => 'encrypted',
+        'legacy_password_quoting' => 'boolean',
         'public_port_timeout' => 'integer',
         'restart_count' => 'integer',
         'last_restart_at' => 'datetime',
@@ -100,6 +103,9 @@ class StandaloneKeydb extends BaseModel
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
                 $database->last_online_at = now();
+            }
+            if ($database->exists && $database->isDirty('keydb_password')) {
+                $database->legacy_password_quoting = false;
             }
         });
     }

@@ -21,8 +21,16 @@ class ScheduledTasksController extends Controller
             'application_id',
             'service_id',
         ]);
+        if (! $this->canReadSensitive()) {
+            $task->makeHidden(['command']);
+        }
 
         return serializeApiResponse($task);
+    }
+
+    private function canReadSensitive(): bool
+    {
+        return request()->attributes->get('can_read_sensitive', false) === true;
     }
 
     private function resolveApplication(Request $request, int $teamId): ?Application
@@ -218,6 +226,9 @@ class ScheduledTasksController extends Controller
 
         $executions = $task->executions()->get()->map(function ($execution) {
             $execution->makeHidden(['id', 'scheduled_task_id']);
+            if (! $this->canReadSensitive()) {
+                $execution->makeHidden(['message']);
+            }
 
             return serializeApiResponse($execution);
         });

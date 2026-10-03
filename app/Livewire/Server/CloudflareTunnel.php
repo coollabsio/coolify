@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\ConfigureCloudflared;
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Livewire\Component;
 class CloudflareTunnel extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Server $server;
 
@@ -25,11 +27,9 @@ class CloudflareTunnel extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
-        return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
-        ];
+        return $this->teamChannelListeners([
+            'CloudflareTunnelConfigured' => 'refresh',
+        ]);
     }
 
     public function refresh()

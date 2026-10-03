@@ -51,11 +51,11 @@ services:
     ports:
       - "${APP_PORT:-8000}:8080"
       - "${REVERB_PORT:-${SOKETI_PORT:-6001}}:6001"
-      - "${TERMINAL_PORT:-6002}:6002"
+      - "6002:6002"
     expose:
       - "${APP_PORT:-8000}"
       - "6001"
-      - "${TERMINAL_PORT:-6002}"
+      - "6002"
     healthcheck:
       test: curl --fail http://localhost:8080/api/health && curl --fail http://localhost:${PUSHER_BACKEND_PORT:-6001}/up || exit 1
       interval: 5s

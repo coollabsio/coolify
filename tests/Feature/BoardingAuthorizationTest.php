@@ -151,6 +151,75 @@ test('a client supplied private key identifier from another team is rejected by 
         ->call('selectExistingPrivateKey');
 })->throws(ModelNotFoundException::class);
 
+test('a member cannot restore a restricted onboarding selection', function () {
+    $member = User::factory()->create();
+    $member->teams()->attach($this->otherTeam, ['role' => 'member']);
+    $this->otherTeam->update(['show_boarding' => false]);
+    actAsBoardingUser($member, $this->otherTeam);
+
+    Livewire::test(Index::class, [
+        'selectedServerType' => 'remote',
+        'selectedExistingPrivateKey' => $this->otherKey->id,
+    ])->assertForbidden();
+});
+
+test('a member cannot use a restricted onboarding selection', function () {
+    $member = User::factory()->create();
+    $member->teams()->attach($this->otherTeam, ['role' => 'member']);
+    $this->otherTeam->update(['show_boarding' => false]);
+    actAsBoardingUser($member, $this->otherTeam);
+
+    Livewire::test(Index::class)
+        ->set('selectedExistingPrivateKey', $this->otherKey->id)
+        ->call('selectExistingPrivateKey')
+        ->assertForbidden();
+});
+
+test('an owner can select an existing onboarding resource', function () {
+    actAsBoardingUser($this->otherOwner, $this->otherTeam);
+
+    $component = Livewire::test(Index::class)
+        ->set('selectedExistingPrivateKey', $this->otherKey->id)
+        ->call('selectExistingPrivateKey')
+        ->assertOk()
+        ->assertSet('createdPrivateKey.id', $this->otherKey->id)
+        ->assertSet('privateKey', null);
+
+    expect($component->get('createdPrivateKey')->getAttributes())->not->toHaveKey('private_key');
+});
+
+test('an owner can resume onboarding with an existing resource', function () {
+    actAsBoardingUser($this->otherOwner, $this->otherTeam);
+
+    $component = Livewire::test(Index::class, [
+        'selectedServerType' => 'remote',
+        'selectedExistingPrivateKey' => $this->otherKey->id,
+    ])
+        ->assertOk()
+        ->assertSet('createdPrivateKey.id', $this->otherKey->id)
+        ->assertSet('privateKey', null);
+
+    expect($component->get('createdPrivateKey')->getAttributes())->not->toHaveKey('private_key');
+});
+
+test('an owner can create a server from an existing onboarding resource', function () {
+    actAsBoardingUser($this->otherOwner, $this->otherTeam);
+
+    Livewire::test(Index::class)
+        ->set('selectedExistingPrivateKey', $this->otherKey->id)
+        ->call('selectExistingPrivateKey')
+        ->set('remoteServerName', 'Existing key server')
+        ->set('remoteServerHost', '192.0.2.51')
+        ->set('remoteServerPort', 22)
+        ->set('remoteServerUser', 'root')
+        ->call('saveServer')
+        ->assertOk()
+        ->assertSet('currentState', 'validate-server')
+        ->assertSet('privateKey', null);
+
+    expect(Server::query()->where('ip', '192.0.2.51')->firstOrFail()->private_key_id)->toBe($this->otherKey->id);
+});
+
 test('a hydrated server model from another team is forbidden before use', function () {
     actAsBoardingUser($this->rootOwner, $this->rootTeam);
 

@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
@@ -110,8 +111,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
                         return;
                     }
 
-                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
-                    if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
+                    // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity.
+                    // Never skip while the server is marked unreachable or unusable: the heartbeat does not
+                    // restore these flags, so deployments would fail with "Server is not functional" forever.
+                    if ($server->isSentinelEnabled() && $server->isSentinelLive()
+                        && $server->settings->is_reachable && $server->settings->is_usable) {
                         return;
                     }
                     if ($this->shouldSkipDueToBackoff($server)) {
@@ -166,7 +170,9 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        // Sentinel versions that report their version on push are updated by SentinelController.
         if ($server->isSentinelEnabled()
+            && ! Cache::has(Server::sentinelReportedVersionCacheKey($server->id))
             && shouldRunCronNow('0 * * * *', $serverTimezone, "sentinel-version-check:{$server->id}", $this->executionTime)
         ) {
             CheckAndStartSentinelJob::dispatch($server);

@@ -1,3 +1,5 @@
+@props(['deploymentsIndicator' => false])
+
 <nav class="flex flex-col flex-1 bg-white border-r border-neutral-200 dark:border-white/[0.06] dark:bg-panel pt-2"
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"
     @mouseover="
@@ -132,6 +134,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Destinations</span>
                 </a>
             </li>
+            @if (auth()->user()?->isAdmin())
+                <li>
+                    <a title="Registries" {{ wireNavigate() }}
+                        class="{{ request()->is('registries*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('registries.index') }}">
+                        <x-reicon name="layers" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Registries</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="S3 Storage" {{ wireNavigate() }}
                     class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -239,17 +251,21 @@
             @endif
         @endif
     </ul>
-    {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
-    <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
-        :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
-        <x-top-user-menu sidebar />
-        <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
-            class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
-            <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
-                <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
-            </svg>
-        </button>
+    {{-- Sticky sidebar footer (desktop only; mobile uses a temporary slide-over) --}}
+    <div class="sticky bottom-0 mt-auto -mx-2 hidden flex-col gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3">
+        @if ($deploymentsIndicator)
+            <livewire:deployments-indicator variant="sidebar" />
+        @endif
+        <div class="flex items-center gap-1" :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
+            <x-top-user-menu sidebar />
+            <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
+                class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
+                <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+            </button>
+        </div>
     </div>
     <div x-show="collapsed && tooltip.show" x-cloak x-transition.opacity.duration.100ms
         :style="`left: ${tooltip.x}px; top: ${tooltip.y}px;`"

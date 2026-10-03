@@ -35,6 +35,7 @@ class Handler extends ExceptionHandler
         ProcessException::class,
         NonReportableException::class,
         DeploymentException::class,
+        DatabaseStartException::class,
     ];
 
     /**

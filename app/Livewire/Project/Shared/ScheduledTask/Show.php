@@ -106,7 +106,7 @@ class Show extends Component
         } else {
             $this->isEnabled = $this->task->enabled;
             $this->name = $this->task->name;
-            $this->command = $this->task->command;
+            $this->command = auth()->user()?->can('update', $this->resource) ? $this->task->command : 'Hidden (only admins can view)';
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;

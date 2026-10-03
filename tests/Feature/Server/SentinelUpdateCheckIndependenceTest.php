@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ServerRole;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\ServerManagerJob;
 use App\Models\InstanceSettings;
@@ -127,6 +128,7 @@ it('respects server timezone when checking sentinel updates', function () {
 it('does not dispatch sentinel check for build servers', function () {
     $this->server->settings->update([
         'is_build_server' => true,
+        'server_role' => ServerRole::BUILD,
     ]);
 
     $instanceSettings = InstanceSettings::first();
@@ -151,6 +153,7 @@ it('handles multiple servers with different sentinel eligibility', function () {
     ]);
     $server2->settings->update([
         'is_build_server' => true,
+        'server_role' => ServerRole::BUILD,
         'server_timezone' => 'UTC',
     ]);
 

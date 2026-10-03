@@ -36,34 +36,27 @@ class StartProxy
 
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
+        // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
+        $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
         SaveProxyConfiguration::run($server, $configuration);
-        $docker_compose_yml_base64 = base64_encode($configuration);
-        $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
-        $server->save();
+        $server->markProxyConfigurationApplied($configuration);
 
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
-                'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
+                "docker stack deploy --detach=true -c $compose_file coolify-proxy",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            if (isDev()) {
-                if ($proxyType === ProxyTypes::CADDY->value) {
-                    $proxy_path = '/data/coolify/proxy/caddy';
-                }
-            }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
-                "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
+                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                'docker compose pull',
+                "docker compose -f $compose_file pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
                 '    docker stop coolify-proxy 2>/dev/null || true',
@@ -79,11 +72,15 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
+            if ($proxyType !== ProxyTypes::TRAEFIK->value) {
+                // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
+                $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
+            }
             // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
             $commands = $commands->merge(ensureProxyNetworksExist($server));
             $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --wait --remove-orphans',
+                "docker compose -f $compose_file up -d --wait --remove-orphans",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));

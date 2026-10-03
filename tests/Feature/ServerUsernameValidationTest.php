@@ -180,3 +180,17 @@ it('rejects unsafe SSH usernames during onboarding server validation', function 
             ],
         ]);
 });
+
+it('does not disclose another team through the duplicate server IP message', function () {
+    $this->actingAs($this->user);
+    $foreignTeam = Team::factory()->create();
+    Server::factory()->create(['team_id' => $this->team->id, 'ip' => '192.0.2.40']);
+    Server::factory()->create(['team_id' => $foreignTeam->id, 'ip' => '192.0.2.41']);
+
+    foreach (['192.0.2.40', '192.0.2.41'] as $ip) {
+        Livewire::test(ByIp::class, ['private_keys' => collect([$this->privateKey])])
+            ->set('ip', $ip)
+            ->call('submit')
+            ->assertDispatched('error', 'A server with this IP/Domain already exists.');
+    }
+});
