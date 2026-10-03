@@ -34,7 +34,7 @@
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
+                                :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
                             <x-forms.input canGate="update" :canResource="$server" type="password" required
                                 id="logDrainNewRelicLicenseKey" label="License key"
                                 :disabled="$server->isLogDrainEnabled()" />
@@ -53,12 +53,43 @@
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
                             <x-forms.input canGate="update" :canResource="$server" type="password" required
                                 id="logDrainAxiomApiKey" label="API key"
                                 :disabled="$server->isLogDrainEnabled()" />
                             <x-forms.input canGate="update" :canResource="$server" required
                                 id="logDrainAxiomDatasetName" label="Dataset name"
+                                :disabled="$server->isLogDrainEnabled()" />
+                        </div>
+                    </x-application.settings-section>
+                    <x-application.settings-section id="server-cloudwatch-drain-section" title="Amazon CloudWatch Logs"
+                        helper="Send container logs directly to CloudWatch Logs using the Docker awslogs logging driver.">
+                        <div class="mb-4 max-w-sm">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCloudwatchEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <p class="mb-4 text-sm leading-6 text-neutral-600 dark:text-fg-dim">
+                            AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM
+                            instance role, or configure <code>AWS_ACCESS_KEY_ID</code>/<code>AWS_SECRET_ACCESS_KEY</code>
+                            for the Docker service or in <code>/root/.aws/credentials</code>. The credentials need
+                            <code>logs:CreateLogGroup</code>, <code>logs:CreateLogStream</code> and
+                            <code>logs:PutLogEvents</code>. The log group is created if it does not exist. Redeploy or
+                            restart resources to apply the logging driver.
+                        </p>
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" required
+                                id="logDrainCloudwatchGroup" label="Log group" placeholder="/coolify/production"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server"
+                                id="logDrainCloudwatchStreamPrefix" label="Log stream prefix" placeholder="docker/"
+                                helper="Optional. Log streams are named after the container, prefixed with this value (e.g. docker/&lt;container name&gt;)."
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" required
+                                id="logDrainCloudwatchRegion" label="Region" placeholder="us-east-1"
                                 :disabled="$server->isLogDrainEnabled()" />
                         </div>
                     </x-application.settings-section>
@@ -70,7 +101,7 @@
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
                                 ]"
-                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || !auth()->user()->can('update', $server)" />
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
                         </div>
                         <div class="grid gap-4 lg:grid-cols-2">
                             <x-forms.textarea canGate="update" :canResource="$server" rows="8" required

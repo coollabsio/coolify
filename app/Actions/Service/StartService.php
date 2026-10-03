@@ -104,7 +104,7 @@ class StartService
             return [];
         }
 
-        if (! $service->destination?->server?->isLogDrainEnabled()) {
+        if (! $service->destination?->server?->isFluentBitLogDrainEnabled()) {
             return [];
         }
 
