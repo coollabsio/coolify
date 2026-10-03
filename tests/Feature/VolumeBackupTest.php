@@ -61,8 +61,8 @@ it('allows large volume backups to run for ten hours by default', function () {
 
     expect($job->timeout)->toBe(36000)
         ->and((new VolumeBackups)->timeout)->toBe(36000)
-        ->and(config('horizon.defaults.s6.timeout'))->toBeGreaterThan($job->timeout)
-        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.defaults.s6.timeout'));
+        ->and(config('horizon.worker_timeout'))->toBeGreaterThan($job->timeout)
+        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.worker_timeout'));
 });
 
 it('changes the default volume backup timeout without changing existing timeouts', function () {

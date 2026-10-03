@@ -289,7 +289,7 @@ test('an import task may run longer than the SSH command timeout while other rem
     $timeouts = Queue::pushed(CoolifyTask::class)->mapWithKeys(fn (CoolifyTask $job) => [
         (data_get($job->activity, 'properties.operation') ?? 'other') => $job->timeout,
     ]);
-    $workerTimeout = (int) config('horizon.defaults.s6.timeout');
+    $workerTimeout = (int) config('horizon.worker_timeout');
 
     expect($timeouts['other'])->toBe(600)
         ->and($timeouts[ResourceStartActivity::DATABASE_IMPORT_OPERATION])->toBeGreaterThan(min($commandTimeout, $workerTimeout - 600))

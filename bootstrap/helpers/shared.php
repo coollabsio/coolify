@@ -1028,8 +1028,8 @@ function isCloud(): bool
  * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
  * process needs no special env — only the worker must be configured to drain `deployments`.
  *
- * IMPORTANT: on cloud a worker MUST include `deployments` in its `HORIZON_QUEUES`, otherwise
- * these jobs are never processed.
+ * On cloud, config/horizon.php provisions a dedicated `deployments` pool in production
+ * (see docs/cloud-horizon-workers.md).
  */
 function deployment_queue(): string
 {
@@ -1045,12 +1045,29 @@ function deployment_queue(): string
  * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
  * worker must be configured to drain `crons`.
  *
- * IMPORTANT: on cloud a worker MUST include `crons` in its `HORIZON_QUEUES`, otherwise these
- * jobs are never processed.
+ * On cloud, config/horizon.php provisions a dedicated `crons` pool in production
+ * (see docs/cloud-horizon-workers.md).
  */
 function crons_queue(): string
 {
     return isCloud() ? 'crons' : 'high';
+}
+
+/**
+ * Resolve the queue used for slow server maintenance — scheduled, manual and stop-triggered
+ * Docker cleanups.
+ *
+ * On cloud these jobs run on a dedicated `maintenance` queue so a small, bounded Horizon pool
+ * drains them and slow remote prunes cannot occupy the `high` workers; self-hosted keeps them
+ * on the shared `high` queue, so a custom `HORIZON_QUEUES` does not need a new queue name. Routing is decided by `isCloud()` (config-based), so the dispatching
+ * process needs no special env — only the worker must be configured to drain `maintenance`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `maintenance` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function maintenance_queue(): string
+{
+    return isCloud() ? 'maintenance' : 'high';
 }
 
 function translate_cron_expression($expression_to_validate): string

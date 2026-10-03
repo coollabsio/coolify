@@ -47,7 +47,7 @@ class StartDatabaseImport
     public static function jobTimeoutSeconds(): int
     {
         $timeout = (int) config('constants.ssh.command_timeout') + self::JOB_TIMEOUT_MARGIN_SECONDS;
-        $workerTimeout = (int) config('horizon.defaults.s6.timeout');
+        $workerTimeout = (int) config('horizon.worker_timeout');
 
         return $workerTimeout > 0 ? min($timeout, $workerTimeout - self::JOB_TIMEOUT_MARGIN_SECONDS) : $timeout;
     }
