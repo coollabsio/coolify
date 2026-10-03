@@ -381,6 +381,7 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         'application_deployment_queue' => $queue,
         'server' => $otherServer,
         'mainServer' => $otherServer,
+        'destination' => $this->destination,
         'deployment_uuid' => 'deployment-uuid',
         'workdir' => '/artifacts/deployment-uuid',
         'configuration_dir' => $this->application->workdir(),
@@ -403,6 +404,10 @@ test('a Dockerfile deployment to an additional server writes missing content fil
         ->and($write)->toBeLessThan($up)
         ->and(ContentFilesUpRecorder::ssh()[$write])->toContain("@'{$otherServer->ip}'")
         ->and($this->logEntries)->toContain(['Writing 1 missing configuration file.', 'stdout']);
+
+    $connect = ContentFilesUpRecorder::indexOf('deployment', "docker network connect '{$this->destination->network}' coolify-proxy");
+    expect($connect)->not->toBeNull()
+        ->and($connect)->toBeLessThan($up);
 });
 
 test('the content file check and write are safe for non-root servers', function () {

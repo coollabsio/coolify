@@ -4699,6 +4699,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Ensure .env file exists before docker compose tries to load it (defensive programming)
             $this->execute_remote_command(
                 ["touch {$this->configuration_dir}/.env", 'hidden' => true],
+                [$this->destination->proxyConnectCommand(), 'hidden' => true, 'ignore_errors' => true],
             );
 
             if ($this->application->build_pack === 'dockerimage') {
