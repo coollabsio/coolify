@@ -766,7 +766,7 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [])
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -777,7 +777,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = $http_basic_auth_argon2id_options
+            ? password_hash($http_basic_auth_password, PASSWORD_ARGON2ID, $http_basic_auth_argon2id_options)
+            : password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     $trafficAppKey = caddyTrafficAppKey($uuid, $service_name);
@@ -834,6 +836,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_http_basic_auth_enabled) {
             // Caddy 2.8 renamed basicauth to basic_auth; see Server::caddySupportsBasicAuthDirective().
             $basicAuthDirective = $supports_basic_auth_directive ? 'basic_auth' : 'basicauth';
+            if ($http_basic_auth_argon2id_options) {
+                $labels->push("caddy_{$loop}.{$basicAuthDirective}=argon2id");
+            }
             $labels->push("caddy_{$loop}.{$basicAuthDirective}.{$http_basic_auth_username}=\"{$hashedPassword}\"");
         }
         if ($is_traffic_analytics_enabled) {
@@ -907,7 +912,7 @@ function dockerComposeServicePorts(?string $compose, ?string $serviceName): arra
         ->unique()->values()->all();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?int $http_basic_auth_bcrypt_cost = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -919,7 +924,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
     if ($is_http_basic_auth_enabled) {
-        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => $http_basic_auth_bcrypt_cost ?? 10]);
     }
 
     if ($is_http_basic_auth_enabled) {
@@ -1186,6 +1191,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
     $labels = collect([]);
+    $httpBasicAuthArgon2idOptions = $application->usesArgon2idBasicAuth() ? [
+        'memory_cost' => $application->http_basic_auth_argon2id_memory_cost,
+        'time_cost' => $application->http_basic_auth_argon2id_time_cost,
+    ] : [];
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
@@ -1205,6 +1214,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
                         ));
@@ -1222,6 +1232,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                            http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                             noindex_domains: $noindexDomains,
                             is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1242,6 +1254,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
@@ -1258,6 +1271,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                    http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                     noindex_domains: $noindexDomains,
                     is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1288,6 +1303,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1305,6 +1321,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                        http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                         noindex_domains: $noindexDomains,
                         is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                         supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1324,6 +1342,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1339,6 +1358,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
                 noindex_domains: $noindexDomains,
                 is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                 supports_log_append: $application->destination->server->caddySupportsLogAppend(),

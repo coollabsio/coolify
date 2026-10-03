@@ -6,6 +6,7 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -425,6 +426,10 @@ class ApplicationsController extends Controller
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
@@ -620,6 +625,10 @@ class ApplicationsController extends Controller
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
@@ -815,6 +824,10 @@ class ApplicationsController extends Controller
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
@@ -981,6 +994,10 @@ class ApplicationsController extends Controller
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
@@ -1143,6 +1160,10 @@ class ApplicationsController extends Controller
                             'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'default' => 'bcrypt', 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
@@ -1228,7 +1249,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1240,7 +1261,9 @@ class ApplicationsController extends Controller
             'destination_uuid' => 'string',
             'is_http_basic_auth_enabled' => 'boolean',
             'http_basic_auth_username' => 'string|nullable',
-            'http_basic_auth_password' => 'string|nullable',
+            // bcrypt ignores everything after 72 bytes. Labels for Traefik always use bcrypt and are also generated on
+            // Caddy servers when "Labels for all supported proxies" is selected, so that the proxy can be switched easily.
+            'http_basic_auth_password' => 'string|nullable|max:72',
             'autogenerate_domain' => 'boolean',
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
@@ -3106,6 +3129,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'use_build_secrets' => ['type' => 'boolean', 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'http_basic_auth_hash_algorithm' => ['type' => 'string', 'enum' => ['bcrypt', 'argon2id'], 'description' => 'Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer.'],
+                            'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
+                            'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -3226,7 +3253,7 @@ class ApplicationsController extends Controller
         $dnsCleanup = app(ManagedDnsRecordCleanup::class);
         $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -3241,7 +3268,9 @@ class ApplicationsController extends Controller
             'is_http_basic_auth_enabled' => 'boolean|nullable',
             'is_preview_deployments_enabled' => 'boolean|nullable',
             'http_basic_auth_username' => 'string',
-            'http_basic_auth_password' => 'string',
+            // bcrypt ignores everything after 72 bytes. Labels for Traefik always use bcrypt and are also generated on
+            // Caddy servers when "Labels for all supported proxies" is selected, so that the proxy can be switched easily.
+            'http_basic_auth_password' => 'string|max:72',
             'include_source_commit_in_build' => 'boolean',
             'ports_exposes' => 'nullable|string|regex:/^(\d+)(,\d+)*$/',
         ];
@@ -3322,7 +3351,8 @@ class ApplicationsController extends Controller
 
         $requestHasHttpBasicAuth = $request->has('is_http_basic_auth_enabled')
             || $request->has('http_basic_auth_username')
-            || $request->has('http_basic_auth_password');
+            || $request->has('http_basic_auth_password')
+            || $request->hasAny(['http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost']);
 
         if ($request->has('is_http_basic_auth_enabled') && $request->is_http_basic_auth_enabled === true) {
             if (blank($application->http_basic_auth_username) || blank($application->http_basic_auth_password)) {
@@ -4866,6 +4896,15 @@ class ApplicationsController extends Controller
     private function validateDataApplications(Request $request, Server $server)
     {
         $teamId = getTeamIdFromToken();
+
+        if ($request->input('http_basic_auth_hash_algorithm') === HttpBasicAuthHashAlgorithm::ARGON2ID->value && ! $server->caddySupportsArgon2idBasicAuth()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'http_basic_auth_hash_algorithm' => 'Argon2id needs a server that runs the Caddy proxy, version 2.11 or newer.',
+                ],
+            ], 422);
+        }
 
         // Validate ports_mappings
         if ($request->has('ports_mappings')) {
