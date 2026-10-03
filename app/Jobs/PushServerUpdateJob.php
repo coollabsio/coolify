@@ -811,14 +811,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     }
                 } catch (\Throwable $e) {
                 }
-            } else {
-                // Connect proxy to networks periodically as a safety net to avoid excessive job dispatches.
-                // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
-                $proxyCacheKey = 'connect-proxy:'.$this->server->id;
-                if (! Cache::has($proxyCacheKey)) {
-                    Cache::put($proxyCacheKey, true, config('constants.proxy.connect_networks_interval_seconds', 3600));
-                    ConnectProxyToNetworksJob::dispatch($this->server);
-                }
             }
         }
     }

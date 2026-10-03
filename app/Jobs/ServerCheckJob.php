@@ -92,7 +92,6 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                         $this->server->save();
-                        ConnectProxyToNetworksJob::dispatchSync($this->server);
                     }
                 }
             }

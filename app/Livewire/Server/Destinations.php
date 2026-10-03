@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Jobs\ConnectProxyToNetworksJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -26,11 +25,6 @@ class Destinations extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    private function createNetworkAndAttachToProxy()
-    {
-        ConnectProxyToNetworksJob::dispatchSync($this->server);
     }
 
     public function add($name)
@@ -63,7 +57,6 @@ class Destinations extends Component
                     'server_id' => $this->server->id,
                 ]);
             }
-            $this->createNetworkAndAttachToProxy();
         }
     }
 

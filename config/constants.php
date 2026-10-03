@@ -109,14 +109,6 @@ return [
 
     ],
 
-    'proxy' => [
-        // How often (seconds) PushServerUpdateJob periodically re-connects the
-        // proxy to Docker networks as a safety net. Real network-layout changes
-        // already connect the proxy on-demand; this only covers gaps (Swarm
-        // networks added via UI, proxy crash recovery).
-        'connect_networks_interval_seconds' => env('PROXY_CONNECT_NETWORKS_INTERVAL_SECONDS', 3600),
-    ],
-
     'github_runner' => [
         // GitHub stops sending jobs to runners that are more than 30 days behind, so the default follows
         // "latest" and is pulled for every runner. Users can pin a tag in the runner settings.
