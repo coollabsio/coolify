@@ -1,0 +1,14 @@
+paranoid: true
+
+allowBuilds:
+  node-pty: true
+jailBuildExclusions:
+  - node-pty
+
+minimumReleaseAge: 4320 # 3 days
+advisoryCheckEveryInstall: true
+
+securityScanner: "@socketsecurity/bun-security-scanner"
+
+nodeLinker: isolated
+enableGlobalVirtualStore: false

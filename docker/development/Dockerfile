@@ -95,8 +95,8 @@ COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/con
 ENV PHP_OPCACHE_ENABLE=0
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
+COPY package*.json /terminal/
+RUN npm ci --omit=dev --prefix /terminal && \
     npm rebuild node-pty --prefix /terminal --update-binary
 COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js

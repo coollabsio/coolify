@@ -175,7 +175,7 @@ If you encounter issues or break your database or something else, follow these s
 
 2. Force-remove all Coolify dev containers:
    ```bash
-   npm run clean
+   aube run --no-install clean
    ```
 
 3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):

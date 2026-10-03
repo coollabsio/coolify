@@ -56,7 +56,7 @@ FROM node:24-alpine AS static-assets
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -171,8 +171,8 @@ COPY --chown=www-data:www-data changelogs/ ./changelogs/
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
+COPY package*.json /terminal/
+RUN npm ci --omit=dev --prefix /terminal && \
     npm rebuild node-pty --prefix /terminal --update-binary
 COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js

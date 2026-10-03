@@ -22,7 +22,7 @@ compact divided list, not legacy green check SVGs or fixed-width status rows.
 >   requirements in `AGENTS.md`.
 > - Validate Blade with `./scripts/dev exec php artisan view:cache`, then clear
 >   it with `./scripts/dev exec php artisan view:clear`.
-> - Build frontend assets with `npm run build`.
+> - Build frontend assets with `aube run build`.
 > - Use existing components before adding another styling abstraction.
 
 ---
@@ -799,5 +799,5 @@ oversized 200px status numbers.
 15. Sweep every sibling route for legacy controls and shells.
 16. Run `git diff --check`.
 17. Compile Blade views with `./scripts/dev exec php artisan view:cache`.
-18. Build assets with `npm run build`.
+18. Build assets with `aube run build`.
 19. Hard-refresh and inspect the family routes in both themes.

@@ -62,8 +62,8 @@ php artisan test --compact tests/Feature/SomeTest.php  # specific file
 vendor/bin/pint --dirty --format agent              # format changed files
 
 # Frontend
-npm run dev                     # vite dev server
-npm run build                   # production build
+aube run dev                    # vite dev server
+aube run build                  # production build
 ```
 
 ## Browser Tests (Pest Browser Plugin)
@@ -105,7 +105,7 @@ function loginAsRoot(): mixed
 
 `visit()` does NOT hit the dev app on `localhost:8000`. Instead the Pest Browser Plugin:
 
-1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `npm install && npx playwright install chromium`).
+1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `aube install && aube exec playwright install chromium`).
 2. Boots an **in-process amphp HTTP server** on a random port that serves the Laravel app from the test process itself.
 
 Because the "server" and the test share one PHP process, they share the phpunit env (sqlite `:memory:`, array cache) — so `config()->set(...)`, model writes, and `Cache` calls in the test are visible to browser-issued requests, and `RefreshDatabase` never touches the dev Postgres.
@@ -268,7 +268,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `aube run build`, `aube run dev`, or `composer run dev`. Ask them.
 
 ## Documentation Files
 
@@ -377,7 +377,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `aube run build` or ask the user to run `aube run dev` or `composer run dev`.
 
 === laravel/v12 rules ===
 
