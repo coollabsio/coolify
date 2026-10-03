@@ -432,8 +432,8 @@ class DeployController extends Controller
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
                 $dockerTagForResource = $dockerTag;
+                $preview = null;
                 if ($pr !== 0) {
-                    $preview = null;
                     if ($resource instanceof Application && $resource->build_pack === 'dockerimage') {
                         $preview = $this->upsertDockerImagePreview($resource, $pr, $dockerTag);
                         $dockerTagForResource = $preview?->docker_registry_image_tag;
@@ -446,7 +446,7 @@ class DeployController extends Controller
                         continue;
                     }
                 }
-                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource);
+                $result = $this->deploy_resource($resource, $force, $pr, $dockerTagForResource, $preview?->git_type);
                 if (isset($result['status']) && $result['status'] === 429) {
                     return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
                 }
@@ -519,7 +519,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0, ?string $dockerTag = null, ?string $gitType = null): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -544,6 +544,7 @@ class DeployController extends Controller
                     force_rebuild: $force,
                     pull_request_id: $pr,
                     is_api: true,
+                    git_type: $gitType,
                     docker_registry_image_tag: $dockerTag,
                 );
                 if ($result['status'] === 'queue_full') {

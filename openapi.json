@@ -11,6 +11,401 @@
         }
     ],
     "paths": {
+        "\/applications\/{uuid}\/previews": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "List Preview Deployments",
+                "description": "List the preview deployments of an application, newest pull request first.",
+                "operationId": "list-preview-deployments-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of preview deployments.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#\/components\/schemas\/ApplicationPreview"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create Preview Deployment",
+                "description": "Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.",
+                "operationId": "create-preview-deployment-by-application-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "pull_request_id"
+                                ],
+                                "properties": {
+                                    "pull_request_id": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 42
+                                    },
+                                    "pull_request_html_url": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "example": "https:\/\/github.com\/org\/repo\/pull\/42"
+                                    },
+                                    "git_type": {
+                                        "description": "Git provider that hosts the pull request. Sets the ref Coolify fetches (pull\/{id}\/head or merge-requests\/{id}\/head).",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "enum": [
+                                            "github",
+                                            "gitlab",
+                                            "gitea",
+                                            "bitbucket"
+                                        ]
+                                    },
+                                    "commit": {
+                                        "description": "Commit SHA to deploy. Required for Bitbucket.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "docker_tag": {
+                                        "description": "Docker image tag. Docker Image applications only.",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "force": {
+                                        "description": "Rebuild without cache.",
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "instant_deploy": {
+                                        "description": "Queue a deployment. Set to false to only create the preview, for example to set its domains first.",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Existing preview deployment updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreviewDeployment"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Preview deployment created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreviewDeployment"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "description": "Deployment queue is full."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/previews\/{pull_request_id}": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get Preview Deployment",
+                "description": "Get a preview deployment by pull request ID.",
+                "operationId": "get-preview-deployment-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview deployment.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ApplicationPreview"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Delete Preview Deployment",
+                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
+                "operationId": "delete-preview-deployment-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "description": "Pull request ID of the preview to delete.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preview deletion queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Update Preview Domains",
+                "description": "Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.",
+                "operationId": "update-preview-domains-by-pull-request-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "pull_request_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "domains": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "example": "https:\/\/pr.example.com:3000"
+                                    },
+                                    "docker_compose_domains": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "domain": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "redirect": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Preview domains updated."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "$ref": "#\/components\/responses\/403"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Domain conflict."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/{uuid}\/secret-manager": {
             "patch": {
                 "tags": [
@@ -3575,6 +3970,15 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "service_name",
+                        "in": "query",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3670,6 +4074,15 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "service_name",
+                        "in": "query",
+                        "description": "Return logs only from the container of the Docker Compose service with this name. Returns 404 when no running container matches.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3696,175 +4109,6 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "\/applications\/{uuid}\/previews\/{pull_request_id}": {
-            "delete": {
-                "tags": [
-                    "Applications"
-                ],
-                "summary": "Delete Preview Deployment",
-                "description": "Delete a preview deployment for a pull request. Cancels active deployments, stops containers, removes volumes\/networks, and deletes the preview record.",
-                "operationId": "delete-preview-deployment-by-pull-request-id",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "description": "UUID of the application.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "pull_request_id",
-                        "in": "path",
-                        "description": "Pull request ID of the preview to delete.",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Preview deletion queued.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "400": {
-                        "$ref": "#\/components\/responses\/400"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "422": {
-                        "$ref": "#\/components\/responses\/422"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "patch": {
-                "tags": [
-                    "Applications"
-                ],
-                "summary": "Update Preview Domains",
-                "description": "Replace domains for a preview deployment. Use domains for regular applications or docker_compose_domains for Docker Compose applications. Ports are stored as internal overrides while public domains remain portless.",
-                "operationId": "update-preview-domains-by-pull-request-id",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "pull_request_id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application\/json": {
-                            "schema": {
-                                "properties": {
-                                    "domains": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "example": "https:\/\/pr.example.com:3000"
-                                    },
-                                    "docker_compose_domains": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "properties": {
-                                                "name": {
-                                                    "type": "string"
-                                                },
-                                                "domain": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "redirect": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "enum": [
-                                                        "www",
-                                                        "non-www",
-                                                        "both"
-                                                    ]
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "force_domain_override": {
-                                        "type": "boolean",
-                                        "default": false
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Preview domains updated."
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "403": {
-                        "$ref": "#\/components\/responses\/403"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "409": {
-                        "description": "Domain conflict."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -22592,6 +22836,105 @@
                 },
                 "type": "object"
             },
+            "ApplicationPreview": {
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "pull_request_id": {
+                        "type": "integer"
+                    },
+                    "pull_request_html_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "git_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "domains": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "docker_compose_domains": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "domain": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "redirect": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "domain_port_overrides": {
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "docker_registry_image_tag": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_online_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ApplicationPreviewDeployment": {
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "deployment_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "preview": {
+                        "$ref": "#\/components\/schemas\/ApplicationPreview"
+                    }
+                },
+                "type": "object"
+            },
             "VolumeBackupScheduleRequest": {
                 "required": [
                     "frequency"
@@ -24228,12 +24571,12 @@
     },
     "tags": [
         {
-            "name": "Secret Managers",
-            "description": "Secret Managers"
-        },
-        {
             "name": "Applications",
             "description": "Applications"
+        },
+        {
+            "name": "Secret Managers",
+            "description": "Secret Managers"
         },
         {
             "name": "Cloud-init Scripts",
