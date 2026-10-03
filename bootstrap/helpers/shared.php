@@ -1070,6 +1070,23 @@ function maintenance_queue(): string
     return isCloud() ? 'maintenance' : 'high';
 }
 
+/**
+ * Resolve the queue used for incoming webhook processing — GitHub pull request webhooks and
+ * Stripe events.
+ *
+ * On cloud these jobs run on a dedicated `webhooks` queue so a busy `high` queue cannot delay
+ * them; self-hosted keeps them on the shared `high` queue, so a custom `HORIZON_QUEUES` does
+ * not need a new queue name. Routing is decided by `isCloud()` (config-based), so the
+ * dispatching process needs no special env — only the worker must be configured to drain `webhooks`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `webhooks` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function webhooks_queue(): string
+{
+    return isCloud() ? 'webhooks' : 'high';
+}
+
 function translate_cron_expression($expression_to_validate): string
 {
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {

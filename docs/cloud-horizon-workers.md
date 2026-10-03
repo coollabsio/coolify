@@ -11,14 +11,18 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
 | `high`        | `high`        | `HORIZON_HIGH_PROCESSES`        | 60               |
 | `default`     | `default`     | `HORIZON_DEFAULT_PROCESSES`     | 40               |
 | `maintenance` | `maintenance` | `HORIZON_MAINTENANCE_PROCESSES` | 10               |
+| `webhooks`    | `webhooks`    | `HORIZON_WEBHOOKS_PROCESSES`    | 10               |
 
-- Counts apply to **each node**. Two nodes with the defaults run 460 workers.
+- Counts apply to **each node**. Two nodes with the defaults run 480 workers.
 - `maintenance` runs Docker cleanups (scheduled, manual, and the cleanup
   that runs after a resource stops). Remote prunes can be slow, so this pool
   is small on purpose: it limits how many cleanups run at the same time and
   keeps them away from the `high` workers. It is added on top of the other
   pools. Each cleanup has a 600 s timeout, and only one cleanup runs per
   server at a time. Self-hosted instances keep cleanups on `high`.
+- `webhooks` processes GitHub pull request webhooks and Stripe events, so a
+  full `high` queue cannot delay them. These jobs are short (60 s timeout or
+  less). Self-hosted instances keep them on `high`.
 - Each pool has `minProcesses = maxProcesses` and `balance = false`. Horizon
   does not scale them.
 - A value that is not a positive integer falls back to the default.
@@ -45,6 +49,7 @@ HORIZON_CRONS_PROCESSES=60
 HORIZON_HIGH_PROCESSES=60
 HORIZON_DEFAULT_PROCESSES=40
 HORIZON_MAINTENANCE_PROCESSES=10
+HORIZON_WEBHOOKS_PROCESSES=10
 # Worker timeout. Must stay above the longest job timeout (36000 s) and below
 # retry_after (86400 s). The config clamps it to 36600..85800.
 HORIZON_TIMEOUT=36600
@@ -108,28 +113,28 @@ Do these steps on one node at a time. Do not flush Redis or clear queues.
    docker exec coolify php artisan horizon:terminate
    ```
 
-5. Make sure the five supervisors are running on this node:
+5. Make sure the six supervisors are running on this node:
 
    ```bash
    docker exec coolify php artisan horizon:supervisors
    ```
 
-6. Make sure the `maintenance` queue drains (its depth goes down) and that
+6. Make sure the `maintenance` and `webhooks` queues drain (its depth goes down) and that
    `php artisan scheduled:diagnostics` shows no growing count of stale
    occurrences.
 7. Do the same steps on the next node.
 
-Jobs that the old code put on `high` (for example Docker cleanups) stay on
-`high`, and the `high` pool still processes them.
+Jobs that the old code put on `high` (for example Docker cleanups and webhook
+jobs) stay on `high`, and the `high` pool still processes them.
 
 ## Rollback
 
 1. Deploy the previous image, or remove the `HORIZON_*_PROCESSES` overrides.
 2. Run `config:cache` and `horizon:terminate` on one node at a time.
-3. Jobs that wait on the `maintenance` queue are not lost, but the old
-   configuration has no `maintenance` pool. Keep one node with the new
-   configuration until `maintenance` is empty, or start a temporary worker:
-   `php artisan queue:work redis --queue=maintenance --tries=1 --timeout=600`.
+3. Jobs that wait on the `maintenance` or `webhooks` queue are not lost, but
+   the old configuration has no pool for them. Keep one node with the new
+   configuration until both queues are empty, or start a temporary worker:
+   `php artisan queue:work redis --queue=maintenance,webhooks --tries=1 --timeout=600`.
 4. Do not roll back the migration. The old code ignores the new columns.
 
 ## Metrics to collect before you change worker counts

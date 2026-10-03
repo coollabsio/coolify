@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\ProcessGithubPullRequestWebhook;
+use App\Jobs\StripeProcessJob;
 use Laravel\Horizon\ProvisioningPlan;
 use Laravel\Horizon\SupervisorOptions;
 
@@ -91,12 +93,13 @@ test('cloud production runs one fixed-size pool per queue with default process c
         'HORIZON_HIGH_PROCESSES' => null,
         'HORIZON_DEFAULT_PROCESSES' => null,
         'HORIZON_MAINTENANCE_PROCESSES' => null,
+        'HORIZON_WEBHOOKS_PROCESSES' => null,
     ]));
 
     $production = $parsed['production'];
-    expect(array_keys($production))->toBe(['deployments', 'crons', 'high', 'default', 'maintenance']);
+    expect(array_keys($production))->toBe(['deployments', 'crons', 'high', 'default', 'maintenance', 'webhooks']);
 
-    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 10] as $queue => $processes) {
+    foreach (['deployments' => 60, 'crons' => 60, 'high' => 60, 'default' => 40, 'maintenance' => 10, 'webhooks' => 10] as $queue => $processes) {
         $pool = $production[$queue];
         expect($pool->queue)->toBe($queue)
             ->and($pool->balancing())->toBeFalse()
@@ -119,6 +122,7 @@ test('cloud pool sizes come from env and invalid values fall back to defaults', 
         'HORIZON_HIGH_PROCESSES' => 'abc',
         'HORIZON_DEFAULT_PROCESSES' => '-5',
         'HORIZON_MAINTENANCE_PROCESSES' => '4',
+        'HORIZON_WEBHOOKS_PROCESSES' => '6',
     ]))['production'];
 
     expect($production['deployments']->maxProcesses)->toBe(25)
@@ -127,7 +131,9 @@ test('cloud pool sizes come from env and invalid values fall back to defaults', 
         ->and($production['high']->maxProcesses)->toBe(60)
         ->and($production['default']->maxProcesses)->toBe(40)
         ->and($production['maintenance']->minProcesses)->toBe(4)
-        ->and($production['maintenance']->maxProcesses)->toBe(4);
+        ->and($production['maintenance']->maxProcesses)->toBe(4)
+        ->and($production['webhooks']->minProcesses)->toBe(6)
+        ->and($production['webhooks']->maxProcesses)->toBe(6);
 
     $fallback = horizonSupervisorsFor(loadHorizonConfigWithEnv([
         'SELF_HOSTED' => 'false',
@@ -142,7 +148,7 @@ test('cloud queue helpers route to queues that have a dedicated pool', function 
 
     $production = horizonSupervisorsFor(loadHorizonConfigWithEnv(['SELF_HOSTED' => 'false']))['production'];
 
-    expect($production)->toHaveKeys([deployment_queue(), crons_queue(), maintenance_queue()]);
+    expect($production)->toHaveKeys([deployment_queue(), crons_queue(), maintenance_queue(), webhooks_queue()]);
 });
 
 test('self-hosted queue helpers route to a queue the s6 supervisor drains', function () {
@@ -157,6 +163,31 @@ test('self-hosted queue helpers route to a queue the s6 supervisor drains', func
     foreach ($parsed as $supervisors) {
         expect(array_keys($supervisors))->toBe(['s6'])
             ->and(explode(',', $supervisors['s6']->queue))
-            ->toContain(deployment_queue(), crons_queue(), maintenance_queue());
+            ->toContain(deployment_queue(), crons_queue(), maintenance_queue(), webhooks_queue());
     }
 });
+
+test('webhook jobs run on the webhooks queue on cloud and on high on self-hosted', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+
+    $stripeJob = new StripeProcessJob(['type' => 'invoice.paid']);
+    $githubJob = new ProcessGithubPullRequestWebhook(
+        applicationId: 1,
+        githubAppId: null,
+        action: 'opened',
+        pullRequestId: 1,
+        pullRequestHtmlUrl: 'https://github.com/coollabsio/coolify/pull/1',
+        pullRequestTitle: null,
+        beforeSha: null,
+        afterSha: null,
+        commitSha: 'abc123',
+        authorAssociation: null,
+        fullName: 'coollabsio/coolify',
+    );
+
+    expect($stripeJob->queue)->toBe($queue)
+        ->and($githubJob->queue)->toBe($queue);
+})->with([
+    'cloud' => [false, 'webhooks'],
+    'self-hosted' => [true, 'high'],
+]);

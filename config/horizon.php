@@ -42,6 +42,9 @@ $selfHostedSupervisor = $workerOptions + [
 | cleanups. It is small on purpose: it bounds how many cleanups run at once
 | per node, and it comes on top of the other pools, so cleanups never take
 | deployment, cron or high workers.
+|
+| The `webhooks` pool (see webhooks_queue()) processes GitHub pull request
+| webhooks and Stripe events, so other jobs cannot delay them.
 */
 $cloudSupervisors = [];
 
@@ -51,6 +54,7 @@ foreach ([
     'high' => ['HORIZON_HIGH_PROCESSES', 60],
     'default' => ['HORIZON_DEFAULT_PROCESSES', 40],
     'maintenance' => ['HORIZON_MAINTENANCE_PROCESSES', 10],
+    'webhooks' => ['HORIZON_WEBHOOKS_PROCESSES', 10],
 ] as $queue => [$processesEnv, $defaultProcesses]) {
     $processes = filter_var(env($processesEnv), FILTER_VALIDATE_INT, [
         'options' => ['min_range' => 1, 'default' => $defaultProcesses],
