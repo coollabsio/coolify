@@ -348,6 +348,10 @@
             "version": "7.3.0",
             "hash": "tree-v2:c7713b62c33d0f6504f5226e33be144a1255125ec013abfe5ee06fa619c4a340"
         },
+        "radebatz/type-info-extras": {
+            "version": "1.0.9",
+            "hash": "tree-v2:8922f01f69a848e5332fe1e16033223e9afd552039df344b851fd2e2644488ca"
+        },
         "ralouphie/getallheaders": {
             "version": "3.0.3",
             "hash": "tree-v2:db666a4e690725b904b5de22a95b230e08ba09f45559a03b32ffb933b0abb75f"
@@ -689,8 +693,8 @@
             "hash": "tree-v2:06d6d20af34021a04bb906b2f8b28a82dc986db7e17234bbae7074b1235e7119"
         },
         "zircote/swagger-php": {
-            "version": "5.8.3",
-            "hash": "tree-v2:82ab08143346378ab92441f4372cb4ff75439fc9164d53dc79e155d03d12d5a8"
+            "version": "6.11.0",
+            "hash": "tree-v2:d6535e60c5f64c53eba5cfe4f8729ae437b0007f2a0d67d2a2daeae3bf01f79f"
         }
     },
     "require-dev": {

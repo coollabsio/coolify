@@ -58,7 +58,7 @@
         "symfony/yaml": "^8.1.8",
         "visus/cuid2": "^7.0.0",
         "yosymfony/toml": "^1.0.4",
-        "zircote/swagger-php": "^5.8.3"
+        "zircote/swagger-php": "^6.11.0"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.6.2",
