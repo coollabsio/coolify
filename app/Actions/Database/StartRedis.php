@@ -104,7 +104,7 @@ class StartRedis
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD-SHELL',
+                        'CMD',
                         'redis-cli',
                         'ping',
                     ]),
