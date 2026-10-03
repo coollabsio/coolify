@@ -95,10 +95,7 @@ class StartDatabaseProxy
                         ],
                     ],
                     'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            'stat /etc/nginx/nginx.conf || exit 1',
-                        ],
+                        'test' => ['CMD', 'stat', '/etc/nginx/nginx.conf'],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 3,
