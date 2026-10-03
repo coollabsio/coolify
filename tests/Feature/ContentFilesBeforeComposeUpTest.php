@@ -4,6 +4,7 @@ use App\Actions\Service\DeployServiceApplication;
 use App\Actions\Service\StartService;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\CoolifyTask;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -579,3 +580,22 @@ test('the server file sync still marks a storage without content as a directory'
 
     expect($volume->fresh()->is_directory)->toBeTruthy();
 });
+
+test('starting a service runs its commands on the deployment queue', function (bool $selfHosted, string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  app:\n    image: nginx:alpine\n",
+    ]);
+    fakeContentFilesServer([]);
+
+    StartService::run($service);
+
+    Bus::assertDispatched(CoolifyTask::class, fn (CoolifyTask $job) => $job->queue === $queue);
+})->with([
+    'cloud' => [false, 'deployments'],
+    'self-hosted' => [true, 'high'],
+]);

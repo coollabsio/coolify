@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Service\StartService;
@@ -42,6 +43,7 @@ describe('start action job routing', function () {
         expect($actionClass::makeJob()->queue)->toBe('deployments');
     })->with([
         StartDatabase::class,
+        RestartDatabase::class,
         StartDatabaseProxy::class,
         StartService::class,
     ]);
@@ -52,6 +54,7 @@ describe('start action job routing', function () {
         expect($actionClass::makeJob()->queue)->toBe('high');
     })->with([
         StartDatabase::class,
+        RestartDatabase::class,
         StartDatabaseProxy::class,
         StartService::class,
     ]);

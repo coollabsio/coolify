@@ -64,6 +64,6 @@ class DeployServiceApplication
             $commands->push("docker network connect --alias {$networkAlias} {$network} {$containerName} >/dev/null 2>&1 || true");
         }
 
-        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        return remote_process($commands->toArray(), $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged', queue: deployment_queue());
     }
 }

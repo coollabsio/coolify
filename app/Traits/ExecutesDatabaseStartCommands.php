@@ -14,6 +14,6 @@ trait ExecutesDatabaseStartCommands
             return app(DatabaseStartCommandExecutor::class)->execute($commands, $database, $activity);
         }
 
-        return remote_process($commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return remote_process($commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged', queue: deployment_queue());
     }
 }

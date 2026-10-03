@@ -85,3 +85,19 @@ it('removes the command when the task fails permanently', function () {
     expect($stored->getExtraProperty('command'))->toBeNull()
         ->and($stored->getExtraProperty('status'))->toBe(ProcessStatus::ERROR->value);
 });
+
+it('queues a remote process on the high queue by default', function () {
+    Queue::fake();
+
+    remote_process(['echo ok'], $this->server);
+
+    Queue::assertPushedOn('high', CoolifyTask::class);
+});
+
+it('queues a remote process on the requested queue', function () {
+    Queue::fake();
+
+    remote_process(['echo ok'], $this->server, queue: 'deployments');
+
+    Queue::assertPushedOn('deployments', CoolifyTask::class);
+});

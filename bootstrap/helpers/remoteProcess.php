@@ -29,6 +29,7 @@ function remote_process(
     $callEventData = null,
     array $properties = [],
     ?int $timeout = null,
+    string $queue = 'high',
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -74,6 +75,7 @@ function remote_process(
         call_event_on_finish: $callEventOnFinish,
         call_event_data: $callEventData,
         timeout: $timeout,
+        queue: $queue,
     ));
 
     $activity->refresh();

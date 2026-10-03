@@ -38,6 +38,7 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
      * Create a new job instance.
      *
      * @param  int|null  $timeout  Job timeout in seconds; null keeps the default above.
+     * @param  string  $queue  Queue to run on; start actions pass deployment_queue().
      */
     public function __construct(
         public Activity $activity,
@@ -45,12 +46,13 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
         public $call_event_on_finish,
         public $call_event_data,
         ?int $timeout = null,
+        string $queue = 'high',
     ) {
         if ($timeout !== null) {
             $this->timeout = $timeout;
         }
 
-        $this->onQueue('high');
+        $this->onQueue($queue);
     }
 
     /**

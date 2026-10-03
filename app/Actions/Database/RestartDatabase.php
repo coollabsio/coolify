@@ -15,10 +15,16 @@ use App\Models\StandaloneSqlite;
 use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 class RestartDatabase
 {
     use AsAction;
+
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     /**
      * @param  string|null  $reservation  The token from StartDatabase::reserveOperation(). The request

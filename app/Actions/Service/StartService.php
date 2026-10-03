@@ -64,7 +64,7 @@ class StartService
         }
         $commands = array_merge($commands, $this->logDrainNetworkConnectCommands($service));
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged', queue: deployment_queue());
     }
 
     /**
