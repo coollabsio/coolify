@@ -191,11 +191,6 @@
                             <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
                                 :file="$buildPack === 'dockerfile' && !$application->dockerfile ? 'dockerfileLocation' : null"
                                 fileLabel="Dockerfile location" defaultFile="/Dockerfile" disabled="!canUpdate">
-                                @if ($buildPack === 'dockerfile')
-                                    <x-forms.input id="dockerfileTargetBuild" label="Docker build stage target"
-                                        helper="Useful if you have multi-staged dockerfile."
-                                        x-bind:disabled="!canUpdate" />
-                                @endif
                                 @if ($application->could_set_build_commands())
                                     @if ($application->settings->is_static)
                                         <x-forms.input placeholder="/dist" id="publishDirectory"
@@ -238,6 +233,11 @@
                                         : 'If no usable build server is available, the deployment fails.';
                                 @endphp
                                 <div class="grid gap-4 pt-2 sm:grid-cols-2">
+                                    @if ($buildPack === 'dockerfile')
+                                        <x-forms.input id="dockerfileTargetBuild" label="Docker build stage target"
+                                            helper="Useful if you have multi-staged dockerfile."
+                                            x-bind:disabled="!canUpdate" />
+                                    @endif
                                     <x-forms.listbox id="isBuildServerEnabled" label="Builder selection"
                                         onChange="instantSave" :options="$buildServerOptions"
                                         helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
