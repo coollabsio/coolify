@@ -3,16 +3,101 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
+use Lorisleiva\Actions\Decorators\UniqueJobDecorator;
+use RuntimeException;
 
-class CleanupDocker
+class CleanupDocker implements ShouldBeUnique
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
+    /**
+     * Timeout of a queued cleanup, shared with DockerCleanupJob.
+     */
+    public const JOB_TIMEOUT = 600;
+
+    /**
+     * Time budget for all remote commands of one cleanup. It stays below JOB_TIMEOUT, so a
+     * slow server makes the cleanup fail with an error instead of the worker killing the job.
+     * A remote Docker prune that already started still finishes on the server.
+     */
+    public const REMOTE_COMMANDS_DEADLINE = 540;
+
+    /**
+     * Delay of a queued cleanup. Stop requests for one server in this window (for example a
+     * bulk stop through the API) become one cleanup that runs after the batch.
+     */
+    public const QUEUED_DELAY = 60;
+
+    public int $jobTries = 1;
+
+    /**
+     * Bounds how long a lost queued run (for example a killed worker) blocks new cleanups.
+     */
+    public int $jobUniqueFor = self::QUEUED_DELAY + 240;
+
+    public int $jobTimeout = self::JOB_TIMEOUT;
+
+    private int $deadline = 0;
+
+    /**
+     * Overlap lock key shared by DockerCleanupJob and queued CleanupDocker runs.
+     */
+    public static function overlapLockKey(Server $server): string
+    {
+        return 'docker-cleanup-'.$server->uuid;
+    }
+
+    /**
+     * Lock lifetime: longer than the job timeout, so a new run cannot start while a timed-out
+     * run is still finishing.
+     */
+    public static function overlapLockExpiresAfter(): int
+    {
+        return self::JOB_TIMEOUT + 60;
+    }
+
+    /**
+     * At most one queued cleanup per server. The unique lock is released when a worker starts
+     * the job, so a stop during a running cleanup queues one follow-up cleanup.
+     */
+    public static function makeUniqueJob(mixed ...$arguments): UniqueJobDecorator
+    {
+        return new UniqueUntilProcessingJobDecorator(static::class, ...$arguments);
+    }
+
+    public function getJobUniqueId(Server $server): string
+    {
+        return $server->uuid;
+    }
+
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(maintenance_queue())->delay(self::QUEUED_DELAY);
+    }
+
+    /**
+     * Only applies when dispatched as a job. ::run() inside DockerCleanupJob already holds
+     * the lock and does not go through this middleware.
+     */
+    public function getJobMiddleware(Server $server): array
+    {
+        return [
+            (new WithoutOverlapping(self::overlapLockKey($server)))
+                ->shared()
+                ->expireAfter(self::overlapLockExpiresAfter())
+                ->dontRelease(),
+        ];
+    }
 
     public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
     {
+        $this->deadline = now()->getTimestamp() + self::REMOTE_COMMANDS_DEADLINE;
         $helperImageVersion = getHelperVersion();
         $helperImage = coolifyHelperImage();
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
@@ -61,7 +146,7 @@ class CleanupDocker
         }
 
         foreach ($commands as $command) {
-            $commandOutput = instant_remote_process([$command], $server, false);
+            $commandOutput = $this->runRemoteCommand($command, $server);
             if ($commandOutput !== null) {
                 $cleanupLog[] = [
                     'command' => $command,
@@ -71,6 +156,21 @@ class CleanupDocker
         }
 
         return $cleanupLog;
+    }
+
+    /**
+     * Run one remote command with the time left before the cleanup deadline as its local
+     * SSH timeout. Errors and timeouts of a single command are ignored, as before; once the
+     * deadline has passed the cleanup stops and fails.
+     */
+    private function runRemoteCommand(string $command, Server $server): ?string
+    {
+        $remaining = $this->deadline - now()->getTimestamp();
+        if ($remaining < 1) {
+            throw new RuntimeException('Docker cleanup did not finish within '.self::REMOTE_COMMANDS_DEADLINE.' seconds. The remaining cleanup commands were not run.');
+        }
+
+        return instant_remote_process([$command], $server, false, timeout: $remaining);
     }
 
     /**
@@ -125,6 +225,11 @@ class CleanupDocker
         return implode(' && ', $commands);
     }
 
+    /**
+     * Remove old application images while the N most recent images of each application stay
+     * for rollback. Uses a fixed number of remote commands, independent of the number of
+     * applications on the server.
+     */
     private function cleanupApplicationImages(Server $server, $applications = null): array
     {
         $cleanupLog = [];
@@ -132,42 +237,53 @@ class CleanupDocker
         if ($applications === null) {
             $applications = $server->applications();
         }
+        if ($applications->isEmpty()) {
+            return $cleanupLog;
+        }
+        $applications->loadMissing('settings');
 
         $disableRetention = $server->settings->disable_application_image_retention ?? false;
+
+        // Image of each container, keyed by container name
+        $containerImages = collect(explode("\n", $this->runRemoteCommand("docker ps -a --format '{{.Names}}#{{.Image}}' 2>/dev/null || true", $server) ?? ''))
+            ->filter()
+            ->mapWithKeys(function (string $line) {
+                [$name, $image] = array_pad(explode('#', $line, 2), 2, '');
+
+                return [$name => $image];
+            });
+
+        $serverImages = collect(explode("\n", $this->runRemoteCommand("docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' 2>/dev/null || true", $server) ?? ''))
+            ->filter()
+            ->map(function (string $line) {
+                [$repository, $tag, $createdAt] = array_pad(explode('#', $line, 3), 3, '');
+
+                return [
+                    'repository' => $repository,
+                    'tag' => $tag,
+                    'created_at' => $createdAt,
+                    'image_ref' => "{$repository}:{$tag}",
+                ];
+            })
+            ->filter(fn ($image) => $image['tag'] !== '' && $image['tag'] !== '<none>');
+
+        $imagesToDelete = collect();
 
         foreach ($applications as $application) {
             $imagesToKeep = $disableRetention ? 0 : ($application->settings->docker_images_to_keep ?? 2);
             $imageRepository = $application->docker_registry_image_name ?? $application->uuid;
 
-            // Get the currently running image tag
-            $currentTagCommand = "docker inspect --format='{{.Config.Image}}' {$application->uuid} 2>/dev/null | grep -oP '(?<=:)[^:]+$' || true";
-            $currentTag = instant_remote_process([$currentTagCommand], $server, false);
-            $currentTag = trim($currentTag ?? '');
+            // Tag of the image of the running container (named after the application uuid)
+            $currentTag = preg_match('/:([^:]+)$/', $containerImages->get($application->uuid, ''), $matches) ? $matches[1] : '';
 
-            // List all images for this application with their creation timestamps
-            // Use wildcard to match both uuid:tag and uuid_servicename:tag (Docker Compose with build)
-            $listCommand = "docker images --format '{{.Repository}}:{{.Tag}}#{{.CreatedAt}}' --filter reference='{$imageRepository}*' 2>/dev/null || true";
-            $output = instant_remote_process([$listCommand], $server, false);
+            // Matches both uuid:tag and uuid_servicename:tag (Docker Compose with build), like
+            // the docker images --filter reference='<repository>*' filter
+            $images = $serverImages->filter(fn ($image) => str_starts_with($image['repository'], $imageRepository)
+                && ! str_contains(substr($image['repository'], strlen($imageRepository)), '/'));
 
-            if (empty($output)) {
+            if ($images->isEmpty()) {
                 continue;
             }
-
-            $images = collect(explode("\n", trim($output)))
-                ->filter()
-                ->map(function ($line) {
-                    $parts = explode('#', $line);
-                    $imageRef = $parts[0] ?? '';
-                    $tagParts = explode(':', $imageRef);
-
-                    return [
-                        'repository' => $tagParts[0] ?? '',
-                        'tag' => $tagParts[1] ?? '',
-                        'created_at' => $parts[1] ?? '',
-                        'image_ref' => $imageRef,
-                    ];
-                })
-                ->filter(fn ($image) => ! empty($image['tag']));
 
             // Separate images into categories
             // PR images (pr-*) are always deleted
@@ -176,55 +292,47 @@ class CleanupDocker
             $buildImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && str_ends_with($image['tag'], '-build'));
             $regularImages = $images->filter(fn ($image) => ! str_starts_with($image['tag'], 'pr-') && ! str_ends_with($image['tag'], '-build'));
 
-            // Always delete all PR images
-            foreach ($prImages as $image) {
-                $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
-                $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
-                $cleanupLog[] = [
-                    'command' => $deleteCommand,
-                    'output' => $deleteOutput ?? 'PR image removed or was in use',
-                ];
-            }
-
             // Filter out current running image from regular images and sort by creation date
             $sortedRegularImages = $regularImages
                 ->filter(fn ($image) => $image['tag'] !== $currentTag)
                 ->sortByDesc('created_at')
                 ->values();
 
-            // Keep only N images (imagesToKeep), delete the rest
-            $imagesToDelete = $sortedRegularImages->skip($imagesToKeep);
-
-            foreach ($imagesToDelete as $image) {
-                $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
-                $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
-                $cleanupLog[] = [
-                    'command' => $deleteCommand,
-                    'output' => $deleteOutput ?? 'Image removed or was in use',
-                ];
-            }
-
             // Clean up build images (-build suffix) that don't correspond to retained regular images
             // Build images are intermediate artifacts (e.g. Nixpacks) not used by running containers.
             // If a build is in progress, docker rmi will fail silently since the image is in use.
             $keptTags = $sortedRegularImages->take($imagesToKeep)->pluck('tag');
-            if (! empty($currentTag)) {
-                $keptTags = $keptTags->push($currentTag);
+            if ($currentTag !== '') {
+                $keptTags->push($currentTag);
             }
 
-            foreach ($buildImages as $image) {
-                $baseTag = preg_replace('/-build$/', '', $image['tag']);
-                if (! $keptTags->contains($baseTag)) {
-                    $deleteCommand = "docker rmi {$image['image_ref']} 2>/dev/null || true";
-                    $deleteOutput = instant_remote_process([$deleteCommand], $server, false);
-                    $cleanupLog[] = [
-                        'command' => $deleteCommand,
-                        'output' => $deleteOutput ?? 'Build image removed or was in use',
-                    ];
-                }
-            }
+            $imagesToDelete = $imagesToDelete
+                ->concat($prImages)
+                ->concat($sortedRegularImages->skip($imagesToKeep))
+                ->concat($buildImages->reject(fn ($image) => $keptTags->contains(preg_replace('/-build$/', '', $image['tag']))));
+        }
+
+        // Images in use fail silently; docker rmi continues with the next image
+        foreach ($this->imageRemovalCommands($imagesToDelete->pluck('image_ref')->unique()) as $deleteCommand) {
+            $deleteOutput = $this->runRemoteCommand($deleteCommand, $server);
+            $cleanupLog[] = [
+                'command' => $deleteCommand,
+                'output' => $deleteOutput ?? 'Images removed or were in use',
+            ];
         }
 
         return $cleanupLog;
+    }
+
+    /**
+     * @param  Collection<int, string>  $imageRefs
+     * @return Collection<int, string>
+     */
+    private function imageRemovalCommands(Collection $imageRefs): Collection
+    {
+        return $imageRefs
+            ->chunk(100)
+            ->map(fn (Collection $chunk) => 'docker rmi '.$chunk->map(fn (string $ref) => escapeshellarg($ref))->implode(' ').' 2>/dev/null || true')
+            ->values();
     }
 }

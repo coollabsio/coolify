@@ -15,14 +15,13 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 600;
+    public $timeout = CleanupDocker::JOB_TIMEOUT;
 
     public $tries = 1;
 
@@ -30,9 +29,20 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?DockerCleanupExecution $execution_log = null;
 
+    /**
+     * Shares the per-server lock with queued CleanupDocker runs, so two cleanups never run on
+     * one server at once. A scheduled run that finds the lock held marks its occurrence
+     * skipped (not missed); a manual run is dropped as before. The lock outlives the job
+     * timeout, so a new run cannot start while a timed-out run is still finishing.
+     */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('docker-cleanup-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
+        return [
+            ScheduledJobDeliveryService::withoutOverlapping(CleanupDocker::overlapLockKey($this->server), $this->occurrenceUuid)
+                ->shared()
+                ->expireAfter(CleanupDocker::overlapLockExpiresAfter())
+                ->dontRelease(),
+        ];
     }
 
     public function __construct(
@@ -42,7 +52,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteUnusedNetworks = false,
         public ?string $occurrenceUuid = null,
     ) {
-        $this->onQueue('high');
+        $this->onQueue(maintenance_queue());
     }
 
     public function handle(): void
