@@ -18,8 +18,6 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
-
     public $timeout = 600;
 
     public function middleware(): array
@@ -35,7 +33,7 @@ class ServerPatchCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
-            if ($this->server->serverStatus() === false) {
+            if ($this->server->isFunctional() === false) {
                 return;
             }
 

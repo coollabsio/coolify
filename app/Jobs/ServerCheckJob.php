@@ -52,7 +52,13 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            if ($this->server->serverStatus() === false) {
+            // ServerConnectionCheckJob owns reachability. Do not probe SSH again here: one failed
+            // probe would mark the server unreachable without UNREACHABLE_THRESHOLD.
+            if ($this->server->isFunctional() === false) {
+                if ($this->server->settings->is_reachable === false) {
+                    $this->server->markResourcesAsExited();
+                }
+
                 return 'Server is not reachable or not ready.';
             }
 

@@ -18,7 +18,6 @@ use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
-use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
@@ -1050,7 +1049,6 @@ $siteAddress {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -1785,31 +1783,39 @@ $siteAddress {
     {
         ['uptime' => $uptime] = $this->validateConnection();
         if ($uptime === false) {
-            foreach ($this->applications() as $application) {
-                $application->status = 'exited';
-                $application->save();
-            }
-            foreach ($this->databases() as $database) {
-                $database->status = 'exited';
-                $database->save();
-            }
-            foreach ($this->services() as $service) {
-                $apps = $service->applications()->get();
-                $dbs = $service->databases()->get();
-                foreach ($apps as $app) {
-                    $app->status = 'exited';
-                    $app->save();
-                }
-                foreach ($dbs as $db) {
-                    $db->status = 'exited';
-                    $db->save();
-                }
-            }
+            $this->markResourcesAsExited();
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Mark all resources on this server as exited, because their containers cannot be checked.
+     */
+    public function markResourcesAsExited(): void
+    {
+        foreach ($this->applications() as $application) {
+            $application->status = 'exited';
+            $application->save();
+        }
+        foreach ($this->databases() as $database) {
+            $database->status = 'exited';
+            $database->save();
+        }
+        foreach ($this->services() as $service) {
+            $apps = $service->applications()->get();
+            $dbs = $service->databases()->get();
+            foreach ($apps as $app) {
+                $app->status = 'exited';
+                $app->save();
+            }
+            foreach ($dbs as $db) {
+                $db->status = 'exited';
+                $db->save();
+            }
+        }
     }
 
     public function isReachableChanged()
@@ -1845,13 +1851,11 @@ $siteAddress {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        $this->disableSshMux();
-
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this);
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
@@ -2142,12 +2146,6 @@ $siteAddress {
         return $this->applications()->count() == 0 &&
             $this->databases()->count() == 0 &&
             $this->services()->count() == 0;
-    }
-
-    private function disableSshMux(): void
-    {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
     }
 
     /**

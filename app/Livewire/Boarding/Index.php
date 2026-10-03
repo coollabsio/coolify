@@ -7,7 +7,6 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
-use App\Services\ConfigurationRepository;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -341,10 +340,8 @@ class Index extends Component
         $this->authorizeCreatedServer();
 
         try {
-            $this->disableSshMux();
-
             // EC2 does not have `uptime` command, lol
-            instant_remote_process(['ls /'], $this->createdServer, true);
+            instant_remote_process(['ls /'], $this->createdServer, true, disableMultiplexing: true);
 
             $this->createdServer->settings()->update([
                 'is_reachable' => true,
@@ -522,12 +519,6 @@ class Index extends Component
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
         ['private' => $this->privateKey, 'public' => $this->publicKey] = generateSSHKey();
-    }
-
-    private function disableSshMux(): void
-    {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
     }
 
     private function authorizeCreatedServer(): void

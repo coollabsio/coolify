@@ -32,6 +32,12 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
     private string $checkFrequency = '* * * * *';
 
     /**
+     * Provider state seldom changes, and each check is one API call per server.
+     * Hetzner allows 3600 requests per hour for each token.
+     */
+    private const CLOUD_PROVIDER_STATUS_CHECK_CRON = '*/5 * * * *';
+
+    /**
      * Create a new job instance.
      */
     public function __construct()
@@ -86,7 +92,7 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function dispatchCloudProviderStatusChecks(Collection $servers): void
     {
-        if (! shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
+        if (! shouldRunCronNow(self::CLOUD_PROVIDER_STATUS_CHECK_CRON, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
             return;
         }
 
@@ -161,7 +167,11 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         $waitTime = $server->waitBeforeDoingSshCheck();
         $sentinelOutOfSync = Carbon::parse($lastSentinelUpdate)->isBefore($this->executionTime->copy()->subSeconds($waitTime));
 
-        if ($sentinelOutOfSync) {
+        // Build servers and Swarm workers have no containers to sync, and ServerConnectionCheckJob
+        // already checks their connection.
+        $hasContainersToSync = ! $server->isBuildServer() && ! $server->isSwarmWorker();
+
+        if ($sentinelOutOfSync && $hasContainersToSync) {
             // Dispatch ServerCheckJob if Sentinel is out of sync
             if (shouldRunCronNow($this->checkFrequency, $serverTimezone, "server-check:{$server->id}", $this->executionTime)) {
                 if (! $this->shouldSkipDueToBackoff($server)) {
