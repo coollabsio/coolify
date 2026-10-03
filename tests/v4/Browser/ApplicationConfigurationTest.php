@@ -156,6 +156,38 @@ it('saves custom docker run options from the UI', function () {
         ->screenshot(filename: 'application-docker-run-options');
 });
 
+it('warns when the Dockerfile location repeats the base directory and applies the suggested fix', function () {
+    $this->application->update([
+        'build_pack' => 'dockerfile',
+        'base_directory' => '/apps/api',
+        'dockerfile_location' => '/apps/api/Dockerfile',
+    ]);
+
+    loginAndSkipBoarding();
+
+    $page = visit(applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ));
+
+    $page->assertSee('Base directory is repeated')
+        ->assertSee('/apps/api/apps/api/Dockerfile')
+        ->screenshot(filename: 'application-dockerfile-location-repeats-base-directory')
+        ->click('Use /Dockerfile')
+        ->assertDontSee('Base directory is repeated')
+        ->assertSee('/apps/api/Dockerfile');
+
+    submitLivewireForm($page);
+
+    $page->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-dockerfile-location-fixed');
+
+    $this->application->refresh();
+    expect($this->application->base_directory)->toBe('/apps/api')
+        ->and($this->application->dockerfile_location)->toBe('/Dockerfile');
+});
+
 it('restores the default file location when the field is cleared', function (string $buildPack, string $column, string $default) {
     $this->application->update(['build_pack' => $buildPack, $column => '/docker/custom']);
 
