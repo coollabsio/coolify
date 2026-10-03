@@ -16,16 +16,32 @@ use App\Models\ServiceDatabase;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
 use App\Services\RestartCountTracker;
+use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\UniqueJobDecorator;
 
-class GetContainersStatus
+/**
+ * Queued runs are coalesced per server: while one run waits in the queue, further dispatches are
+ * dropped because the waiting run reads the same container snapshot. The lock is released when a
+ * worker starts the run, so a request made during a run still queues one follow-up.
+ * Synchronous run() calls are not affected.
+ */
+class GetContainersStatus implements ShouldBeUnique
 {
     use AsAction;
 
     public string $jobQueue = 'high';
+
+    public int $jobTimeout = 120;
+
+    /**
+     * Bounds how long a lost queued run (for example a killed worker) blocks new refreshes.
+     */
+    public int $jobUniqueFor = 60;
 
     public $applications;
 
@@ -44,6 +60,16 @@ class GetContainersStatus
     protected ?Collection $serviceContainerStatuses;
 
     protected ?Collection $serviceContainerRestartCounts;
+
+    public static function makeUniqueJob(mixed ...$arguments): UniqueJobDecorator
+    {
+        return new UniqueUntilProcessingJobDecorator(static::class, ...$arguments);
+    }
+
+    public function getJobUniqueId(Server $server): string
+    {
+        return $server->uuid;
+    }
 
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
