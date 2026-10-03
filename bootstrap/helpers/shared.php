@@ -1021,7 +1021,8 @@ function isCloud(): bool
 }
 
 /**
- * Resolve the queue used for application deployments, database starts and service starts.
+ * Resolve the queue used for application deployments and for database, service and proxy
+ * starts and restarts.
  *
  * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
  * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing

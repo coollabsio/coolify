@@ -8,11 +8,17 @@ use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyPortParser;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {
     use AsAction;
+
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     public function handle(Server $server, bool $async = true, bool $force = false, bool $restarting = false): string|Activity
     {
@@ -87,7 +93,7 @@ class StartProxy
         }
 
         if ($async) {
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id);
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
         } else {
             instant_remote_process($commands, $server);
 

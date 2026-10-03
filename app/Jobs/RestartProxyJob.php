@@ -31,7 +31,10 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
         return [(new WithoutOverlapping('restart-proxy-'.$this->server->uuid))->expireAfter(120)->dontRelease()];
     }
 
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue(deployment_queue());
+    }
 
     public function handle()
     {
@@ -56,7 +59,8 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
                 $commands,
                 $this->server,
                 callEventOnFinish: 'ProxyStatusChanged',
-                callEventData: $this->server->id
+                callEventData: $this->server->id,
+                queue: deployment_queue(),
             );
 
             // Store activity ID and notify UI immediately with it
