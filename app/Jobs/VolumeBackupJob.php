@@ -488,6 +488,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->backup->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(function (Builder $query): void {
                 $query->where('s3_storage_deleted', true)->orWhereNull('s3_uploaded');
             })

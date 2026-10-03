@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\Storages;
 
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Jobs\VolumeBackupJob;
+use App\Jobs\VolumeBackupRecoveryJob;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -278,6 +280,8 @@ class VolumeBackups extends Component
 
         $deletedCount = $this->backup?->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(fn ($query) => $query
                 ->where('s3_storage_deleted', true)
                 ->orWhereNull('s3_uploaded')
@@ -288,6 +292,33 @@ class VolumeBackups extends Component
             $deletedCount > 0 ? 'success' : 'info',
             $deletedCount > 0 ? "Cleaned up {$deletedCount} deleted backup entries." : 'No deleted backup entries found.',
         );
+    }
+
+    public function retryRecovery(int $executionId): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $execution = $this->backup?->executions()->whereKey($executionId)->first();
+        if (! $execution || ! $execution->hasPendingRecovery()) {
+            $this->dispatch('error', 'No pending recovery found for this backup execution.');
+
+            return;
+        }
+
+        $execution->update([
+            'recovery_attempts' => 0,
+            'recovery_next_retry_at' => null,
+            'recovery_needs_attention' => false,
+        ]);
+        Cache::forget(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id));
+        VolumeBackupRecoveryJob::dispatch($execution);
+        auditLog('ui.volume_backup.recovery_retried', [
+            'team_id' => $this->resource->team()?->id,
+            'resource_uuid' => $this->resource->uuid,
+            'backup_uuid' => $this->backup->uuid,
+            'execution_uuid' => $execution->uuid,
+        ]);
+        $this->dispatch('success', 'Backup recovery queued.');
     }
 
     public function deleteBackup(int $executionId, string $password, array $selectedActions = []): bool|string

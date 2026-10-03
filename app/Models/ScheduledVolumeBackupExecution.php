@@ -21,6 +21,11 @@ class ScheduledVolumeBackupExecution extends BaseModel
         'local_storage_deleted',
         's3_storage_deleted',
         's3_uploaded',
+        'recovery_attempts',
+        'recovery_last_attempt_at',
+        'recovery_next_retry_at',
+        'recovery_error',
+        'recovery_needs_attention',
     ];
 
     protected function casts(): array
@@ -34,7 +39,16 @@ class ScheduledVolumeBackupExecution extends BaseModel
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',
             's3_uploaded' => 'boolean',
+            'recovery_attempts' => 'integer',
+            'recovery_last_attempt_at' => 'datetime',
+            'recovery_next_retry_at' => 'datetime',
+            'recovery_needs_attention' => 'boolean',
         ];
+    }
+
+    public function hasPendingRecovery(): bool
+    {
+        return $this->stop_recovery_pending || $this->s3_cleanup_pending;
     }
 
     public function scheduledVolumeBackup(): BelongsTo

@@ -282,9 +282,16 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'endpoint' => $s3->endpoint,
         'use_path_style_endpoint' => true,
         'aws_url' => $s3->awsUrl(),
+        'throw' => true,
     ]);
 
-    if (! $disk->delete($filenames)) {
+    try {
+        $deleted = $disk->delete($filenames);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('One or more S3 backup files could not be deleted.', previous: $exception);
+    }
+
+    if (! $deleted) {
         throw new RuntimeException('One or more S3 backup files could not be deleted.');
     }
 }

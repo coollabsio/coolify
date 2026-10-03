@@ -39,6 +39,11 @@ class ScheduledJobManager implements ShouldQueue
     private const VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES = 5;
 
     /**
+     * Bounds the volume backup recovery jobs dispatched in one scheduler run.
+     */
+    private const VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES = 100;
+
+    /**
      * The schedule types that run as separate dispatchers, with the delivery job types they own.
      * Each type has its own overlap lock, so a slow type cannot make another type skip a run.
      */
@@ -485,16 +490,29 @@ class ScheduledJobManager implements ShouldQueue
 
     private function recoverStoppedVolumeBackupContainers(): void
     {
+        $dispatched = 0;
+
         ScheduledVolumeBackupExecution::query()
             ->where(fn (Builder $query) => $query
                 ->where('stop_recovery_pending', true)
                 ->orWhere('s3_cleanup_pending', true))
-            ->chunkById(self::CHUNK_SIZE, function ($executions): void {
+            ->where('recovery_needs_attention', false)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('recovery_next_retry_at')
+                ->orWhere('recovery_next_retry_at', '<=', now()))
+            ->chunkById(self::CHUNK_SIZE, function ($executions) use (&$dispatched): bool {
                 foreach ($executions as $execution) {
-                    if (Cache::add("volume-backup-recovery-dispatched:{$execution->id}", true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {
+                    if ($dispatched >= self::VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES) {
+                        return false;
+                    }
+
+                    if (Cache::add(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id), true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {
                         VolumeBackupRecoveryJob::dispatch($execution);
+                        $dispatched++;
                     }
                 }
+
+                return true;
             });
     }
 
@@ -503,13 +521,9 @@ class ScheduledJobManager implements ShouldQueue
         try {
             $server = $backup->server();
 
-            if ($backup->executions()
-                ->where(fn (Builder $query) => $query
-                    ->where('stop_recovery_pending', true)
-                    ->orWhere('s3_cleanup_pending', true))
-                ->exists()) {
+            if ($backup->executions()->where('stop_recovery_pending', true)->exists()) {
                 $this->skippedCount++;
-                $this->logSkip('volume_backup', 'container_recovery_pending', [
+                $this->logSkip('volume_backup', 'stopped_container_recovery_pending', [
                     'backup_id' => $backup->id,
                     'team_id' => $backup->team_id,
                 ]);
