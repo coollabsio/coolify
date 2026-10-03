@@ -92,7 +92,7 @@
                             <x-forms.input placeholder="/docker-compose.yaml"
                                 wire:model.defer="docker_compose_location" label="Compose file"
                                 helper="Path relative to the base directory." x-model="composeLocation"
-                                @blur="composeLocation = normalize(composeLocation)" />
+                                @blur="composeLocation = normalize(composeLocation).replace(/^\/$/, '/docker-compose.yaml')" />
                             <p class="sm:col-span-2 text-xs text-neutral-500 dark:text-fg-dim">
                                 Resolved file:
                                 <code class="font-mono text-coollabs dark:text-warning"

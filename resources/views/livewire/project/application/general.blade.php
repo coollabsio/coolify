@@ -159,7 +159,8 @@
                                         this.baseDir = this.normalizePath(this.baseDir);
                                     },
                                     normalizeComposeLocation() {
-                                        this.composeLocation = this.normalizePath(this.composeLocation);
+                                        const path = this.normalizePath(this.composeLocation);
+                                        this.composeLocation = path === '/' ? '/docker-compose.yaml' : path;
                                     }
                                 }" class="grid gap-4 lg:grid-cols-2">
                                     <x-forms.input x-bind:disabled="shouldDisable()" placeholder="/"
@@ -230,7 +231,8 @@
                                     this.baseDir = this.normalizePath(this.baseDir);
                                 },
                                 normalizeDockerfileLocation() {
-                                    this.dockerfileLocation = this.normalizePath(this.dockerfileLocation);
+                                    const path = this.normalizePath(this.dockerfileLocation);
+                                    this.dockerfileLocation = path === '/' ? '/Dockerfile' : path;
                                 }
                             }" class="grid gap-4 lg:grid-cols-2">
                                 <x-forms.input placeholder="/"
