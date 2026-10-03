@@ -292,6 +292,40 @@ it('accepts a new queued cleanup once the waiting one is lost', function () {
     Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, 2);
 });
 
+it('does not queue a cleanup after a stop when a cleanup ran on the server recently', function () {
+    Queue::fake();
+    $cleanedServer = dockerCleanupReachableServer();
+    $otherServer = dockerCleanupReachableServer();
+    Cache::put(CleanupDocker::lastRunCacheKey($cleanedServer), true, CleanupDocker::STOP_CLEANUP_COOLDOWN);
+
+    CleanupDocker::dispatchAfterStop($cleanedServer);
+    CleanupDocker::dispatchAfterStop($otherServer);
+
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, 1);
+    Queue::assertPushed(UniqueUntilProcessingJobDecorator::class, fn (JobDecorator $job) => $job->getParameters()[0]->is($otherServer));
+});
+
+it('cleans after a stop only when the disk usage reaches the server threshold', function (string $diskUsage, bool $cleans) {
+    $server = dockerCleanupReachableServer();
+    $server->settings()->update(['docker_cleanup_threshold' => 80]);
+    $commands = collect();
+    Process::fake(function ($process) use ($commands, $diskUsage) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $commands->push($command);
+
+        return Process::result(output: str_contains($command, 'df / --output=pcent') ? $diskUsage : '');
+    });
+
+    CleanupDocker::run($server->fresh(), false, false, true);
+
+    expect($commands->contains(fn (string $command) => str_contains($command, 'docker builder prune')))->toBe($cleans)
+        ->and(Cache::has(CleanupDocker::lastRunCacheKey($server)))->toBe($cleans);
+})->with([
+    'below threshold' => ['79', false],
+    'at threshold' => ['80', true],
+    'unknown usage' => ['', true],
+]);
+
 it('scans application images with a fixed number of remote commands and keeps the retention rules', function () {
     $server = dockerCleanupReachableServer();
     $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();

@@ -41,7 +41,7 @@ class StopDatabase
             }
 
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
+                CleanupDocker::dispatchAfterStop($server);
             }
 
             if ($database->is_public) {

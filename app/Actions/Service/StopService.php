@@ -62,7 +62,7 @@ class StopService
                 $service->deleteConnectedNetworks();
             }
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, false, false);
+                CleanupDocker::dispatchAfterStop($server);
             }
         } catch (\Exception $e) {
             return $e->getMessage();

@@ -7,6 +7,7 @@ use App\Support\Actions\UniqueUntilProcessingJobDecorator;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Lorisleiva\Actions\Decorators\UniqueJobDecorator;
@@ -33,6 +34,12 @@ class CleanupDocker implements ShouldBeUnique
      * bulk stop through the API) become one cleanup that runs after the batch.
      */
     public const QUEUED_DELAY = 60;
+
+    /**
+     * A resource stop does not queue a cleanup when a cleanup finished on the server in this
+     * window. The scheduled cleanup still runs.
+     */
+    public const STOP_CLEANUP_COOLDOWN = 3600;
 
     public int $jobTries = 1;
 
@@ -71,6 +78,24 @@ class CleanupDocker implements ShouldBeUnique
         return new UniqueUntilProcessingJobDecorator(static::class, ...$arguments);
     }
 
+    public static function lastRunCacheKey(Server $server): string
+    {
+        return 'docker-cleanup-last-run-'.$server->uuid;
+    }
+
+    /**
+     * Cleanup after a resource stop: skipped when a cleanup ran recently, and the queued run
+     * only cleans when the disk usage is at or above the server cleanup threshold.
+     */
+    public static function dispatchAfterStop(Server $server): void
+    {
+        if (Cache::has(self::lastRunCacheKey($server))) {
+            return;
+        }
+
+        static::dispatch($server, false, false, true);
+    }
+
     public function getJobUniqueId(Server $server): string
     {
         return $server->uuid;
@@ -95,9 +120,16 @@ class CleanupDocker implements ShouldBeUnique
         ];
     }
 
-    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
+    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false, bool $onlyAboveThreshold = false)
     {
         $this->deadline = now()->getTimestamp() + self::REMOTE_COMMANDS_DEADLINE;
+
+        if ($onlyAboveThreshold) {
+            $diskUsage = $server->getDiskUsage();
+            if (is_numeric($diskUsage) && (int) $diskUsage < $server->settings->docker_cleanup_threshold) {
+                return [];
+            }
+        }
         $helperImageVersion = getHelperVersion();
         $helperImage = coolifyHelperImage();
         $helperImageWithVersion = "$helperImage:$helperImageVersion";
@@ -154,6 +186,8 @@ class CleanupDocker implements ShouldBeUnique
                 ];
             }
         }
+
+        Cache::put(self::lastRunCacheKey($server), true, self::STOP_CLEANUP_COOLDOWN);
 
         return $cleanupLog;
     }

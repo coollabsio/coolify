@@ -1931,7 +1931,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -2841,7 +2841,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
@@ -4203,7 +4203,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -5765,7 +5765,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
@@ -11971,7 +11971,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Run docker cleanup.'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           required: false
           schema:
             type: boolean
@@ -12547,7 +12547,7 @@ paths:
         -
           name: docker_cleanup
           in: query
-          description: 'Perform docker cleanup (prune networks, volumes, etc.).'
+          description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.'
           schema:
             type: boolean
             default: true
