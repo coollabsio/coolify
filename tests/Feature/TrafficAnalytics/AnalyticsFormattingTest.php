@@ -55,3 +55,21 @@ it('renders ampersands in breakdown empty-state descriptions', function () {
         ->toContain('No ai agents &amp; bots data for the selected range.')
         ->not->toContain('No ai agents &amp;amp; bots data for the selected range.');
 });
+
+it('distinguishes a missing response status from numeric values in other dimensions', function (string $dimension, mixed $value, string $display) {
+    $html = view('livewire.traffic._breakdown-section', [
+        'dimension' => $dimension,
+        'label' => 'Breakdown',
+        'rows' => [['value' => $value, 'requests' => 2, 'bytesOut' => 0]],
+    ])->render();
+
+    expect($html)->toContain('title="'.$display.'"')
+        ->toContain('title="2 requests"');
+})->with([
+    'integer zero status' => ['status', 0, 'No response status (0)'],
+    'string zero status' => ['status', '0', 'No response status (0)'],
+    'valid status' => ['status', '200', '200'],
+    'missing status' => ['status', '', 'Unknown'],
+    'overflow status' => ['status', '__other__', 'Other'],
+    'zero in another dimension' => ['path', '0', '0'],
+]);
