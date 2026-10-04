@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JsonSerializable;
+use stdClass;
 use Throwable;
 
 class AuditEvent extends Model
@@ -16,6 +19,27 @@ class AuditEvent extends Model
     use HasFactory;
 
     public const UPDATED_AT = null;
+
+    /**
+     * Raw commands and configurations can contain credentials without sensitive field names.
+     *
+     * @var array<int, string>
+     */
+    private const SENSITIVE_VALUE_FIELDS = [
+        'git_full_url',
+        'install_command', 'build_command', 'start_command',
+        'health_check_command', 'health_check_response_text',
+        'custom_docker_run_options', 'pre_deployment_command', 'post_deployment_command',
+        'docker_compose_custom_start_command', 'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+        'postgres_conf', 'mysql_conf', 'mariadb_conf', 'mongo_conf', 'redis_conf', 'keydb_conf',
+        'internal_db_url', 'external_db_url', 'init_scripts',
+        'dockerfile', 'docker_compose', 'docker_compose_raw', 'custom_labels',
+        'last_saved_proxy_configuration',
+        'environment_variables', 'environment_variables_preview',
+        'validation_logs', 'server_metadata', 'logs',
+        'configuration_snapshot', 'configuration_diff', 'content', 'file_storage_content',
+    ];
 
     protected $fillable = [
         'team_id',
@@ -34,6 +58,7 @@ class AuditEvent extends Model
         'resource_name',
         'description',
         'metadata',
+        'changes',
         'ip_address',
         'user_agent',
         'created_at',
@@ -43,6 +68,7 @@ class AuditEvent extends Model
     {
         return [
             'metadata' => 'array',
+            'changes' => 'encrypted:array',
             'created_at' => 'datetime',
         ];
     }
@@ -86,8 +112,26 @@ class AuditEvent extends Model
      */
     public static function record(string $event, array $context = [], string $level = 'info'): void
     {
+        self::recordWithChanges($event, $context, level: $level);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>  $changes
+     */
+    public static function recordModelMutation(string $event, array $context, array $changes): void
+    {
+        self::recordWithChanges($event, $context, $changes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, array{old: mixed, new: mixed}>|null  $changes
+     */
+    private static function recordWithChanges(string $event, array $context, ?array $changes = null, string $level = 'info'): void
+    {
         try {
-            $attributes = self::attributesFor($event, $context, $level);
+            $attributes = self::attributesFor($event, $context, $changes, $level);
 
             DB::afterCommit(function () use ($attributes): void {
                 defer(function () use ($attributes): void {
@@ -113,7 +157,7 @@ class AuditEvent extends Model
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private static function attributesFor(string $event, array $context, string $level): array
+    private static function attributesFor(string $event, array $context, ?array $changes, string $level): array
     {
         $teamId = data_get(auth()->user()?->currentAccessToken(), 'team_id')
             ?? (array_key_exists('team_id', $context)
@@ -152,7 +196,8 @@ class AuditEvent extends Model
             'resource_name' => $resourceName,
             'description' => data_get($context, 'audit_description')
                 ?? trim(($resourceName ?? Str::headline((string) $resourceType)).' '.Str::headline($action)),
-            'metadata' => self::redact($context),
+            'metadata' => self::redact(Arr::except($context, ['audit_changes'])),
+            'changes' => $changes,
             'ip_address' => app()->bound('request') ? request()->ip() : null,
             'user_agent' => app()->bound('request') ? Str::limit((string) request()->userAgent(), 200, '') : null,
         ];
@@ -204,10 +249,24 @@ class AuditEvent extends Model
         return $key ? data_get($context, $key) : null;
     }
 
-    private static function redact(mixed $value, ?string $key = null): mixed
+    public static function isSensitiveField(string $field): bool
     {
-        if ($key !== null && self::isSensitiveKey($key)) {
+        return in_array($field, self::SENSITIVE_VALUE_FIELDS, true)
+            || preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie|license_key/i', $field) === 1;
+    }
+
+    public static function redact(mixed $value, ?string $key = null): mixed
+    {
+        if ($key !== null && (in_array($key, self::SENSITIVE_VALUE_FIELDS, true) || self::isSensitiveKey($key))) {
             return '[REDACTED]';
+        }
+
+        if ($value instanceof Arrayable) {
+            $value = $value->toArray();
+        } elseif ($value instanceof JsonSerializable) {
+            $value = $value->jsonSerialize();
+        } elseif ($value instanceof stdClass) {
+            $value = (array) $value;
         }
 
         if (! is_array($value)) {
