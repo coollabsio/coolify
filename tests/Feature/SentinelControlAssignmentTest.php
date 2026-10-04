@@ -78,15 +78,15 @@ it('rotates the short-lived Flux credential on every assignment', function () {
         ->and($secondClaims['exp'] - $secondClaims['iat'])->toBe(900);
 });
 
-it('grants the typed endpoint reconciliation capability to Nodes', function () {
+it('no longer grants the removed endpoint reconciliation capability', function () {
     $assignment = requestSentinelAssignment($this->token, [
-        'capabilities' => ['discovery.corrosion.endpoints.reconcile.v1'],
+        'capabilities' => ['system.ping.v1', 'discovery.corrosion.endpoints.reconcile.v1'],
     ])
         ->assertOk()
         ->json();
 
     $claims = (array) JWT::decode($assignment['credential'], new Key(config('constants.flux.signing_public_key'), 'EdDSA'));
-    expect($claims['caps'])->toBe(['discovery.corrosion.endpoints.reconcile.v1']);
+    expect($claims['caps'])->toBe(['system.ping.v1']);
 });
 
 it('grants the log read capability to Nodes that advertise it', function () {

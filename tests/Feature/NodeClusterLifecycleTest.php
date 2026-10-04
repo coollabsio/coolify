@@ -32,19 +32,19 @@ beforeEach(function () {
 
 function fakeNodeCleanup(): void
 {
-    Http::fake(function (Request $request) {
-        $base = ['command_id' => $request['command_id'], 'observed_at_unix_ms' => 1_700_000_000_000];
-
-        return str_ends_with($request->url(), 'discovery.corrosion.endpoints.reconcile')
-            ? Http::response([...$base, 'owner_node_ip' => $request['owner_node_ip'], 'endpoint_count' => 0])
-            : Http::response([...$base, 'wireguard_removed' => true, 'firewall_removed' => true, 'discovery_removed' => true, 'resolver_reverted' => true]);
-    });
+    Http::fake(fn (Request $request) => Http::response([
+        'command_id' => $request['command_id'],
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'wireguard_removed' => true,
+        'firewall_removed' => true,
+        'discovery_removed' => true,
+        'resolver_reverted' => true,
+    ]));
 }
 
 function grantCleanupCapabilities(Node $node): void
 {
     Cache::put($node->cacheKey(), ['status' => 'connected', 'capabilities' => [
-        'discovery.corrosion.endpoints.reconcile.v1',
         'network.cluster.leave.v1',
     ]]);
 }
@@ -156,7 +156,8 @@ it('cleans every unused Node before deleting a cluster', function () {
         expect($node->fresh()->node_cluster_id)->toBeNull()
             ->and($node->fresh()->wireguard_ip)->toBeNull();
     }
-    Http::assertSentCount(4);
+    Http::assertSentCount(2);
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'discovery.corrosion.endpoints.reconcile'));
     Queue::assertNotPushed(ReconcileNodeClusterNetworkJob::class);
 });
 

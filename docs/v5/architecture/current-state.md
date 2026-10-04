@@ -213,9 +213,15 @@ command for the same attempt.
   systemd service. Gossip and the HTTP API bind only to the Node WireGuard
   address. A stable non-zero Corrosion cluster ID separates each Coolify Node
   cluster.
-- After each complete container inventory, Coolify sends one owned endpoint
-  snapshot for that Node through a typed, durable operation. Sentinel replaces
-  only rows whose owner matches the local Node WireGuard address.
+- Sentinel publishes the endpoints of its own Node every 15 seconds from local
+  Podman state, with a 120-second expiry. It replaces only rows whose owner
+  matches the local Node WireGuard address.
+- Coolify provides identity, not liveness. Each managed container carries the
+  workload DNS name in the `coolify.dns_name` label. Coolify sends the Node DNS
+  name as `node_dns_name` with the Corrosion configuration. Discovery keeps
+  working while Coolify is down.
+- A changed workload DNS name applies after the next deployment, because
+  container labels do not change in place.
 - Corrosion replicates workload identity, namespace, owning Node, reachable
   endpoint address, state, health, update time, and expiry. It cannot change
   authoritative membership or network configuration.
@@ -328,8 +334,8 @@ cross-instance command routing are not implemented yet.
 - full-mesh WireGuard reconciliation with host-only private keys, observed
   state, drift checks, staged activation, systemd rollback, and SSH repair;
 - scoped nftables reconciliation in the dedicated `coolify_cluster` table;
-- pinned host-native Corrosion, owned and expiring endpoint snapshots, cluster
-  membership observation, and private internal workload DNS;
+- pinned host-native Corrosion, Sentinel-published owned and expiring endpoint
+  snapshots, cluster membership observation, and private internal workload DNS;
 - explicit two-QEMU-Node development topology for cross-Node network tests.
 
 ### Not implemented

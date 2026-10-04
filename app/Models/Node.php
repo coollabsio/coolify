@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class Node extends BaseModel
@@ -93,6 +94,20 @@ class Node extends BaseModel
         }
 
         return $this->sentinel_url;
+    }
+
+    /**
+     * The DNS label of this Node in the `nodes` discovery namespace. Sentinel
+     * publishes the Node endpoint under this name.
+     */
+    public function discoveryDnsName(): string
+    {
+        $name = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower(Str::slug((string) $this->name))), '-');
+        if ($name === '') {
+            $name = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower((string) $this->uuid)), '-');
+        }
+
+        return rtrim(substr($name, 0, 63), '-');
     }
 
     public function cacheKey(): string

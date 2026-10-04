@@ -30,6 +30,7 @@ class BuildContainerLabels
             'coolify.component' => $component,
             'coolify.project' => $workload->project?->uuid,
             'coolify.environment' => $workload->environment?->uuid,
+            'coolify.dns_name' => $workload->internal_dns_name,
         ], fn (?string $value): bool => filled($value));
     }
 }

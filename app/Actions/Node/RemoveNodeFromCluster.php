@@ -34,12 +34,7 @@ class RemoveNodeFromCluster
 
         $hadAppliedNetwork = $node->network_applied_revision !== null || $cluster->network_status === 'active';
         if ($hadAppliedNetwork) {
-            $node->ensureCapability('discovery.corrosion.endpoints.reconcile.v1');
             $node->ensureCapability('network.cluster.leave.v1');
-            $this->dispatch($node, 'discovery.corrosion.endpoints.reconcile.v1', [
-                'owner_node_ip' => $node->wireguard_ip,
-                'endpoints' => [],
-            ]);
             $this->dispatch($node, 'network.cluster.leave.v1', [
                 'interface' => $cluster->wireguard_interface,
                 'owner_node_ip' => $node->wireguard_ip,
@@ -107,8 +102,6 @@ class RemoveNodeFromCluster
                 && data_get($result, 'command_id') === $operation->uuid
                 && is_numeric(data_get($result, 'observed_at_unix_ms'))
                 && match ($commandType) {
-                    'discovery.corrosion.endpoints.reconcile.v1' => data_get($result, 'owner_node_ip') === $node->wireguard_ip
-                        && data_get($result, 'endpoint_count') === 0,
                     'network.cluster.leave.v1' => data_get($result, 'wireguard_removed') === true
                         && data_get($result, 'firewall_removed') === true
                         && data_get($result, 'discovery_removed') === true

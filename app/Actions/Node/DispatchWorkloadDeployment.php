@@ -35,6 +35,8 @@ class DispatchWorkloadDeployment
         $containerIp = null;
         if ($operation->node->node_cluster_id !== null) {
             $containerIp = EnsureNodeWorkloadAddress::run($operation->node, $operation->workload);
+            EnsureNodeWorkloadDnsNames::run($operation->node);
+            $operation->workload->refresh();
         }
         $name = 'coolify-'.$operation->workload->uuid.'-main';
         $response = Http::withToken($token)

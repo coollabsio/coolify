@@ -63,7 +63,8 @@ it('publishes a ready target before it removes and withdraws the source workload
     Http::fake(function (Request $request) use ($target, $workload, $revision, &$events) {
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {
             $events[] = 'deploy-target';
-            expect($request['ports'])->toBe([]);
+            expect($request['ports'])->toBe([])
+                ->and($request['labels']['coolify.dns_name'])->toBe('move-app');
 
             return Http::response([
                 'command_id' => $request['command_id'],
@@ -106,17 +107,9 @@ it('publishes a ready target before it removes and withdraws the source workload
             ]);
         }
 
-        $workloadEndpoints = collect($request['endpoints'])->where('namespace', 'default');
-        $events[] = $request['server_id'] === $target->uuid && $workloadEndpoints->isNotEmpty()
-            ? 'publish-target'
-            : 'withdraw-source';
+        $events[] = 'unexpected:'.$request->url();
 
-        return Http::response([
-            'command_id' => $request['command_id'],
-            'observed_at_unix_ms' => 1_700_000_001_100,
-            'owner_node_ip' => $request['owner_node_ip'],
-            'endpoint_count' => count($request['endpoints']),
-        ]);
+        return Http::response('unexpected request', 500);
     });
 
     $operation = CreateMoveOperation::run($source, $target, $revision, $user);
@@ -128,9 +121,7 @@ it('publishes a ready target before it removes and withdraws the source workload
         ->and($workload->refresh()->desired_state)->toBe(NodeWorkloadDesiredState::RUNNING)
         ->and($events)->toBe([
             'deploy-target',
-            'publish-target',
             'remove-source',
-            'withdraw-source',
         ]);
 });
 

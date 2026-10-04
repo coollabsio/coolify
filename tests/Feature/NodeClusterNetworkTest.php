@@ -49,8 +49,8 @@ it('rejects network reconciliation before changing state when Sentinel lacks a c
 
 it('reconciles a complete full mesh through durable typed operations', function () {
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Mesh');
-    $first = Node::factory()->create(['team_id' => $this->team->id, 'ip' => '192.0.2.10']);
-    $second = Node::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $first->private_key_id, 'ip' => '192.0.2.11']);
+    $first = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'Worker One', 'ip' => '192.0.2.10']);
+    $second = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'Worker Two', 'private_key_id' => $first->private_key_id, 'ip' => '192.0.2.11']);
     AssignNodeToCluster::run($cluster, $first);
     AssignNodeToCluster::run($cluster->refresh(), $second);
     $source = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
@@ -120,6 +120,16 @@ it('reconciles a complete full mesh through durable typed operations', function 
             ->and($request['data']['peers'][0]['allowed_ips'][0])->toEndWith('/32')
             ->and($request['data']['peers'][0]['allowed_ips'][1])->toEndWith('/24');
     });
+    $corrosionRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'discovery.corrosion.reconcile'));
+    expect($corrosionRequests->pluck('data.node_dns_name', 'data.server_id')->all())->toBe([
+        $first->uuid => 'worker-one',
+        $second->uuid => 'worker-two',
+    ]);
+    $corrosionOperation = NodeOperation::query()
+        ->where('node_id', $first->id)
+        ->where('command_type', 'discovery.corrosion.reconcile.v1')
+        ->sole();
+    expect($corrosionOperation->request['node_dns_name'])->toBe('worker-one');
     $firewallRequests = $requests->filter(fn (array $request) => str_ends_with($request['url'], 'network.firewall.reconcile'));
     $firewallRequests->each(fn (array $request) => expect($request['data']['flux_probe_host'])->toBe('192.0.2.1')
         ->and($request['data']['local_node_ip'])->toBeIn([$first->wireguard_ip, $second->wireguard_ip])
@@ -196,3 +206,18 @@ it('rejects a firewall result that does not confirm ingress enforcement', functi
         ->toThrow(RuntimeException::class, 'unsafe');
     expect($cluster->refresh()->network_status)->toBe('error');
 });
+
+it('derives a valid Node discovery dns name', function (string $name, string $uuid, string $expected) {
+    $node = new Node(['name' => $name, 'uuid' => $uuid]);
+
+    expect($node->discoveryDnsName())->toBe($expected)
+        ->and(strlen($node->discoveryDnsName()))->toBeLessThanOrEqual(63)
+        ->and($node->discoveryDnsName())->toMatch('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/');
+})->with([
+    'slugged name' => ['Worker Node A', 'abc123', 'worker-node-a'],
+    'empty slug falls back to the uuid' => ['!!!', 'Q8ZK2X7H4J', 'q8zk2x7h4j'],
+    'blank name falls back to the uuid' => ['', 'node1uuid', 'node1uuid'],
+    'non-ascii name is transliterated' => ['Nöde Ünïcode', 'abc123', 'node-unicode'],
+    'long name is truncated to 63 characters' => [str_repeat('a', 70), 'abc123', str_repeat('a', 63)],
+    'truncation does not leave a trailing dash' => [str_repeat('a', 62).' b', 'abc123', str_repeat('a', 62)],
+]);

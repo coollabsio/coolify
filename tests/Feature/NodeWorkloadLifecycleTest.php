@@ -76,7 +76,7 @@ it('converges each workload lifecycle command', function (NodeWorkloadAction $ac
     'remove' => fn () => [NodeWorkloadAction::REMOVE, []],
 ]);
 
-it('reconciles discovery immediately after each converged lifecycle action', function (NodeWorkloadAction $action, array $containers, bool $isPublished) {
+it('leaves discovery to Sentinel after a converged lifecycle action in a cluster', function (NodeWorkloadAction $action, array $containers) {
     $cluster = NodeCluster::factory()->create([
         'team_id' => $this->team->id,
         'network_status' => 'active',
@@ -86,8 +86,7 @@ it('reconciles discovery immediately after each converged lifecycle action', fun
         'wireguard_ip' => '10.250.0.2',
     ]);
     $operation = CreateLifecycleOperation::run($this->node, $this->revision, $action);
-    $discoveryEndpoints = null;
-    Http::fake(function ($request) use ($action, $containers, $operation, &$discoveryEndpoints) {
+    Http::fake(function ($request) use ($action, $containers, $operation) {
         if (str_ends_with($request->url(), '/v1/commands/workload.lifecycle')) {
             return Http::response([
                 'command_id' => $operation->uuid,
@@ -104,28 +103,18 @@ it('reconciles discovery immediately after each converged lifecycle action', fun
             ]);
         }
 
-        $discoveryEndpoints = collect($request['endpoints'])->where('namespace', 'default')->values()->all();
-
-        return Http::response([
-            'command_id' => $request['command_id'],
-            'observed_at_unix_ms' => 1_700_000_000_200,
-            'owner_node_ip' => $request['owner_node_ip'],
-            'endpoint_count' => count($request['endpoints']),
-        ]);
+        return Http::response('unexpected request', 500);
     });
 
     (new ManageNodeWorkloadJob($operation->id))->handle();
 
-    expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
-        ->and($discoveryEndpoints !== [])->toBe($isPublished);
-    if ($isPublished) {
-        expect(data_get($discoveryEndpoints, '0.state'))->toBe($action === NodeWorkloadAction::STOP ? 'exited' : 'running');
-    }
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED);
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'discovery.corrosion.endpoints.reconcile'));
 })->with([
-    'start publishes' => fn () => [NodeWorkloadAction::START, [lifecycleContainer($this, 'running')], true],
-    'restart publishes' => fn () => [NodeWorkloadAction::RESTART, [lifecycleContainer($this, 'running')], true],
-    'stop withdraws from DNS' => fn () => [NodeWorkloadAction::STOP, [lifecycleContainer($this, 'exited')], true],
-    'remove withdraws its row' => fn () => [NodeWorkloadAction::REMOVE, [], false],
+    'start' => fn () => [NodeWorkloadAction::START, [lifecycleContainer($this, 'running')]],
+    'restart' => fn () => [NodeWorkloadAction::RESTART, [lifecycleContainer($this, 'running')]],
+    'stop' => fn () => [NodeWorkloadAction::STOP, [lifecycleContainer($this, 'exited')]],
+    'remove' => fn () => [NodeWorkloadAction::REMOVE, []],
 ]);
 
 it('waits for a transitional container state to converge', function () {
@@ -280,12 +269,7 @@ it('updates a permanent workload dns name from the Node page', function () {
         'wireguard_ip' => '10.250.0.2',
     ]);
     $this->workload->update(['internal_dns_name' => 'example-app']);
-    Http::fake(fn ($request) => Http::response([
-        'command_id' => $request['command_id'],
-        'observed_at_unix_ms' => now()->getTimestampMs(),
-        'owner_node_ip' => $request['owner_node_ip'],
-        'endpoint_count' => count($request['endpoints']),
-    ]));
+    Http::fake();
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'workloads'])
         ->assertSet('dnsNames.'.$this->workload->uuid, 'example-app')
@@ -293,10 +277,10 @@ it('updates a permanent workload dns name from the Node page', function () {
         ->set('dnsNames.'.$this->workload->uuid, 'stable-api')
         ->call('saveWorkloadDnsName', $this->workload->uuid)
         ->assertHasNoErrors()
-        ->assertDispatched('success', 'Internal DNS name updated.');
+        ->assertDispatched('success', 'Internal DNS name updated. Redeploy the workload to apply it.');
 
     expect($this->workload->refresh()->internal_dns_name)->toBe('stable-api');
-    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/v1/commands/discovery.corrosion.endpoints.reconcile'));
+    Http::assertNothingSent();
 });
 
 it('rejects invalid or colliding workload dns names from the Node page', function () {

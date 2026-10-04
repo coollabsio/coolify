@@ -10,7 +10,6 @@ use App\Actions\Node\FetchContainers;
 use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\PrepareNodeWorkloadRevision;
-use App\Actions\Node\PublishNodeDiscoveryEndpoints;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\UpgradeSentinel;
 use App\Actions\Node\ValidateNode;
@@ -226,7 +225,7 @@ class Show extends Component
                 $field.'.regex' => 'Use lowercase letters, numbers, and hyphens. Do not start or end with a hyphen.',
             ]);
 
-            $workload = DB::transaction(function () use ($field, $workloadUuid): NodeWorkload {
+            DB::transaction(function () use ($field, $workloadUuid): void {
                 $workload = NodeWorkload::query()
                     ->where('uuid', $workloadUuid)
                     ->where('team_id', $this->node->team_id)
@@ -247,17 +246,11 @@ class Show extends Component
                 }
 
                 $workload->update(['internal_dns_name' => $dnsName]);
-
-                return $workload->load('nodes.cluster');
             });
-
-            foreach ($workload->nodes as $workloadNode) {
-                PublishNodeDiscoveryEndpoints::run($workloadNode, now());
-            }
 
             $this->loadNodeData();
             $this->dispatch('close-modal');
-            $this->dispatch('success', 'Internal DNS name updated.');
+            $this->dispatch('success', 'Internal DNS name updated. Redeploy the workload to apply it.');
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (\Throwable $e) {

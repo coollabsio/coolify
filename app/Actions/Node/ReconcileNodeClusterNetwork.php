@@ -34,7 +34,6 @@ class ReconcileNodeClusterNetwork
             'network.firewall.reconcile.v1',
             'discovery.corrosion.inspect.v1',
             'discovery.corrosion.reconcile.v1',
-            'discovery.corrosion.endpoints.reconcile.v1',
         ];
         foreach ($cluster->nodes as $node) {
             foreach ($requiredCapabilities as $capability) {
@@ -108,6 +107,7 @@ class ReconcileNodeClusterNetwork
                     'version' => self::CORROSION_VERSION,
                     'cluster_id' => $cluster->uuid,
                     'bind_address' => $node->wireguard_ip,
+                    'node_dns_name' => $node->discoveryDnsName(),
                     'peers' => $nodes->where('id', '!=', $node->id)->pluck('wireguard_ip')->map(fn (string $ip): string => $ip.':8787')->values()->all(),
                 ]);
             }

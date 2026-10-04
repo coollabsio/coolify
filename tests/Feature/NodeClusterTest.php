@@ -184,17 +184,16 @@ it('cleans an applied Node network before detaching it and reconciles survivors'
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
     $leaving->workloads()->attach($workload, ['container_ip' => '100.64.0.2']);
     Cache::put($leaving->cacheKey(), ['capabilities' => [
-        'discovery.corrosion.endpoints.reconcile.v1',
         'network.cluster.leave.v1',
     ]]);
-    Http::fake(function ($request) {
-        $base = ['command_id' => $request['command_id'], 'observed_at_unix_ms' => 1_700_000_000_000];
-        if (str_ends_with($request->url(), 'discovery.corrosion.endpoints.reconcile')) {
-            return Http::response([...$base, 'owner_node_ip' => $request['owner_node_ip'], 'endpoint_count' => 0]);
-        }
-
-        return Http::response([...$base, 'wireguard_removed' => true, 'firewall_removed' => true, 'discovery_removed' => true, 'resolver_reverted' => true]);
-    });
+    Http::fake(fn ($request) => Http::response([
+        'command_id' => $request['command_id'],
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'wireguard_removed' => true,
+        'firewall_removed' => true,
+        'discovery_removed' => true,
+        'resolver_reverted' => true,
+    ]));
 
     RemoveNodeFromCluster::run($cluster->fresh(), $leaving->fresh(), $this->user);
 
@@ -202,7 +201,8 @@ it('cleans an applied Node network before detaching it and reconciles survivors'
         ->and($leaving->fresh()->workload_cidr)->toBeNull()
         ->and($leaving->workloads()->count())->toBe(0)
         ->and($cluster->fresh()->network_status)->toBe('reconciling');
-    Http::assertSentCount(2);
+    Http::assertSentCount(1);
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'discovery.corrosion.endpoints.reconcile'));
     Http::assertSent(fn ($request): bool => str_ends_with($request->url(), 'network.cluster.leave')
         && $request['interface'] === $cluster->wireguard_interface
         && $request['owner_node_ip'] === $leavingIp);
@@ -218,7 +218,7 @@ it('keeps membership when remote Node cleanup fails', function () {
     AssignNodeToCluster::run($cluster, $node);
     $cluster->update(['network_status' => 'active']);
     $node->update(['network_applied_revision' => $cluster->desired_revision]);
-    Cache::put($node->cacheKey(), ['capabilities' => ['discovery.corrosion.endpoints.reconcile.v1', 'network.cluster.leave.v1']]);
+    Cache::put($node->cacheKey(), ['capabilities' => ['network.cluster.leave.v1']]);
     Http::fake(['*' => Http::response('failed', 502)]);
 
     expect(fn () => RemoveNodeFromCluster::run($cluster->fresh(), $node->fresh(), $this->user))->toThrow(RequestException::class)

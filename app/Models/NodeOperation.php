@@ -14,6 +14,9 @@ class NodeOperation extends BaseModel
     /**
      * Commands that Coolify runs periodically in the background. They are
      * hidden from activity lists unless they fail.
+     *
+     * `discovery.corrosion.endpoints.reconcile.v1` is no longer sent. It stays
+     * here so that rows from older versions stay hidden.
      */
     public const BACKGROUND_COMMAND_TYPES = [
         'container.list.v1',

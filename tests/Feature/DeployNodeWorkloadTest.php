@@ -210,6 +210,41 @@ it('deploys a clustered workload with its stable managed network address', funct
         && $request['dns_server'] === $this->node->fresh()->wireguard_ip);
 });
 
+it('labels a clustered workload with its internal dns name before deploying', function () {
+    $cluster = CreateNodeCluster::run($this->node->team, User::factory()->create(), 'Mesh');
+    AssignNodeToCluster::run($cluster, $this->node);
+    expect($this->workload->fresh()->internal_dns_name)->toBeNull();
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    expect($this->workload->fresh()->internal_dns_name)->toBe('example-app');
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/v1/commands/workload.deploy')
+        && $request['labels']['coolify.dns_name'] === 'example-app'
+        && $request['labels']['coolify.workload'] === $this->workload->uuid);
+});
+
+it('does not add a dns name label for a workload outside a cluster', function () {
+    Http::fake(['*/v1/commands/workload.deploy' => Http::response([
+        'command_id' => $this->operation->uuid,
+        'observed_at_unix_ms' => 1_700_000_000_000,
+        'runtime_id' => 'runtime-123',
+        'name' => 'coolify-'.$this->workload->uuid.'-main',
+        'image' => $this->revision->image,
+    ])]);
+
+    DispatchWorkloadDeployment::run($this->operation);
+
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/v1/commands/workload.deploy')
+        && ! array_key_exists('coolify.dns_name', $request['labels']));
+});
+
 it('fails when the deployed revision is not running after inventory refresh', function () {
     Http::fake(function ($request) {
         if (str_ends_with($request->url(), '/v1/commands/workload.deploy')) {

@@ -83,7 +83,6 @@ class FetchContainers
                 'container_inventory_observed_at' => $observedAt,
             ],
         ])->save();
-        PublishNodeDiscoveryEndpoints::run($node->refresh(), Carbon::parse($observedAt));
 
         return count($containers);
     }
