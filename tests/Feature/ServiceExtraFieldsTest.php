@@ -44,6 +44,21 @@ it('only adds Grafana extra fields for Grafana server images', function (string 
     'loki' => ['grafana/loki:latest', false],
     'promtail' => ['grafana/promtail:latest', false],
     'tempo' => ['grafana/tempo:latest', false],
+    'registry.example.com grafana' => ['registry.example.com/grafana/grafana:latest', true],
+    'registry.example.com grafana-oss' => ['registry.example.com/grafana/grafana-oss:latest', true],
+    'registry.example.com grafana-enterprise' => ['registry.example.com/grafana/grafana-enterprise:latest', true],
+    'registry.example.com loki' => ['registry.example.com/grafana/loki:latest', false],
+    'registry.example.com promtail' => ['registry.example.com/grafana/promtail:latest', false],
+    'registry.example.com tempo' => ['registry.example.com/grafana/tempo:latest', false],
+    'registry.example.com:5000 grafana' => ['registry.example.com:5000/grafana/grafana:latest', true],
+    'registry.example.com:5000 grafana-oss' => ['registry.example.com:5000/grafana/grafana-oss:latest', true],
+    'registry.example.com:5000 grafana-enterprise' => ['registry.example.com:5000/grafana/grafana-enterprise:latest', true],
+    'registry.example.com:5000 loki' => ['registry.example.com:5000/grafana/loki:latest', false],
+    'registry.example.com:5000 promtail' => ['registry.example.com:5000/grafana/promtail:latest', false],
+    'registry.example.com:5000 tempo' => ['registry.example.com:5000/grafana/tempo:latest', false],
+    'registry port without tag' => ['registry.example.com:5000/grafana/grafana', true],
+    'digest' => ['grafana/grafana@sha256:'.str_repeat('a', 64), true],
+    'registry port with digest' => ['registry.example.com:5000/grafana/grafana@sha256:'.str_repeat('a', 64), true],
 ]);
 
 it('exposes Jean Server authentication and access settings', function () {

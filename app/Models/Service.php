@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\ContainerStatusAggregator;
+use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
 use App\Traits\Auditable;
@@ -642,7 +643,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $this->isGrafanaServerImage($image->toString()):
+                case $this->isGrafanaServerImage($application->image):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -1425,6 +1426,7 @@ class Service extends BaseModel
      */
     private function isGrafanaServerImage(string $image): bool
     {
+        $image = (new DockerImageParser)->parse($image)->getFullImageNameWithoutTag();
         $names = ['grafana/grafana', 'grafana/grafana-oss', 'grafana/grafana-enterprise'];
 
         return collect($names)->contains(
