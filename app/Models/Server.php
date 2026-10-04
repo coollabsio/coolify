@@ -33,9 +33,11 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
@@ -1080,6 +1082,25 @@ $siteAddress {
     public static function sentinelReportedVersionCacheKey(int $serverId): string
     {
         return "sentinel:reported-version:{$serverId}";
+    }
+
+    /**
+     * The last known reason why Sentinel pushes do not arrive. It is shown while Sentinel is out of sync.
+     */
+    public function sentinelPushProblem(): ?string
+    {
+        return Cache::get("sentinel:push-problem:{$this->id}");
+    }
+
+    public function rememberSentinelPushProblem(?string $problem): void
+    {
+        if (blank($problem)) {
+            Cache::forget("sentinel:push-problem:{$this->id}");
+
+            return;
+        }
+
+        Cache::put("sentinel:push-problem:{$this->id}", Str::limit($problem, 500), now()->addDay());
     }
 
     public function isSentinelLive()

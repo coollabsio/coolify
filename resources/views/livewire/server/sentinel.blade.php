@@ -38,6 +38,9 @@
                 <x-callout type="warning" title="Sentinel is out of sync">
                     <div class="space-y-3">
                         <p>Sentinel has not reported within the expected interval. Check these items before syncing again:</p>
+                        @if ($sentinelPushProblem = $server->sentinelPushProblem())
+                            <p><span class="font-medium">Last error:</span> <code class="break-all">{{ $sentinelPushProblem }}</code></p>
+                        @endif
                         <ul class="list-disc space-y-1 pl-4">
                             <li>Confirm that the <code>coolify-sentinel</code> container is running.</li>
                             <li>
