@@ -14,6 +14,7 @@ else
 fi
 SKIP_BACKUP=${4:-false}
 STATUS_FILE="/data/coolify/source/.upgrade-status"
+REQUIRED_AVAILABLE_SPACE=7
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
@@ -52,6 +53,14 @@ echo "Target Version: ${LATEST_IMAGE}" >>"$LOGFILE"
 echo "Helper Version: ${LATEST_HELPER_VERSION}" >>"$LOGFILE"
 echo "Registry URL: ${REGISTRY_URL}" >>"$LOGFILE"
 echo "============================================================" >>"$LOGFILE"
+
+AVAILABLE_SPACE=$(df -Pk "$(docker info --format '{{.DockerRootDir}}')" 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}')
+if [ -n "$AVAILABLE_SPACE" ] && [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
+    log "ERROR: Not enough disk space: ${AVAILABLE_SPACE}GB available, ${REQUIRED_AVAILABLE_SPACE}GB required"
+    write_status "error" "Not enough disk space: ${AVAILABLE_SPACE}GB available, ${REQUIRED_AVAILABLE_SPACE}GB required"
+    echo "     ERROR: Not enough disk space: ${AVAILABLE_SPACE}GB available, ${REQUIRED_AVAILABLE_SPACE}GB required. Aborting upgrade."
+    exit 1
+fi
 
 log_section "Step 1/6: Downloading configuration files"
 write_status "1" "Downloading configuration files"
