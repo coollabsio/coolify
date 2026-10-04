@@ -70,6 +70,7 @@
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
                 ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => $activeSubMenu === 'dynamic-confs', 'icon' => 'sliders', 'visible' => $server->proxySet()],
+                ['label' => 'TLS Certificates', 'route' => 'server.proxy.certificates', 'active' => $activeSubMenu === 'certificates', 'icon' => 'shield-star', 'visible' => $server->proxyType() === \App\Enums\ProxyTypes::TRAEFIK->value],
                 ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
             ],
         ],
