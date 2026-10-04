@@ -20,6 +20,27 @@ class AuditEvent extends Model
 
     public const UPDATED_AT = null;
 
+    /**
+     * Raw commands and configurations can contain credentials without sensitive field names.
+     *
+     * @var array<int, string>
+     */
+    private const SENSITIVE_VALUE_FIELDS = [
+        'git_full_url',
+        'install_command', 'build_command', 'start_command',
+        'health_check_command', 'health_check_response_text',
+        'custom_docker_run_options', 'pre_deployment_command', 'post_deployment_command',
+        'docker_compose_custom_start_command', 'docker_compose_custom_build_command',
+        'custom_nginx_configuration',
+        'postgres_conf', 'mysql_conf', 'mariadb_conf', 'mongo_conf', 'redis_conf', 'keydb_conf',
+        'internal_db_url', 'external_db_url', 'init_scripts',
+        'dockerfile', 'docker_compose', 'docker_compose_raw', 'custom_labels',
+        'last_saved_proxy_configuration',
+        'environment_variables', 'environment_variables_preview',
+        'validation_logs', 'server_metadata', 'logs',
+        'configuration_snapshot', 'configuration_diff', 'content', 'file_storage_content',
+    ];
+
     protected $fillable = [
         'team_id',
         'event',
@@ -228,9 +249,15 @@ class AuditEvent extends Model
         return $key ? data_get($context, $key) : null;
     }
 
+    public static function isSensitiveField(string $field): bool
+    {
+        return in_array($field, self::SENSITIVE_VALUE_FIELDS, true)
+            || preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie|license_key/i', $field) === 1;
+    }
+
     public static function redact(mixed $value, ?string $key = null): mixed
     {
-        if ($key !== null && self::isSensitiveKey($key)) {
+        if ($key !== null && (in_array($key, self::SENSITIVE_VALUE_FIELDS, true) || self::isSensitiveKey($key))) {
             return '[REDACTED]';
         }
 

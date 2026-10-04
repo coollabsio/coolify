@@ -135,12 +135,13 @@ trait Auditable
             'deleted_at',
             'order',
             'status',
+            ...(get_class_vars(static::class)['hidden'] ?? []),
             ...$this->getHidden(),
             ...($this->auditExclude ?? []),
         ], true)
             || str_ends_with($field, '_id')
             || str_ends_with($field, '_at')
-            || preg_match('/password|secret|token|private_key|signature|credential|api_key|access_key|authorization|cookie/i', $field)
+            || AuditEvent::isSensitiveField($field)
             || (is_string($cast) && ($cast === 'encrypted' || str_starts_with($cast, 'encrypted:')));
     }
 

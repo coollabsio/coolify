@@ -257,6 +257,86 @@ test('auditable models redact nested secrets in object casts', function () {
     ]);
 });
 
+test('audit changes exclude raw fields that can contain embedded credentials', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    AuditEvent::query()->delete();
+
+    $application->update([
+        'name' => 'Safe name',
+        'git_full_url' => 'https://user:embedded-password@example.com/repo.git',
+        'build_command' => 'API_KEY=embedded-key npm run build',
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->toHaveKey('name')
+        ->not->toHaveKeys(['git_full_url', 'build_command']);
+});
+
+test('audit changes exclude database configuration credentials on create and delete', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    AuditEvent::query()->delete();
+
+    $database = StandaloneRedis::query()->create([
+        'name' => 'Redis',
+        'environment_id' => $environment->id,
+        'destination_type' => Server::class,
+        'destination_id' => 0,
+        'redis_conf' => 'requirepass embedded-redis-password',
+    ]);
+    $database->delete();
+
+    $events = AuditEvent::query()->orderBy('id')->get();
+
+    expect($events)->toHaveCount(2);
+    foreach ($events as $event) {
+        expect($event->changes)->toHaveKey('name')->not->toHaveKey('redis_conf');
+    }
+});
+
+test('audit metadata redacts nested raw configuration credentials', function () {
+    auditLog('ui.server.updated', [
+        'team_id' => $this->team->id,
+        'configuration' => ['last_saved_proxy_configuration' => 'PASSWORD=must-not-be-recorded'],
+    ]);
+
+    expect(AuditEvent::query()->sole()->metadata['configuration'])->toBe([
+        'last_saved_proxy_configuration' => '[REDACTED]',
+    ]);
+});
+
+test('audit changes keep model default hidden fields excluded after makeVisible', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id]);
+    AuditEvent::query()->delete();
+    $application->makeVisible(['domain_dns_statuses']);
+
+    $application->update([
+        'name' => 'Updated application',
+        'domain_dns_statuses' => ['example.com' => 'private DNS data'],
+    ]);
+
+    expect(AuditEvent::query()->sole()->changes)->not->toHaveKey('domain_dns_statuses');
+});
+
+test('audit changes redact credentials embedded in nested proxy configuration', function () {
+    Server::flushIdentityMap();
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy = ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => 'PASSWORD=old-secret'];
+    $server->save();
+    AuditEvent::query()->delete();
+
+    $server->proxy = ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => 'PASSWORD=new-secret'];
+    $server->save();
+
+    expect(AuditEvent::query()->sole()->changes['proxy'])->toBe([
+        'old' => ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => '[REDACTED]'],
+        'new' => ['type' => 'TRAEFIK', 'last_saved_proxy_configuration' => '[REDACTED]'],
+    ]);
+});
+
 test('audit metadata redacts secrets in serializable objects', function (Closure $configuration) {
     auditLog('ui.server.updated', [
         'team_id' => $this->team->id,
