@@ -23,9 +23,18 @@ class FlushCacheDatabase
             throw new \RuntimeException('Database is not running.');
         }
 
-        $command = $this->buildFlushCommand($database->uuid, $this->resolvePassword($database));
+        $cli = $database instanceof StandaloneKeydb ? 'keydb-cli' : 'redis-cli';
+        if ($database instanceof StandaloneDragonfly && $database->enable_ssl) {
+            $cli .= ' --tls --cacert /etc/dragonfly/certs/coolify-ca.crt --cert /etc/dragonfly/certs/server.crt --key /etc/dragonfly/certs/server.key';
+        }
 
-        instant_remote_process(command: [$command], server: $server, throwError: true);
+        $command = $this->buildFlushCommand($database->uuid, $this->resolvePassword($database), $cli);
+
+        $output = instant_remote_process(command: [$command], server: $server, throwError: true);
+
+        if ($output !== 'OK') {
+            throw new \RuntimeException($output ?: 'Failed to flush the database.');
+        }
     }
 
     /**
@@ -41,14 +50,13 @@ class FlushCacheDatabase
      * This is a limitation shared with every other password-carrying remote command in the
      * codebase (e.g. DatabaseBackupJob); the escaping still holds, so no command is injected.
      */
-    public function buildFlushCommand(string $containerName, ?string $password): string
+    public function buildFlushCommand(string $containerName, ?string $password, string $cli = 'redis-cli'): string
     {
-        $redisCli = 'redis-cli';
         if (filled($password)) {
-            $redisCli .= ' -a '.escapeshellarg($password);
+            $cli .= ' -a '.escapeshellarg($password);
         }
 
-        return "docker exec {$containerName} {$redisCli} FLUSHALL ASYNC";
+        return "docker exec {$containerName} {$cli} FLUSHALL ASYNC";
     }
 
     private function resolvePassword(StandaloneRedis|StandaloneKeydb|StandaloneDragonfly $database): ?string
