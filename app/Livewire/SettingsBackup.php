@@ -111,6 +111,14 @@ class SettingsBackup extends Component
             ]);
             $this->database->refresh();
             $this->backup->refresh();
+            auditLog('ui.database.backup_schedule_created', [
+                'team_id' => $this->backup->team_id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'backup_uuid' => $this->backup->uuid,
+                'frequency' => $this->backup->frequency,
+                'save_s3' => (bool) $this->backup->save_s3,
+            ]);
             $this->s3s = S3Storage::whereTeamId(0)->get();
 
             $this->uuid = $this->database->uuid;

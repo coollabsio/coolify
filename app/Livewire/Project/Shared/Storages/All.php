@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Livewire\Project\Service\Storage as StorageComponent;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
@@ -15,6 +16,7 @@ use Livewire\Component;
 
 class All extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
 
     public $resource;
@@ -100,7 +102,12 @@ class All extends Component
         }
         $storage->mount_path = $form['mountPath'];
         $storage->is_preview_suffix_enabled = (bool) $form['isPreviewSuffixEnabled'];
+        $changedFields = auditChangedFields($storage);
         $storage->save();
+
+        if ($changedFields !== []) {
+            $this->auditStorageChange($this->resource, 'updated', $storage, ['changed_fields' => $changedFields]);
+        }
 
         $this->dispatch('success', 'Storage updated successfully');
     }
@@ -171,6 +178,9 @@ class All extends Component
         }
 
         $storage->delete();
+        $this->auditStorageChange($this->resource, 'deleted', $storage, [
+            'docker_volume_deleted' => $this->deleteDockerVolume,
+        ]);
         $this->refreshList();
         $this->dispatch('storageCountsChanged')->to(StorageComponent::class);
         $this->dispatch('configurationChanged');

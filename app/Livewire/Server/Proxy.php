@@ -97,6 +97,33 @@ class Proxy extends Component
         return is_array($traefikVersions) ? $traefikVersions : null;
     }
 
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditProxyUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.proxy.updated', $this->proxyAuditContext([
+            'changed_fields' => $changedFields,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function proxyAuditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
+    }
+
     public function getConfigurationFilePathProperty(): string
     {
         return rtrim($this->server->proxyPath(), '/').'/docker-compose.yml';
@@ -136,7 +163,9 @@ class Proxy extends Component
             $this->authorize('update', $this->server);
             $this->validate();
             $this->syncData(true);
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditProxyUpdate($changedFields);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -147,8 +176,10 @@ class Proxy extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $redirectChanged = (bool) data_get($this->server->proxy, 'redirect_enabled', true) !== $this->redirectEnabled;
             $this->server->proxy->redirect_enabled = $this->redirectEnabled;
             $this->server->save();
+            $this->auditProxyUpdate($redirectChanged ? ['redirect_enabled'] : []);
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
@@ -164,6 +195,7 @@ class Proxy extends Component
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();
+            auditLog('ui.server.proxy.configuration_saved', $this->proxyAuditContext());
             $this->server->setupDefaultRedirect();
             $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration saved.');
@@ -180,6 +212,7 @@ class Proxy extends Component
             $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->save();
+            auditLog('ui.server.proxy.configuration_reset', $this->proxyAuditContext());
             $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration reset to default.');
         } catch (\Throwable $e) {

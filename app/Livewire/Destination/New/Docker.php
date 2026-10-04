@@ -98,6 +98,14 @@ class Docker extends Component
                 }
             }
 
+            auditLog('ui.destination.created', [
+                'team_id' => $this->selectedServer->team_id,
+                'destination_uuid' => $docker->uuid,
+                'destination_name' => $docker->name,
+                'destination_type' => $isSwarm ? 'swarm' : 'standalone',
+                'server_uuid' => $this->selectedServer->uuid,
+            ]);
+
             return redirectRoute($this, 'destination.show', [$docker->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);

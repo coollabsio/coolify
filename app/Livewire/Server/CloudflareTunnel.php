@@ -59,6 +59,7 @@ class CloudflareTunnel extends Component
             $this->isCloudflareTunnelsEnabled = false;
             $this->server->settings->is_cloudflare_tunnel = false;
             $this->server->settings->save();
+            auditLog('ui.server.cloudflare_tunnel.disabled', $this->auditContext());
             if ($this->server->ip_previous) {
                 $this->server->update(['ip' => $this->server->ip_previous]);
                 $this->dispatch('success', 'Cloudflare Tunnel disabled.<br><br>Manually updated the server IP address to its previous IP address.');
@@ -77,6 +78,7 @@ class CloudflareTunnel extends Component
             $this->isCloudflareTunnelsEnabled = true;
             $this->server->settings->is_cloudflare_tunnel = true;
             $this->server->settings->save();
+            auditLog('ui.server.cloudflare_tunnel.enabled', $this->auditContext());
             $this->server->refresh();
             $this->dispatch('success', 'Cloudflare Tunnel enabled.');
         } catch (\Throwable $e) {
@@ -93,6 +95,9 @@ class CloudflareTunnel extends Component
                 $this->ssh_domain = str($this->ssh_domain)->replace('/', '');
             }
             $activity = ConfigureCloudflared::run($this->server, $this->cloudflare_token, $this->ssh_domain);
+            auditLog('ui.server.cloudflare_tunnel.configuration_started', $this->auditContext([
+                'ssh_domain' => (string) $this->ssh_domain,
+            ]));
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -102,5 +107,18 @@ class CloudflareTunnel extends Component
     public function render()
     {
         return view('livewire.server.cloudflare-tunnel');
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 }

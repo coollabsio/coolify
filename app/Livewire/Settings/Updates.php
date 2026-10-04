@@ -64,7 +64,16 @@ class Updates extends Component
             $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
             $this->settings->docker_registry_url = $validated['docker_registry_url'];
             $this->syncRegistryUrlToEnv($validated['docker_registry_url']);
+            $changedFields = auditChangedFields($this->settings);
             $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'updates',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
             $this->dispatch('success', 'Settings updated!');
         } catch (ValidationException $e) {
             throw $e;

@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -22,6 +23,7 @@ use Livewire\Component;
 
 class Domains extends Component
 {
+    use AuditsApplicationSettings;
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
     use InteractsWithDnsProviders;
@@ -247,7 +249,7 @@ class Domains extends Component
         $this->validateOnly('isForceHttpsEnabled');
 
         $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
-        $this->application->settings->save();
+        $this->saveApplicationSettingsWithAudit($this->application);
         $this->resetDefaultLabels();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'HTTP to HTTPS redirect updated.');

@@ -83,6 +83,14 @@ class CreateScheduledBackup extends Component
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
+            auditLog('ui.database.backup_schedule_created', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $databaseBackup->uuid,
+                'frequency' => $databaseBackup->frequency,
+                'save_s3' => (bool) $databaseBackup->save_s3,
+            ]);
             if ($database->getMorphClass() === ServiceDatabase::class) {
                 $service = $database->service;
                 $this->redirectRoute('project.service.volume-backups.index', [

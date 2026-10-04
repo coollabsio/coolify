@@ -54,7 +54,9 @@ class Charts extends Component
             $this->server->settings->sentinel_metrics_refresh_rate_seconds = $this->sentinelMetricsRefreshRateSeconds;
             $this->server->settings->sentinel_metrics_history_days = $this->sentinelMetricsHistoryDays;
             $this->server->settings->sentinel_push_interval_seconds = $this->sentinelPushIntervalSeconds;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSentinelUpdate($changedFields);
 
             $this->dispatch('success', 'Metrics settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
@@ -68,6 +70,7 @@ class Charts extends Component
             $this->authorize('update', $this->server);
             $this->server->settings->is_metrics_enabled = ! $this->server->settings->is_metrics_enabled;
             $this->server->settings->save();
+            $this->auditSentinelUpdate(['is_metrics_enabled']);
             $this->server->refresh();
 
             if ($this->server->isMetricsEnabled()) {
@@ -107,6 +110,25 @@ class Charts extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Metrics settings belong to Sentinel, so they use the same event as the Sentinel page and API.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSentinelUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.sentinel.updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function setInterval()

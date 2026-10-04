@@ -5,6 +5,7 @@ use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderTokenForm;
 use App\Livewire\Security\CloudProviderTokens;
 use App\Models\Application;
+use App\Models\AuditEvent;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
@@ -398,25 +399,10 @@ describe('API mutation audit logging', function () {
         $response->assertStatus(403);
     });
 
-    test('project creation emits api.project.created audit event', function () {
+    test('project creation records api.project.created audit event', function () {
         [$team, $user] = makeAuditTeamUser();
         $token = makeAuditApiToken($user, $team);
         auth()->forgetGuards();
-
-        $auditChannel = Mockery::mock();
-        $auditChannel->shouldReceive('info')
-            ->atLeast()
-            ->once()
-            ->with('api.project.created', Mockery::on(function ($context) {
-                return $context['event'] === 'api.project.created'
-                    && ! empty($context['project_uuid'])
-                    && $context['project_name'] === 'audit-project';
-            }));
-
-        Log::shouldReceive('channel')->with('audit')->andReturn($auditChannel);
-        Log::shouldReceive('warning')->andReturnNull();
-        Log::shouldReceive('info')->andReturnNull();
-        Log::shouldReceive('error')->andReturnNull();
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$token,
@@ -427,6 +413,11 @@ describe('API mutation audit logging', function () {
         ]);
 
         $response->assertStatus(201);
+
+        $event = AuditEvent::query()->where('event', 'api.project.created')->sole();
+        expect($event->team_id)->toBe($team->id)
+            ->and($event->resource_uuid)->toBe($response->json('uuid'))
+            ->and($event->resource_name)->toBe('audit-project');
     });
 });
 

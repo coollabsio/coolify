@@ -191,7 +191,8 @@ class GithubRunners extends Component
                 $this->prepareRunnerGroup($githubApp);
             }
 
-            GithubRunnerConfig::updateOrCreate(['server_id' => $this->server->id], [
+            $config = GithubRunnerConfig::firstOrNew(['server_id' => $this->server->id]);
+            $config->fill([
                 'github_app_id' => $githubApp->id,
                 'labels' => $labels,
                 'max_runners' => $this->maxRunners,
@@ -205,6 +206,9 @@ class GithubRunners extends Component
                 'is_dedicated' => $this->isDedicated,
                 'allow_pull_requests' => $this->allowPullRequests,
             ]);
+            $changedFields = auditChangedFields($config);
+            $config->save();
+            $this->auditConfigSaved($config, $githubApp, $changedFields);
             unset($this->config);
             $this->syncData();
             $this->dispatch('success', 'GitHub runner settings saved.');
@@ -230,6 +234,7 @@ class GithubRunners extends Component
 
             if ($config->is_enabled) {
                 $config->update(['is_enabled' => false]);
+                auditLog('ui.server.github_runners.disabled', $this->auditContext());
                 $config->executions()->where('status', GithubRunnerStatus::Idle)->get()
                     ->each(function (GithubRunnerExecution $execution) {
                         $execution->finish(GithubRunnerStatus::Cancelled, 'Runners were disabled on this server.');
@@ -243,6 +248,7 @@ class GithubRunners extends Component
                 $this->authorize('update', $config->githubApp);
                 $this->prepareRunnerGroup($config->githubApp);
                 $config->update(['is_enabled' => true]);
+                auditLog('ui.server.github_runners.enabled', $this->auditContext());
                 ProvisionGithubRunnerJob::dispatchQueued($config->github_app_id);
                 $this->dispatch('success', 'GitHub runners enabled.');
             }
@@ -287,6 +293,41 @@ class GithubRunners extends Component
         if ($group['is_default']) {
             $this->dispatch('warning', 'Runners use the Default runner group of the organization. Check which repositories can use that group on GitHub.');
         }
+    }
+
+    /**
+     * Record a created configuration with its set fields, or the changed field names of an updated one.
+     *
+     * @param  array<int, string>  $changedFields  Fields changed by the save, captured before it.
+     */
+    private function auditConfigSaved(GithubRunnerConfig $config, GithubApp $githubApp, array $changedFields): void
+    {
+        if ($config->wasRecentlyCreated) {
+            $changedFields = array_values(array_diff(array_keys($config->getAttributes()), ['id', 'uuid', 'server_id', 'created_at', 'updated_at']));
+        }
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog($config->wasRecentlyCreated ? 'ui.server.github_runners.created' : 'ui.server.github_runners.updated', $this->auditContext([
+            'github_app_uuid' => $githubApp->uuid,
+            'github_app_name' => $githubApp->name,
+            'changed_fields' => $changedFields,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
     }
 
     public function render()
