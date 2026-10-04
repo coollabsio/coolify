@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Project\Shared;
 
-use App\Actions\Database\FlushCacheDatabase;
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -167,7 +167,7 @@ class Danger extends Component
                 return 'The provided password is incorrect.';
             }
 
-            FlushCacheDatabase::run($this->resource);
+            FlushDatabase::run($this->resource);
             auditLog('ui.database.flushed', [
                 'team_id' => $this->resource->team()?->id,
                 'database_uuid' => $this->resource->uuid,

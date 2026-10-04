@@ -8,7 +8,7 @@ use App\Models\StandaloneRedis;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
-class FlushCacheDatabase
+class FlushDatabase
 {
     use AsAction;
 
