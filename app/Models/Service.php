@@ -1426,12 +1426,19 @@ class Service extends BaseModel
      */
     private function isGrafanaServerImage(string $image): bool
     {
-        $image = (new DockerImageParser)->parse($image)->getFullImageNameWithoutTag();
-        $names = ['grafana/grafana', 'grafana/grafana-oss', 'grafana/grafana-enterprise'];
+        $parsedImage = (new DockerImageParser)->parse($image);
+        $image = $parsedImage->getImageName();
 
-        return collect($names)->contains(
-            fn (string $name) => $image === $name || str($image)->endsWith('/'.$name)
-        );
+        // The parser recognizes registry hosts with dots or ports, but not bare localhost.
+        if ($parsedImage->getRegistryUrl() === '' && str_starts_with($image, 'localhost/')) {
+            $image = substr($image, strlen('localhost/'));
+        }
+
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
     }
 
     public function saveExtraFields($fields)
