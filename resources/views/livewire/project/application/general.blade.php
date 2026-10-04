@@ -1,3 +1,4 @@
+@php use App\Enums\HttpBasicAuthHashAlgorithm; use App\Enums\ProxyTypes; @endphp
 <div x-data="{
     initLoadingCompose: $wire.entangle('initLoadingCompose'),
     canUpdate: @js(auth()->user()->can('update', $application)),
@@ -571,6 +572,44 @@
                                 x-bind:disabled="!canUpdate" />
                             <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
                                 x-bind:disabled="!canUpdate" />
+                        </div>
+                        @php
+                            $server = $application->destination->server;
+                            $supportsArgon2id = $server->caddySupportsArgon2idBasicAuth();
+                            $usesArgon2id = $httpBasicAuthHashAlgorithm === HttpBasicAuthHashAlgorithm::ARGON2ID->value;
+                        @endphp
+                        <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
+                            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Password hashing</h3>
+                            <div class="grid w-full gap-4 {{ $usesArgon2id ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }}">
+                                <x-forms.listbox id="httpBasicAuthHashAlgorithm" label="Algorithm" onChange="instantSave"
+                                    helper="Algorithm that hashes the password for the proxy labels.<br><br>Traefik supports only bcrypt. Argon2id needs the Caddy proxy, version 2.11 or newer. With Argon2id, labels generated for Traefik use bcrypt."
+                                    :options="[
+                                        ['value' => HttpBasicAuthHashAlgorithm::BCRYPT->value, 'label' => 'bcrypt', 'description' => 'Works with every proxy'],
+                                        ['value' => HttpBasicAuthHashAlgorithm::ARGON2ID->value, 'label' => 'Argon2id', 'disabled' => ! $supportsArgon2id, 'description' => match (true) {
+                                            $supportsArgon2id => 'Memory-hard, more resistant to cracking',
+                                            $server->proxyType() === ProxyTypes::CADDY->value => 'Needs Caddy 2.11 or newer on this server',
+                                            default => 'Only supported by the Caddy proxy',
+                                        }],
+                                    ]" x-bind:disabled="!canUpdate" />
+                                @if ($usesArgon2id)
+                                    <div wire:key="http-basic-auth-argon2id-memory-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthArgon2idMemoryCost" label="Memory" onChange="instantSave"
+                                            helper="Memory that the proxy needs to check a password. More memory makes the hash harder to crack, but every login attempt that the proxy has not seen before uses this much memory on the server."
+                                            :options="collect([8, 16, 32, 64, 128, 256])->map(fn (int $mebibytes) => ['value' => $mebibytes * 1024, 'label' => $mebibytes.' MiB'])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                    <div wire:key="http-basic-auth-argon2id-time-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthArgon2idTimeCost" label="Iterations" onChange="instantSave"
+                                            helper="Number of passes over the memory. More iterations make the hash harder to crack and a password check slower."
+                                            :options="collect(range(1, 12))->map(fn (int $iterations) => ['value' => $iterations, 'label' => (string) $iterations])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                @else
+                                    <div wire:key="http-basic-auth-bcrypt-cost" class="min-w-0">
+                                        <x-forms.listbox id="httpBasicAuthBcryptCost" label="Cost factor" onChange="instantSave"
+                                            helper="Each step doubles the work to check or crack the password. Traefik checks the password on every request, so a higher cost makes every request slower."
+                                            :options="collect(range(4, 14))->map(fn (int $cost) => ['value' => $cost, 'label' => (string) $cost])->all()" x-bind:disabled="!canUpdate" />
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endif
                     @endif

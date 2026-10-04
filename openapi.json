@@ -979,6 +979,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -1569,6 +1599,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -2161,6 +2221,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -2647,6 +2737,36 @@
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
                                     },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -3112,6 +3232,36 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "default": "bcrypt",
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "default": 10,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "default": 65536,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "default": 4,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -3701,6 +3851,32 @@
                                     "use_build_secrets": {
                                         "type": "boolean",
                                         "description": "Use Docker Build Secrets for build-time environment variables."
+                                    },
+                                    "http_basic_auth_hash_algorithm": {
+                                        "type": "string",
+                                        "enum": [
+                                            "bcrypt",
+                                            "argon2id"
+                                        ],
+                                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                                    },
+                                    "http_basic_auth_bcrypt_cost": {
+                                        "type": "integer",
+                                        "minimum": 4,
+                                        "maximum": 14,
+                                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_memory_cost": {
+                                        "type": "integer",
+                                        "minimum": 8192,
+                                        "maximum": 262144,
+                                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                                    },
+                                    "http_basic_auth_argon2id_time_cost": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 12,
+                                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
                                     "is_git_submodules_enabled": {
                                         "type": "boolean",
@@ -23503,6 +23679,32 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Password for HTTP Basic Authentication"
+                    },
+                    "http_basic_auth_hash_algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "bcrypt",
+                            "argon2id"
+                        ],
+                        "description": "Hash algorithm for the HTTP Basic Authentication password. Argon2id needs the Caddy proxy, version 2.11 or newer."
+                    },
+                    "http_basic_auth_bcrypt_cost": {
+                        "type": "integer",
+                        "minimum": 4,
+                        "maximum": 14,
+                        "description": "Bcrypt cost for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_memory_cost": {
+                        "type": "integer",
+                        "minimum": 8192,
+                        "maximum": 262144,
+                        "description": "Argon2id memory cost in KiB for the HTTP Basic Authentication password."
+                    },
+                    "http_basic_auth_argon2id_time_cost": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12,
+                        "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                     },
                     "settings": {
                         "$ref": "#\/components\/schemas\/ApplicationSetting"
