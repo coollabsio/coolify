@@ -94,6 +94,9 @@ class Previews extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            if (! $this->application->isGithubAppSource()) {
+                throw new \Exception('Loading pull requests is only supported for GitHub App sources.');
+            }
             ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
