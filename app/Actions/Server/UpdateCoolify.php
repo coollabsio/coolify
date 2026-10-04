@@ -2,7 +2,10 @@
 
 namespace App\Actions\Server;
 
+use App\Jobs\DatabaseBackupJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
@@ -20,12 +23,13 @@ class UpdateCoolify
 
     public function handle($manual_update = false)
     {
+        $settings = instanceSettings();
         if (isDev()) {
+            $this->backupDatabase($settings);
             Sleep::for(10)->seconds();
 
             return;
         }
-        $settings = instanceSettings();
         $this->server = Server::find(0);
         if (! $this->server) {
             return;
@@ -109,9 +113,26 @@ class UpdateCoolify
             );
         }
 
+        $this->backupDatabase($settings);
+
         $this->update();
         $settings->new_version_available = false;
         $settings->save();
+    }
+
+    private function backupDatabase(InstanceSettings $settings): void
+    {
+        $backup = StandalonePostgresql::whereName('coolify-db')->first()?->scheduledBackups()->first();
+        if (! $settings->is_backup_before_update_enabled || ! $backup) {
+            return;
+        }
+
+        // Run the job directly: a dispatched job is skipped silently while a scheduled run of this backup holds its overlap lock.
+        $job = new DatabaseBackupJob($backup);
+        $job->handle();
+        if ($job->backup_log?->status !== 'success') {
+            throw new \Exception('The database backup failed, so the update was not started.');
+        }
     }
 
     private function update()

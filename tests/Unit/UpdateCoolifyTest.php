@@ -3,7 +3,11 @@
 use App\Actions\Server\UpdateCoolify;
 use App\Livewire\Settings\Updates;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\RemoteProcessCommand;
@@ -11,9 +15,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
+use Illuminate\Support\Sleep;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
@@ -38,6 +45,28 @@ function updateCoolifyTestCreateRootServerAndSettings(array $settings = []): voi
         'update_check_frequency' => '0 * * * *',
     ], $settings));
     Once::flush();
+}
+
+function updateCoolifyTestCreateInstanceBackup(): ScheduledDatabaseBackup
+{
+    Storage::fake('ssh-keys');
+    Notification::fake();
+    Server::query()->whereKey(0)->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => 0])->id]);
+    Server::flushIdentityMap();
+    StandalonePostgresql::forceCreate([
+        'id' => 0,
+        'name' => 'coolify-db',
+        'postgres_password' => 'password',
+        'destination_type' => StandaloneDocker::class,
+        'destination_id' => 0,
+    ]);
+
+    return ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'database_id' => 0,
+        'database_type' => StandalonePostgresql::class,
+        'team_id' => 0,
+    ]);
 }
 
 afterEach(function () {
@@ -315,4 +344,48 @@ it('prevents downgrade even with manual update', function () {
         expect($e->getMessage())->toContain('4.0.10');
         expect($e->getMessage())->toContain('4.0.0');
     }
+});
+
+it('runs the instance backup before the update when it is enabled', function (string $env, bool $manualUpdate, bool $isBackupBeforeUpdateEnabled) {
+    Sleep::fake();
+    Queue::fake();
+    config([
+        'app.env' => $env,
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+
+    updateCoolifyTestCreateRootServerAndSettings(['is_backup_before_update_enabled' => $isBackupBeforeUpdateEnabled]);
+    updateCoolifyTestCreateInstanceBackup();
+    Process::fake(['*du -b*' => '128', '*' => '']);
+
+    (new UpdateCoolify)->handle(manual_update: $manualUpdate);
+
+    $isBackupBeforeUpdateEnabled
+        ? Process::assertRan(fn ($process) => str_contains($process->command, 'pg_dump'))
+        : Process::assertNotRan(fn ($process) => str_contains($process->command, 'pg_dump'));
+})->with([
+    'manual update' => ['testing', true, true],
+    'automatic update' => ['testing', false, true],
+    'development' => ['local', true, true],
+    'disabled' => ['testing', true, false],
+]);
+
+it('does not start the update when the instance backup fails', function () {
+    Queue::fake();
+    config([
+        'app.env' => 'testing',
+        'constants.coolify.version' => '4.0.9',
+        'constants.ssh.mux_enabled' => false,
+    ]);
+    Http::fake(['*' => Http::response(['coolify' => ['v4' => ['version' => '4.0.10']]], 200)]);
+
+    updateCoolifyTestCreateRootServerAndSettings();
+    updateCoolifyTestCreateInstanceBackup();
+    Process::fake(['*pg_dump*' => Process::result(exitCode: 1), '*' => '']);
+
+    expect(fn () => (new UpdateCoolify)->handle(manual_update: true))
+        ->toThrow(Exception::class, 'The database backup failed, so the update was not started.')
+        ->and(Activity::count())->toBe(0);
 });
