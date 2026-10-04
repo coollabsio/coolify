@@ -3349,10 +3349,15 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
-        $requestHasHttpBasicAuth = $request->has('is_http_basic_auth_enabled')
-            || $request->has('http_basic_auth_username')
-            || $request->has('http_basic_auth_password')
-            || $request->hasAny(['http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost']);
+        $requestHasHttpBasicAuth = $request->hasAny([
+            'is_http_basic_auth_enabled',
+            'http_basic_auth_username',
+            'http_basic_auth_password',
+            'http_basic_auth_hash_algorithm',
+            'http_basic_auth_bcrypt_cost',
+            'http_basic_auth_argon2id_memory_cost',
+            'http_basic_auth_argon2id_time_cost',
+        ]);
 
         if ($request->has('is_http_basic_auth_enabled') && $request->is_http_basic_auth_enabled === true) {
             if (blank($application->http_basic_auth_username) || blank($application->http_basic_auth_password)) {
