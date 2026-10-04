@@ -255,10 +255,48 @@ command for the same attempt.
 | Action | Effect |
 | --- | --- |
 | Renew certificate | Issues and activates a new Flux leaf certificate under the current CA. It restarts Flux, validates the served certificate, and restores the prior files after a failed check. |
-| Repair trust | Reinstalls the current Coolify CA bundle on one server and restarts Sentinel. It does not create a new CA or leaf certificate. |
+| Repair trust | Reinstalls the current Coolify CA bundle on one server and restarts Sentinel. During a CA rotation the current bundle holds both CAs. It does not create a new CA or leaf certificate. |
+| Rotate CA | Replaces the installation CA in stages without downtime. Instance admins run it from **Settings → Node trust** or with `php artisan flux:rotate-ca`. |
 
-CA rotation is not implemented. It needs a staged dual-CA bundle, per-server
-acknowledgements, an overlap period, and a controlled retirement step.
+### CA rotation
+
+Coolify stores each rotation in `flux_ca_rotations` and each Node's
+acknowledged trust bundle version in `nodes.flux_trust_bundle_version`. Every
+step re-reads that state, so a failed or interrupted step can be retried.
+
+1. **Start** creates a pending CA and publishes trust bundle N+1 with the old
+   and new CA (`distributing`).
+2. Coolify sends the bundle to each connected Node over the authenticated Flux
+   channel as `trust.bundle.update.v1`. Sentinel validates it (PEM CA
+   certificates only, 64 KiB and 8 certificates at most, not expired, version
+   strictly newer or the identical bundle), writes the bundle and then its
+   version file atomically next to the current files, keeps the replaced pair
+   as `.previous`, and acknowledges the installed version. Trust anchors never
+   travel through the assignment polling channel. Offline Nodes receive the
+   bundle when they reconnect (the Flux `connected` event reports their
+   installed version) and from a five-minute scheduled retry.
+3. **Switch** requires every usable Node to acknowledge N+1. It issues a Flux
+   leaf from the new CA through the renewal path (restart, served-certificate
+   check, file rollback), then makes the new CA active (`switched`). Sentinel
+   reads the bundle from disk on every connection, so it reconnects without a
+   restart.
+4. **Retire** publishes bundle N+2 with the new CA only (`retiring`). After
+   every usable Node acknowledges it, the old CA is marked `retired` and its
+   private key is erased (`completed`). Leaf renewal always uses the active CA.
+
+Before the switch, **cancel** discards the new CA, erases its key, and
+publishes N+2 with the old CA only (`cancelling` → `cancelled`).
+
+The switch and the final retire or cancel step can be forced when some Nodes
+have not acknowledged the bundle. Those Nodes need **Repair trust** over SSH.
+Sentinels without the `trust.bundle.update.v1` capability also need Repair
+trust (or a Sentinel upgrade, which installs the current bundle).
+
+Sentinel reports its installed bundle version in the assignment request and
+in the Flux hello. Coolify returns that version in the assignment while the
+bundle still trusts the CA of the served Flux leaf, so the Node can connect and
+receive the next bundle. Otherwise Coolify returns the current version, and
+Sentinel refuses to connect until trust is repaired.
 
 ## Deployment states
 
@@ -340,7 +378,6 @@ cross-instance command routing are not implemented yet.
 
 ### Not implemented
 
-- staged CA rotation;
 - production rollout and upgrade policy for host-native Sentinel;
 - multi-Flux routing and horizontal scaling;
 - complete application deployment orchestration, volumes, secrets, networks,

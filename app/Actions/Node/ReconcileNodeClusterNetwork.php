@@ -9,10 +9,11 @@ use App\Models\NodeFirewallRule;
 use App\Models\NodeIngressRule;
 use App\Models\NodeOperation;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -22,33 +23,98 @@ class ReconcileNodeClusterNetwork
 {
     use AsAction;
 
-    private const CORROSION_VERSION = 'v1.0.0';
+    public const CORROSION_VERSION = 'v1.0.0';
 
-    /** @return list<NodeOperation> */
-    public function handle(NodeCluster $cluster, User $user): array
+    public const REQUIRED_CAPABILITIES = [
+        'network.wireguard.key.ensure.v1',
+        'network.wireguard.reconcile.v1',
+        'network.firewall.reconcile.v1',
+        'discovery.corrosion.inspect.v1',
+        'discovery.corrosion.reconcile.v1',
+    ];
+
+    private const CORROSION_INSPECTIONS = 20;
+
+    private const MAX_BACKOFF_MINUTES = 30;
+
+    /**
+     * Applies the desired network revision Node by Node. Every reachable Node converges on its
+     * own: a failing Node becomes `error` and an offline Node stays `pending` without blocking
+     * the others. Offline Nodes with a key stay WireGuard and Corrosion peers.
+     *
+     * @param  list<int>|null  $nodeIds  Limit the run to these member Nodes. Null runs every member.
+     * @param  bool  $onlyDueNodes  Skip Nodes that converged or still wait for their retry backoff.
+     * @return list<NodeOperation>
+     *
+     * @throws LockTimeoutException when another network run of this cluster holds the lock.
+     */
+    public function handle(NodeCluster $cluster, User $user, ?array $nodeIds = null, bool $onlyDueNodes = false): array
     {
         Gate::forUser($user)->authorize('update', $cluster);
-        $requiredCapabilities = [
-            'network.wireguard.key.ensure.v1',
-            'network.wireguard.reconcile.v1',
-            'network.firewall.reconcile.v1',
-            'discovery.corrosion.inspect.v1',
-            'discovery.corrosion.reconcile.v1',
-        ];
-        foreach ($cluster->nodes as $node) {
-            foreach ($requiredCapabilities as $capability) {
-                $node->ensureCapability($capability);
-            }
+        $lock = $cluster->networkLock();
+        if (! $lock->get()) {
+            throw new LockTimeoutException('Another network reconciliation of this cluster is running.');
         }
-        $attempt = (string) Str::uuid();
-        $cluster->update(['network_status' => 'reconciling']);
 
         try {
-            $nodes = $this->lockedNodes($cluster);
-            if ($nodes->isEmpty()) {
+            return $this->reconcile($cluster->refresh(), $user, $nodeIds, $onlyDueNodes);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Whether a Corrosion inspection shows the Node joined every reachable peer. Sentinel reports
+     * `alive_member_count`; older Sentinels only report `member_state`, which needs every
+     * configured peer, including offline ones.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    public static function corrosionConverged(array $result, int $expectedAlivePeers): bool
+    {
+        if (data_get($result, 'version') !== self::CORROSION_VERSION) {
+            return false;
+        }
+        $aliveMembers = data_get($result, 'alive_member_count');
+        if (is_numeric($aliveMembers)) {
+            return in_array(data_get($result, 'member_state'), ['joining', 'converged'], true)
+                && (int) $aliveMembers >= $expectedAlivePeers;
+        }
+
+        return data_get($result, 'member_state') === 'converged';
+    }
+
+    /** Whether an automatic run should apply the network to this member Node now. */
+    public static function isDue(NodeCluster $cluster, Node $node): bool
+    {
+        if (is_array($node->network_pending_leave)) {
+            return true;
+        }
+
+        return match ($cluster->nodeNetworkState($node)) {
+            'converged' => false,
+            'error' => $node->network_next_attempt_at === null || ! $node->network_next_attempt_at->isFuture(),
+            default => true,
+        };
+    }
+
+    /**
+     * @param  list<int>|null  $nodeIds
+     * @return list<NodeOperation>
+     */
+    private function reconcile(NodeCluster $cluster, User $user, ?array $nodeIds, bool $onlyDueNodes): array
+    {
+        $fullRun = $nodeIds === null;
+
+        try {
+            $members = $this->members($cluster);
+            if ($members->isEmpty()) {
                 throw new RuntimeException('Assign at least one Node before network activation.');
             }
-            foreach ($nodes as $node) {
+            if ($fullRun) {
+                $cluster->update(['network_status' => 'reconciling']);
+            }
+            foreach ($members as $node) {
                 if (blank($node->workload_cidr)) {
                     AssignNodeToCluster::run($cluster, $node);
                     $node->refresh();
@@ -57,90 +123,198 @@ class ReconcileNodeClusterNetwork
                     EnsureNodeWorkloadAddress::run($node, $workload);
                 }
             }
-            $nodes = $this->lockedNodes($cluster);
+            $cluster->refresh();
+            $members = $this->members($cluster);
 
+            $targets = $fullRun ? $members : $members->whereIn('id', $nodeIds)->values();
+            if ($onlyDueNodes) {
+                $targets = $targets->filter(fn (Node $node): bool => self::isDue($cluster, $node))->values();
+            }
+
+            $attempt = (string) Str::uuid();
             $operations = [];
-            foreach ($nodes as $node) {
-                $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.key.ensure.v1', [
-                    'interface' => $cluster->wireguard_interface,
-                ]);
-            }
+            /** @var array<int, string> $failures */
+            $failures = [];
+            /** @var array<int, Node> $ready */
+            $ready = [];
+            $peerSetChanged = false;
 
-            $nodes = $this->lockedNodes($cluster);
-            if ($nodes->contains(fn (Node $node): bool => blank($node->wireguard_public_key))) {
-                throw new RuntimeException('Every Node must report a WireGuard public key.');
-            }
-            $fluxProbeHost = parse_url((string) config('constants.flux.public_url'), PHP_URL_HOST) ?: '';
-            foreach ($nodes as $node) {
-                $peers = $nodes->where('id', '!=', $node->id)->map(fn (Node $peer): array => [
-                    'public_key' => $peer->wireguard_public_key,
-                    'endpoint' => $peer->wireguard_endpoint ?: $peer->ip.':'.$cluster->wireguard_port,
-                    'allowed_ips' => [$peer->wireguard_ip.'/32', $peer->workload_cidr],
-                    'persistent_keepalive_seconds' => 25,
-                ])->values()->all();
-                $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.reconcile.v1', [
-                    'interface' => $cluster->wireguard_interface,
-                    'address' => $node->wireguard_ip.'/32',
-                    'listen_port' => $cluster->wireguard_port,
-                    'revision' => $cluster->desired_revision,
-                    'peers' => $peers,
-                    'flux_probe_host' => $fluxProbeHost,
-                ]);
-            }
-
-            foreach ($nodes as $node) {
-                $operations[] = $this->runOperation($node, $user, $attempt, 'network.firewall.reconcile.v1', [
-                    'revision' => $cluster->desired_revision,
-                    'wireguard_port' => $cluster->wireguard_port,
-                    'wireguard_interface' => $cluster->wireguard_interface,
-                    'cluster_cidr' => $cluster->cidr,
-                    'local_node_ip' => $node->wireguard_ip,
-                    'flux_probe_host' => $fluxProbeHost,
-                    'workload_cidrs' => $nodes->pluck('workload_cidr')->filter()->values()->all(),
-                    'rules' => $this->firewallRules($cluster),
-                    'ingress_rules' => $this->ingressRules($cluster),
-                ]);
-            }
-
-            foreach ($nodes as $node) {
-                $operations[] = $this->runOperation($node, $user, $attempt, 'discovery.corrosion.reconcile.v1', [
-                    'version' => self::CORROSION_VERSION,
-                    'cluster_id' => $cluster->uuid,
-                    'bind_address' => $node->wireguard_ip,
-                    'node_dns_name' => $node->discoveryDnsName(),
-                    'peers' => $nodes->where('id', '!=', $node->id)->pluck('wireguard_ip')->map(fn (string $ip): string => $ip.':8787')->values()->all(),
-                ]);
-            }
-
-            foreach ($nodes as $node) {
-                $converged = false;
-                for ($inspection = 1; $inspection <= 20; $inspection++) {
-                    $operation = $this->runOperation(
-                        $node,
-                        $user,
-                        "{$attempt}:corrosion-inspection-{$inspection}",
-                        'discovery.corrosion.inspect.v1',
-                        [],
-                    );
-                    $operations[] = $operation;
-                    if (data_get($operation->result, 'member_state') === 'converged') {
-                        $converged = true;
-                        break;
+            $prepare = function (Collection $nodes) use (&$operations, &$failures, &$ready, &$peerSetChanged, $cluster, $user, $attempt): void {
+                foreach ($nodes as $node) {
+                    if (isset($ready[$node->id]) || isset($failures[$node->id])) {
+                        continue;
                     }
-                    usleep(500_000);
+                    if (! $node->canReceiveNetworkCommands()) {
+                        $this->markPending($cluster, $node);
+
+                        continue;
+                    }
+                    try {
+                        foreach (self::REQUIRED_CAPABILITIES as $capability) {
+                            $node->ensureCapability($capability);
+                        }
+                        if (! LeaveNodeClusterNetwork::completePending($node)) {
+                            throw new RuntimeException('The Node is still leaving its previous cluster network.');
+                        }
+                        if (blank($node->wireguard_public_key)) {
+                            $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.key.ensure.v1', [
+                                'interface' => $cluster->wireguard_interface,
+                            ]);
+                            $node->refresh();
+                            if (blank($node->wireguard_public_key)) {
+                                throw new RuntimeException('The Node did not report a WireGuard public key.');
+                            }
+                            $peerSetChanged = true;
+                        }
+                        $ready[$node->id] = $node;
+                    } catch (Throwable $exception) {
+                        $failures[$node->id] = $exception->getMessage();
+                    }
                 }
-                if (! $converged) {
-                    throw new RuntimeException("Corrosion did not converge on Node {$node->name}.");
+            };
+            $prepare($targets);
+
+            if ($peerSetChanged) {
+                // A new peer joined the mesh: every other Node needs a new revision with it.
+                $cluster->increment('desired_revision');
+                $cluster->refresh();
+                $prepare($this->members($cluster));
+            }
+
+            $members = $this->members($cluster);
+            $peers = $members->filter(fn (Node $node): bool => filled($node->wireguard_public_key) && filled($node->wireguard_ip) && filled($node->workload_cidr));
+            $fluxProbeHost = parse_url((string) config('constants.flux.public_url'), PHP_URL_HOST) ?: '';
+            $firewallRules = $this->firewallRules($cluster);
+            $ingressRules = $this->ingressRules($cluster);
+            $workloadCidrs = $members->pluck('workload_cidr')->filter()->values()->all();
+
+            /** @var array<int, Node> $applied */
+            $applied = [];
+            foreach ($ready as $nodeId => $node) {
+                try {
+                    $nodePeers = $peers->where('id', '!=', $node->id)->values();
+                    $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.reconcile.v1', [
+                        'interface' => $cluster->wireguard_interface,
+                        'address' => $node->wireguard_ip.'/32',
+                        'listen_port' => $cluster->wireguard_port,
+                        'revision' => $cluster->desired_revision,
+                        'peers' => $nodePeers->map(fn (Node $peer): array => [
+                            'public_key' => $peer->wireguard_public_key,
+                            'endpoint' => $peer->wireguard_endpoint ?: $peer->ip.':'.$cluster->wireguard_port,
+                            'allowed_ips' => [$peer->wireguard_ip.'/32', $peer->workload_cidr],
+                            'persistent_keepalive_seconds' => 25,
+                        ])->all(),
+                        'flux_probe_host' => $fluxProbeHost,
+                    ]);
+                    $operations[] = $this->runOperation($node, $user, $attempt, 'network.firewall.reconcile.v1', [
+                        'revision' => $cluster->desired_revision,
+                        'wireguard_port' => $cluster->wireguard_port,
+                        'wireguard_interface' => $cluster->wireguard_interface,
+                        'cluster_cidr' => $cluster->cidr,
+                        'local_node_ip' => $node->wireguard_ip,
+                        'flux_probe_host' => $fluxProbeHost,
+                        'workload_cidrs' => $workloadCidrs,
+                        'rules' => $firewallRules,
+                        'ingress_rules' => $ingressRules,
+                    ]);
+                    $operations[] = $this->runOperation($node, $user, $attempt, 'discovery.corrosion.reconcile.v1', [
+                        'version' => self::CORROSION_VERSION,
+                        'cluster_id' => $cluster->uuid,
+                        'bind_address' => $node->wireguard_ip,
+                        'node_dns_name' => $node->discoveryDnsName(),
+                        'peers' => $nodePeers->map(fn (Node $peer): string => $peer->wireguard_ip.':8787')->all(),
+                    ]);
+                    $applied[$nodeId] = $node;
+                } catch (Throwable $exception) {
+                    $failures[$nodeId] = $exception->getMessage();
                 }
             }
 
-            $cluster->update(['network_status' => 'active', 'last_reconciled_at' => now()]);
+            // Corrosion only has to see the peers that can answer: Nodes applied in this run and
+            // reachable Nodes that already converged.
+            $healthy = collect(array_keys($applied))->merge(
+                $members->filter(fn (Node $node): bool => ! isset($ready[$node->id]) && ! isset($failures[$node->id])
+                    && $cluster->nodeNetworkState($node) === 'converged'
+                    && $node->canReceiveNetworkCommands())->pluck('id'),
+            )->unique();
+            $converging = $applied;
+            for ($inspection = 1; $inspection <= self::CORROSION_INSPECTIONS && $converging !== []; $inspection++) {
+                foreach ($converging as $nodeId => $node) {
+                    try {
+                        $operation = $this->runOperation(
+                            $node,
+                            $user,
+                            "{$attempt}:corrosion-inspection-{$inspection}",
+                            'discovery.corrosion.inspect.v1',
+                            [],
+                        );
+                        $operations[] = $operation;
+                        $expectedPeers = $healthy->reject(fn (int $id): bool => $id === $nodeId)->count();
+                        if (self::corrosionConverged($operation->result ?? [], $expectedPeers)) {
+                            $node->refresh()->update(['corrosion_status' => 'converged']);
+                            unset($converging[$nodeId]);
+                        }
+                    } catch (Throwable $exception) {
+                        $failures[$nodeId] = $exception->getMessage();
+                        unset($converging[$nodeId], $applied[$nodeId]);
+                        $healthy = $healthy->reject(fn (int $id): bool => $id === $nodeId);
+                    }
+                }
+                if ($converging !== [] && $inspection < self::CORROSION_INSPECTIONS) {
+                    Sleep::usleep(500_000);
+                }
+            }
+            foreach ($converging as $nodeId => $node) {
+                $failures[$nodeId] = "Corrosion did not converge on Node {$node->name}.";
+                unset($applied[$nodeId]);
+            }
+
+            foreach ($applied as $node) {
+                $node->refresh()->update([
+                    'network_status' => 'converged',
+                    'network_error' => null,
+                    'network_attempts' => 0,
+                    'network_next_attempt_at' => null,
+                ]);
+            }
+            foreach ($failures as $nodeId => $message) {
+                $this->markError(Node::query()->findOrFail($nodeId), $message);
+            }
+
+            $cluster->refresh();
+            $status = $cluster->deriveNetworkStatus();
+            $cluster->update(array_filter([
+                // A Node-scoped run must not hide a queued full reconciliation.
+                'network_status' => $fullRun || $cluster->network_status !== 'reconciling' ? $status : null,
+                'last_reconciled_at' => $applied !== [] ? now() : null,
+            ], fn ($value) => $value !== null));
 
             return $operations;
         } catch (Throwable $exception) {
-            $cluster->update(['network_status' => 'error']);
+            if ($fullRun) {
+                $cluster->update(['network_status' => 'error']);
+            }
             throw $exception;
         }
+    }
+
+    private function markPending(NodeCluster $cluster, Node $node): void
+    {
+        if ($cluster->nodeNetworkState($node) === 'converged') {
+            return;
+        }
+        $node->refresh()->update(['network_status' => 'pending', 'network_error' => null]);
+    }
+
+    private function markError(Node $node, string $message): void
+    {
+        $attempts = $node->network_attempts + 1;
+        $node->update([
+            'network_status' => 'error',
+            'network_error' => mb_substr($message, 0, 2000),
+            'network_attempts' => $attempts,
+            'network_next_attempt_at' => now()->addMinutes(min(2 ** min($attempts - 1, 10), self::MAX_BACKOFF_MINUTES)),
+        ]);
     }
 
     /** @return list<array{source_ip: string, destination_ip: string, protocol: string, port: int}> */
@@ -188,14 +362,13 @@ class ReconcileNodeClusterNetwork
     }
 
     /** @return Collection<int, Node> */
-    private function lockedNodes(NodeCluster $cluster): Collection
+    private function members(NodeCluster $cluster): Collection
     {
-        return DB::transaction(fn () => Node::query()
+        return Node::query()
             ->where('team_id', $cluster->team_id)
             ->where('node_cluster_id', $cluster->id)
-            ->lockForUpdate()
             ->orderBy('id')
-            ->get());
+            ->get();
     }
 
     /** @param array<string, mixed> $payload */

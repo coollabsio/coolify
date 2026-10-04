@@ -23,11 +23,19 @@ class EnsureFluxCertificateAuthority
                 return $authority;
             }
 
-            return $this->createAuthority();
+            return $this->createAuthority(FluxCertificateAuthority::STATE_ACTIVE);
         }, 3);
     }
 
-    private function createAuthority(): FluxCertificateAuthority
+    /**
+     * Create the next CA for a staged rotation. It is trusted by Nodes before it signs a leaf.
+     */
+    public function createPending(): FluxCertificateAuthority
+    {
+        return $this->createAuthority(FluxCertificateAuthority::STATE_PENDING);
+    }
+
+    private function createAuthority(string $state): FluxCertificateAuthority
     {
         $config = tmpfile();
         if ($config === false) {
@@ -87,7 +95,7 @@ CONFIG;
                 'serial_number' => strtolower($parsed['serialNumberHex']),
                 'valid_from' => CarbonImmutable::createFromTimestampUTC($parsed['validFrom_time_t']),
                 'valid_until' => CarbonImmutable::createFromTimestampUTC($parsed['validTo_time_t']),
-                'state' => 'active',
+                'state' => $state,
             ]);
         } finally {
             fclose($config);

@@ -2,7 +2,8 @@
 
 namespace App\Actions\Node;
 
-use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
+use App\Actions\Sentinel\DistributeFluxTrustBundle;
+use App\Actions\Sentinel\ResolveFluxTrustBundle;
 use App\Models\Node;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -11,20 +12,46 @@ class RepairFluxTrust
 {
     use AsAction;
 
+    private const CERTIFICATE_PATTERN = '/-----BEGIN CERTIFICATE-----\R[A-Za-z0-9+\/=\r\n]+?-----END CERTIFICATE-----/';
+
     public function handle(Node $node): ?string
     {
         if (! isDev() || ! config('constants.sentinel.host_enabled', false)) {
             return null;
         }
 
-        $authority = EnsureFluxCertificateAuthority::run();
+        // The current bundle includes both CAs while a CA rotation overlaps them.
+        $bundle = ResolveFluxTrustBundle::run();
 
-        return instant_remote_process(
-            [self::remoteCommand(self::repairScript($authority->certificate_pem, $authority->version))],
+        $output = instant_remote_process(
+            [self::remoteCommand(self::repairScript($bundle['certificate_pem'], $bundle['version']))],
             $node,
             timeout: 600,
             disableMultiplexing: true,
         );
+        DistributeFluxTrustBundle::recordInstalledVersion($node, $bundle['version']);
+
+        return $output;
+    }
+
+    /**
+     * A trust bundle holds one or more PEM CA certificates and nothing else.
+     */
+    public static function isValidBundle(string $bundle): bool
+    {
+        if (strlen($bundle) > DistributeFluxTrustBundle::MAX_BUNDLE_BYTES
+            || ! preg_match_all(self::CERTIFICATE_PATTERN, $bundle, $matches)
+            || trim((string) preg_replace(self::CERTIFICATE_PATTERN, '', $bundle)) !== '') {
+            return false;
+        }
+        foreach ($matches[0] as $certificate) {
+            $parsed = openssl_x509_parse($certificate);
+            if ($parsed === false || ! str_contains((string) data_get($parsed, 'extensions.basicConstraints'), 'CA:TRUE')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static function repairScript(string $certificate, int $trustBundleVersion): string
@@ -120,7 +147,7 @@ SCRIPT;
 
     public static function trustFileStagingScript(string $certificate, int $trustBundleVersion): string
     {
-        if (openssl_x509_parse($certificate) === false) {
+        if (! self::isValidBundle($certificate)) {
             throw new InvalidArgumentException('The Flux trust bundle is invalid.');
         }
         if ($trustBundleVersion < 1) {

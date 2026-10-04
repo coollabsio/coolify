@@ -311,7 +311,10 @@ class Show extends Component
 
     public function renewFluxCertificate(): void
     {
-        $this->runAction(fn () => RenewFluxCertificate::run(null, true), 'Flux TLS certificate renewed.');
+        $this->runAction(function (): void {
+            $this->authorize('update', instanceSettings());
+            RenewFluxCertificate::run(null, true);
+        }, 'Flux TLS certificate renewed.');
     }
 
     public function refreshFluxConnection(): void

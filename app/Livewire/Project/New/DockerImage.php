@@ -56,14 +56,16 @@ class DockerImage extends Component
             ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
                 ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork()
                 ->orderBy('name')])
             ->withCount(['nodes as available_nodes_count' => fn ($query) => $query
                 ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker'])])
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork()])
             ->orderBy('name')
             ->get()
             ->flatMap(function (NodeCluster $cluster): array {
-                $ready = $cluster->network_status === 'active' && $cluster->available_nodes_count > 0;
+                $ready = in_array($cluster->network_status, ['active', 'degraded'], true) && $cluster->available_nodes_count > 0;
 
                 $targets = [[
                     'value' => 'cluster:'.$cluster->uuid,

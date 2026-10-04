@@ -14,7 +14,6 @@ use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -31,20 +30,30 @@ beforeEach(function () {
     $this->team = $this->user->teams()->firstOrFail();
 });
 
-it('rejects network reconciliation before changing state when Sentinel lacks a capability', function () {
+function connectNetworkTestNode(Node $node, ?array $capabilities = null): void
+{
+    $node->update(['is_usable' => true]);
+    Cache::put($node->cacheKey(), array_filter([
+        'status' => 'connected',
+        'last_heartbeat_at' => now()->toIso8601String(),
+        'capabilities' => $capabilities,
+    ], fn ($value) => $value !== null));
+}
+
+it('marks only the Node without a required Sentinel capability as failed', function () {
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Mesh');
     $node = Node::factory()->create(['team_id' => $this->team->id]);
     AssignNodeToCluster::run($cluster, $node);
-    Cache::put($node->cacheKey(), [
-        'status' => 'connected',
-        'capabilities' => ['network.wireguard.key.ensure.v1'],
-    ]);
+    connectNetworkTestNode($node, ['network.wireguard.key.ensure.v1']);
+    Http::fake();
 
-    expect(fn () => ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user))
-        ->toThrow(RuntimeException::class, 'Upgrade Sentinel');
+    ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
 
-    expect($cluster->refresh()->network_status)->toBe('pending')
+    expect($node->refresh()->network_status)->toBe('error')
+        ->and($node->network_error)->toContain('Upgrade Sentinel')
+        ->and($cluster->refresh()->network_status)->toBe('error')
         ->and(NodeOperation::query()->count())->toBe(0);
+    Http::assertNothingSent();
 });
 
 it('reconciles a complete full mesh through durable typed operations', function () {
@@ -53,6 +62,8 @@ it('reconciles a complete full mesh through durable typed operations', function 
     $second = Node::factory()->create(['team_id' => $this->team->id, 'name' => 'Worker Two', 'private_key_id' => $first->private_key_id, 'ip' => '192.0.2.11']);
     AssignNodeToCluster::run($cluster, $first);
     AssignNodeToCluster::run($cluster->refresh(), $second);
+    connectNetworkTestNode($first);
+    connectNetworkTestNode($second);
     $source = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
     $destination = NodeWorkload::factory()->create(['team_id' => $this->team->id]);
     $sourceIp = EnsureNodeWorkloadAddress::run($first, $source);
@@ -155,14 +166,19 @@ it('reconciles a complete full mesh through durable typed operations', function 
         ]]));
 });
 
-it('marks the cluster unhealthy when a staged host change fails', function () {
+it('marks the cluster unhealthy when a staged host change fails on its only Node', function () {
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Broken');
     $node = Node::factory()->create(['team_id' => $this->team->id]);
     AssignNodeToCluster::run($cluster, $node);
+    connectNetworkTestNode($node);
     Http::fake(fn () => Http::response(['message' => 'failed'], 502));
 
-    expect(fn () => ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user))->toThrow(RequestException::class);
+    ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
+
     expect($cluster->refresh()->network_status)->toBe('error')
+        ->and($node->refresh()->network_status)->toBe('error')
+        ->and($node->network_error)->toContain('502')
+        ->and($node->network_attempts)->toBe(1)
         ->and(NodeOperation::query()->where('status', NodeOperationStatus::FAILED)->exists())->toBeTrue();
 });
 
@@ -170,41 +186,48 @@ it('rejects a network result when Sentinel did not cancel rollback', function ()
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Unsafe');
     $node = Node::factory()->create(['team_id' => $this->team->id]);
     AssignNodeToCluster::run($cluster, $node);
-    Http::fake(function (Request $request) use ($cluster) {
+    connectNetworkTestNode($node);
+    Http::fake(function (Request $request) {
         $data = $request->data();
         $base = ['command_id' => $data['command_id'], 'observed_at_unix_ms' => 1_700_000_000_000];
 
         return match (true) {
             str_ends_with($request->url(), 'network.wireguard.key.ensure') => Http::response([...$base, 'public_key' => 'public-key']),
-            str_ends_with($request->url(), 'network.wireguard.reconcile') => Http::response([...$base, 'rollback_cancelled' => false, 'public_key' => 'public-key', 'listen_port' => 51820, 'applied_revision' => $cluster->desired_revision, 'configuration_hash' => 'hash', 'drifted' => false, 'peers' => []]),
+            str_ends_with($request->url(), 'network.wireguard.reconcile') => Http::response([...$base, 'rollback_cancelled' => false, 'public_key' => 'public-key', 'listen_port' => 51820, 'applied_revision' => $data['revision'], 'configuration_hash' => 'hash', 'drifted' => false, 'peers' => []]),
             default => Http::response($base),
         };
     });
 
-    expect(fn () => ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user))
-        ->toThrow(RuntimeException::class, 'unsafe');
-    expect($cluster->refresh()->network_status)->toBe('error');
+    ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
+
+    expect($cluster->refresh()->network_status)->toBe('error')
+        ->and($node->refresh()->network_status)->toBe('error')
+        ->and($node->network_error)->toContain('unsafe');
 });
 
 it('rejects a firewall result that does not confirm ingress enforcement', function () {
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Old firewall agent');
     $node = Node::factory()->create(['team_id' => $this->team->id]);
     AssignNodeToCluster::run($cluster, $node);
-    Http::fake(function (Request $request) use ($cluster) {
+    connectNetworkTestNode($node);
+    Http::fake(function (Request $request) {
         $data = $request->data();
         $base = ['command_id' => $data['command_id'], 'observed_at_unix_ms' => 1_700_000_000_000];
 
         return match (true) {
             str_ends_with($request->url(), 'network.wireguard.key.ensure') => Http::response([...$base, 'public_key' => 'public-key']),
-            str_ends_with($request->url(), 'network.wireguard.reconcile') => Http::response([...$base, 'rollback_cancelled' => true, 'public_key' => 'public-key', 'listen_port' => 51820, 'applied_revision' => $cluster->desired_revision, 'configuration_hash' => 'hash', 'drifted' => false, 'peers' => []]),
-            str_ends_with($request->url(), 'network.firewall.reconcile') => Http::response([...$base, 'rollback_cancelled' => true, 'applied_revision' => $cluster->desired_revision, 'configuration_hash' => 'hash', 'drifted' => false, 'table' => 'coolify_cluster']),
+            str_ends_with($request->url(), 'network.wireguard.reconcile') => Http::response([...$base, 'rollback_cancelled' => true, 'public_key' => 'public-key', 'listen_port' => 51820, 'applied_revision' => $data['revision'], 'configuration_hash' => 'hash', 'drifted' => false, 'peers' => []]),
+            str_ends_with($request->url(), 'network.firewall.reconcile') => Http::response([...$base, 'rollback_cancelled' => true, 'applied_revision' => $data['revision'], 'configuration_hash' => 'hash', 'drifted' => false, 'table' => 'coolify_cluster']),
             default => Http::response([], 404),
         };
     });
 
-    expect(fn () => ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user))
-        ->toThrow(RuntimeException::class, 'unsafe');
-    expect($cluster->refresh()->network_status)->toBe('error');
+    ReconcileNodeClusterNetwork::run($cluster->refresh(), $this->user);
+
+    expect($cluster->refresh()->network_status)->toBe('error')
+        ->and($node->refresh()->network_status)->toBe('error')
+        ->and($node->network_error)->toContain('unsafe')
+        ->and(NodeOperation::query()->where('status', NodeOperationStatus::FAILED)->sole()->command_type)->toBe('network.firewall.reconcile.v1');
 });
 
 it('derives a valid Node discovery dns name', function (string $name, string $uuid, string $expected) {

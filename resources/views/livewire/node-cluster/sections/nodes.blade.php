@@ -60,7 +60,7 @@
             </div>
             @foreach ($nodes as $node)
                 @php
-                    $networkInSync = $cluster->isNodeNetworkInSync($node);
+                    $networkState = $cluster->nodeNetworkState($node);
                 @endphp
                 <div wire:key="cluster-node-{{ $node->uuid }}"
                     class="{{ $nodeGridClasses }} min-h-14 border-b border-neutral-200 py-2.5 text-[12px] last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
@@ -86,14 +86,26 @@
                         <x-status-badge :status="$node->is_usable ? 'Ready' : 'Not ready'"
                             :type="$node->is_usable ? 'success' : 'warning'" />
                     </div>
-                    <div>
-                        <x-status-badge :status="$networkInSync ? 'In sync' : 'Pending'"
-                            :type="$networkInSync ? 'success' : 'warning'" />
+                    <div class="min-w-0">
+                        <x-status-badge :status="match ($networkState) {
+                            'converged' => 'In sync',
+                            'error' => 'Failed',
+                            default => 'Pending',
+                        }" :type="match ($networkState) {
+                            'converged' => 'success',
+                            'error' => 'error',
+                            default => 'warning',
+                        }" />
+                        @if ($networkState !== 'converged' && filled($node->network_error))
+                            <p class="mt-1 truncate text-[11px] text-neutral-500 dark:text-fg-faint" title="{{ $node->network_error }}">
+                                {{ $node->network_error }}
+                            </p>
+                        @endif
                     </div>
                     <div class="flex justify-end">
                         @if ($canUpdateCluster)
                             <x-forms.button wire:click="removeNode('{{ $node->uuid }}')"
-                                wire:confirm="Remove {{ $node->name }} from this cluster? Its private network configuration will be removed."
+                                wire:confirm="Remove {{ $node->name }} from this cluster? Its private network configuration will be removed, or when it is offline, as soon as it reconnects."
                                 wire:loading.attr="disabled" wire:target="removeNode('{{ $node->uuid }}')">
                                 Remove
                             </x-forms.button>

@@ -17,6 +17,21 @@ class FluxCertificateAuthority extends BaseModel
         'state',
     ];
 
+    /** Created for a rotation and trusted by Nodes, but not yet signing Flux leaves. */
+    public const STATE_PENDING = 'pending';
+
+    /** Signs the Flux leaf. */
+    public const STATE_ACTIVE = 'active';
+
+    /** Replaced by a rotated CA and still trusted until retirement. */
+    public const STATE_SUPERSEDED = 'superseded';
+
+    /** Removed from the trust bundle. The row stays for audit; the key is erased. */
+    public const STATE_RETIRED = 'retired';
+
+    /** A cancelled rotation's CA. It never signed a leaf; the key is erased. */
+    public const STATE_DISCARDED = 'discarded';
+
     protected $hidden = ['private_key_pem'];
 
     protected $casts = [

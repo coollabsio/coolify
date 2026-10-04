@@ -2,7 +2,8 @@
 
 namespace App\Actions\Node;
 
-use App\Actions\Sentinel\EnsureFluxCertificateAuthority;
+use App\Actions\Sentinel\DistributeFluxTrustBundle;
+use App\Actions\Sentinel\ResolveFluxTrustBundle;
 use App\Models\Node;
 use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -20,15 +21,19 @@ class InstallSentinel
         $token = $node->ensureValidSentinelToken();
         $endpoint = $node->ensureSentinelUrl();
         $image ??= config('constants.sentinel.host_image');
-        $authority = EnsureFluxCertificateAuthority::run();
-        $script = self::installationScript($token, $endpoint, $image, $authority->certificate_pem, $authority->version);
+        // The current bundle includes both CAs while a CA rotation overlaps them.
+        $bundle = ResolveFluxTrustBundle::run();
+        $script = self::installationScript($token, $endpoint, $image, $bundle['certificate_pem'], $bundle['version']);
 
-        return instant_remote_process(
+        $output = instant_remote_process(
             [self::remoteCommand($script)],
             $node,
             timeout: 600,
             disableMultiplexing: true,
         );
+        DistributeFluxTrustBundle::recordInstalledVersion($node, $bundle['version']);
+
+        return $output;
     }
 
     public static function installationScript(string $token, string $endpoint, string $image, string $certificate, int $trustBundleVersion): string
@@ -225,7 +230,7 @@ UNIT;
         if (! preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9._:\/-]*(@sha256:[a-f0-9]{64})?\z/', $image)) {
             throw new InvalidArgumentException('The Sentinel host image is invalid.');
         }
-        if (openssl_x509_parse($certificate) === false) {
+        if (! RepairFluxTrust::isValidBundle($certificate)) {
             throw new InvalidArgumentException('The Flux trust bundle is invalid.');
         }
         if ($trustBundleVersion < 1) {

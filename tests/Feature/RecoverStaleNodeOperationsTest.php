@@ -146,6 +146,37 @@ it('verifies a stale uncertain lifecycle operation instead of replaying it', fun
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.lifecycle'));
 });
 
+it('confirms an uncertain deployment before the stale limit when the requested revision runs', function () {
+    fakeInventory($this, 'running');
+    $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN, minutesAgo: 2);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::SUCCEEDED)
+        ->and($operation->result['verification']['converged'])->toBeTrue();
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.deploy'));
+});
+
+it('keeps an uncertain deployment open until the stale limit when the revision does not run yet', function () {
+    fakeInventory($this, null);
+    $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN, minutesAgo: 2);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN);
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'workload.deploy'));
+});
+
+it('does not verify an operation that became uncertain less than a minute ago', function () {
+    Http::preventStrayRequests();
+    $operation = staleOperation($this, 'workload.deploy.v1', NodeOperationStatus::UNCERTAIN, minutesAgo: 0);
+
+    RecoverStaleOperations::run();
+
+    expect($operation->refresh()->status)->toBe(NodeOperationStatus::UNCERTAIN);
+    Http::assertNothingSent();
+});
+
 it('closes a stale workload operation when the Node cannot be reached', function () {
     Http::fake(fn () => throw new ConnectionException('connection refused'));
     $operation = staleOperation($this, 'workload.lifecycle.v1', NodeOperationStatus::UNCERTAIN, ['revision_uuid' => $this->revision->uuid, 'action' => NodeWorkloadAction::START->value]);

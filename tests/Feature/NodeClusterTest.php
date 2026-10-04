@@ -183,7 +183,8 @@ it('cleans an applied Node network before detaching it and reconciles survivors'
     $leaving->update(['network_applied_revision' => $cluster->desired_revision]);
     $workload = NodeWorkload::factory()->create(['team_id' => $team->id]);
     $leaving->workloads()->attach($workload, ['container_ip' => '100.64.0.2']);
-    Cache::put($leaving->cacheKey(), ['capabilities' => [
+    $leaving->update(['is_usable' => true]);
+    Cache::put($leaving->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => [
         'network.cluster.leave.v1',
     ]]);
     Http::fake(fn ($request) => Http::response([
@@ -218,7 +219,8 @@ it('keeps membership when remote Node cleanup fails', function () {
     AssignNodeToCluster::run($cluster, $node);
     $cluster->update(['network_status' => 'active']);
     $node->update(['network_applied_revision' => $cluster->desired_revision]);
-    Cache::put($node->cacheKey(), ['capabilities' => ['network.cluster.leave.v1']]);
+    $node->update(['is_usable' => true]);
+    Cache::put($node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => ['network.cluster.leave.v1']]);
     Http::fake(['*' => Http::response('failed', 502)]);
 
     expect(fn () => RemoveNodeFromCluster::run($cluster->fresh(), $node->fresh(), $this->user))->toThrow(RequestException::class)
@@ -721,6 +723,7 @@ it('maps the cluster network status to a typed badge', function (?string $status
 })->with([
     ['active', 'Active', 'success'],
     ['applied', 'Active', 'success'],
+    ['degraded', 'Degraded', 'warning'],
     ['reconciling', 'Syncing', 'warning'],
     ['error', 'Failed', 'error'],
     ['failed', 'Failed', 'error'],

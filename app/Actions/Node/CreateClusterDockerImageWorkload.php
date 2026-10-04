@@ -38,7 +38,7 @@ class CreateClusterDockerImageWorkload
         if (! $requestedBy->isAdminOfTeam($project->team_id)) {
             throw new RuntimeException('The user cannot deploy resources for this project team.');
         }
-        if ($cluster->network_status !== 'active') {
+        if (! in_array($cluster->network_status, ['active', 'degraded'], true)) {
             throw new RuntimeException('The cluster network is not ready.');
         }
 
@@ -46,6 +46,7 @@ class CreateClusterDockerImageWorkload
             $availableNodes = $cluster->nodes()
                 ->where('is_usable', true)
                 ->whereIn('role', [NodeRole::WORKER, NodeRole::CONTROLLER_WORKER])
+                ->onDeployableClusterNetwork()
                 ->with('cluster')
                 ->withCount('workloads')
                 ->orderBy('workloads_count')

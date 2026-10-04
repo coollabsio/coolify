@@ -3,6 +3,7 @@
 namespace App\Actions\Sentinel;
 
 use App\Models\FluxCertificate;
+use App\Models\FluxCertificateAuthority;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -15,8 +16,9 @@ class IssueFluxCertificate
 
     /**
      * @param  list<string>  $identities
+     * @param  FluxCertificateAuthority|null  $authority  The signing CA. Defaults to the active CA; a CA rotation passes its pending CA.
      */
-    public function handle(array $identities): FluxCertificate
+    public function handle(array $identities, ?FluxCertificateAuthority $authority = null): FluxCertificate
     {
         Validator::make(['identities' => $identities], [
             'identities' => ['required', 'array', 'list', 'min:1', 'max:100'],
@@ -35,7 +37,10 @@ class IssueFluxCertificate
             }
         }
 
-        $authority = EnsureFluxCertificateAuthority::run();
+        $authority ??= EnsureFluxCertificateAuthority::run();
+        if (! in_array($authority->state, [FluxCertificateAuthority::STATE_ACTIVE, FluxCertificateAuthority::STATE_PENDING], true)) {
+            throw new RuntimeException('A retired or discarded Flux CA cannot sign certificates.');
+        }
         $config = tmpfile();
         if ($config === false) {
             throw new RuntimeException('Cannot create the Flux certificate OpenSSL configuration.');

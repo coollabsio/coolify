@@ -44,14 +44,16 @@ function fakeNodeCleanup(): void
 
 function grantCleanupCapabilities(Node $node): void
 {
-    Cache::put($node->cacheKey(), ['status' => 'connected', 'capabilities' => [
+    $node->update(['is_usable' => true]);
+    Cache::put($node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => [
         'network.cluster.leave.v1',
     ]]);
 }
 
 function grantInspectionCapabilities(Node $node): void
 {
-    Cache::put($node->cacheKey(), ['status' => 'connected', 'capabilities' => [
+    $node->update(['is_usable' => true]);
+    Cache::put($node->cacheKey(), ['status' => 'connected', 'last_heartbeat_at' => now()->toIso8601String(), 'capabilities' => [
         'network.wireguard.inspect.v1',
         'network.firewall.inspect.v1',
         'discovery.corrosion.inspect.v1',
@@ -90,6 +92,8 @@ it('detects healthy network state without requesting repair', function () {
     $cluster->update(['network_status' => 'active']);
     $node->update([
         'network_applied_revision' => $cluster->desired_revision,
+        'network_status' => 'converged',
+        'corrosion_status' => 'converged',
         'network_observed_state' => ['configuration_hash' => 'wg-hash'],
         'metadata' => ['firewall_configuration_hash' => 'firewall-hash'],
     ]);
@@ -104,19 +108,24 @@ it('detects healthy network state without requesting repair', function () {
         };
     });
 
-    expect(InspectNodeClusterDrift::run($cluster->fresh()))->toBeFalse();
+    expect(InspectNodeClusterDrift::run($cluster->fresh()))->toBe([]);
     Http::assertSentCount(3);
 });
 
-it('queues automatic reconciliation when inspection detects drift', function () {
+it('queues a Node-scoped reconciliation of the same revision when inspection detects drift', function () {
     Queue::fake();
     $cluster = CreateNodeCluster::run($this->team, $this->user, 'Drifted mesh');
     $node = Node::factory()->create(['team_id' => $this->team->id]);
     AssignNodeToCluster::run($cluster, $node);
-    $cluster->update(['network_status' => 'active']);
-    $node->update(['network_observed_state' => ['configuration_hash' => 'expected']]);
+    $cluster->refresh()->update(['network_status' => 'active']);
+    $node->update([
+        'network_applied_revision' => $cluster->desired_revision,
+        'network_status' => 'converged',
+        'corrosion_status' => 'converged',
+        'network_observed_state' => ['configuration_hash' => 'expected'],
+    ]);
     grantInspectionCapabilities($node);
-    $expectedRevision = $cluster->fresh()->desired_revision + 1;
+    $revision = $cluster->desired_revision;
     Http::fake(fn (Request $request) => Http::response([
         'command_id' => $request['command_id'],
         'observed_at_unix_ms' => 1_700_000_000_000,
@@ -127,9 +136,12 @@ it('queues automatic reconciliation when inspection detects drift', function () 
 
     (new InspectNodeClusterNetworksJob)->handle();
 
-    expect($cluster->fresh()->network_status)->toBe('reconciling');
-    expect($cluster->fresh()->desired_revision)->toBe($expectedRevision);
-    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $cluster->id);
+    expect($cluster->fresh()->desired_revision)->toBe($revision)
+        ->and($node->fresh()->network_status)->toBe('pending')
+        ->and($node->fresh()->network_error)->toContain('drifted');
+    Queue::assertPushed(ReconcileNodeClusterNetworkJob::class, fn ($job) => $job->clusterId === $cluster->id
+        && $job->nodeIds === [$node->id]
+        && $job->onlyDueNodes === true);
 });
 
 it('cleans every unused Node before deleting a cluster', function () {

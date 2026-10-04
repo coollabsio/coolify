@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Node\QueueNodeNetworkConvergence;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
+use App\Actions\Sentinel\ResolveFluxTrustBundle;
 use App\Http\Controllers\Controller;
+use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\RefreshNodeContainersJob;
+use App\Models\FluxCaRotation;
 use App\Models\Node;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -87,6 +91,7 @@ class FluxConnectionEventController extends Controller
             'endpoint' => $fluxUrl,
             'capabilities' => $data['capabilities'] ?? data_get($current, 'capabilities'),
         ], fn ($value) => $value !== null), now()->addMinutes(5));
+        $reconnected = $data['event'] === 'connected' || ! $node->is_reachable;
         if (! $node->is_reachable) {
             $node->update(['is_reachable' => true]);
         }
@@ -96,7 +101,35 @@ class FluxConnectionEventController extends Controller
         if (isset($data['capabilities']) && $node->sentinel_capabilities !== $data['capabilities']) {
             $node->update(['sentinel_capabilities' => $data['capabilities']]);
         }
+        if ($data['event'] === 'connected' && isset($data['trust_bundle_version'])) {
+            $this->recordTrustBundle($node, (int) $data['trust_bundle_version']);
+        }
+        if ($reconnected) {
+            rescue(fn () => QueueNodeNetworkConvergence::run($node->refresh()));
+        }
 
         return response()->noContent();
+    }
+
+    /**
+     * Record the trust bundle Sentinel reported and deliver a newer one, so a
+     * Node that was offline during a CA rotation catches up when it reconnects.
+     */
+    private function recordTrustBundle(Node $node, int $version): void
+    {
+        if ($node->flux_trust_bundle_version !== $version) {
+            $node->forceFill([
+                'flux_trust_bundle_version' => $version,
+                'flux_trust_bundle_acknowledged_at' => now(),
+            ])->saveQuietly();
+        }
+        if (! FluxCaRotation::query()->exists()) {
+            return;
+        }
+        rescue(function () use ($node, $version): void {
+            if ($version < ResolveFluxTrustBundle::run()['version']) {
+                DistributeFluxTrustBundleJob::dispatch($node->id);
+            }
+        });
     }
 }

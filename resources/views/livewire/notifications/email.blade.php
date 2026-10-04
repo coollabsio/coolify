@@ -170,8 +170,8 @@
                             ['property' => 'dockerCleanupSuccessEmailNotifications', 'label' => 'Docker cleanup success', 'enabled' => $dockerCleanupSuccessEmailNotifications],
                             ['property' => 'dockerCleanupFailureEmailNotifications', 'label' => 'Docker cleanup failure', 'enabled' => $dockerCleanupFailureEmailNotifications],
                             ['property' => 'serverDiskUsageEmailNotifications', 'label' => 'Server disk usage', 'enabled' => $serverDiskUsageEmailNotifications],
-                            ['property' => 'serverReachableEmailNotifications', 'label' => 'Server reachable', 'enabled' => $serverReachableEmailNotifications],
-                            ['property' => 'serverUnreachableEmailNotifications', 'label' => 'Server unreachable', 'enabled' => $serverUnreachableEmailNotifications],
+                            ['property' => 'serverReachableEmailNotifications', 'label' => 'Server or Node reachable', 'enabled' => $serverReachableEmailNotifications],
+                            ['property' => 'serverUnreachableEmailNotifications', 'label' => 'Server or Node unreachable', 'enabled' => $serverUnreachableEmailNotifications],
                             ['property' => 'serverPatchEmailNotifications', 'label' => 'Server patching', 'enabled' => $serverPatchEmailNotifications],
                             ['property' => 'traefikOutdatedEmailNotifications', 'label' => 'Traefik proxy outdated', 'enabled' => $traefikOutdatedEmailNotifications],
                         ]" />

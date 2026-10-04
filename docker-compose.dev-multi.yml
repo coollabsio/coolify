@@ -162,7 +162,10 @@ services:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_PORT:-1025}:1025"
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
-      - coolify
+      coolify:
+        # InstanceSettingsSeeder points SMTP at coolify-mail (the legacy container name).
+        aliases:
+          - coolify-mail
 
   minio:
     profiles: ["minio"]

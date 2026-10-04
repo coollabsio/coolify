@@ -446,10 +446,11 @@ class Select extends Component
         $cluster = NodeCluster::query()
             ->where('team_id', currentTeam()->id)
             ->where('uuid', $clusterUuid)
-            ->where('network_status', 'active')
+            ->whereIn('network_status', ['active', 'degraded'])
             ->whereHas('nodes', fn ($query) => $query
                 ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker']))
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork())
             ->firstOrFail();
 
         return redirect()->route('project.resource.create', [
@@ -467,7 +468,7 @@ class Select extends Component
             ->where('uuid', $nodeUuid)
             ->where('is_usable', true)
             ->whereIn('role', ['worker', 'controller-worker'])
-            ->whereHas('cluster', fn ($query) => $query->where('network_status', 'active'))
+            ->onDeployableClusterNetwork()
             ->firstOrFail();
 
         return redirect()->route('project.resource.create', [
@@ -515,16 +516,19 @@ class Select extends Component
         $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
         $this->clusters = NodeCluster::query()
             ->where('team_id', currentTeam()->id)
-            ->where('network_status', 'active')
+            ->whereIn('network_status', ['active', 'degraded'])
             ->whereHas('nodes', fn ($query) => $query
                 ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker']))
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork())
             ->withCount(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
-                ->whereIn('role', ['worker', 'controller-worker'])])
+                ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork()])
             ->with(['nodes' => fn ($query) => $query
                 ->where('is_usable', true)
                 ->whereIn('role', ['worker', 'controller-worker'])
+                ->onDeployableClusterNetwork()
                 ->orderBy('name')])
             ->orderBy('name')
             ->get();

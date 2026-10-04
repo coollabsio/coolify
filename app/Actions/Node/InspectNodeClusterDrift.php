@@ -16,26 +16,41 @@ class InspectNodeClusterDrift
 {
     use AsAction;
 
-    public function handle(NodeCluster $cluster): bool
+    private const CAPABILITIES = ['network.wireguard.inspect.v1', 'network.firewall.inspect.v1', 'discovery.corrosion.inspect.v1'];
+
+    /**
+     * Inspects every reachable, converged member Node and returns the IDs of the Nodes whose
+     * host network drifted from the desired revision. A failed inspection counts as drift.
+     *
+     * @return list<int>
+     */
+    public function handle(NodeCluster $cluster): array
     {
-        if ($cluster->network_status !== 'active') {
-            return false;
+        $healthy = $cluster->nodes()
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Node $node): bool => $cluster->nodeNetworkState($node) === 'converged' && $node->canReceiveNetworkCommands())
+            ->values();
+
+        $drifted = [];
+        foreach ($healthy as $node) {
+            // A Sentinel without inspection support cannot report drift; repairing it would not help.
+            if (collect(self::CAPABILITIES)->contains(fn (string $capability): bool => $node->supportsCapability($capability) === false)) {
+                continue;
+            }
+            try {
+                if ($this->nodeHasDrift($cluster, $node, $healthy->count() - 1)) {
+                    $drifted[] = $node->id;
+                }
+            } catch (Throwable) {
+                $drifted[] = $node->id;
+            }
         }
 
-        foreach ($cluster->nodes()->orderBy('id')->get() as $node) {
-            foreach (['network.wireguard.inspect.v1', 'network.firewall.inspect.v1', 'discovery.corrosion.inspect.v1'] as $capability) {
-                $node->ensureCapability($capability);
-            }
-
-            if ($this->nodeHasDrift($cluster, $node)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $drifted;
     }
 
-    private function nodeHasDrift(NodeCluster $cluster, Node $node): bool
+    private function nodeHasDrift(NodeCluster $cluster, Node $node, int $expectedAlivePeers): bool
     {
         $wireguard = $this->runOperation($node, 'network.wireguard.inspect.v1', [
             'interface' => $cluster->wireguard_interface,
@@ -61,8 +76,7 @@ class InspectNodeClusterDrift
 
         $corrosion = $this->runOperation($node, 'discovery.corrosion.inspect.v1', []);
 
-        return data_get($corrosion, 'version') !== 'v1.0.0'
-            || data_get($corrosion, 'member_state') !== 'converged';
+        return ! ReconcileNodeClusterNetwork::corrosionConverged($corrosion, $expectedAlivePeers);
     }
 
     /**

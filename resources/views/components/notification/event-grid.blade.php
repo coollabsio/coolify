@@ -34,8 +34,16 @@
             ['key' => 'dockerCleanupSuccess', 'label' => 'Docker cleanup success'],
             ['key' => 'dockerCleanupFailure', 'label' => 'Docker cleanup failure'],
             ['key' => 'serverDiskUsage', 'label' => 'Disk usage warning'],
-            ['key' => 'serverReachable', 'label' => 'Server reachable'],
-            ['key' => 'serverUnreachable', 'label' => 'Server unreachable'],
+            [
+                'key' => 'serverReachable',
+                'label' => 'Server or Node reachable',
+                'helper' => 'Also notifies when a Node cluster network is active again.',
+            ],
+            [
+                'key' => 'serverUnreachable',
+                'label' => 'Server or Node unreachable',
+                'helper' => 'Also notifies when a Node cluster network fails or is degraded.',
+            ],
             ['key' => 'serverPatch', 'label' => 'Server patching'],
             ['key' => 'traefikOutdated', 'label' => 'Traefik proxy outdated'],
         ],

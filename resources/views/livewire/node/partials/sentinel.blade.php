@@ -152,7 +152,7 @@
                 </div>
                 <x-forms.button wire:click="repairFluxTrust">Repair trust</x-forms.button>
             </div>
-            @if (isDev())
+            @if (isDev() && auth()->user()?->can('update', instanceSettings()))
                 <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                     <div class="min-w-0">
                         <p class="text-[13px] font-medium text-black dark:text-fg">Renew certificate</p>
@@ -175,6 +175,19 @@
                     <dd class="mt-0.5 break-all font-mono text-[11px] text-neutral-700 dark:text-fg-dim">
                         {{ data_get($fluxConnection, 'endpoint') ?? 'Not connected' }}
                     </dd>
+                </div>
+                <div class="min-w-0">
+                    <dt class="text-neutral-500 dark:text-fg-faint">Trust bundle</dt>
+                    <dd class="mt-0.5 break-all font-mono text-[11px] text-neutral-700 dark:text-fg-dim">
+                        {{ $node->flux_trust_bundle_version ?? 'Unknown' }}
+                        @if (isInstanceAdmin())
+                            <a href="{{ route('settings.node-trust') }}" {{ wireNavigate() }}
+                                class="ml-1 font-sans underline">CA rotation</a>
+                        @endif
+                    </dd>
+                    @if (filled($node->flux_trust_bundle_error))
+                        <dd class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $node->flux_trust_bundle_error }}</dd>
+                    @endif
                 </div>
             </dl>
         </div>

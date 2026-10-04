@@ -62,7 +62,38 @@ class RecoverStaleOperations
             });
         $this->releaseStuckClusters($staleBefore);
 
+        // An uncertain workload operation has no worker left, for example after a Flux restart.
+        // Confirm it before the stale limit when the requested state already runs; otherwise it
+        // waits for the stale limit, so a slow command on the Node can still finish.
+        NodeOperation::query()
+            ->where('status', NodeOperationStatus::UNCERTAIN)
+            ->whereIn('command_type', self::WORKLOAD_COMMANDS)
+            ->where('updated_at', '>=', $staleBefore)
+            ->where('updated_at', '<', now()->subMinute())
+            ->with(['node', 'revision'])
+            ->chunkById(100, function ($operations) use (&$recovered): void {
+                foreach ($operations as $operation) {
+                    if ($this->confirmConverged($operation)) {
+                        $recovered++;
+                    }
+                }
+            });
+
         return $recovered;
+    }
+
+    private function confirmConverged(NodeOperation $operation): bool
+    {
+        $verification = $this->verify($operation);
+        if (! ($verification['converged'] ?? false)) {
+            return false;
+        }
+
+        return ClaimOperation::run(
+            $operation,
+            NodeOperationStatus::SUCCEEDED,
+            result: [...($operation->result ?? []), 'verification' => $verification],
+        ) !== null;
     }
 
     private function recover(NodeOperation $operation): bool

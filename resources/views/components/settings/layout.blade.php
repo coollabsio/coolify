@@ -11,6 +11,9 @@
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
         ],
     ];
+    if (isDev() && config('constants.sentinel.host_enabled', false)) {
+        $settingsMenuSections['Instance'][] = ['label' => 'Node trust', 'route' => 'settings.node-trust', 'icon' => 'shield-star'];
+    }
 @endphp
 
 <section class="application-settings-workspace w-full max-w-none">

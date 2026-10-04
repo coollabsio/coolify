@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\FetchLatestSentinelRelease;
 use App\Enums\NodeRole;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -33,6 +34,11 @@ class Node extends BaseModel
             'is_usable' => 'boolean',
             'network_observed_state' => 'array',
             'wireguard_last_handshake_at' => 'datetime',
+            'flux_trust_bundle_version' => 'integer',
+            'flux_trust_bundle_acknowledged_at' => 'datetime',
+            'network_attempts' => 'integer',
+            'network_next_attempt_at' => 'datetime',
+            'network_pending_leave' => 'array',
         ];
     }
 
@@ -128,6 +134,34 @@ class Node extends BaseModel
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /** A Node can take network commands when it is usable and Sentinel sent a recent Flux heartbeat. */
+    public function canReceiveNetworkCommands(): bool
+    {
+        return $this->is_usable && $this->hasRecentFluxHeartbeat();
+    }
+
+    /**
+     * Nodes whose network runs the desired revision of their cluster. Keep in sync with
+     * NodeCluster::nodeNetworkState().
+     */
+    public function scopeNetworkConverged(Builder $query): Builder
+    {
+        return $query
+            ->where('nodes.corrosion_status', 'converged')
+            ->where(fn (Builder $query) => $query->whereNull('nodes.network_status')->orWhere('nodes.network_status', 'converged'))
+            ->whereHas('cluster', fn (Builder $query) => $query->whereColumn('node_clusters.desired_revision', 'nodes.network_applied_revision'));
+    }
+
+    /** Nodes in an active cluster network, or converged Nodes in a degraded one. */
+    public function scopeOnDeployableClusterNetwork(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereHas('cluster', fn (Builder $query) => $query->where('network_status', 'active'))
+            ->orWhere(fn (Builder $query) => $query
+                ->whereHas('cluster', fn (Builder $query) => $query->where('network_status', 'degraded'))
+                ->networkConverged()));
     }
 
     public function supportsCapability(string $capability): ?bool

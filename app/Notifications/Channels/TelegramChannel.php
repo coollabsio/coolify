@@ -11,6 +11,10 @@ use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupMissing;
 use App\Notifications\Database\BackupSuccess;
+use App\Notifications\Node\ClusterNetworkRecovered;
+use App\Notifications\Node\ClusterNetworkUnhealthy;
+use App\Notifications\Node\Reachable as NodeReachable;
+use App\Notifications\Node\Unreachable as NodeUnreachable;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use App\Notifications\Server\DockerCleanupFailed;
@@ -50,8 +54,12 @@ class TelegramChannel
             DockerCleanupSuccess::class => $settings->telegram_notifications_docker_cleanup_success_thread_id,
             DockerCleanupFailed::class => $settings->telegram_notifications_docker_cleanup_failure_thread_id,
             HighDiskUsage::class => $settings->telegram_notifications_server_disk_usage_thread_id,
-            Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
-            Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
+            Unreachable::class,
+            NodeUnreachable::class,
+            ClusterNetworkUnhealthy::class => $settings->telegram_notifications_server_unreachable_thread_id,
+            Reachable::class,
+            NodeReachable::class,
+            ClusterNetworkRecovered::class => $settings->telegram_notifications_server_reachable_thread_id,
             ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
             TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
             default => null,

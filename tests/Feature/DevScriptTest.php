@@ -1,6 +1,7 @@
 <?php
 
 use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 
 beforeEach(function () {
     $this->devRoot = sys_get_temp_dir().'/coolify-dev-script-'.bin2hex(random_bytes(4));
@@ -225,6 +226,13 @@ BASH);
         ->not->toContain('shutdown coolify-dev-fix-some_thing-2--ubuntu-root')
         ->not->toContain('shutdown coolify-dev-ubuntu-root')
         ->not->toContain('--profile testing-host up');
+});
+
+it('lets the seeded instance SMTP host reach mailpit', function () {
+    $compose = Yaml::parseFile(base_path('docker-compose.dev-multi.yml'));
+
+    expect($compose['services']['mailpit']['networks']['coolify']['aliases'])->toContain('coolify-mail')
+        ->and(file_get_contents(base_path('database/seeders/InstanceSettingsSeeder.php')))->toContain("'smtp_host' => 'coolify-mail'");
 });
 
 it('keeps fresh worktree instances writable and stable during the first composer install', function () {

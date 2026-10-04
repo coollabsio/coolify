@@ -169,6 +169,46 @@ it('requires an available workload node in the selected cluster', function () {
     ))->toThrow(RuntimeException::class, 'The cluster has no workload Node that can accept a deployment.');
 });
 
+it('deploys only to converged Nodes of a degraded cluster network', function () {
+    $this->cluster->update(['network_status' => 'degraded', 'desired_revision' => 3]);
+    $this->node->update(['network_applied_revision' => 2, 'network_status' => 'pending', 'corrosion_status' => 'converged']);
+    $convergedNode = Node::factory()->create([
+        'team_id' => $this->team->id,
+        'node_cluster_id' => $this->cluster->id,
+        'private_key_id' => $this->node->private_key_id,
+        'is_usable' => true,
+        'is_reachable' => true,
+        'metadata' => healthyNodeResourceMetadata(),
+        'network_applied_revision' => 3,
+        'network_status' => 'converged',
+        'corrosion_status' => 'converged',
+    ]);
+
+    expect(fn () => CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user, $this->node,
+    ))->toThrow(RuntimeException::class, 'The selected Node is not available in this cluster.');
+
+    $deployment = CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster->refresh(), 'nginx:latest', $this->user,
+    );
+
+    expect($deployment['workload']->nodes()->sole()->is($convergedNode))->toBeTrue();
+
+    $component = new Select;
+    $component->parameters = ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid];
+    $component->loadServers();
+    expect($component->clusters->modelKeys())->toBe([$this->cluster->id])
+        ->and($component->clusters->sole()->nodes->modelKeys())->toBe([$convergedNode->id]);
+});
+
+it('rejects deployments while the cluster network failed', function () {
+    $this->cluster->update(['network_status' => 'error']);
+
+    expect(fn () => CreateClusterDockerImageWorkload::run(
+        $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user,
+    ))->toThrow(RuntimeException::class, 'The cluster network is not ready.');
+});
+
 function healthyNodeResourceMetadata(): array
 {
     return [

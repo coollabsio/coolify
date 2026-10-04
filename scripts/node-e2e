@@ -1,0 +1,743 @@
+#!/usr/bin/env bash
+# End-to-end checks for v5 Nodes on the QEMU development environment of this checkout.
+#
+# Usage:
+#   scripts/node-e2e [--only <scenario>[,<scenario>]] [--list] [--build]
+#
+#   --list    list the scenarios and exit
+#   --only    run only these scenarios, in the given order
+#   --build   build Sentinel (host binary) and Flux from $SENTINEL_DIR and install them first
+#
+# Runs every scenario except offline-removal, which is destructive and runs only when named
+# with --only. Each scenario prints PASS or FAIL with the reason and restores what it changed
+# (Coolify, VMs, workload, firewall rule, CA rotation), also when it fails. Exits non-zero
+# when a scenario fails.
+#
+# Needs the instance of this checkout (./scripts/dev start) with the KVM workers node-worker-a
+# and node-worker-b in the cluster "Development QEMU mesh" and one workload on worker A, plus
+# jq and virsh on the host. Coolify-side steps run through `php artisan dev:node-e2e`.
+#
+# Env: SENTINEL_DIR=/root/devel/sentinel  NODE_E2E_WORK=<dir for build artifacts and the SSH key>
+#      NODE_E2E_SENTINEL_VERSION=<version baked into the Sentinel build>
+#
+set -euo pipefail
+set -o errtrace
+
+cd "$(dirname "$0")/.."
+ROOT="$(pwd -P)"
+
+SCENARIOS=(preflight coolify-down-dns reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline offline-removal)
+DEFAULT_SCENARIOS=(preflight coolify-down-dns reboot-recovery stop-marker flux-restart offline-node ca-rotation ca-rotation-offline)
+declare -A DESCRIPTIONS=(
+  [preflight]='stack up, both Nodes connected, cluster active, workload running, DNS on both Nodes'
+  [coolify-down-dns]='Coolify down for 150 s: DNS keeps resolving and endpoint expiry keeps moving'
+  [reboot-recovery]='Coolify down, reboot both VMs: network, Corrosion, DNS, and workload come back'
+  [stop-marker]='a stopped workload stays stopped across a reboot; a started one comes back'
+  [flux-restart]='restart Flux during a deployment: no operation stays active, workload runs'
+  [offline-node]='Node B offline: A converges, B pending, cluster degraded, notifications, B catches up'
+  [ca-rotation]='full staged Flux CA rotation with both Nodes online, then system.ping'
+  [ca-rotation-offline]='CA rotation with Node B offline during distribution: B blocks the switch, then catches up'
+  [offline-removal]='(opt-in, destructive) remove offline Node B, deferred leave on boot, add B back'
+)
+
+SENTINEL_DIR="${SENTINEL_DIR:-/root/devel/sentinel}"
+WORK="${NODE_E2E_WORK:-$HOME/.cache/coolify-node-e2e}"
+GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+ENV_DIR="$(dirname "$GIT_COMMON_DIR")/.dev-instances"
+PROJECT="$(./scripts/dev container)"
+INSTANCE="${PROJECT#coolify-dev-}"
+APP="$PROJECT"
+FLUX="$PROJECT-flux"
+ENV_FILE="$ENV_DIR/$INSTANCE.env"
+FLUX_OVERRIDE="$ENV_DIR/$INSTANCE-flux-override.yml"
+RESTART_DIR="$ROOT/storage/app/node-e2e"
+KEY="$WORK/ssh-key"
+SSH_OPTS=(-i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes)
+declare -A NODE_IP=() NODE_WG=()
+WORKLOAD_NAME=''
+CONTAINER_NAME=''
+WORKLOAD_IP=''
+ROTATION_START_VERSION=''
+
+usage() {
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+}
+
+log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
+
+# ---------------------------------------------------------------------------
+# Scenario bookkeeping: fail() records the reason, note() adds a detail to the result line.
+
+REASON_FILE=''
+NOTES_FILE=''
+RESTORE_STEPS=()
+
+fail() {
+  [[ -s "$REASON_FILE" ]] || printf '%s' "$*" >"$REASON_FILE"
+  exit 1
+}
+
+note() {
+  log "$*"
+  printf '%s; ' "$*" >>"$NOTES_FILE"
+}
+
+# on_exit <command...>: run when the scenario ends, newest first, also after a failure.
+on_exit() { RESTORE_STEPS+=("$*"); }
+
+run_restore_steps() {
+  local index
+  for ((index = ${#RESTORE_STEPS[@]} - 1; index >= 0; index--)); do
+    log "restore: ${RESTORE_STEPS[index]}"
+    (eval "${RESTORE_STEPS[index]}") || log "restore step failed: ${RESTORE_STEPS[index]}"
+  done
+  log 'restore: baseline'
+  restore_baseline || log 'restore: baseline is not reached'
+}
+
+# wait_until <seconds> <description> <command...>: poll every 5 s.
+wait_until() {
+  local timeout="$1" description="$2" deadline
+  shift 2
+  deadline=$((SECONDS + timeout))
+  while ! "$@" >/dev/null 2>&1; do
+    if ((SECONDS >= deadline)); then
+      fail "timeout after ${timeout}s: $description"
+    fi
+    sleep 5
+  done
+}
+
+# Same as wait_until, but returns 1 instead of failing the scenario.
+try_until() {
+  local timeout="$1" deadline
+  shift
+  deadline=$((SECONDS + timeout))
+  while ! "$@" >/dev/null 2>&1; do
+    ((SECONDS < deadline)) || return 1
+    sleep 5
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Coolify, Flux, VMs, Nodes
+
+artisan() { docker exec -i "$APP" php artisan dev:node-e2e "$@"; }
+
+status_json() { artisan status; }
+
+# st <jq filter>: one value from the status JSON.
+st() { status_json | jq -r "$1"; }
+
+st_is() { [[ "$(st "$1" 2>/dev/null)" == "$2" ]]; }
+
+coolify_running() {
+  [[ "$(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$APP" 2>/dev/null)" == 'running healthy' ]] &&
+    artisan status >/dev/null 2>&1
+}
+
+coolify_stop() {
+  log "stopping Coolify ($APP)"
+  docker stop "$APP" >/dev/null
+}
+
+coolify_start() {
+  if [[ "$(docker inspect --format '{{.State.Status}}' "$APP")" != running ]]; then
+    log "starting Coolify ($APP)"
+    docker start "$APP" >/dev/null
+  fi
+  try_until 300 coolify_running || {
+    log 'Coolify did not become healthy within 5 minutes'
+    return 1
+  }
+}
+
+vm_domain() { echo "coolify-dev-$INSTANCE--node-worker-$1"; }
+
+vm_state() { virsh domstate "$(vm_domain "$1")" 2>/dev/null | head -1; }
+
+node_ssh() {
+  local node="$1"
+  shift
+  ssh "${SSH_OPTS[@]}" "root@${NODE_IP[$node]}" "$@"
+}
+
+boot_id() { node_ssh "$1" cat /proc/sys/kernel/random/boot_id 2>/dev/null; }
+
+booted_since() { local current; current="$(boot_id "$1")" && [[ -n "$current" && "$current" != "$2" ]]; }
+
+sentinel_active() { node_ssh "$1" systemctl is-active --quiet sentinel; }
+
+vm_shutdown() {
+  log "shutting down VM $(vm_domain "$1")"
+  virsh shutdown "$(vm_domain "$1")" >/dev/null
+  wait_until 180 "VM $1 shuts off" vm_is_off "$1"
+}
+
+vm_is_off() { [[ "$(vm_state "$1")" == 'shut off' ]]; }
+
+vm_start() {
+  if [[ "$(vm_state "$1")" != running ]]; then
+    log "starting VM $(vm_domain "$1")"
+    virsh start "$(vm_domain "$1")" >/dev/null
+  fi
+  try_until 240 sentinel_active "$1"
+}
+
+# vm_reboot <node>...: reboot and wait until SSH answers with a new boot ID.
+vm_reboot() {
+  local node
+  declare -A before=()
+  for node in "$@"; do
+    before[$node]="$(boot_id "$node")"
+    log "rebooting VM $(vm_domain "$node")"
+    node_ssh "$node" 'systemctl reboot' >/dev/null 2>&1 || true
+  done
+  for node in "$@"; do
+    wait_until 240 "VM $node boots again" booted_since "$node" "${before[$node]}"
+  done
+}
+
+node_connected() { st_is ".nodes.$1.connected" true; }
+
+# Connected in Coolify and answering system.ping through Flux right now.
+node_reachable() { artisan ping "$1" >/dev/null 2>&1 && node_connected "$1"; }
+
+nodes_reachable() { node_reachable a && node_reachable b; }
+
+container_state() { node_ssh a "podman inspect -f '{{.State.Status}}' $CONTAINER_NAME 2>/dev/null || echo absent"; }
+
+workload_running() { [[ "$(container_state)" == running ]]; }
+
+dns_answer() {
+  node_ssh "$1" "dig +short +time=2 +tries=1 @${NODE_WG[$1]} $WORKLOAD_NAME.default.coolify.internal" 2>/dev/null
+}
+
+dns_resolves() { [[ "$(dns_answer "$1")" == "$WORKLOAD_IP" ]]; }
+
+dns_resolves_everywhere() { dns_resolves a && dns_resolves b; }
+
+# Expiry of the workload endpoint row in Corrosion on a Node, as Unix seconds.
+endpoint_expires_at() {
+  node_ssh "$1" "corrosion query --config /etc/corrosion/config.toml \"SELECT expires_at FROM workload_endpoints WHERE workload_id = '$WORKLOAD_NAME' AND container_ip = '$WORKLOAD_IP'\"" 2>/dev/null | tail -1
+}
+
+cluster_active() { st_is '.cluster.network_status' active; }
+
+no_active_workload_operations() { st_is '.workload.active_operations | length' 0; }
+
+# Brings the environment back to normal: Coolify up, both VMs up and connected, workload running.
+restore_baseline() {
+  coolify_start || return 1
+  vm_start a || return 1
+  vm_start b || return 1
+  try_until 240 nodes_reachable || {
+    log 'Nodes did not reconnect within 4 minutes'
+    return 1
+  }
+  if [[ "$(st '.workload.desired_state')" != running ]] || ! workload_running; then
+    try_until 300 no_active_workload_operations || true
+    artisan lifecycle start >/dev/null || artisan deploy >/dev/null || true
+    try_until 180 workload_running || {
+      log 'The workload is not running'
+      return 1
+    }
+  fi
+  try_until 300 cluster_active || log "cluster network is $(st '.cluster.network_status' 2>/dev/null || echo unknown)"
+}
+
+load_environment() {
+  local status
+  mkdir -p "$WORK"
+  if [[ ! -s "$KEY" ]]; then
+    docker cp "$APP:/var/www/html/storage/app/ssh/keys/ssh_key@ssh" "$KEY" >/dev/null
+  fi
+  chmod 600 "$KEY"
+  status="$(status_json)" || {
+    echo "Coolify ($APP) does not answer. Start the instance with ./scripts/dev start." >&2
+    exit 1
+  }
+  for node in a b; do
+    NODE_IP[$node]="$(jq -er ".nodes.$node.ip" <<<"$status")"
+    NODE_WG[$node]="$(jq -er ".nodes.$node.wireguard_ip" <<<"$status")"
+  done
+  WORKLOAD_NAME="$(jq -er '.workload.name' <<<"$status")"
+  CONTAINER_NAME="$(jq -er '.workload.container_name' <<<"$status")"
+  WORKLOAD_IP="$(jq -er '.workload.container_ips[0]' <<<"$status")"
+  [[ "$(jq -er '.workload.node_uuids[0]' <<<"$status")" == development-qemu-node-worker-a ]] ||
+    { echo 'The end-to-end workload must run on worker A.' >&2; exit 1; }
+}
+
+cleanup_work() {
+  rm -f "$KEY" "$WORK"/sentinel "$WORK"/*.log
+  rmdir "$WORK" 2>/dev/null || true
+  rm -rf "$RESTART_DIR"
+}
+
+# ---------------------------------------------------------------------------
+# Mailpit (the instance SMTP settings point at it)
+
+mailpit_url() { echo "http://127.0.0.1:$(grep -E '^FORWARD_MAILPIT_DASHBOARD_PORT=' "$ENV_FILE" | cut -d= -f2-)"; }
+
+# mail_count <subject substring> <since RFC3339>
+mail_count() {
+  curl -fsS "$(mailpit_url)/api/v1/messages?limit=200" |
+    jq --arg subject "$1" --arg since "$2" '[.messages[] | select((.Subject | contains($subject)) and .Created >= $since)] | length'
+}
+
+mail_arrived() { (($(mail_count "$1" "$2") > 0)); }
+
+# ---------------------------------------------------------------------------
+# Build and install
+
+build_and_install() {
+  local version="${NODE_E2E_SENTINEL_VERSION:-0.0.0-dev-e2e-$(date +%Y%m%d%H%M)}" id node
+  mkdir -p "$WORK"
+  log "building Sentinel $version from $SENTINEL_DIR"
+  docker build -q -f "$SENTINEL_DIR/Dockerfile.host" --build-arg VERSION="$version" -t "sentinel-host:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
+  log 'building Flux'
+  docker build -q -f "$SENTINEL_DIR/Dockerfile.flux" -t "flux:$INSTANCE-dev" "$SENTINEL_DIR" >/dev/null
+  id="$(docker create "sentinel-host:$INSTANCE-dev" /sentinel)"
+  docker cp "$id:/sentinel" "$WORK/sentinel" >/dev/null
+  docker rm "$id" >/dev/null
+  for node in a b; do
+    log "installing Sentinel on worker $node"
+    scp "${SSH_OPTS[@]}" -q "$WORK/sentinel" "root@${NODE_IP[$node]}:/usr/local/bin/sentinel.new"
+    node_ssh "$node" 'chmod 755 /usr/local/bin/sentinel.new && mv /usr/local/bin/sentinel.new /usr/local/bin/sentinel && systemctl restart sentinel'
+  done
+  rm -f "$WORK/sentinel"
+  printf 'services:\n  flux:\n    image: flux:%s-dev\n' "$INSTANCE" >"$FLUX_OVERRIDE"
+  log 'recreating Flux with the local image'
+  local -a env_files=()
+  [[ -f .env ]] && env_files+=(--env-file .env)
+  docker compose -p "$PROJECT" -f docker-compose.dev-multi.yml -f docker-compose.node-dev.yml -f "$FLUX_OVERRIDE" \
+    "${env_files[@]}" --env-file "$ENV_FILE" up -d --no-deps flux >/dev/null 2>&1
+  try_until 180 nodes_reachable || { echo 'Nodes did not reconnect after the install.' >&2; exit 1; }
+  for node in a b; do
+    log "worker $node runs $(node_ssh "$node" 'sentinel --version')"
+  done
+}
+
+# Answers the restart request of `dev:node-e2e ca-continue` during the CA switch.
+serve_flux_restart() {
+  local pid="$1"
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ -f "$RESTART_DIR/flux-restart.request" ]]; then
+      log "restarting Flux for certificate $(cut -c1-23 "$RESTART_DIR/flux-restart.request")..."
+      rm -f "$RESTART_DIR/flux-restart.request"
+      docker restart "$FLUX" >/dev/null
+      touch "$RESTART_DIR/flux-restart.done"
+    fi
+    sleep 1
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Scenarios
+
+scenario_preflight() {
+  local container
+  for container in "$APP" "$FLUX" "$PROJECT-postgres-1" "$PROJECT-redis-1"; do
+    [[ "$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null)" == running ]] || fail "container $container is not running"
+  done
+  coolify_running || fail 'Coolify is not healthy'
+  [[ "$(vm_state a)" == running && "$(vm_state b)" == running ]] || fail 'both worker VMs must run'
+  wait_until 120 'both Nodes connected and answering system.ping' nodes_reachable
+  wait_until 300 'cluster network active' cluster_active
+  [[ "$(st '.workload.desired_state')" == running ]] || fail 'workload desired state is not running'
+  workload_running || fail "workload container is $(container_state)"
+  wait_until 60 'DNS resolves on worker A' dns_resolves a
+  wait_until 60 'DNS resolves on worker B' dns_resolves b
+  note "Sentinel $(st '.nodes.a.sentinel_version')/$(st '.nodes.b.sentinel_version'), revision $(st '.cluster.desired_revision')"
+}
+
+scenario_coolify_down_dns() {
+  local before_a before_b after_a after_b started
+  before_a="$(endpoint_expires_at a)"
+  before_b="$(endpoint_expires_at b)"
+  [[ -n "$before_a" && -n "$before_b" ]] || fail 'workload endpoint row is missing in Corrosion'
+  on_exit coolify_start
+  coolify_stop
+  started=$SECONDS
+  while ((SECONDS - started < 150)); do
+    sleep 30
+    dns_resolves a || fail "DNS stopped resolving on worker A after $((SECONDS - started))s"
+    dns_resolves b || fail "DNS stopped resolving on worker B after $((SECONDS - started))s"
+  done
+  after_a="$(endpoint_expires_at a)"
+  after_b="$(endpoint_expires_at b)"
+  ((after_a > before_a + 100 && after_b > before_b + 100)) ||
+    fail "endpoint expiry did not move: A $before_a -> $after_a, B $before_b -> $after_b"
+  (($(node_ssh a 'date +%s') < after_a)) || fail 'endpoint expired'
+  note "expires_at A +$((after_a - before_a))s, B +$((after_b - before_b))s while Coolify was down 150s"
+  coolify_start || fail 'Coolify did not start again'
+  wait_until 180 'Nodes reconnect after Coolify start' nodes_reachable
+}
+
+# network_restored <node>: WireGuard interface, firewall table, and discovery services after boot.
+network_restored() {
+  node_ssh "$1" 'ip link show coolify0 >/dev/null && nft list table inet coolify_cluster >/dev/null && systemctl is-active --quiet corrosion coolify-discovery-dns'
+}
+
+network_and_dns_restored() { network_restored "$1" && dns_resolves "$1"; }
+
+scenario_reboot_recovery() {
+  local node started
+  on_exit coolify_start
+  coolify_stop
+  started=$SECONDS
+  vm_reboot a b
+  for node in a b; do
+    wait_until 180 "network, Corrosion, and DNS restored on worker $node" network_and_dns_restored "$node"
+  done
+  wait_until 180 'workload running after reboot' workload_running
+  note "restored $((SECONDS - started))s after the reboot command, without Coolify"
+  coolify_start || fail 'Coolify did not start again'
+  wait_until 240 'Nodes reconnect after Coolify start' nodes_reachable
+}
+
+scenario_stop_marker() {
+  local result started
+  on_exit coolify_start
+  result="$(artisan lifecycle stop)" || fail "stop failed: $result"
+  [[ "$(jq -r .status <<<"$result")" == succeeded ]] || fail "stop operation: $result"
+  [[ "$(container_state)" != running ]] || fail 'container still runs after stop'
+  coolify_stop
+  vm_reboot a
+  wait_until 180 'network restored on worker A' network_restored a
+  # Give the boot restore time to (wrongly) start the container.
+  started=$SECONDS
+  while ((SECONDS - started < 60)); do
+    [[ "$(container_state)" != running ]] || fail 'stopped workload started after reboot'
+    sleep 10
+  done
+  note "stopped workload stayed $(container_state) after reboot"
+  coolify_start || fail 'Coolify did not start again'
+  wait_until 240 'worker A reconnects' node_reachable a
+  wait_until 120 'no active workload operation' no_active_workload_operations
+  result="$(artisan lifecycle start)" || fail "start failed: $result"
+  [[ "$(jq -r .status <<<"$result")" == succeeded ]] || fail "start operation: $result"
+  wait_until 60 'workload running after start' workload_running
+  coolify_stop
+  vm_reboot a
+  wait_until 180 'workload running after second reboot' workload_running
+  wait_until 120 'DNS resolves on both Nodes after second reboot' dns_resolves_everywhere
+  coolify_start || fail 'Coolify did not start again'
+  wait_until 240 'worker A reconnects' node_reachable a
+}
+
+operation_status() { artisan operation "$1" | jq -r .status; }
+
+scenario_flux_restart() {
+  local result operation status started
+  wait_until 420 'no active workload operation' no_active_workload_operations
+  # Deployments need fresh Node resource data, which the scheduler collects every minute.
+  started=$SECONDS
+  until result="$(artisan deploy --pull=newer)"; do
+    [[ "$result" == *'resource data'* && $((SECONDS - started)) -lt 180 ]] || fail "deploy failed: $result"
+    sleep 10
+  done
+  operation="$(jq -r .uuid <<<"$result")"
+  [[ "$(jq -r .created <<<"$result")" == true ]] || fail "deployment was not created: $result"
+  started=$SECONDS
+  status="$(artisan await-operation "$operation" | jq -r .status)"
+  [[ "$status" != queued ]] || fail 'deployment stayed queued for 60s'
+  # Without a stop timeout: Flux goes away mid-command like after a crash.
+  log "restarting Flux while the deployment is $status"
+  docker restart -t 0 "$FLUX" >/dev/null
+  sleep 5
+  note "Flux restarted while the operation was $status, 5s later it was $(operation_status "$operation")"
+  # Stale operation recovery runs every five minutes and confirms an uncertain operation that converged.
+  wait_until 420 'no active operation for the workload' no_active_workload_operations
+  result="$(artisan operation "$operation")"
+  note "operation ended $(jq -r .status <<<"$result")$(jq -r 'if .error then ": " + .error else "" end' <<<"$result") after $((SECONDS - started))s"
+  wait_until 300 'workload running' workload_running
+  wait_until 120 'Nodes reconnected to Flux' nodes_reachable
+  wait_until 60 'DNS resolves on both Nodes' dns_resolves_everywhere
+}
+
+offline_network_degraded() {
+  local status
+  status="$(status_json)" || return 1
+  jq -e '.nodes.a.network_state == "converged" and .nodes.a.network_applied_revision == .cluster.desired_revision
+    and .nodes.b.network_status == "pending" and .cluster.network_status == "degraded"' <<<"$status" >/dev/null
+}
+
+unreachable_notified() {
+  st_is '.nodes.b.unreachable_notified_at != null and .cluster.network_unhealthy_notified_at != null' true
+}
+
+recovered() {
+  local status
+  status="$(status_json)" || return 1
+  jq -e '.cluster.network_status == "active" and .nodes.b.network_state == "converged"
+    and .nodes.b.network_applied_revision == .cluster.desired_revision
+    and .nodes.b.unreachable_notified_at == null and .cluster.network_unhealthy_notified_at == null' <<<"$status" >/dev/null
+}
+
+scenario_offline_node() {
+  local since started result
+  since="$(date -u +%Y-%m-%dT%H:%M:%S)"
+  on_exit 'vm_start b'
+  vm_shutdown b
+  started=$SECONDS
+  wait_until 180 'Coolify sees worker B unreachable' eval '! node_connected b'
+  note "B disconnected after $((SECONDS - started))s"
+  on_exit 'artisan firewall-remove >/dev/null'
+  result="$(artisan firewall-add)" || fail "adding the firewall rule failed: $result"
+  wait_until 240 'A converged, B pending, cluster degraded after a rule change' offline_network_degraded
+  wait_until 360 'unreachable and cluster unhealthy notification state set' unreachable_notified
+  note "notification state set $((SECONDS - started))s after shutdown"
+  result="$(artisan firewall-remove)" || fail "removing the firewall rule failed: $result"
+  wait_until 240 'A converged on the second revision while B is offline' offline_network_degraded
+  if st_is '.notification_channels.server_unreachable | index("EmailChannel") != null' true; then
+    wait_until 60 'unreachable mail in Mailpit' mail_arrived 'QEMU worker node B) is unreachable' "$since"
+    wait_until 60 'cluster degraded mail in Mailpit' mail_arrived 'Development QEMU mesh) is degraded' "$since"
+  else
+    note 'unreachable mails skipped: email is disabled for server_unreachable'
+  fi
+  vm_start b || fail 'worker B did not boot'
+  started=$SECONDS
+  wait_until 180 'worker B reconnects' node_reachable b
+  wait_until 300 'B converges, cluster active, notification state cleared' recovered
+  note "B converged $((SECONDS - started))s after it reconnected"
+  wait_until 60 'DNS resolves on both Nodes' dns_resolves_everywhere
+  if st_is '.notification_channels.server_reachable | index("EmailChannel") != null' true; then
+    wait_until 120 'recovery mails in Mailpit' mail_arrived 'QEMU worker node B) is reachable' "$since"
+  else
+    note 'recovery mails skipped: the team disabled email for server_reachable (the default)'
+  fi
+  note "mails: $(curl -fsS "$(mailpit_url)/api/v1/messages?limit=50" | jq -r --arg since "$since" '[.messages[] | select(.Created >= $since) | .Subject] | join(" | ")')"
+}
+
+rotation_status() { artisan ca-status; }
+
+rotation_blocking_none() { [[ "$(rotation_status | jq -r .blocking)" == 0 ]]; }
+
+rotation_idle() { [[ "$(rotation_status | jq -r '.rotation.in_progress // false')" == false ]]; }
+
+pings_work() { artisan ping a >/dev/null && artisan ping b >/dev/null; }
+
+# Finishes or cancels a rotation that a failed run left behind.
+rotation_restore() {
+  local step
+  for _ in 1 2 3 4; do
+    rotation_idle && return 0
+    step="$(rotation_status | jq -r .next_step)"
+    log "rotation restore: $step"
+    if [[ "$step" == switch ]]; then
+      artisan ca-cancel >/dev/null || return 1
+      continue
+    fi
+    try_until 180 rotation_blocking_none || true
+    rotation_continue || return 1
+  done
+}
+
+# Runs `ca-continue` and restarts Flux when the CA switch asks for it.
+rotation_continue() {
+  local output="$WORK/ca-continue.json" pid status
+  mkdir -p "$RESTART_DIR"
+  rm -f "$RESTART_DIR"/flux-restart.*
+  artisan ca-continue >"$output" 2>&1 &
+  pid=$!
+  serve_flux_restart "$pid"
+  wait "$pid" && status=0 || status=$?
+  if ((status != 0)); then
+    log "ca-continue failed: $(cat "$output")"
+  fi
+  rm -f "$output"
+  return "$status"
+}
+
+# node_trust_bundle <node>: "<certificate count> <bundle version> <sha256 of the first CA>" as Sentinel stores them.
+node_trust_bundle() {
+  node_ssh "$1" 'echo "$(grep -c "BEGIN CERTIFICATE" /etc/coolify/sentinel-flux-ca.pem) $(cat /etc/coolify/sentinel-flux-ca.version) $(openssl x509 -in /etc/coolify/sentinel-flux-ca.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d : | tr A-F a-f)"'
+}
+
+# rotation_start: start a rotation and print the bundle version before it.
+rotation_start() {
+  local start_version result
+  rotation_idle || fail 'a CA rotation is already in progress'
+  start_version="$(rotation_status | jq -r .bundle_version)"
+  on_exit rotation_restore
+  result="$(artisan ca-start)" || fail "start failed: $result"
+  [[ "$(jq -r .rotation.dual_bundle_version <<<"$result")" == $((start_version + 1)) ]] || fail "unexpected dual bundle: $result"
+  ROTATION_START_VERSION=$start_version
+}
+
+# rotation_complete: every step after both Nodes acknowledged the dual bundle, with checks.
+rotation_complete() {
+  local start_version="$ROTATION_START_VERSION" result node
+  rotation_continue || fail 'switch to the new CA failed'
+  [[ "$(rotation_status | jq -r .rotation.status)" == switched ]] || fail 'rotation is not switched'
+  wait_until 240 'Nodes reconnect through the new Flux certificate' nodes_reachable
+  wait_until 60 'system.ping through the new certificate' pings_work
+  rotation_continue || fail 'retirement start failed'
+  wait_until 300 'both Nodes acknowledge the final bundle' rotation_blocking_none
+  rotation_continue || fail 'retiring the old CA failed'
+  result="$(rotation_status)"
+  [[ "$(jq -r .rotation.status <<<"$result")" == completed ]] || fail "rotation did not complete: $(jq -c .rotation <<<"$result")"
+  [[ "$(jq -r '[.nodes[] | select(.is_usable) | .version] | unique | join(",")' <<<"$result")" == $((start_version + 2)) ]] ||
+    fail "Nodes did not all acknowledge bundle $((start_version + 2)): $(jq -c '[.nodes[] | {name, version}]' <<<"$result")"
+  [[ "$(jq -r .rotation.switch_forced <<<"$result")/$(jq -r .rotation.completion_forced <<<"$result")" == false/false ]] || fail 'a step was forced'
+  for node in a b; do
+    [[ "$(node_trust_bundle "$node")" == "1 $((start_version + 2)) $(jq -r .rotation.to_fingerprint <<<"$result")" ]] ||
+      fail "worker $node trusts $(node_trust_bundle "$node") instead of the new CA alone"
+  done
+  wait_until 120 'Nodes connected after the rotation' nodes_reachable
+  wait_until 60 'system.ping on both Nodes' pings_work
+}
+
+scenario_ca_rotation() {
+  local started=$SECONDS
+  rotation_start
+  wait_until 300 'both Nodes acknowledge the dual bundle' rotation_blocking_none
+  note "dual bundle $((ROTATION_START_VERSION + 1)) acknowledged after $((SECONDS - started))s"
+  rotation_complete
+  note "completed in $((SECONDS - started))s, bundle $ROTATION_START_VERSION -> $((ROTATION_START_VERSION + 2))"
+}
+
+node_acknowledged() { [[ "$(rotation_status | jq -r --arg uuid "development-qemu-node-worker-$1" '.nodes[] | select(.uuid == $uuid) | .acknowledged')" == true ]]; }
+
+scenario_ca_rotation_offline() {
+  local started output
+  on_exit 'vm_start b'
+  vm_shutdown b
+  wait_until 180 'Coolify sees worker B unreachable' eval '! node_connected b'
+  rotation_start
+  wait_until 300 'worker A acknowledges the dual bundle' node_acknowledged a
+  [[ "$(rotation_status | jq -r .blocking)" == 1 ]] || fail 'offline worker B does not block the switch'
+  output="$(artisan ca-continue)" && fail 'the switch ran while worker B had not acknowledged the dual bundle'
+  [[ "$output" == *'QEMU worker node B'* ]] || fail "unexpected switch refusal: $output"
+  vm_start b || fail 'worker B did not boot'
+  started=$SECONDS
+  wait_until 180 'worker B reconnects' node_reachable b
+  wait_until 360 'worker B catches up with the dual bundle' rotation_blocking_none
+  note "B acknowledged the dual bundle $((SECONDS - started))s after it booted"
+  rotation_complete
+  note "completed, bundle $ROTATION_START_VERSION -> $((ROTATION_START_VERSION + 2))"
+}
+
+leave_completed_on_b() {
+  st_is '.nodes.b.network_pending_leave' false &&
+    node_ssh b '! ip link show coolify0 >/dev/null 2>&1 && ! nft list table inet coolify_cluster >/dev/null 2>&1 && ! systemctl is-active --quiet corrosion'
+}
+
+scenario_offline_removal() {
+  local result
+  [[ "$(st '.nodes.b.cluster_id')" == "$(st '.cluster.id')" ]] || fail 'worker B is not in the cluster'
+  on_exit 'vm_start b'
+  on_exit readd_node_b
+  vm_shutdown b
+  wait_until 180 'Coolify sees worker B unreachable' eval '! node_connected b'
+  result="$(artisan remove-node b)" || fail "removal failed: $result"
+  [[ "$(jq -r .pending_leave <<<"$result")" == true ]] || fail "leave was not deferred: $result"
+  wait_until 240 'cluster active with worker A only' cluster_active
+  vm_start b || fail 'worker B did not boot'
+  wait_until 180 'worker B reconnects' node_reachable b
+  wait_until 300 'deferred leave ran and B network is torn down' leave_completed_on_b
+  note 'deferred leave completed after B reconnected'
+  readd_node_b || fail 'adding worker B back failed'
+  wait_until 240 'cluster active with both Nodes' cluster_active
+  wait_until 120 'DNS resolves on both Nodes' dns_resolves_everywhere
+}
+
+readd_node_b() {
+  local result
+  if [[ "$(st '.nodes.b.cluster_id')" == "$(st '.cluster.id')" ]]; then
+    return 0
+  fi
+  try_until 240 node_reachable b || return 1
+  try_until 300 eval "st_is '.nodes.b.network_pending_leave' false" || return 1
+  result="$(artisan add-node b)" || {
+    log "add-node failed: $result"
+    return 1
+  }
+  NODE_WG[b]="$(st '.nodes.b.wireguard_ip')"
+}
+
+# ---------------------------------------------------------------------------
+
+run_scenario() {
+  local name="$1" status started reason notes
+  REASON_FILE="$(mktemp -p "$WORK")"
+  NOTES_FILE="$(mktemp -p "$WORK")"
+  started=$SECONDS
+  log "=== $name: ${DESCRIPTIONS[$name]}"
+  set +e
+  (
+    set -e
+    RESTORE_STEPS=()
+    trap '[[ -s "$REASON_FILE" ]] || printf "unexpected failure at line %s: %s" "$LINENO" "$BASH_COMMAND" >"$REASON_FILE"' ERR
+    trap run_restore_steps EXIT
+    "scenario_${name//-/_}"
+  )
+  status=$?
+  set -e
+  reason="$(cat "$REASON_FILE")"
+  notes="$(sed 's/; $//' "$NOTES_FILE")"
+  rm -f "$REASON_FILE" "$NOTES_FILE"
+  if ((status == 0)); then
+    RESULTS+=("PASS  $name ($((SECONDS - started))s)${notes:+ - $notes}")
+    return 0
+  fi
+  RESULTS+=("FAIL  $name ($((SECONDS - started))s) - ${reason:-exit $status}${notes:+ [$notes]}")
+  return 1
+}
+
+main() {
+  local build=false only='' name failed=0
+  local -a selected=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --list)
+        for name in "${SCENARIOS[@]}"; do
+          printf '%-20s %s\n' "$name" "${DESCRIPTIONS[$name]}"
+        done
+        exit 0
+        ;;
+      --only)
+        only="${2:?--only needs a scenario list}"
+        shift
+        ;;
+      --build) build=true ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 2
+        ;;
+    esac
+    shift
+  done
+  if [[ -n "$only" ]]; then
+    IFS=, read -ra selected <<<"$only"
+    for name in "${selected[@]}"; do
+      [[ -v "DESCRIPTIONS[$name]" ]] || {
+        echo "Unknown scenario '$name'. Use --list." >&2
+        exit 2
+      }
+    done
+  else
+    selected=("${DEFAULT_SCENARIOS[@]}")
+  fi
+
+  trap cleanup_work EXIT
+  load_environment
+  if [[ "$build" == true ]]; then
+    build_and_install
+  fi
+
+  RESULTS=()
+  for name in "${selected[@]}"; do
+    run_scenario "$name" || failed=1
+  done
+  printf '\n'
+  printf '%s\n' "${RESULTS[@]}"
+  return "$failed"
+}
+
+main "$@"

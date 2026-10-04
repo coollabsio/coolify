@@ -87,6 +87,7 @@ use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Server\TransferImport as ServerTransferImport;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
+use App\Livewire\Settings\FluxTrust as SettingsFluxTrust;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
@@ -179,6 +180,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
     Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
     Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+    Route::get('/settings/node-trust', SettingsFluxTrust::class)->name('settings.node-trust');
 
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');

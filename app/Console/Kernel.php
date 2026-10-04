@@ -10,7 +10,9 @@ use App\Jobs\CheckMissingDatabaseBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\InspectNodeClusterNetworksJob;
+use App\Jobs\NotifyNodeHealthJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\RecoverStaleNodeOperationsJob;
@@ -52,12 +54,20 @@ class Kernel extends ConsoleKernel
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('flux:renew-certificate')->daily()->onOneServer()->withoutOverlapping(30)
             ->when(fn () => config('constants.sentinel.host_enabled'));
+        // Retries trust bundle delivery to connected Nodes that missed a CA rotation step.
+        $this->scheduleInstance->job(new DistributeFluxTrustBundleJob)
+            ->everyFiveMinutes()
+            ->onOneServer()
+            ->when(fn () => config('constants.sentinel.host_enabled'));
         $this->scheduleInstance->call(fn () => CleanupOperations::run())
             ->name('cleanup:node-operations')
             ->daily()
             ->onOneServer()
             ->withoutOverlapping(30);
         $this->scheduleInstance->job(new RefreshConnectedNodesJob)
+            ->everyMinute()
+            ->onOneServer();
+        $this->scheduleInstance->job(new NotifyNodeHealthJob)
             ->everyMinute()
             ->onOneServer();
         $this->scheduleInstance->job(new RecoverStaleNodeOperationsJob)

@@ -4,12 +4,14 @@ use App\Actions\Node\FetchContainers;
 use App\Actions\Node\InstallSentinel;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Sentinel\PingFluxConnection;
+use App\Actions\Sentinel\RenewFluxCertificate;
 use App\Enums\NodeContainerManagementState;
 use App\Livewire\Node\Show;
 use App\Livewire\Server\Sentinel as LegacySentinel;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\Server;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,7 +51,7 @@ it('shows and runs node Sentinel controls in development', function () {
         ->assertSee('Troubleshooting')
         ->assertSee('Validate node')
         ->assertSee('Repair trust')
-        ->assertSee('Renew certificate')
+        ->assertDontSee('Renew certificate')
         ->assertDontSee('Refresh state')
         ->assertDontSee('Install or update')
         ->call('installSentinel')
@@ -193,4 +195,27 @@ it('shows and refreshes the read-only Node container inventory', function () {
         ->assertDontSee('Delete container')
         ->call('refreshContainers')
         ->assertDispatched('success', 'Container inventory refreshed. 1 container found.');
+});
+
+it('lets only instance admins renew the instance-wide Flux certificate', function () {
+    RenewFluxCertificate::partialMock()->shouldReceive('handle')->never();
+
+    Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
+        ->call('renewFluxCertificate')
+        ->assertNotDispatched('success');
+});
+
+it('renews the Flux certificate for a root team admin', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+    $this->actingAs($user);
+    session(['currentTeam' => $rootTeam]);
+    $node = Node::factory()->create(['team_id' => 0]);
+    RenewFluxCertificate::partialMock()->shouldReceive('handle')->once()->with(null, true);
+
+    Livewire::test(Show::class, ['node_uuid' => $node->uuid, 'section' => 'sentinel'])
+        ->assertSee('Renew certificate')
+        ->call('renewFluxCertificate')
+        ->assertDispatched('success', 'Flux TLS certificate renewed.');
 });

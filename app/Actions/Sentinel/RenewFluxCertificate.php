@@ -3,6 +3,7 @@
 namespace App\Actions\Sentinel;
 
 use App\Models\FluxCertificate;
+use App\Models\FluxCertificateAuthority;
 use App\Models\Server;
 use Closure;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -15,8 +16,9 @@ class RenewFluxCertificate
 
     /**
      * @param  Closure(FluxCertificate): void|null  $restartAndValidate
+     * @param  FluxCertificateAuthority|null  $authority  A CA rotation switch passes the new CA; renewal otherwise keeps the active CA.
      */
-    public function handle(?Closure $restartAndValidate = null, bool $force = false): bool
+    public function handle(?Closure $restartAndValidate = null, bool $force = false, ?FluxCertificateAuthority $authority = null): bool
     {
         $directory = rtrim(config('constants.coolify.base_config_path'), '/').'/flux';
         if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
@@ -38,16 +40,17 @@ class RenewFluxCertificate
                 return false;
             }
             $previous = $active->sole();
-            if (! $force && $previous->valid_until->isAfter(now()->addDays(config('constants.flux.renew_before_days')))) {
+            if ($authority === null && ! $force && $previous->valid_until->isAfter(now()->addDays(config('constants.flux.renew_before_days')))) {
                 return false;
             }
-            if ($previous->certificateAuthority->state !== 'active') {
+            if ($authority === null && $previous->certificateAuthority->state !== FluxCertificateAuthority::STATE_ACTIVE) {
                 throw new RuntimeException('Flux renewal requires the current installation CA.');
             }
 
-            $candidate = $previous->getConnection()->transaction(function () use ($previous): FluxCertificate {
-                $candidate = IssueFluxCertificate::run($previous->identities);
-                if ($candidate->certificate_authority_id !== $previous->certificate_authority_id) {
+            $candidate = $previous->getConnection()->transaction(function () use ($previous, $authority): FluxCertificate {
+                $candidate = IssueFluxCertificate::run($previous->identities, $authority);
+                $expectedAuthorityId = $authority->id ?? $previous->certificate_authority_id;
+                if ($candidate->certificate_authority_id !== $expectedAuthorityId) {
                     throw new RuntimeException('Flux renewal must not change the installation CA.');
                 }
                 $candidate->update(['state' => 'pending', 'version' => $previous->version + 1]);
