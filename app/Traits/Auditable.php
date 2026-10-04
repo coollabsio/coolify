@@ -7,7 +7,9 @@ use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 trait Auditable
 {
@@ -100,15 +102,25 @@ trait Auditable
      */
     private function auditChanges(string $action, array $fields): array
     {
-        return collect($fields)
-            ->reject(fn (string $field): bool => $this->isExcludedAuditField($field))
-            ->mapWithKeys(fn (string $field): array => [
-                $field => [
-                    'old' => $action === 'created' ? null : AuditEvent::redact($this->getOriginal($field)),
-                    'new' => $action === 'deleted' ? null : AuditEvent::redact($this->getAttribute($field)),
-                ],
-            ])
-            ->all();
+        try {
+            return collect($fields)
+                ->reject(fn (string $field): bool => $this->isExcludedAuditField($field))
+                ->mapWithKeys(fn (string $field): array => [
+                    $field => [
+                        'old' => $action === 'created' ? null : AuditEvent::redact($this->getOriginal($field)),
+                        'new' => $action === 'deleted' ? null : AuditEvent::redact($this->getAttribute($field)),
+                    ],
+                ])
+                ->all();
+        } catch (Throwable $exception) {
+            Log::warning('Audit change preparation failed', [
+                'resource_type' => Str::snake(class_basename($this)),
+                'action' => $action,
+                'exception' => $exception::class,
+            ]);
+
+            return [];
+        }
     }
 
     private function isExcludedAuditField(string $field): bool

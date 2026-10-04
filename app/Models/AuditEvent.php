@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JsonSerializable;
+use stdClass;
 use Throwable;
 
 class AuditEvent extends Model
@@ -229,6 +232,14 @@ class AuditEvent extends Model
     {
         if ($key !== null && self::isSensitiveKey($key)) {
             return '[REDACTED]';
+        }
+
+        if ($value instanceof Arrayable) {
+            $value = $value->toArray();
+        } elseif ($value instanceof JsonSerializable) {
+            $value = $value->jsonSerialize();
+        } elseif ($value instanceof stdClass) {
+            $value = (array) $value;
         }
 
         if (! is_array($value)) {

@@ -31,6 +31,8 @@ use App\Models\User;
 use App\Traits\Auditable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +40,19 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
+
+class FailingAuditAttributeCast implements CastsAttributes
+{
+    public function get(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        throw new RuntimeException('sensitive attribute value');
+    }
+
+    public function set(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        return $value;
+    }
+}
 
 uses(RefreshDatabase::class);
 
@@ -216,6 +231,72 @@ test('auditable models exclude hidden and encrypted attributes from changes', fu
     ])->and($event->changes)->not->toHaveKey('value')
         ->and(DB::table('audit_events')->where('id', $event->id)->value('changes'))
         ->not->toContain('super-secret');
+});
+
+test('auditable models redact nested secrets in object casts', function () {
+    Server::flushIdentityMap();
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy = [
+        'type' => 'TRAEFIK',
+        'credentials' => ['password' => 'old-proxy-password'],
+    ];
+    $server->save();
+    AuditEvent::query()->delete();
+
+    $server->proxy = [
+        'type' => 'TRAEFIK',
+        'credentials' => ['password' => 'new-proxy-password'],
+    ];
+    $server->save();
+
+    $changes = AuditEvent::query()->sole()->changes;
+
+    expect($changes['proxy'])->toBe([
+        'old' => ['type' => 'TRAEFIK', 'credentials' => '[REDACTED]'],
+        'new' => ['type' => 'TRAEFIK', 'credentials' => '[REDACTED]'],
+    ]);
+});
+
+test('audit metadata redacts secrets in serializable objects', function (Closure $configuration) {
+    auditLog('ui.server.updated', [
+        'team_id' => $this->team->id,
+        'configuration' => $configuration(),
+    ]);
+
+    expect(AuditEvent::query()->sole()->metadata['configuration'])->toBe([
+        'enabled' => true,
+        'nested' => ['password' => '[REDACTED]'],
+    ]);
+})->with([
+    'plain object' => fn () => (object) [
+        'enabled' => true,
+        'nested' => (object) ['password' => 'must-not-be-recorded'],
+    ],
+    'JSON serializable object' => fn () => new class implements JsonSerializable
+    {
+        public function jsonSerialize(): mixed
+        {
+            return ['enabled' => true, 'nested' => ['password' => 'must-not-be-recorded']];
+        }
+    },
+]);
+
+test('audit change preparation failures do not fail model writes', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    AuditEvent::query()->delete();
+    $project->mergeCasts(['description' => FailingAuditAttributeCast::class]);
+
+    $project->update(['description' => 'Persist this description']);
+
+    expect(Project::query()->findOrFail($project->id)->description)->toBe('Persist this description')
+        ->and(AuditEvent::query()->sole()->changes)->toBe([]);
+
+    Log::shouldHaveReceived('warning')->once()->with(
+        'Audit change preparation failed',
+        Mockery::on(fn (array $context): bool => $context['action'] === 'updated'
+            && $context['exception'] === RuntimeException::class
+            && array_keys($context) === ['resource_type', 'action', 'exception']),
+    );
 });
 
 test('auditable models exclude timestamp attributes from changes', function () {
