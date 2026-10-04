@@ -76,7 +76,6 @@ test('flushes every key with the engine CLI and records an audit event', functio
     $database = $model::create([
         'name' => 'cache',
         'image' => 'redis:7',
-        'status' => 'running:healthy',
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
@@ -88,15 +87,15 @@ test('flushes every key with the engine CLI and records an audit event', functio
         ->call('flush')
         ->assertDispatched('success');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "sudo docker exec {$database->uuid} {$cli} FLUSHALL ASYNC"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "sudo bash -c 'docker exec {$database->uuid} sh -c '\\''REDISCLI_AUTH=\"\$REDIS_PASSWORD\" {$cli} FLUSHALL ASYNC'\\'''"));
     expect(AuditEvent::query()
         ->where('event', 'ui.database.flushed')
         ->where('resource_uuid', $database->uuid)
         ->exists())->toBeTrue();
 })->with([
     'redis' => [StandaloneRedis::class, [], 'redis-cli'],
-    'keydb' => [StandaloneKeydb::class, ['keydb_password' => 'secret'], "keydb-cli -a 'secret'"],
-    'dragonfly with tls' => [StandaloneDragonfly::class, ['dragonfly_password' => 'secret', 'enable_ssl' => true], "redis-cli --tls --cacert /etc/dragonfly/certs/coolify-ca.crt --cert /etc/dragonfly/certs/server.crt --key /etc/dragonfly/certs/server.key -a 'secret'"],
+    'keydb' => [StandaloneKeydb::class, ['keydb_password' => 'secret'], 'keydb-cli'],
+    'dragonfly with tls' => [StandaloneDragonfly::class, ['dragonfly_password' => 'secret', 'enable_ssl' => true], 'redis-cli --tls --cacert /etc/dragonfly/certs/coolify-ca.crt --cert /etc/dragonfly/certs/server.crt --key /etc/dragonfly/certs/server.key'],
 ]);
 
 test('reports an error when the database does not reply OK', function () {
