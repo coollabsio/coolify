@@ -3,6 +3,7 @@
 use App\Events\SentinelSynchronized;
 use App\Http\Controllers\Api\SentinelController;
 use App\Jobs\PushServerUpdateJob;
+use App\Models\AuditEvent;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -90,6 +91,7 @@ it('does not audit successful sentinel pushes', function () use ($running) {
     pushSentinel($this->token, sentinelPayload($running()))->assertOk();
 
     Queue::assertPushed(PushServerUpdateJob::class, 1);
+    expect(AuditEvent::query()->count())->toBe(0);
 });
 
 it('updates the heartbeat even when the job is skipped', function () use ($running) {

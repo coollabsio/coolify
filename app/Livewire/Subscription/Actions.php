@@ -68,9 +68,14 @@ class Actions extends Component
             return true;
         }
 
+        $previousServerLimit = (int) $this->server_limits;
         $result = (new UpdateSubscriptionQuantity)->execute(currentTeam(), $this->quantity);
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('quantity_updated', [
+                'from_server_limit' => $previousServerLimit,
+                'to_server_limit' => $this->quantity,
+            ]);
             $this->server_limits = $this->quantity;
             $this->pricePreview = null;
             $this->dispatch('success', 'Server limit updated to '.$this->quantity.'.');
@@ -105,6 +110,7 @@ class Actions extends Component
         $result = app(RefundSubscription::class)->execute(currentTeam());
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('refunded');
             $this->dispatch('success', 'Subscription refunded successfully.');
             $this->redirect(route('subscription.index'), navigate: true);
 
@@ -127,6 +133,7 @@ class Actions extends Component
             $result = app(RefundSubscription::class)->execute(currentTeam());
 
             if ($result['success']) {
+                $this->auditSubscriptionChange('refunded');
                 $this->dispatch('success', 'Subscription refunded and cancelled successfully.');
                 $this->redirect(route('subscription.index'), navigate: true);
 
@@ -162,6 +169,8 @@ class Actions extends Component
 
             $team->subscriptionEnded();
 
+            $this->auditSubscriptionChange('cancelled', ['cancel_at_period_end' => false]);
+
             \Log::info("Subscription {$subscription->stripe_subscription_id} cancelled immediately for team {$team->name}");
 
             $this->dispatch('success', 'Subscription cancelled successfully.');
@@ -186,6 +195,7 @@ class Actions extends Component
         $result = (new CancelSubscriptionAtPeriodEnd)->execute(currentTeam());
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('cancellation_scheduled', ['cancel_at_period_end' => true]);
             $this->dispatch('success', 'Subscription will be cancelled at the end of the billing period.');
 
             return true;
@@ -201,6 +211,7 @@ class Actions extends Component
         $result = (new ResumeSubscription)->execute(currentTeam());
 
         if ($result['success']) {
+            $this->auditSubscriptionChange('resumed');
             $this->dispatch('success', 'Subscription resumed successfully.');
 
             return true;
@@ -209,6 +220,24 @@ class Actions extends Component
         $this->dispatch('error', 'Something went wrong resuming the subscription. Please <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');
 
         return true;
+    }
+
+    /**
+     * Record a user-triggered subscription change for the current team.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function auditSubscriptionChange(string $action, array $context = []): void
+    {
+        $team = currentTeam();
+
+        auditLog("ui.subscription.{$action}", [
+            'team_id' => $team?->id,
+            'resource' => 'subscription',
+            'subscription_id' => $team?->subscription?->id,
+            'team_name' => $team?->name,
+            ...$context,
+        ]);
     }
 
     private function checkRefundEligibility(): void

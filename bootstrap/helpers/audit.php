@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AuditEvent;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -44,6 +45,24 @@ if (! function_exists('auditLog')) {
         }
 
         AuditEvent::record($event, $context, $level);
+    }
+}
+
+if (! function_exists('auditChangedFields')) {
+    /**
+     * Names of the attributes that the next save() will really change, without timestamps.
+     * Call it before save(). Loosely equal values, such as `false` and `0` in an uncast
+     * boolean column, do not count as changes.
+     *
+     * @return array<int, string>
+     */
+    function auditChangedFields(Model $model): array
+    {
+        return collect(array_keys($model->getDirty()))
+            ->reject(fn (string $field): bool => in_array($field, ['created_at', 'updated_at'], true)
+                || $model->getOriginal($field) == $model->getAttribute($field))
+            ->values()
+            ->all();
     }
 }
 

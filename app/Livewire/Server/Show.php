@@ -267,7 +267,9 @@ class Show extends Component
                 $this->server->settings->server_timezone = $this->serverTimezone;
             }
 
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->name = $this->server->name;
             $this->description = $this->server->description;
@@ -297,6 +299,25 @@ class Show extends Component
             $this->serverTimezone = $this->server->settings->server_timezone;
             $this->isValidating = $this->server->is_validating ?? false;
         }
+    }
+
+    /**
+     * Server columns are audited by the model. Settings live on ServerSetting, so record their names here.
+     *
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 
     public function refresh()
@@ -522,6 +543,11 @@ class Show extends Component
         try {
             $this->authorize('manageSentinel', $this->server);
             $this->server->settings->generateSentinelToken();
+            auditLog('ui.server.sentinel.token_regenerated', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

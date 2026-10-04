@@ -6,13 +6,14 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class DeploymentNavbar extends Component
 {
-    use AuthorizesRequests;
+    use AuditsApplicationSettings, AuthorizesRequests;
 
     public ApplicationDeploymentQueue $application_deployment_queue;
 
@@ -43,7 +44,7 @@ class DeploymentNavbar extends Component
         try {
             $this->authorize('update', $this->application);
             $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
-            $this->application->settings->save();
+            $this->saveApplicationSettingsWithAudit($this->application);
             $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
             $this->dispatch('refreshQueue');
         } catch (\Throwable $e) {

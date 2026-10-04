@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Livewire\Project\Shared\Storages\All as StorageList;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
@@ -18,6 +19,7 @@ use Livewire\Component;
 
 class Storage extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
     use ListensToTeamChannel;
 
@@ -283,13 +285,14 @@ class Storage extends Component
 
             $name = $this->resource->uuid.'-'.$this->name;
 
-            LocalPersistentVolume::create([
+            $volume = LocalPersistentVolume::create([
                 'name' => $name,
                 'mount_path' => $this->mount_path,
                 'host_path' => null,
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->getMorphClass(),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $volume);
             $this->clearForm();
             $this->activeTab = 'volumes';
             $this->refreshStorages();
@@ -315,7 +318,7 @@ class Storage extends Component
 
             $fs_path = confineFileMountPath($this->fileStorageHostPath(), $this->file_storage_path, 'file storage path');
 
-            LocalFileVolume::create([
+            $fileVolume = LocalFileVolume::create([
                 'fs_path' => $fs_path,
                 'mount_path' => $this->file_storage_path,
                 'content' => $this->file_storage_content,
@@ -323,6 +326,7 @@ class Storage extends Component
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $fileVolume);
 
             $this->clearForm();
             $this->activeTab = 'files';
@@ -348,7 +352,7 @@ class Storage extends Component
             $this->host_file_storage_source = validateHostFileMountPath($this->host_file_storage_source, 'host file source path');
             $this->host_file_storage_destination = validateFileMountPath($this->host_file_storage_destination, 'host file destination path');
 
-            LocalFileVolume::create([
+            $hostFileVolume = LocalFileVolume::create([
                 'fs_path' => $this->host_file_storage_source,
                 'mount_path' => $this->host_file_storage_destination,
                 'content' => null,
@@ -357,6 +361,7 @@ class Storage extends Component
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $hostFileVolume);
 
             $this->clearForm();
             $this->activeTab = 'files';
@@ -391,13 +396,14 @@ class Storage extends Component
             $server = $this->resource->service?->server ?? $this->resource->destination->server;
             LocalFileVolume::assertRemotePathIsConfined($this->fileStorageHostPath(), $this->file_storage_directory_source, $server);
 
-            LocalFileVolume::create([
+            $directoryVolume = LocalFileVolume::create([
                 'fs_path' => $this->file_storage_directory_source,
                 'mount_path' => $this->file_storage_directory_destination,
                 'is_directory' => true,
                 'resource_id' => $this->resource->id,
                 'resource_type' => get_class($this->resource),
             ]);
+            $this->auditStorageChange($this->resource, 'created', $directoryVolume);
 
             $this->clearForm();
             $this->activeTab = 'directories';

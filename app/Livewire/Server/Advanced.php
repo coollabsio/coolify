@@ -56,7 +56,9 @@ class Advanced extends Component
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
             $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
             $this->server->settings->server_disk_usage_notification_interval_hours = $this->serverDiskUsageNotificationIntervalHours;
+            $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
+            $this->auditSettingsUpdate($changedFields);
         } else {
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
@@ -97,5 +99,22 @@ class Advanced extends Component
     public function render()
     {
         return view('livewire.server.advanced');
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditSettingsUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.settings_updated', [
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+            'changed_fields' => $changedFields,
+        ]);
     }
 }

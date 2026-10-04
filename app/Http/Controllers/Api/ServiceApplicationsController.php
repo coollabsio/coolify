@@ -373,6 +373,13 @@ class ServiceApplicationsController extends Controller
 
         $serviceApplication->refresh();
 
+        auditLog('api.service_application.updated', [
+            'team_id' => $teamId,
+            'service_uuid' => $service->uuid,
+            'service_application_uuid' => $serviceApplication->uuid,
+            'changed_fields' => array_keys($payload),
+        ]);
+
         return response()->json($this->removeSensitiveData($serviceApplication));
     }
 

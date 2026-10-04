@@ -489,7 +489,20 @@ class PreviewDomains extends Component
         foreach ($this->domainRows as $index => $row) {
             $this->domainRows[$index]['url'] = DomainPortOverrides::withoutPort($row['url']);
         }
+        $changedFields = array_values(array_intersect(
+            auditChangedFields($this->preview),
+            ['fqdn', 'docker_compose_domains', 'domain_port_overrides'],
+        ));
         $this->preview->save();
+        if ($changedFields !== []) {
+            auditLog('ui.application.preview_updated', [
+                'team_id' => $this->preview->application->team()?->id,
+                'application_uuid' => $this->preview->application->uuid,
+                'application_name' => $this->preview->application->name,
+                'pull_request_id' => $this->preview->pull_request_id,
+                'changed_fields' => $changedFields,
+            ]);
+        }
         $dnsCleanup->queueReleaseOfRemovedHostnames($this->preview, $previousDnsHostnames, currentTeam()->id);
         $this->persistDnsStatuses();
         $this->refreshDomains();

@@ -288,9 +288,7 @@ class CloudflareDnsProvider
     private function forgetDeletedRecord(ManagedDnsRecord $record, ManagedDnsDeletionResult $result, ?Model $resource): ManagedDnsDeletionResult
     {
         $record->delete();
-        if ($result === ManagedDnsDeletionResult::Deleted) {
-            $this->auditDnsRecord('deleted', $record->zone, $record->name, $resource);
-        }
+        $this->auditDnsRecord($result === ManagedDnsDeletionResult::Deleted ? 'deleted' : 'already_deleted', $record->zone, $record->name, $resource);
 
         return $result;
     }

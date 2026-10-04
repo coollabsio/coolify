@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database\Sqlite;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Models\Application;
 use App\Models\LocalPersistentVolume;
 use App\Models\StandaloneSqlite;
@@ -14,6 +15,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ConnectApplication extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
 
     public StandaloneSqlite $database;
@@ -105,7 +107,7 @@ class ConnectApplication extends Component
                 throw new \Exception("{$application->name} already mounts this database volume.");
             }
 
-            LocalPersistentVolume::create([
+            $volume = LocalPersistentVolume::create([
                 'name' => $this->volumeName,
                 'mount_path' => $this->mountPath,
                 'host_path' => null,
@@ -114,6 +116,7 @@ class ConnectApplication extends Component
                 'resource_type' => $application->getMorphClass(),
                 'is_preview_suffix_enabled' => false,
             ]);
+            $this->auditStorageChange($application, 'created', $volume, $this->sqliteAuditContext());
 
             return redirect()->route('project.application.persistent-storage', $this->applicationRouteParameters($application));
         } catch (\Throwable $e) {
@@ -153,6 +156,9 @@ class ConnectApplication extends Component
         $this->authorize('update', $volume->resource ?? $this->database);
 
         $volume->delete();
+        if ($volume->resource !== null) {
+            $this->auditStorageChange($volume->resource, 'deleted', $volume, $this->sqliteAuditContext());
+        }
 
         $this->dispatch('success', 'Application unlinked. Redeploy it to apply the change.');
     }
@@ -160,6 +166,17 @@ class ConnectApplication extends Component
     public function render()
     {
         return view('livewire.project.database.sqlite.connect-application');
+    }
+
+    /**
+     * @return array{standalone_sqlite_uuid: string, standalone_sqlite_name: string}
+     */
+    private function sqliteAuditContext(): array
+    {
+        return [
+            'standalone_sqlite_uuid' => $this->database->uuid,
+            'standalone_sqlite_name' => $this->database->name,
+        ];
     }
 
     /**
