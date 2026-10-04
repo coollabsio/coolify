@@ -255,6 +255,13 @@ $appListboxOptions = array_merge(
                     @else
                         @php $maxAppRequests = max(1, (int) collect($topApps)->max('requests')); @endphp
                         <div x-data="{ page: 0, per: 10, total: {{ count($topApps) }} }">
+                            <div class="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium text-neutral-500 dark:border-white/[0.07] dark:text-fg-dim">
+                                <span class="min-w-0 flex-1">Application / service</span>
+                                <span class="hidden w-16 shrink-0 text-right sm:inline" title="Request volume relative to the busiest row in this list">Volume</span>
+                                <span class="w-16 shrink-0 text-right">Requests</span>
+                                <span class="hidden w-16 shrink-0 text-right sm:inline" title="Total response data sent">Bandwidth</span>
+                                <span class="size-3.5 shrink-0" aria-hidden="true"></span>
+                            </div>
                             @foreach ($topApps as $row)
                                 @php
                                     $appHref = $row['link'] ?? null;
@@ -279,7 +286,7 @@ $appListboxOptions = array_merge(
                                     <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
                                         <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $appWidth }}%;"></div>
                                     </div>
-                                    <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                                    <span class="w-16 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
                                         title="{{ number_format($row['requests']) }} requests">{{ compactNumber($row['requests']) }}</span>
                                     <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($row['bandwidth']) }}</span>
                                     @if ($appHref)
@@ -287,6 +294,8 @@ $appListboxOptions = array_merge(
                                             fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                                         </svg>
+                                    @else
+                                        <span class="size-3.5 shrink-0" aria-hidden="true"></span>
                                     @endif
                                 </{{ $appHref ? 'a' : 'div' }}>
                             @endforeach
