@@ -66,6 +66,24 @@ RUN npm run build
 FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
 
 # =================================================================
+# Stage 4: Terminal dependencies (match the production Node.js ABI and libc)
+# =================================================================
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+
+USER root
+
+RUN apk upgrade && \
+    apk add --no-cache nodejs npm make g++ python3
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary && \
+    rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
+        /terminal/node_modules/node-pty/prebuilds/win32-*
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
+
+# =================================================================
 # Final Stage: Production image
 # =================================================================
 FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
@@ -112,10 +130,6 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     nodejs \
-    npm \
-    make \
-    g++ \
-    python3 \
     openssh-client \
     git \
     git-lfs \
@@ -171,12 +185,7 @@ COPY --chown=www-data:www-data changelogs/ ./changelogs/
 RUN composer dump-autoload
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
-    npm rebuild node-pty --prefix /terminal --update-binary
-COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
-COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
-RUN chown -R www-data:www-data /terminal
+COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
