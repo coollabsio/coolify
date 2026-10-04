@@ -111,6 +111,13 @@ class InstanceSettings extends Model
         static::updated(function ($settings) {
             // Clear once() cache so subsequent calls get fresh data
             Once::flush();
+
+            if ($settings->wasChanged(['fqdn', 'public_ipv4', 'public_ipv6'])) {
+                ServerSetting::followInstanceUrlChange(
+                    ServerSetting::instanceSentinelUrl($settings->getOriginal('fqdn'), $settings->getOriginal('public_ipv4'), $settings->getOriginal('public_ipv6')),
+                    ServerSetting::instanceSentinelUrl($settings->fqdn, $settings->public_ipv4, $settings->public_ipv6),
+                );
+            }
         });
     }
 

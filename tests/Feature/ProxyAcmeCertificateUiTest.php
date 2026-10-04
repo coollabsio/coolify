@@ -1,8 +1,8 @@
 <?php
 
 it('gates Traefik ACME certificate deletion behind update authorization', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/proxy.blade.php'));
-    $component = file_get_contents(app_path('Livewire/Server/Proxy.php'));
+    $view = file_get_contents(resource_path('views/livewire/server/proxy/certificates.blade.php'));
+    $component = file_get_contents(app_path('Livewire/Server/Proxy/Certificates.php'));
 
     expect($view)
         ->toContain('submitAction="deleteTraefikCertificate')
