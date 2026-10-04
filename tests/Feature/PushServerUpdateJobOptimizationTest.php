@@ -1,11 +1,13 @@
 <?php
 
+use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerStorageCheckJob;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -136,6 +138,8 @@ it('does not dispatch proxy network work when the proxy is running', function ()
         ],
         'filesystem_usage_root' => ['used_percentage' => 10],
     ];
+
+    Event::fake([ServiceChecked::class]);
 
     (new PushServerUpdateJob($server, $data))->handle();
 

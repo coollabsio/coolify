@@ -11,6 +11,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Events\ServiceChecked;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -366,6 +367,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
 
         if (! $this->isCompleteSnapshot()) {
+            ServiceChecked::dispatch($this->server->team_id);
+
             return;
         }
 
@@ -390,6 +393,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->aggregateServiceContainerStatuses();
 
         $this->checkLogDrainContainer();
+
+        ServiceChecked::dispatch($this->server->team_id);
     }
 
     private function isCompleteSnapshot(): bool
