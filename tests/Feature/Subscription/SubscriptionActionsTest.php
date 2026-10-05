@@ -17,6 +17,8 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Stripe\Service\InvoiceService;
+use Stripe\Service\RefundService;
 use Stripe\Service\SubscriptionService;
 use Stripe\StripeClient;
 
@@ -166,6 +168,36 @@ describe('cancelImmediately with account deletion', function () {
             ->assertRedirect(route('login'));
 
         expect(User::find($this->user->id))->toBeNull();
+    });
+
+    test('keeps the account when cancellation fails after a successful refund', function () {
+        $this->stripe->invoices = Mockery::mock(InvoiceService::class);
+        $this->stripe->refunds = Mockery::mock(RefundService::class);
+        $this->stripe->subscriptions->shouldReceive('retrieve')->with('sub_test_123')->andReturn((object) [
+            'status' => 'active',
+            'start_date' => now()->subDays(10)->timestamp,
+            'current_period_end' => now()->addDays(20)->timestamp,
+        ]);
+        $this->stripe->invoices->shouldReceive('all')->andReturn((object) ['data' => [
+            (object) ['payment_intent' => 'pi_test_123'],
+        ]]);
+        $this->stripe->refunds->shouldReceive('create')->once()
+            ->with(['payment_intent' => 'pi_test_123'])
+            ->andReturn((object) ['id' => 're_test_123']);
+        $this->stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_test_123')
+            ->andThrow(new RuntimeException('Stripe cancel API error'));
+
+        Livewire::test(Actions::class)
+            ->call('cancelImmediately', 'password', ['refundLatestPayment', 'deleteAccount'])
+            ->assertDispatched('error')
+            ->assertNotDispatched('success')
+            ->assertNoRedirect();
+
+        $this->assertModelExists($this->user);
+        $this->assertModelExists($this->team);
+        expect($this->team->subscription->fresh()->stripe_subscription_id)->toBe('sub_test_123')
+            ->and($this->team->subscription->fresh()->stripe_refunded_at)->not->toBeNull()
+            ->and(auth()->check())->toBeTrue();
     });
 
     test('does not cancel when the account cannot be deleted', function () {
