@@ -29,12 +29,17 @@
                     <span wire:loading.remove wire:target="dryRun">Dry run</span>
                     <span wire:loading wire:target="dryRun">Checking…</span>
                 </x-forms.button>
-                <x-forms.button wire:click="importBundle" wire:loading.attr="disabled"
-                    wire:target="dryRun,importBundle"
-                    wire:confirm="Import this server into the current team?">
-                    <span wire:loading.remove wire:target="importBundle">Import server</span>
-                    <span wire:loading wire:target="importBundle">Importing…</span>
-                </x-forms.button>
+                <x-modal-confirmation title="Import server?" submitAction="importBundle" :actions="[
+                    'The server and its resources are imported into the current team.',
+                ]" :confirmWithText="false" :confirmWithPassword="false"
+                    warningMessage="Run a dry run first to check the bundle." step2ButtonText="Import server">
+                    <x-slot:trigger>
+                        <x-forms.button wire:target="dryRun,importBundle">
+                            <span wire:loading.remove wire:target="importBundle">Import server</span>
+                            <span wire:loading wire:target="importBundle">Importing…</span>
+                        </x-forms.button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
             </div>
         </div>
 

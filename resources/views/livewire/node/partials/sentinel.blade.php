@@ -123,10 +123,10 @@
             </p>
             <div class="flex flex-wrap items-center gap-2">
                 <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>
-                <x-forms.button wire:click="restartSentinel"
-                    wire:confirm="Restart Sentinel on this server? The control connection drops briefly.">
-                    Restart
-                </x-forms.button>
+                <x-modal-confirmation title="Restart Sentinel?" buttonTitle="Restart" submitAction="restartSentinel"
+                    :actions="['Sentinel restarts on this server.']" :confirmWithText="false"
+                    :confirmWithPassword="false" warningMessage="The control connection drops briefly."
+                    step2ButtonText="Restart Sentinel" />
             </div>
         </div>
     </x-application.settings-section>

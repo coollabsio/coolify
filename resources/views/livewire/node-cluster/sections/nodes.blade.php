@@ -125,11 +125,11 @@
                                 title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this server.' : 'Serve public HTTP traffic for cluster applications on port 80 of this server.' }}">
                                 {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
                             </x-forms.button>
-                            <x-forms.button wire:click="removeNode('{{ $node->uuid }}')"
-                                wire:confirm="Remove {{ $node->name }} from this cluster? Its private network configuration will be removed, or when it is offline, as soon as it reconnects."
-                                wire:loading.attr="disabled" wire:target="removeNode('{{ $node->uuid }}')">
-                                Remove
-                            </x-forms.button>
+                            <x-modal-confirmation title="Remove server from cluster?" buttonTitle="Remove"
+                                submitAction="removeNode({{ $node->uuid }})" :actions="[
+                                    $node->name.' is removed from this cluster.',
+                                    'Its private network configuration is removed now, or as soon as it reconnects when it is offline.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Remove server" />
                         @endif
                     </div>
                 </div>

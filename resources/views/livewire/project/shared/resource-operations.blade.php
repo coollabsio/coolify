@@ -217,11 +217,16 @@
                         The resource keeps the same UUID and configuration. Only the hosting server and network
                         destination change.
                     </p>
-                    <x-forms.button
-                        wire:confirm="Migrate this resource? It will be stopped on the source server. Redeploy after migration completes."
-                        @click="$wire.migrateTo(selectedMigrateDestination)">
-                        Migrate resource
-                    </x-forms.button>
+                    <x-modal-confirmation title="Migrate resource?" submitAction="migrateTo" :actions="[
+                        'The resource stops on the source server.',
+                        'Redeploy the resource after the migration completes.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Migrate resource">
+                        <x-slot:trigger>
+                            <x-forms.button @click="submitAction = `migrateTo(${selectedMigrateDestination})`">
+                                Migrate resource
+                            </x-forms.button>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
                 </div>
             </x-application.settings-section>
         @endif

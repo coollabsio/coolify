@@ -74,7 +74,7 @@
                                 'disabled' => ! $s3->is_usable,
                             ])->values()->all();
                         @endphp
-                        <div
+                        <div wire:key="database-backup-{{ $backup->id }}"
                             class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
                             x-show="search === '' || '{{ strtolower(addslashes($databaseName)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($backup->frequency)) }}'.includes(search.toLowerCase())">
                             <div class="min-w-0">
@@ -102,11 +102,12 @@
                                     portal />
                                 <button type="button" class="button shrink-0"
                                     wire:click="moveBackup({{ $backup->id }})">Move</button>
-                                <button type="button" class="button shrink-0 text-error"
-                                    wire:click="disableS3({{ $backup->id }})"
-                                    wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                    Disable
-                                </button>
+                                <x-modal-confirmation title="Disable S3 backups?" buttonTitle="Disable"
+                                    submitAction="disableS3({{ $backup->id }})" :actions="[
+                                        'This backup schedule stops uploading backups to S3 storage.',
+                                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                                    warningMessage="Existing backups in S3 storage are not deleted."
+                                    step2ButtonText="Disable S3" />
                             </div>
                         </div>
                     @endforeach
@@ -123,7 +124,7 @@
                             'disabled' => ! $s3->is_usable,
                         ])->values()->all();
                     @endphp
-                    <div
+                    <div wire:key="volume-backup-{{ $backup->id }}"
                         class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
                         x-show="search === '' || '{{ strtolower(addslashes($targetName)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($targetType)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($resourceName ?? '')) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($backup->frequency)) }}'.includes(search.toLowerCase())">
                         <div class="min-w-0">
@@ -142,11 +143,12 @@
                                 portal />
                             <button type="button" class="button shrink-0"
                                 wire:click="moveVolumeBackup({{ $backup->id }})">Move</button>
-                            <button type="button" class="button shrink-0 text-error"
-                                wire:click="disableVolumeS3({{ $backup->id }})"
-                                wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
-                                Disable
-                            </button>
+                            <x-modal-confirmation title="Disable S3 backups?" buttonTitle="Disable"
+                                submitAction="disableVolumeS3({{ $backup->id }})" :actions="[
+                                    'This backup schedule stops uploading backups to S3 storage.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false"
+                                warningMessage="Existing backups in S3 storage are not deleted."
+                                step2ButtonText="Disable S3" />
                         </div>
                     </div>
                 @endforeach

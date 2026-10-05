@@ -144,11 +144,17 @@
                             </x-modal-input>
 
                             @if ($revision && in_array($workloadState, ['Running', 'Stopped', 'Outdated'], true))
-                                <x-forms.button isError class="size-8! px-0!" title="Remove" aria-label="Remove"
-                                    wire:confirm="Remove the {{ $workload->name }} container from this server?"
-                                    wire:click="manageWorkload('remove', '{{ $revision->uuid }}')">
-                                    <x-reicon name="trash" class="size-3.5" />
-                                </x-forms.button>
+                                <x-modal-confirmation title="Remove container?"
+                                    submitAction="manageWorkload(remove, {{ $revision->uuid }})" :actions="[
+                                        'The '.$workload->name.' container is removed from this server.',
+                                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                                    step2ButtonText="Remove container">
+                                    <x-slot:trigger>
+                                        <x-forms.button isError class="size-8! px-0!" title="Remove" aria-label="Remove">
+                                            <x-reicon name="trash" class="size-3.5" />
+                                        </x-forms.button>
+                                    </x-slot:trigger>
+                                </x-modal-confirmation>
                             @endif
                         </div>
                     @endcan

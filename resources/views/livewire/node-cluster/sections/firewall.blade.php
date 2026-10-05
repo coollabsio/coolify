@@ -86,10 +86,10 @@
                     </div>
                     <div class="flex justify-end">
                         @if ($canUpdateCluster)
-                            <x-forms.button wire:click="removeFirewallRule('{{ $rule->uuid }}')"
-                                wire:confirm="Remove this firewall rule?">
-                                Remove
-                            </x-forms.button>
+                            <x-modal-confirmation title="Remove application rule?" buttonTitle="Remove"
+                                submitAction="removeFirewallRule({{ $rule->uuid }})" :actions="[
+                                    'Traffic from '.($rule->sourceNode?->name ?? $rule->sourceWorkload?->name).' to '.$rule->destinationWorkload->name.' on '.strtoupper($rule->protocol).($rule->protocol !== 'icmp' ? ' / '.$rule->port : '').' is blocked again.',
+                                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Remove rule" />
                         @endif
                     </div>
                 </div>
