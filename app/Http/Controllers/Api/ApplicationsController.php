@@ -2621,7 +2621,7 @@ class ApplicationsController extends Controller
         $pullRequestId = null;
         $pullRequestIdRaw = $request->route('pull_request_id');
         if ($pullRequestIdRaw !== null) {
-            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+            if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
                 return response()->json(['message' => 'Invalid pull_request_id.'], 422);
             }
             $pullRequestId = (int) $pullRequestIdRaw;
@@ -2728,7 +2728,7 @@ class ApplicationsController extends Controller
         $this->authorize('update', $application);
 
         $pullRequestIdRaw = $request->route('pull_request_id');
-        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
             return response()->json(['message' => 'Invalid pull_request_id.'], 422);
         }
 
@@ -5655,7 +5655,7 @@ class ApplicationsController extends Controller
         $this->authorize('delete', $application);
 
         $pullRequestIdRaw = $request->route('pull_request_id');
-        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0) {
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
             return response()->json(['message' => 'Invalid pull_request_id.'], 422);
         }
         $pullRequestId = (int) $pullRequestIdRaw;

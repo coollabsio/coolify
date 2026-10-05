@@ -315,8 +315,8 @@ class DeployController extends Controller
             new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
+            new OA\Parameter(name: 'pull_request_id', in: 'query', description: 'Preview deployment identifier. Alias of pr.', schema: new OA\Schema(type: 'integer', maximum: 2147483647)),
             new OA\Parameter(name: 'docker_tag', in: 'query', description: 'Docker image tag for Docker Image preview deployments. Requires pull_request_id.', schema: new OA\Schema(type: 'string')),
         ],
 
@@ -372,6 +372,9 @@ class DeployController extends Controller
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
 
+        if ($pr > 2147483647) {
+            return response()->json(['message' => 'pull_request_id must be between 1 and 2147483647.'], 400);
+        }
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }

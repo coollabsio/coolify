@@ -86,6 +86,7 @@
                                 "properties": {
                                     "pull_request_id": {
                                         "type": "integer",
+                                        "maximum": 2147483647,
                                         "minimum": 1,
                                         "example": 42
                                     },
@@ -10274,7 +10275,8 @@
                         "in": "query",
                         "description": "Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.",
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "maximum": 2147483647
                         }
                     },
                     {
@@ -10282,7 +10284,8 @@
                         "in": "query",
                         "description": "Preview deployment identifier. Alias of pr.",
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "maximum": 2147483647
                         }
                     },
                     {
