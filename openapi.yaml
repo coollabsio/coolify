@@ -623,7 +623,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1032,7 +1032,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1441,7 +1441,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -1791,7 +1791,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -2127,7 +2127,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true
@@ -2636,7 +2636,7 @@ paths:
                 custom_internal_name:
                   type: string
                   nullable: true
-                  description: 'Custom internal container name. Requires is_consistent_container_name_enabled to be true.'
+                  description: 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'
                 custom_container_name_prefix:
                   type: string
                   nullable: true

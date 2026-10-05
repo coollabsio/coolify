@@ -38,4 +38,4 @@ it('does not return the internal legacy password quoting flag in the database AP
 
     expect($single->json())->not->toHaveKey('legacy_password_quoting')
         ->and(collect($list->json())->firstWhere('uuid', $database->uuid))->not->toHaveKey('legacy_password_quoting');
-})->with(['keydb' => 'create_standalone_keydb', 'dragonfly' => 'create_standalone_dragonfly']);
+})->with(['keydb' => 'create_standalone_keydb', 'dragonfly' => 'create_standalone_dragonfly', 'redis' => 'create_standalone_redis']);

@@ -13,6 +13,17 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class HighDiskUsage extends CustomEmailNotification implements ThrottledNotification
 {
+    /**
+     * Percentage points below the threshold that disk usage must reach before a new spike alerts
+     * again, so usage that moves around the threshold does not send an alert on every change.
+     */
+    public const RECOVERY_MARGIN = 5;
+
+    public static function hasRecovered(int|float $diskUsage, int|float $threshold): bool
+    {
+        return $diskUsage <= $threshold - self::RECOVERY_MARGIN;
+    }
+
     public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
     {
         $this->onQueue('high');

@@ -1338,7 +1338,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     }
 
     // Parse the rest of the services
-    $previewOwnExternalVolumes = collect([]);
+    $previewOwnVolumes = collect([]);
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
         $restart = data_get_str($service, 'restart', RESTART_MODE);
@@ -1489,27 +1489,28 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
-                    // A preview never mounts an external volume: two deployments that write into the same
-                    // data directory (for example two databases) can corrupt it. The preview gets its own
-                    // volume with the name that older Coolify versions gave it, so it keeps its data, and
-                    // the preview cleanup removes it.
-                    $isPreviewOwnExternalVolume = $isPullRequest
-                        && composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null;
+                    // A preview never mounts an external or network (NFS, CIFS) volume: two deployments
+                    // that write into the same data directory (for example two databases) can corrupt it.
+                    // The preview gets its own volume with the name that older Coolify versions gave
+                    // it, so it keeps its data, and the preview cleanup removes it.
+                    $declaration = $topLevel->get('volumes')->get($source->value());
+                    $isNetworkVolume = in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true);
+                    $isPreviewOwnVolume = $isPullRequest
+                        && ($isNetworkVolume || composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null);
                     if (! $isPullRequest && useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
                         // The external volume gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);
 
                         continue;
                     }
-                    if ($isPreviewOwnExternalVolume) {
-                        $previewOwnExternalVolumes->put($source->value(), true);
-                    }
-                    $declaration = $topLevel->get('volumes')->get($source->value());
-                    if (in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+                    if (! $isPullRequest && $isNetworkVolume) {
                         // Network volumes are used as written.
                         $volumesParsed->put($index, $volume);
 
                         continue;
+                    }
+                    if ($isPreviewOwnVolume) {
+                        $previewOwnVolumes->put($source->value(), true);
                     }
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
@@ -1542,7 +1543,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             'resource_type' => get_class($originalResource),
                         ]
                     );
-                    $topLevel->get('volumes')->put($name, $isPreviewOwnExternalVolume
+                    $topLevel->get('volumes')->put($name, $isPreviewOwnVolume
                         ? ['name' => $name]
                         : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
                 }
@@ -2149,8 +2150,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         $parsedServices->put($serviceName, $payload);
     }
-    // The preview mounts its own volumes instead of these external volumes (see above), so it does not declare them.
-    $topLevel->put('volumes', $topLevel->get('volumes')->except($previewOwnExternalVolumes->keys()->all()));
+    // The preview mounts its own volumes instead of these external and network volumes (see above), so it does not declare them.
+    $topLevel->put('volumes', $topLevel->get('volumes')->except($previewOwnVolumes->keys()->all()));
     $topLevel->put('services', $parsedServices);
 
     $customOrder = ['services', 'volumes', 'networks', 'configs', 'secrets'];

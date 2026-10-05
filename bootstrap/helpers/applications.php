@@ -153,7 +153,7 @@ function queue_next_deployment(Application $application, ?int $finished_deployme
         ->where('status', ApplicationDeploymentStatus::QUEUED)
         ->distinct()
         ->pluck('server_id');
-    $server_ids = collect([$application->destination->server_id, $finished_deployment_server_id])
+    $server_ids = collect([$application->destination?->server_id, $finished_deployment_server_id])
         ->merge($application_queued_server_ids)
         ->filter(fn ($server_id) => $server_id !== null)
         ->unique()
@@ -164,7 +164,11 @@ function queue_next_deployment(Application $application, ?int $finished_deployme
         ->sortBy('created_at');
 
     foreach ($queued_deployments as $next_deployment) {
-        start_queued_deployment($next_deployment);
+        try {
+            start_queued_deployment($next_deployment);
+        } catch (Throwable $e) {
+            Log::warning("Failed to start queued deployment {$next_deployment->deployment_uuid}: {$e->getMessage()}");
+        }
     }
 }
 
@@ -264,7 +268,11 @@ function next_queuable(string $server_id, string $application_id, string $commit
     }
 
     // Check server's concurrent build limit
+    // A deleted server keeps its queued deployments; they cannot run anymore.
     $server = Server::find($server_id);
+    if (! $server) {
+        return false;
+    }
     $concurrent_builds = $server->settings->concurrent_builds;
     $active_deployments = ApplicationDeploymentQueue::where('server_id', $server_id)
         ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
@@ -276,8 +284,17 @@ function next_queuable(string $server_id, string $application_id, string $commit
 
     return true;
 }
-function next_after_cancel(?Server $server = null)
+/**
+ * Start the queued deployments that can run after a cancellation. With the application of the
+ * cancelled deployment, its queued deployments on all servers start too, as when a deployment ends.
+ */
+function next_after_cancel(?Server $server = null, ?Application $application = null)
 {
+    if ($application) {
+        queue_next_deployment($application, $server?->id);
+
+        return;
+    }
     if ($server) {
         $next_found = ApplicationDeploymentQueue::where('server_id', data_get($server, 'id'))
             ->where('status', ApplicationDeploymentStatus::QUEUED)

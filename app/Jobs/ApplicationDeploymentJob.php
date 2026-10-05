@@ -646,6 +646,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
 
         // Save build-time .env file BEFORE the build
         $this->save_buildtime_environment_variables();
@@ -792,6 +793,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->generate_image_names();
         $this->cleanup_git();
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
 
         $this->generate_build_env_variables();
 
@@ -1108,6 +1110,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->cleanup_git();
         $this->generate_compose_file();
 
@@ -1141,6 +1144,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_nixpacks_confs();
@@ -1174,6 +1178,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
@@ -1205,6 +1210,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
         }
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
@@ -2280,24 +2286,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     /**
      * Build-time names go into shell and Docker build commands, so they must be valid when the
-     * deployment builds an image. Runtime-only variables only go into the .env file: existing ones
-     * with names that new variables can no longer use (such as my-var) keep working, unless the
-     * name would break a .env line. Deployments without a build step (Docker image) treat
-     * build-time variables the same way, because no build receives them.
+     * deployment builds an image ($buildsImage, checked right before the build steps). Restarts and
+     * deployments that reuse an existing image do not pass them to a build, so handle() only warns.
+     * Runtime-only variables only go into the .env file: existing ones with names that new variables
+     * can no longer use (such as my-var) keep working, unless the name would break a .env line.
+     * Deployments without a build step (Docker image) never validate build-time names.
      */
-    private function validateDeploymentEnvironmentVariableKeys(): void
+    private function validateDeploymentEnvironmentVariableKeys(bool $buildsImage = false): void
     {
         $environmentVariables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->get(['key', 'is_buildtime', 'is_runtime'])
             : $this->application->environment_variables_preview()->get(['key', 'is_buildtime', 'is_runtime']);
-        $passesBuildtimeVariables = $this->deploymentPassesBuildtimeVariables();
+        $validatesBuildtimeKeys = $buildsImage && $this->deploymentPassesBuildtimeVariables();
 
         foreach ($environmentVariables as $environmentVariable) {
             $key = (string) $environmentVariable->key;
             $isEnvFileSafe = $key !== '' && strpbrk($key, "=\n\r\0") === false;
-            if (($environmentVariable->is_buildtime && $passesBuildtimeVariables) || ! $isEnvFileSafe) {
+            if (($environmentVariable->is_buildtime && $validatesBuildtimeKeys) || ! $isEnvFileSafe) {
                 $this->validatedBuildtimeEnvironmentVariableKey($key, 'the deployment environment');
 
+                continue;
+            }
+            // The deployment start already logged the warnings.
+            if ($buildsImage) {
                 continue;
             }
             if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
@@ -2325,7 +2336,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
 
         if ($isBuildtime) {
-            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. This deployment does not build an image, so it is not used as a build-time variable. Rename it before you use it in a build.", 'stderr');
+            $this->application_deployment_queue->addLogEntry("⚠️ Build-time variable {$displayKey} uses a name that new variables cannot use. It is not used as a build-time variable unless the deployment builds an image, and that build fails until you rename it.", 'stderr');
         }
         if ($isRuntime) {
             $this->application_deployment_queue->addLogEntry("⚠️ Runtime variable {$displayKey} uses a name that new variables cannot use. It is still passed to the container, but shell scripts cannot read it.", 'stderr');
@@ -2665,6 +2676,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->cleanup_git();
+        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
         if ($this->application->build_pack === 'nixpacks') {
             $this->generate_nixpacks_confs();
         }
@@ -4875,7 +4887,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->generate_env_variables();
         }
 
-        $variables = $this->env_args;
+        // Invalid names stay out of the helper container: a build fails on them before it starts,
+        // and restarts or deployments that reuse an image do not need them.
+        $variables = $this->env_args->filter(fn ($value, $key): bool => ValidationPatterns::isValidEnvironmentVariableKey((string) $key));
 
         if ($this->build_pack === 'railpack') {
             $variables = $this->without_reserved_docker_client_variables($variables);
