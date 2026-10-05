@@ -1,12 +1,11 @@
 {{-- Cluster server rows on the Servers page. Expects $nodes, $cluster (nullable), and $sentinelRelease. --}}
 @php
-    $serverGridClasses = 'grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 md:min-w-[760px] md:grid-cols-[minmax(0,1fr)_9rem_6.5rem_10rem_9.5rem]';
+    $serverGridClasses = 'grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 md:min-w-[620px] md:grid-cols-[minmax(0,1fr)_6.5rem_10rem_9.5rem]';
 @endphp
 <div class="overflow-x-auto">
     <div
         class="{{ $serverGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
         <div>Server</div>
-        <div class="hidden md:block">IP address</div>
         <div class="hidden md:block">Ingress</div>
         <div class="hidden md:block">Sentinel</div>
         <div>Status</div>
@@ -33,15 +32,8 @@
                 </div>
                 <div class="min-w-0">
                     <p class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</p>
-                    <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                        <span class="md:hidden">{{ $node->ip }}</span>
-                        <span class="hidden md:inline">{{ $node->description }}</span>
-                    </p>
+                    <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $node->description }}</p>
                 </div>
-            </div>
-            <div class="hidden min-w-0 items-center gap-1.5 truncate font-mono text-[12px] text-neutral-600 md:flex dark:text-fg-dim">
-                <x-reicon name="network" class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" />
-                <span class="truncate">{{ $node->ip ?: '-' }}</span>
             </div>
             <div class="hidden md:block">
                 <x-status-badge :status="match ($ingressState) {

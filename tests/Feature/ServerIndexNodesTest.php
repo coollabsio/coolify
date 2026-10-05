@@ -62,7 +62,8 @@ it('groups cluster servers by cluster above the Docker servers', function () {
 
     Livewire::test(ClusterGroups::class)
         ->assertSeeInOrder(['Development QEMU mesh', 'Active', '1 server', 'QEMU worker', 'Not in a cluster', 'Loose cluster server'])
-        ->assertSee('203.0.113.21')
+        ->assertDontSee('203.0.113.21')
+        ->assertDontSee('IP address')
         ->assertSee('1.0.0')
         ->assertSee('Upgrade available')
         ->assertSee('Unreachable')
