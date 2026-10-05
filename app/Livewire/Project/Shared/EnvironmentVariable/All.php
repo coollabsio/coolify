@@ -219,12 +219,17 @@ class All extends Component
         return $this->environmentVariableRowCount > 0;
     }
 
+    private function canViewEnvironmentValues(): bool
+    {
+        return auth()->user()?->can('manageEnvironment', $this->resource) ?? false;
+    }
+
     private function nullLockedValues($envs)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
-        $envs->each(function ($env) use ($isMember) {
-            if ($env->is_shown_once || $isMember) {
+        $envs->each(function ($env) use ($hideValues) {
+            if ($env->is_shown_once || $hideValues) {
                 $env->value = null;
                 $env->real_value = null;
             }
@@ -828,12 +833,12 @@ class All extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $isMember = auth()->user()?->isMember();
+        $hideValues = ! $this->canViewEnvironmentValues();
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(function ($item) use ($isMember) {
-                if ($isMember) {
+            ->map(function ($item) use ($hideValues) {
+                if ($hideValues) {
                     return "$item->key=(Hidden, only admins can view)";
                 }
                 if ($item->is_shown_once) {
@@ -849,6 +854,7 @@ class All extends Component
 
     public function switch()
     {
+        $this->authorize('view', $this->resource);
         $this->view = $this->view === 'normal' ? 'dev' : 'normal';
         if ($this->view === 'dev') {
             $this->ensureEnvironmentVariablesLoaded();

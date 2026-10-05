@@ -63,7 +63,7 @@ class Show extends Component
     public function submit()
     {
         try {
-            $this->authorize('create', Environment::class);
+            $this->authorize('update', $this->project);
             $this->validate();
             $environment = Environment::create([
                 'name' => $this->name,

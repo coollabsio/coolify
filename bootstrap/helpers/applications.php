@@ -7,6 +7,7 @@ use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -275,8 +276,11 @@ function clone_application(Application $source, $destination, array $overrides =
     $uuid = $overrides['uuid'] ?? new_public_id();
     $server = $destination->server;
 
-    if ($server->team_id !== currentTeam()->id) {
-        throw new RuntimeException('Destination does not belong to the current team.');
+    $teamId = $server->team_id;
+    $sourceTeamId = $source->team()?->id;
+    $environmentTeamId = Environment::query()->find($overrides['environment_id'] ?? $source->environment_id)?->project?->team_id;
+    if ($sourceTeamId === null || $environmentTeamId === null || (int) $sourceTeamId !== (int) $teamId || (int) $environmentTeamId !== (int) $teamId) {
+        throw new RuntimeException('The application, the target environment, and the destination must belong to the same team.');
     }
 
     // Prepare name and URL
@@ -342,7 +346,7 @@ function clone_application(Application $source, $destination, array $overrides =
         ])->fill([
             'uuid' => new_public_id(),
             'application_id' => $newApplication->id,
-            'team_id' => currentTeam()->id,
+            'team_id' => $teamId,
         ]);
         $newTask->save();
     }

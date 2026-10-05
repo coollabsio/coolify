@@ -281,7 +281,7 @@
                             @endif
                             @if ($buildPack !== 'dockercompose')
                                 @php
-                                    $hasBuildServers = \App\Models\Server::buildServers(currentTeam()->id)->exists();
+                                    $hasBuildServers = \App\Models\Server::buildServers($application->team()?->id)->exists();
                                     $buildServerOptions = [
                                         ['value' => false, 'label' => 'Deployment server'],
                                         $hasBuildServers

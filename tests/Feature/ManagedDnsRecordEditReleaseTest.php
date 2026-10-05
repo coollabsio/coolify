@@ -6,7 +6,10 @@ use App\Jobs\ConfigureDnsRecordJob;
 use App\Jobs\ReleaseManagedDnsRecordsJob;
 use App\Jobs\ReleaseRemovedDnsHostnamesJob;
 use App\Livewire\Project\Application\Domains;
+use App\Livewire\Project\Application\General;
+use App\Livewire\Project\Application\PreviewDomains;
 use App\Livewire\Project\Service\Domains as ServiceDomains;
+use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\DnsProviderZone;
@@ -612,5 +615,66 @@ describe('hostname lock', function () {
             ->and($result->shouldRetry())->toBeTrue()
             ->and($record->fresh())->not->toBeNull();
         $heldLock->release();
+    });
+});
+
+describe('domain edits after the session team changes', function () {
+    beforeEach(function () {
+        Queue::fake([CheckDomainDnsJob::class, ReleaseRemovedDnsHostnamesJob::class]);
+        fakeCloudflareDns();
+        $this->sessionTeam = Team::factory()->create();
+        $this->sessionTeam->members()->attach($this->user->id, ['role' => 'owner']);
+        $this->user->unsetRelation('teams');
+    });
+
+    function assertReleaseQueuedForTeam(int $teamId, string $resourceType, int $resourceId): void
+    {
+        Queue::assertPushed(ReleaseRemovedDnsHostnamesJob::class, fn (ReleaseRemovedDnsHostnamesJob $job): bool => $job->teamId === $teamId
+            && $job->resourceType === $resourceType
+            && $job->resourceId === $resourceId
+            && $job->hostnames === ['app.example.com']);
+    }
+
+    test('the application general form queues the release for the resource team', function () {
+        $application = createDnsTestApplication($this, 'https://app.example.com');
+        app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '203.0.113.10', $application);
+
+        $component = Livewire::test(General::class, ['application' => $application]);
+        session(['currentTeam' => $this->sessionTeam]);
+        $component->set('fqdn', 'https://new.example.com')->call('submit')->assertHasNoErrors();
+
+        expect($application->fresh()->fqdn)->toBe('https://new.example.com');
+        assertReleaseQueuedForTeam($this->team->id, $application->getMorphClass(), $application->id);
+    });
+
+    test('the preview domain form queues the release for the resource team', function () {
+        $application = createDnsTestApplication($this, 'https://main.example.com');
+        $preview = ApplicationPreview::create([
+            'application_id' => $application->id, 'pull_request_id' => 7,
+            'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/7', 'fqdn' => 'https://app.example.com',
+        ]);
+        app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '203.0.113.10', $preview);
+
+        $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+        session(['currentTeam' => $this->sessionTeam]);
+        $component->call('startEdit', 0)
+            ->set('editingDomainParts.host', 'new.example.com')
+            ->call('updateDomain')
+            ->assertHasNoErrors();
+
+        expect($preview->fresh()->fqdn)->toContain('new.example.com');
+        assertReleaseQueuedForTeam($this->team->id, $preview->getMorphClass(), $preview->id);
+    });
+
+    test('the service application form queues the release for the resource team', function () {
+        $serviceApplication = editReleaseService($this, 'https://app.example.com');
+        app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '203.0.113.10', $serviceApplication);
+
+        $component = Livewire::test(ServiceIndex::class, ['serviceApplication' => $serviceApplication->fresh()]);
+        session(['currentTeam' => $this->sessionTeam]);
+        $component->set('fqdn', 'https://new.example.com')->call('submitApplication')->assertHasNoErrors();
+
+        expect($serviceApplication->fresh()->fqdn)->toBe('https://new.example.com');
+        assertReleaseQueuedForTeam($this->team->id, $serviceApplication->getMorphClass(), $serviceApplication->id);
     });
 });

@@ -4802,7 +4802,7 @@ class DatabasesController extends Controller
             ], 422);
         }
 
-        if ($storage->isSharedWithAnotherResource()) {
+        if ($storage instanceof LocalPersistentVolume && $storage->isSharedWithAnotherResource()) {
             return response()->json([
                 'message' => 'This volume is mounted by an application. Unlink it on the SQLite database page first.',
             ], 422);

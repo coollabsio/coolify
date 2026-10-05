@@ -784,21 +784,21 @@ class Show extends Component
 
     public function loadHetznerTokens(): void
     {
-        $this->availableHetznerTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableHetznerTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'hetzner')
             ->get();
     }
 
     public function loadVultrTokens(): void
     {
-        $this->availableVultrTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableVultrTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'vultr')
             ->get();
     }
 
     public function loadDigitalOceanTokens(): void
     {
-        $this->availableDigitalOceanTokens = CloudProviderToken::ownedByCurrentTeam()
+        $this->availableDigitalOceanTokens = CloudProviderToken::where('team_id', $this->server->team_id)
             ->where('provider', 'digitalocean')
             ->get();
     }
