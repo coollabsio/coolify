@@ -260,7 +260,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($cancelledDeployments > 0) {
             try {
-                next_after_cancel($server);
+                next_after_cancel($server, $application);
             } catch (\Throwable $e) {
                 \Log::warning("Failed to advance deployment queue after deleting preview {$this->resource->id}: {$e->getMessage()}");
             }

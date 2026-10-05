@@ -119,7 +119,7 @@ class DeploymentNavbar extends Component
             // Still mark as cancelled even if cleanup fails
             return handleError($e, $this);
         } finally {
-            next_after_cancel($server);
+            next_after_cancel($server, $this->application);
         }
     }
 }

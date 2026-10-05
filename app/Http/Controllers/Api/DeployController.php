@@ -294,7 +294,7 @@ class DeployController extends Controller
         } finally {
             if ($cancelled) {
                 try {
-                    next_after_cancel($deploymentServer);
+                    next_after_cancel($deploymentServer, $deployment->application);
                 } catch (\Throwable $e) {
                     \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
                 }
