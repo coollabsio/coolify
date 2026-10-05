@@ -56,6 +56,12 @@ class TrafficAnalytics extends Component
 
     public function loadData(): void
     {
+        $this->reset('overview', 'latencyApproximate', 'uniquesApproximate', 'series');
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
+
         if ($this->servers->isEmpty()) {
             return;
         }

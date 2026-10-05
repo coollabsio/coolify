@@ -329,6 +329,12 @@ class Analytics extends Component
 
     public function loadData(): void
     {
+        $this->resetData();
+
+        foreach ($this->servers as $server) {
+            $this->authorize('view', $server);
+        }
+
         if ($this->servers->isEmpty()) {
             return;
         }

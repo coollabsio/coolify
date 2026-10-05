@@ -352,13 +352,13 @@ function restoreScriptNormalize(string $contents): array
  *
  * @return array{exit: int, stdout: string, stderr: string, databases: array<string, string>}
  */
-function postgresReplacementScriptRun(string $target = 'app', string $failure = '', bool $gzip = false): array
+function postgresReplacementScriptRun(string $target = 'app', string $failure = '', bool $gzip = false, ?string $contents = null): array
 {
     $dir = restoreScriptTempDir();
 
     try {
         $backup = $dir.'/backup.sql';
-        file_put_contents($backup, $gzip ? gzencode('SELECT 1;') : 'SELECT 1;');
+        file_put_contents($backup, $contents ?? ($gzip ? gzencode('SELECT 1;') : 'SELECT 1;'));
         $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource('postgresql'), $backup, false, true);
         preg_match('/new=(\w+)/', $script, $new);
         preg_match('/old=(\w+)/', $script, $old);
@@ -448,6 +448,36 @@ test('failed SQL replacement preserves every existing PostgreSQL database and re
     expect($run['exit'])->toBe(1)
         ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
 })->with(['restore', 'swap']);
+
+dataset('corrupt restore gzip', [
+    'missing footer' => fn (string $contents): string => substr(gzencode($contents), 0, -8),
+    'truncated later member' => fn (string $contents): string => gzencode($contents).substr(gzencode('SELECT 2;'), 0, 10),
+]);
+
+test('corrupt gzip SQL replacement preserves every existing PostgreSQL database', function (Closure $corrupt) {
+    $run = postgresReplacementScriptRun(contents: $corrupt('SELECT 1;'));
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('The gzip backup is corrupt or incomplete. Nothing was changed.')
+        ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
+})->with('corrupt restore gzip');
+
+test('rejects corrupt gzip backups before any database client runs', function (string $engine, string $fixture, bool $dumpAll, bool $replaceExisting, Closure $corrupt) {
+    $run = restoreScriptRun($engine, $corrupt(restoreScriptFixture($fixture)), $dumpAll, $replaceExisting);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('The gzip backup is corrupt or incomplete. Nothing was changed.')
+        ->and($run['calls'])->toBe([])
+        ->and($run['leftovers'])->toBe([]);
+})->with([
+    'single PostgreSQL SQL' => ['postgresql', 'pg-sql', false, false],
+    'PostgreSQL archive replacement' => ['postgresql', 'pg-custom', false, true],
+    'all PostgreSQL databases' => ['postgresql', 'pg-sql', true, false],
+    'single MySQL database' => ['mysql', 'mysql-sql', false, false],
+    'all MySQL databases' => ['mysql', 'mysql-sql', true, false],
+    'all MariaDB databases' => ['mariadb', 'mysql-sql', true, false],
+    'MongoDB replacement' => ['mongodb', 'mongo-archive', false, true],
+])->with('corrupt restore gzip');
 
 test('SQL replacement refuses scratch database name collisions without changing existing data', function (string $failure) {
     $run = postgresReplacementScriptRun(failure: $failure);

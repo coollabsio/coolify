@@ -137,6 +137,34 @@ function instant_scp_from_server(string $remoteSource, string $localDest, Server
     );
 }
 
+/**
+ * Write content to a file on a server through SSH stdin. The content never becomes part of a command
+ * line, so it is not limited by the 128 KiB per-argument limit of Linux. A non-root SSH user writes
+ * with `sudo tee` because Coolify directories such as /data/coolify are root-only.
+ */
+function instant_remote_write_file(Server $server, string $path, string $content, bool $throwError = true): void
+{
+    $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'tee '.escapeshellarg($path).' > /dev/null';
+    $timeout = (int) config('constants.ssh.command_timeout');
+
+    SshRetryHandler::retry(
+        function () use ($server, $remoteCommand, $content, $timeout) {
+            $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, commandTimeout: $timeout);
+            $process = Process::timeout($timeout)->input($content)->run($sshCommand);
+
+            if ($process->exitCode() !== 0) {
+                excludeCertainErrors($process->errorOutput(), $process->exitCode());
+            }
+        },
+        [
+            'server' => $server->ip,
+            'dest' => $path,
+            'function' => 'instant_remote_write_file',
+        ],
+        $throwError
+    );
+}
+
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;

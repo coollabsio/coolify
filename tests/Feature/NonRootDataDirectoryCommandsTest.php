@@ -93,7 +93,7 @@ it('writes service compose files without cd or scp on a non-root server', functi
     $lines = nonRootDataDirectoryRemoteLines();
     expectNoUnprivilegedDataDirectoryAccess($lines);
     expect(implode("\n", $lines))
-        ->toContain("| sudo tee {$workdir}/docker-compose.yml > /dev/null")
+        ->toContain(escapeshellarg("sudo tee '{$workdir}/docker-compose.yml' > /dev/null"))
         ->toMatch('/^sudo mv '.preg_quote($workdir, '/').'\/\S+\.env\.tmp '.preg_quote($workdir, '/').'\/\.env$/m');
 });
 
