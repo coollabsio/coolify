@@ -11,6 +11,7 @@ use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class PreviewDomains extends Component
@@ -19,6 +20,8 @@ class PreviewDomains extends Component
 
     public ApplicationPreview $preview;
 
+    /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $domainRows = [];
 
     public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
