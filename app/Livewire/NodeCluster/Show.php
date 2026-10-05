@@ -18,6 +18,7 @@ use App\Rules\PrivateIpv4Cidr;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -178,6 +179,16 @@ class Show extends Component
         return true;
     }
 
+    /**
+     * Clears the destination when it is the newly selected source application.
+     */
+    public function updatedFirewallSourceUuid(string $value): void
+    {
+        if ($value === 'workload:'.$this->firewallDestinationUuid) {
+            $this->reset('firewallDestinationUuid');
+        }
+    }
+
     public function addFirewallRule(): void
     {
         $this->authorize('update', $this->cluster);
@@ -237,7 +248,7 @@ class Show extends Component
             $this->addError('firewallDestinationUuid', 'Select a workload from this mesh.');
         }
         if ($sourceWorkload?->id === $destination?->id) {
-            $this->addError('firewallDestinationUuid', 'The source and destination workloads must be different.');
+            $this->addError('firewallDestinationUuid', 'The source and destination must be different applications.');
         }
         if ($this->getErrorBag()->isNotEmpty()) {
             return null;
@@ -260,6 +271,7 @@ class Show extends Component
         });
         if ($result['created']) {
             $this->queueNetworkReconciliation();
+            $this->dispatchFirewallRulesChanged();
         }
         $this->dispatch('success', $result['created'] ? 'Firewall rule added and reconciliation queued.' : 'The firewall rule already exists.');
 
@@ -285,6 +297,7 @@ class Show extends Component
             $this->cluster->increment('desired_revision');
         });
         $this->queueNetworkReconciliation();
+        $this->dispatchFirewallRulesChanged();
         $this->dispatch('success', 'Firewall rule removed and reconciliation queued.');
     }
 
@@ -377,16 +390,39 @@ class Show extends Component
                 : 'Internal DNS pending',
             'status' => str($workload->desired_state->value)->title()->toString(),
         ]))->values();
-        $firewallCanvasRules = $firewallRules->map(fn (NodeFirewallRule $rule): array => [
+        $firewallCanvasRules = $this->firewallCanvasRules($firewallRules);
+
+        return compact('nodes', 'workloads', 'firewallRules', 'firewallCanvasNodes', 'firewallCanvasRules');
+    }
+
+    /**
+     * @param  Collection<int, NodeFirewallRule>  $firewallRules
+     * @return list<array{uuid: string, sourceType: string, sourceUuid: string|null, destinationUuid: string, protocol: string, port: int}>
+     */
+    private function firewallCanvasRules(Collection $firewallRules): array
+    {
+        return $firewallRules->map(fn (NodeFirewallRule $rule): array => [
             'uuid' => $rule->uuid,
             'sourceType' => $rule->sourceNode !== null ? 'node' : 'workload',
             'sourceUuid' => $rule->sourceNode?->uuid ?? $rule->sourceWorkload?->uuid,
             'destinationUuid' => $rule->destinationWorkload->uuid,
             'protocol' => $rule->protocol,
             'port' => $rule->port,
-        ])->values();
+        ])->values()->all();
+    }
 
-        return compact('nodes', 'workloads', 'firewallRules', 'firewallCanvasNodes', 'firewallCanvasRules');
+    /**
+     * Sends the current rules to the traffic map, which Livewire does not re-render.
+     */
+    private function dispatchFirewallRulesChanged(): void
+    {
+        $this->dispatch('firewall-rules-changed', rules: $this->firewallCanvasRules(
+            NodeFirewallRule::query()
+                ->with(['sourceWorkload', 'sourceNode', 'destinationWorkload'])
+                ->where('node_cluster_id', $this->cluster->id)
+                ->orderBy('id')
+                ->get(),
+        ));
     }
 
     /** @return array<string, mixed> */

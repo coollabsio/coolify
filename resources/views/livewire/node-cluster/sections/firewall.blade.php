@@ -11,7 +11,7 @@
         'WireGuard' => 'UDP / '.$cluster->wireguard_port,
         'Corrosion gossip' => 'UDP / 8787',
         'Corrosion local API' => 'TCP / 8080',
-        'Workload DNS' => 'TCP + UDP / 53',
+        'Application DNS' => 'TCP + UDP / 53',
         'Established connections' => 'Stateful',
         'Other mesh traffic' => 'Denied',
     ];
@@ -36,9 +36,14 @@
                 </x-slot:content>
                 <form wire:submit="addFirewallRule" class="flex flex-col gap-4">
                     <x-forms.listbox id="firewallSourceUuid" label="Source" placeholder="Select a source" required portal
-                        :options="$sourceOptions" />
-                    <x-forms.listbox id="firewallDestinationUuid" label="Destination application"
-                        placeholder="Select an application" required portal :options="$workloadOptions" />
+                        live :options="$sourceOptions" />
+                    <div wire:key="firewall-destination-{{ $firewallSourceUuid }}">
+                        <x-forms.listbox id="firewallDestinationUuid" label="Destination"
+                            placeholder="Select an application" required portal :options="collect($workloadOptions)
+                                ->reject(fn (array $option): bool => 'workload:'.$option['value'] === $firewallSourceUuid)
+                                ->values()
+                                ->all()" />
+                    </div>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="firewallProtocol" label="Protocol" required portal live :options="[
                             ['value' => 'tcp', 'label' => 'TCP'],

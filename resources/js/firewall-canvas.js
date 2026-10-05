@@ -2,6 +2,72 @@ const CARD_WIDTH = 224;
 const CARD_HEIGHT = 104;
 const CANVAS_WIDTH = 2400;
 const CANVAS_HEIGHT = 1400;
+const CARD_GAP = 16;
+
+function cardsOverlap(first, second, gap = CARD_GAP) {
+    return first.x < second.x + CARD_WIDTH + gap
+        && second.x < first.x + CARD_WIDTH + gap
+        && first.y < second.y + CARD_HEIGHT + gap
+        && second.y < first.y + CARD_HEIGHT + gap;
+}
+
+/**
+ * Returns the free card position closest to the candidate, so a card slides
+ * along other cards instead of covering them. Returns null when no free
+ * position fits inside the canvas.
+ */
+export function resolveCardCollision(candidate, obstacles, gap = CARD_GAP) {
+    const maximumX = CANVAS_WIDTH - CARD_WIDTH;
+    const maximumY = CANVAS_HEIGHT - CARD_HEIGHT;
+    const clamp = (value, maximum) => Math.max(0, Math.min(value, maximum));
+    const start = { x: clamp(candidate.x, maximumX), y: clamp(candidate.y, maximumY) };
+
+    if (!obstacles.some((obstacle) => cardsOverlap(start, obstacle, gap))) {
+        return start;
+    }
+
+    const xs = new Set([start.x]);
+    const ys = new Set([start.y]);
+    for (const obstacle of obstacles) {
+        xs.add(obstacle.x - CARD_WIDTH - gap);
+        xs.add(obstacle.x + CARD_WIDTH + gap);
+        ys.add(obstacle.y - CARD_HEIGHT - gap);
+        ys.add(obstacle.y + CARD_HEIGHT + gap);
+    }
+
+    let closest = null;
+    let closestDistance = Infinity;
+    for (const x of xs) {
+        for (const y of ys) {
+            if (x < 0 || y < 0 || x > maximumX || y > maximumY) {
+                continue;
+            }
+            const distance = (x - start.x) ** 2 + (y - start.y) ** 2;
+            if (distance < closestDistance && !obstacles.some((obstacle) => cardsOverlap({ x, y }, obstacle, gap))) {
+                closest = { x, y };
+                closestDistance = distance;
+            }
+        }
+    }
+
+    return closest;
+}
+
+/**
+ * Moves stored cards that overlap earlier cards to the closest free position.
+ */
+export function separateFirewallPositions(nodes, positions) {
+    const placed = [];
+    const separated = { ...positions };
+
+    for (const node of nodes) {
+        const position = resolveCardCollision(separated[node.id] ?? { x: 0, y: 0 }, placed) ?? separated[node.id];
+        separated[node.id] = position;
+        placed.push(position);
+    }
+
+    return separated;
+}
 
 export function groupFirewallRules(rules, nodeIds = null) {
     const connections = new Map();
@@ -28,14 +94,109 @@ export function groupFirewallRules(rules, nodeIds = null) {
     return [...connections.values()];
 }
 
-export function defaultFirewallPositions(nodes) {
-    return Object.fromEntries(nodes.map((node, index) => [
-        node.id,
-        {
-            x: 80 + (index % 4) * 300,
-            y: 80 + Math.floor(index / 4) * 190,
-        },
-    ]));
+const LAYOUT_MARGIN = 40;
+const LAYOUT_COLUMN_GAP = 96;
+const LAYOUT_ROW_GAP = 32;
+const LAYOUT_MAX_ROWS = 4;
+
+/**
+ * Places servers in the first column, then each connected application one
+ * column to the right of its furthest source, so traffic flows left to right.
+ * Applications without rules are grouped in columns after the connected ones.
+ */
+export function autoLayoutFirewallPositions(nodes, connections = []) {
+    const ids = new Set(nodes.map((node) => node.id));
+    const edges = connections.filter((connection) => (
+        connection.source !== connection.destination
+        && ids.has(connection.source)
+        && ids.has(connection.destination)
+    ));
+    const connected = new Set(edges.flatMap((edge) => [edge.source, edge.destination]));
+    const servers = nodes.filter((node) => node.type !== 'workload');
+    const linked = nodes.filter((node) => node.type === 'workload' && connected.has(node.id));
+    const unlinked = nodes.filter((node) => node.type === 'workload' && !connected.has(node.id));
+
+    // Longest path from the sources. The pass limit stops cycles from growing forever.
+    const layer = new Map([
+        ...servers.map((node) => [node.id, 0]),
+        ...linked.map((node) => [node.id, 1]),
+    ]);
+    for (let pass = 0; pass < linked.length; pass++) {
+        let changed = false;
+        for (const edge of edges) {
+            const next = layer.get(edge.source) + 1;
+            if (layer.get(edge.destination) < next && next <= linked.length) {
+                layer.set(edge.destination, next);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            break;
+        }
+    }
+
+    const columns = [];
+    if (servers.length) {
+        columns.push(servers);
+    }
+    const layers = [...new Set(linked.map((node) => layer.get(node.id)))].sort((a, b) => a - b);
+    for (const value of layers) {
+        columns.push(linked.filter((node) => layer.get(node.id) === value));
+    }
+    for (let index = 0; index < unlinked.length; index += LAYOUT_MAX_ROWS) {
+        columns.push(unlinked.slice(index, index + LAYOUT_MAX_ROWS));
+    }
+
+    // Order each column by the average row of its sources to reduce crossing lines.
+    const row = new Map();
+    const positions = {};
+    columns.forEach((column, columnIndex) => {
+        const sorted = [...column].sort((first, second) => sourceRow(first.id) - sourceRow(second.id));
+        sorted.forEach((node, rowIndex) => {
+            row.set(node.id, rowIndex);
+            positions[node.id] = {
+                x: LAYOUT_MARGIN + columnIndex * (CARD_WIDTH + LAYOUT_COLUMN_GAP),
+                y: LAYOUT_MARGIN + rowIndex * (CARD_HEIGHT + LAYOUT_ROW_GAP),
+            };
+        });
+    });
+
+    function sourceRow(nodeId) {
+        const rows = edges
+            .filter((edge) => edge.destination === nodeId && row.has(edge.source))
+            .map((edge) => row.get(edge.source));
+
+        return rows.length ? rows.reduce((total, value) => total + value, 0) / rows.length : Infinity;
+    }
+
+    return positions;
+}
+
+/**
+ * Returns the canvas size that just contains every card, so the viewport
+ * does not scroll into empty space.
+ */
+export function firewallCanvasSize(positions) {
+    const values = Object.values(positions);
+
+    return {
+        width: Math.max(0, ...values.map((position) => position.x + CARD_WIDTH + LAYOUT_MARGIN)),
+        height: Math.max(0, ...values.map((position) => position.y + CARD_HEIGHT + LAYOUT_MARGIN)),
+    };
+}
+
+/**
+ * Returns the zoom level that shows every card inside the viewport.
+ */
+export function fitFirewallZoom(positions, viewport) {
+    if (!Object.keys(positions).length || !viewport.width || !viewport.height) {
+        return 1;
+    }
+
+    const { width, height } = firewallCanvasSize(positions);
+    const zoom = Math.min(1, viewport.width / width, viewport.height / height);
+
+    return Math.max(0.5, Math.floor(zoom * 100) / 100);
 }
 
 export function closestCardConnectionPoints(source, destination) {
@@ -102,8 +263,6 @@ export function firewallCanvas(config) {
         ...config,
         cardWidth: CARD_WIDTH,
         cardHeight: CARD_HEIGHT,
-        canvasWidth: CANVAS_WIDTH,
-        canvasHeight: CANVAS_HEIGHT,
         positions: {},
         connections: [],
         selectedConnectionId: null,
@@ -118,20 +277,43 @@ export function firewallCanvas(config) {
         editorVersion: 0,
 
         init() {
-            const defaults = defaultFirewallPositions(this.nodes);
+            this.connections = groupFirewallRules(this.rules, new Set(this.nodes.map((node) => node.id)));
+            const defaults = autoLayoutFirewallPositions(this.nodes, this.connections);
 
             try {
                 this.positions = { ...defaults, ...JSON.parse(localStorage.getItem(this.storageKey) ?? '{}') };
             } catch {
                 this.positions = defaults;
             }
-
-            this.connections = groupFirewallRules(this.rules, new Set(this.nodes.map((node) => node.id)));
+            this.positions = separateFirewallPositions(this.nodes, this.positions);
             this.bindConnectionEvents();
+        },
+
+        replaceRules(rules) {
+            const selected = this.selectedConnection;
+            this.rules = rules;
+            this.connections = groupFirewallRules(rules, new Set(this.nodes.map((node) => node.id)));
+            if (selected && !this.selectedConnection) {
+                if (selected.rules.length === 0) {
+                    this.connections.push({ ...selected, rules: [] });
+                } else {
+                    this.selectedConnectionId = null;
+                }
+            }
+        },
+
+        get canvasSize() {
+            return firewallCanvasSize(Object.fromEntries(this.nodes.map((node) => [node.id, this.position(node.id)])));
         },
 
         get hasWorkloadTargets() {
             return this.nodes.some((node) => node.type === 'workload');
+        },
+
+        isDropTarget(nodeId) {
+            return Boolean(this.draft)
+                && nodeId !== this.draft.source
+                && nodeId.startsWith('workload:');
         },
 
         canStartConnection(source) {
@@ -185,7 +367,7 @@ export function firewallCanvas(config) {
             const connection = this.selectedConnection;
             const viewport = this.$refs.viewport;
             if (!connection || !viewport) {
-                return '';
+                return {};
             }
 
             const points = this.connectionPoints(connection);
@@ -203,7 +385,7 @@ export function firewallCanvas(config) {
                 height: this.$refs.editor?.offsetHeight || Math.min(320, viewport.clientHeight - 24),
             });
 
-            return `left:${position.left}px;top:${position.top}px;right:auto;bottom:auto`;
+            return { left: `${position.left}px`, top: `${position.top}px`, right: 'auto', bottom: 'auto' };
         },
 
         position(nodeId) {
@@ -259,11 +441,18 @@ export function firewallCanvas(config) {
                 return;
             }
 
-            this.positions[this.dragging.nodeId] = {
-                x: Math.max(0, this.dragging.originX + (event.clientX - this.dragging.startX) / this.zoom),
-                y: Math.max(0, this.dragging.originY + (event.clientY - this.dragging.startY) / this.zoom),
+            const { nodeId } = this.dragging;
+            const candidate = {
+                x: this.dragging.originX + (event.clientX - this.dragging.startX) / this.zoom,
+                y: this.dragging.originY + (event.clientY - this.dragging.startY) / this.zoom,
             };
-            this.positions = { ...this.positions };
+            const obstacles = this.nodes
+                .filter((node) => node.id !== nodeId)
+                .map((node) => this.position(node.id));
+            const position = resolveCardCollision(candidate, obstacles);
+            if (position) {
+                this.positions = { ...this.positions, [nodeId]: position };
+            }
         },
 
         finishDrag() {
@@ -390,8 +579,13 @@ export function firewallCanvas(config) {
         },
 
         resetView() {
+            const viewport = this.$refs.viewport;
+            this.positions = autoLayoutFirewallPositions(this.nodes, this.connections);
+            localStorage.setItem(this.storageKey, JSON.stringify(this.positions));
             this.pan = { x: 0, y: 0 };
-            this.zoom = 1;
+            this.zoom = fitFirewallZoom(this.positions, { width: viewport.clientWidth, height: viewport.clientHeight });
+            viewport.scrollTo({ left: 0, top: 0 });
+            this.selectedConnectionId = null;
         },
     };
 }

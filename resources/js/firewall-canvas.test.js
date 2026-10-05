@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { anchoredPopoverPosition, closestCardConnectionPoints, defaultFirewallPositions, firewallCanvas, firewallNodeIdFromConnector, groupFirewallRules } from './firewall-canvas.js';
+import { anchoredPopoverPosition, autoLayoutFirewallPositions, closestCardConnectionPoints, firewallCanvasSize, fitFirewallZoom, firewallCanvas, firewallNodeIdFromConnector, groupFirewallRules, resolveCardCollision, separateFirewallPositions } from './firewall-canvas.js';
 
 test('groups several firewall rules into one directional connection', () => {
     const connections = groupFirewallRules([
@@ -25,14 +25,46 @@ test('does not draw rules whose endpoint is absent from the canvas', () => {
     assert.deepEqual(connections.map((connection) => connection.rules[0].uuid), ['two']);
 });
 
-test('creates stable grid positions for canvas nodes', () => {
-    const positions = defaultFirewallPositions([
-        { id: 'one' }, { id: 'two' }, { id: 'three' }, { id: 'four' }, { id: 'five' },
+test('creates stable grouped positions for canvas nodes without rules', () => {
+    const positions = autoLayoutFirewallPositions([
+        { id: 'node:a', type: 'node' },
+        { id: 'workload:one', type: 'workload' },
+        { id: 'workload:two', type: 'workload' },
+        { id: 'workload:three', type: 'workload' },
+        { id: 'workload:four', type: 'workload' },
+        { id: 'workload:five', type: 'workload' },
     ]);
 
-    assert.deepEqual(positions.one, { x: 80, y: 80 });
-    assert.deepEqual(positions.four, { x: 980, y: 80 });
-    assert.deepEqual(positions.five, { x: 80, y: 270 });
+    assert.deepEqual(positions['node:a'], { x: 40, y: 40 });
+    assert.deepEqual(positions['workload:one'], { x: 360, y: 40 });
+    assert.deepEqual(positions['workload:four'], { x: 360, y: 448 });
+    assert.deepEqual(positions['workload:five'], { x: 680, y: 40 });
+});
+
+test('places rule destinations to the right of their sources', () => {
+    const nodes = [
+        { id: 'workload:db', type: 'workload' },
+        { id: 'workload:idle', type: 'workload' },
+        { id: 'workload:api', type: 'workload' },
+        { id: 'node:a', type: 'node' },
+    ];
+    const connections = [
+        { source: 'node:a', destination: 'workload:api' },
+        { source: 'workload:api', destination: 'workload:db' },
+        { source: 'workload:db', destination: 'workload:api' },
+    ];
+    const positions = autoLayoutFirewallPositions(nodes, connections);
+
+    assert.equal(positions['node:a'].x, 40);
+    assert.equal(positions['workload:api'].x, 360);
+    assert.equal(positions['workload:db'].x, 680);
+    assert.equal(positions['workload:idle'].x, 1000);
+});
+
+test('zooms out so that every card is visible after a layout', () => {
+    assert.equal(fitFirewallZoom({ a: { x: 40, y: 40 } }, { width: 1000, height: 500 }), 1);
+    assert.equal(fitFirewallZoom({ a: { x: 40, y: 40 }, b: { x: 1000, y: 40 } }, { width: 900, height: 500 }), 0.71);
+    assert.equal(fitFirewallZoom({ a: { x: 4000, y: 40 } }, { width: 900, height: 500 }), 0.5);
 });
 
 test('connects the closest card sides as cards move around the canvas', () => {
@@ -208,5 +240,68 @@ test('renders connection loops outside the SVG namespace', () => {
     assert.match(template, /<template x-for="connection in connections"[\s\S]*?<svg/);
     assert.doesNotMatch(template, /<svg[^>]*>[\s\S]*?<template x-for="connection in connections"/);
     assert.match(template, /stroke-dasharray="8 6"/);
-    assert.match(template, /fill-yellow-400/);
+    assert.match(template, /fill-warning/);
+});
+
+test('keeps a free card position unchanged', () => {
+    assert.deepEqual(resolveCardCollision({ x: 500, y: 80 }, [{ x: 80, y: 80 }]), { x: 500, y: 80 });
+});
+
+test('moves a dropped card to the closest free side of a covered card', () => {
+    assert.deepEqual(resolveCardCollision({ x: 120, y: 90 }, [{ x: 80, y: 80 }]), { x: 120, y: 200 });
+    assert.deepEqual(resolveCardCollision({ x: 250, y: 80 }, [{ x: 80, y: 80 }]), { x: 320, y: 80 });
+});
+
+test('does not move a card into a second card while it avoids the first', () => {
+    const obstacles = [{ x: 80, y: 80 }, { x: 320, y: 80 }];
+    const position = resolveCardCollision({ x: 250, y: 80 }, obstacles);
+
+    for (const obstacle of obstacles) {
+        const overlaps = position.x < obstacle.x + 224 && obstacle.x < position.x + 224
+            && position.y < obstacle.y + 104 && obstacle.y < position.y + 104;
+        assert.equal(overlaps, false);
+    }
+});
+
+test('separates stored card positions that overlap', () => {
+    const positions = separateFirewallPositions(
+        [{ id: 'workload:api' }, { id: 'workload:db' }],
+        { 'workload:api': { x: 80, y: 80 }, 'workload:db': { x: 90, y: 80 } },
+    );
+
+    assert.deepEqual(positions['workload:api'], { x: 80, y: 80 });
+    assert.deepEqual(positions['workload:db'], { x: 90, y: 200 });
+});
+
+test('sizes the canvas to the cards so that empty space cannot be scrolled', () => {
+    assert.deepEqual(firewallCanvasSize({}), { width: 0, height: 0 });
+    assert.deepEqual(
+        firewallCanvasSize({ a: { x: 40, y: 40 }, b: { x: 680, y: 312 } }),
+        { width: 944, height: 456 },
+    );
+});
+
+test('replaces connections when rules change outside the canvas', () => {
+    const nodes = [{ id: 'workload:api', type: 'workload' }, { id: 'workload:db', type: 'workload' }, { id: 'workload:web', type: 'workload' }];
+    const rule = { uuid: 'one', sourceType: 'workload', sourceUuid: 'api', destinationUuid: 'db', protocol: 'tcp', port: 5432 };
+    const canvas = firewallCanvas({ nodes, rules: [rule] });
+    canvas.connections = groupFirewallRules([rule]);
+    canvas.selectedConnectionId = 'workload:api->workload:db';
+
+    canvas.replaceRules([]);
+    assert.deepEqual(canvas.connections, []);
+    assert.equal(canvas.selectedConnectionId, null);
+
+    canvas.connections = [{ id: 'workload:web->workload:db', source: 'workload:web', destination: 'workload:db', rules: [] }];
+    canvas.selectedConnectionId = 'workload:web->workload:db';
+    canvas.replaceRules([rule]);
+    assert.deepEqual(canvas.connections.map((connection) => connection.id), ['workload:api->workload:db', 'workload:web->workload:db']);
+    assert.equal(canvas.selectedConnectionId, 'workload:web->workload:db');
+});
+
+test('returns editor styles as an object so that x-show keeps display none', () => {
+    const canvas = firewallCanvas({ nodes: [], rules: [] });
+    canvas.$refs = { viewport: { clientWidth: 800, clientHeight: 500 } };
+
+    assert.deepEqual(canvas.editorStyle(), {});
 });

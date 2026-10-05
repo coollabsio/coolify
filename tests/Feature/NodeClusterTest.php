@@ -351,7 +351,7 @@ it('shows the system-managed core cluster firewall rules', function () {
         ->assertSee('UDP / 8787')
         ->assertSee('Corrosion local API')
         ->assertSee('TCP / 8080')
-        ->assertSee('Workload DNS')
+        ->assertSee('Application DNS')
         ->assertSee('TCP + UDP / 53')
         ->assertSee('Established connections')
         ->assertDontSee('Core cluster traffic');
@@ -374,7 +374,11 @@ it('adds and removes scoped workload firewall rules', function () {
         ->set('firewallProtocol', 'tcp')
         ->set('firewallPort', 5432)
         ->call('addFirewallRule')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertDispatched('firewall-rules-changed', fn (string $name, array $params): bool => count($params['rules']) === 1
+            && $params['rules'][0]['sourceUuid'] === $source->uuid
+            && $params['rules'][0]['destinationUuid'] === $destination->uuid
+            && $params['rules'][0]['port'] === 5432);
 
     $rule = NodeFirewallRule::query()->sole();
     expect($rule->source_workload_id)->toBe($source->id)
@@ -384,7 +388,8 @@ it('adds and removes scoped workload firewall rules', function () {
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('removeFirewallRule', $rule->uuid)
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertDispatched('firewall-rules-changed', rules: []);
 
     expect(NodeFirewallRule::query()->exists())->toBeFalse()
         ->and($cluster->refresh()->desired_revision)->toBe(4);
@@ -479,6 +484,27 @@ it('rejects firewall rules for workloads outside the mesh', function () {
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->set('firewallSourceUuid', 'workload:'.$source->uuid)
         ->set('firewallDestinationUuid', $foreign->uuid)
+        ->set('firewallPort', 80)
+        ->call('addFirewallRule')
+        ->assertHasErrors('firewallDestinationUuid');
+
+    expect(NodeFirewallRule::query()->exists())->toBeFalse();
+});
+
+it('does not allow the same application as source and destination', function () {
+    Queue::fake();
+    $team = $this->user->teams()->firstOrFail();
+    $cluster = CreateNodeCluster::run($team, $this->user, 'Self rule mesh');
+    $node = Node::factory()->create(['team_id' => $team->id]);
+    AssignNodeToCluster::run($cluster, $node);
+    $application = NodeWorkload::factory()->create(['team_id' => $team->id, 'name' => 'only-application']);
+    EnsureNodeWorkloadAddress::run($node, $application);
+
+    Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
+        ->set('firewallDestinationUuid', $application->uuid)
+        ->set('firewallSourceUuid', 'workload:'.$application->uuid)
+        ->assertSet('firewallDestinationUuid', '')
+        ->set('firewallDestinationUuid', $application->uuid)
         ->set('firewallPort', 80)
         ->call('addFirewallRule')
         ->assertHasErrors('firewallDestinationUuid');
