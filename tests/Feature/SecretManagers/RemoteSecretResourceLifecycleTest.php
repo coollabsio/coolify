@@ -104,18 +104,19 @@ function remoteSecretLifecyclePostgres(): StandalonePostgresql
  */
 function remoteSecretLifecycleWrittenEnvFile(Service $service): string
 {
-    $commands = collect();
-    Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
+    $envFileContent = '';
+    Process::fake(function ($process) use (&$envFileContent) {
+        // The .env content goes to `tee <workdir>/<id>.env.tmp` over SSH stdin.
+        if (preg_match('/tee \S+\.env\.tmp/', $process->command)) {
+            $envFileContent = (string) $process->input;
+        }
 
         return Process::result(output: '');
     });
 
     $service->saveComposeConfigs();
 
-    preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d \| tee [^ ]+\.env\.tmp/", $commands->implode("\n"), $matches);
-
-    return base64_decode($matches[1] ?? '');
+    return $envFileContent;
 }
 
 /*

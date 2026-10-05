@@ -1960,7 +1960,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
         }
         $serverUuid = $request->server_uuid;
-        $instantDeploy = $request->instant_deploy ?? false;
+        $instantDeploy = $request->boolean('instant_deploy');
         if ($request->is_public && ! $request->public_port) {
             $request->offsetSet('is_public', false);
         }
@@ -2033,7 +2033,7 @@ class DatabasesController extends Controller
             'tags' => 'array|nullable',
             'tags.*' => 'string|min:2',
         ]);
-        if ($validator->failed()) {
+        if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $validator->errors(),

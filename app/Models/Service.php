@@ -1588,10 +1588,9 @@ class Service extends BaseModel
 
         $workdir = $this->workdir();
         // Absolute paths and tee, no cd or scp: a non-root SSH user cannot enter /data/coolify on the Coolify host.
-        $commands = [
-            "mkdir -p $workdir",
-            "echo '".base64_encode($this->docker_compose)."' | base64 -d | tee $workdir/docker-compose.yml > /dev/null",
-        ];
+        // File content goes over SSH stdin: inline in the command, a compose over ~96 KB exceeds the argument limit.
+        instant_remote_process(["mkdir -p $workdir"], $this->server);
+        instant_remote_write_file($this->server, "$workdir/docker-compose.yml", $this->docker_compose);
         $environmentFile = "$workdir/".new_public_id().'.env.tmp';
 
         $envs = collect([]);
@@ -1622,15 +1621,8 @@ class Service extends BaseModel
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$this->resolveSecretManagerDotenvValue($env)}");
         }
-        if ($envs->count() === 0) {
-            $commands[] = "touch {$environmentFile}";
-        } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee {$environmentFile} > /dev/null";
-        }
-        $commands[] = "mv {$environmentFile} $workdir/.env";
-
-        instant_remote_process($commands, $this->server);
+        instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
+        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
     }
 
     public function parse(bool $isNew = false): Collection
