@@ -1,11 +1,11 @@
 <div class="application-settings-form mx-auto w-full max-w-3xl">
-    <x-slot:title>Add Node | Coolify</x-slot>
+    <x-slot:title>Add cluster server | Coolify</x-slot>
 
     <header class="mb-5">
-        <a href="{{ route('node-cluster.index') }}" {{ wireNavigate() }} class="mb-2 inline-flex items-center gap-1 text-[12px] text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
-            <x-reicon name="arrow-right" class="size-3.5 rotate-180" /> Clusters
+        <a href="{{ route('server.index') }}" {{ wireNavigate() }} class="mb-2 inline-flex items-center gap-1 text-[12px] text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
+            <x-reicon name="arrow-right" class="size-3.5 rotate-180" /> Servers
         </a>
-        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Add Node</h1>
+        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Add cluster server</h1>
         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Connect a server. Coolify installs and configures the required components.</p>
     </header>
 
@@ -23,7 +23,7 @@
             <div class="mb-4"><h2 class="text-[15px]! font-semibold!">Connect your server</h2><p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">Use a fresh Linux server that Coolify can reach through SSH.</p></div>
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-forms.input wire:model="ip" label="IP address" placeholder="203.0.113.10" required />
-                <x-forms.input wire:model="name" label="Node name" required />
+                <x-forms.input wire:model="name" label="Server name" required />
                 <div class="sm:col-span-2">
                     <x-forms.select wire:model="privateKeyId" label="SSH private key" required>
                         <option value="">Select a private key</option>
@@ -37,7 +37,7 @@
                 <div class="grid gap-4 border-t border-neutral-200 p-3 dark:border-white/[0.08] sm:grid-cols-2">
                     <x-forms.input wire:model="user" label="SSH user" required />
                     <x-forms.input wire:model="port" type="number" label="SSH port" required />
-                    <div class="sm:col-span-2"><x-forms.input wire:model="coolifyUrl" label="Coolify callback URL" helper="The Node uses this URL to connect to Coolify." required /></div>
+                    <div class="sm:col-span-2"><x-forms.input wire:model="coolifyUrl" label="Coolify callback URL" helper="The server uses this URL to connect to Coolify." required /></div>
                 </div>
             </details>
             @if ($errors->any())
@@ -50,7 +50,7 @@
             <div class="mb-4 flex items-start gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><x-reicon name="check-circle" class="size-4" /></span><div><h2 class="text-[15px]! font-semibold!">Server connected</h2><p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Review the cluster. Coolify will install missing components.</p></div></div>
             @if ($clusters->isNotEmpty())
                 <div class="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Cluster">
-                    @foreach (['existing' => ['Existing cluster', 'Add this Node to a cluster.'], 'new' => ['New cluster', 'Create a private cluster.']] as $modeValue => [$modeTitle, $modeDescription])
+                    @foreach (['existing' => ['Existing cluster', 'Add this server to a cluster.'], 'new' => ['New cluster', 'Create a private cluster.']] as $modeValue => [$modeTitle, $modeDescription])
                         <label wire:key="cluster-mode-{{ $modeValue }}"
                             class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-neutral-200 bg-white p-3 text-[12px] transition-colors hover:bg-neutral-50 has-[:checked]:border-coollabs/40 has-[:checked]:bg-coollabs/[0.06] dark:border-white/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.05] dark:has-[:checked]:border-warning/40 dark:has-[:checked]:bg-warning/[0.07]">
                             <input type="radio" wire:model.live="clusterMode" value="{{ $modeValue }}"
@@ -71,7 +71,7 @@
                 @endif
             </div>
             <details class="mt-4 rounded-lg border border-neutral-200 dark:border-white/[0.08]"><summary class="cursor-pointer px-3 py-2.5 text-[12px] font-medium">Technical details</summary><dl class="grid grid-cols-2 gap-3 border-t border-neutral-200 p-3 text-[12px] dark:border-white/[0.08] sm:grid-cols-3">@foreach (['hostname' => 'Hostname', 'os' => 'Operating system', 'arch' => 'Architecture', 'cpus' => 'CPU cores', 'package_manager' => 'Package manager'] as $key => $label)<div><dt class="text-neutral-500 dark:text-fg-faint">{{ $label }}</dt><dd class="mt-0.5 font-medium">{{ data_get($inspection, $key, 'Unknown') }}</dd></div>@endforeach<div><dt class="text-neutral-500 dark:text-fg-faint">Podman</dt><dd class="mt-0.5 font-medium">{{ data_get($inspection, 'podman_installed') ? 'Installed' : 'Will be installed' }}</dd></div></dl></details>
-            <div class="mt-5 flex justify-end"><x-forms.button type="submit" isHighlighted wire:loading.attr="disabled"><span wire:loading.remove wire:target="install">Install Node</span><span wire:loading wire:target="install">Starting...</span></x-forms.button></div>
+            <div class="mt-5 flex justify-end"><x-forms.button type="submit" isHighlighted wire:loading.attr="disabled"><span wire:loading.remove wire:target="install">Install server</span><span wire:loading wire:target="install">Starting...</span></x-forms.button></div>
         </form>
     @else
         @php
@@ -79,11 +79,11 @@
             if ($status === 'queued' || $currentStep === 'queued') {
                 $currentStep = 'preparing';
             }
-            $steps = ['preparing' => ['Preparing server', 'Checking the host and packages'], 'installing' => ['Installing Node components', 'Installing Podman and Sentinel'], 'connecting' => ['Connecting to Coolify', 'Starting the secure control channel'], 'networking' => ['Configuring network', 'Joining the private cluster mesh'], 'verifying' => ['Running final checks', 'Checking the Node connection']];
+            $steps = ['preparing' => ['Preparing server', 'Checking the host and packages'], 'installing' => ['Installing server components', 'Installing Podman and Sentinel'], 'connecting' => ['Connecting to Coolify', 'Starting the secure control channel'], 'networking' => ['Configuring network', 'Joining the private cluster mesh'], 'verifying' => ['Running final checks', 'Checking the server connection']];
             $keys = array_keys($steps); $currentIndex = array_search($currentStep, $keys, true); $currentIndex = $currentIndex === false ? -1 : $currentIndex;
         @endphp
         <section @if (!in_array($status, ['ready', 'failed'])) wire:poll.2s="refreshStatus" @endif class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
-            <div class="mb-4"><h2 class="text-[15px]! font-semibold!">{{ $status === 'ready' ? 'Your Node is ready' : ($status === 'failed' ? 'Installation needs attention' : 'Installing your Node') }}</h2><p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">{{ $status === 'ready' ? $node?->name.' is connected to '.$node?->cluster?->name.'.' : ($status === 'failed' ? 'Installation stopped at the highlighted step. Review the details and retry.' : 'You can leave this page. Installation continues in the background.') }}</p></div>
+            <div class="mb-4"><h2 class="text-[15px]! font-semibold!">{{ $status === 'ready' ? 'Your server is ready' : ($status === 'failed' ? 'Installation needs attention' : 'Installing your server') }}</h2><p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">{{ $status === 'ready' ? $node?->name.' is connected to '.$node?->cluster?->name.'.' : ($status === 'failed' ? 'Installation stopped at the highlighted step. Review the details and retry.' : 'You can leave this page. Installation continues in the background.') }}</p></div>
             <div class="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
                 @foreach ($steps as $key => [$title, $description])
                     @php $index = array_search($key, $keys, true); $itemStatus = $status === 'ready' || $index < $currentIndex ? 'success' : ($status === 'failed' && $key === $currentStep ? 'error' : ($key === $currentStep ? 'running' : 'pending')); @endphp
@@ -97,7 +97,7 @@
                     <div class="border-t border-neutral-200 p-3 dark:border-white/[0.08]">
                         <dl class="grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
                             <div><dt class="text-neutral-500 dark:text-fg-faint">Failed step</dt><dd class="mt-0.5 font-medium">{{ data_get($steps, $currentStep.'.0', str($currentStep)->replace('_', ' ')->title()) }}</dd></div>
-                            <div><dt class="text-neutral-500 dark:text-fg-faint">Node</dt><dd class="mt-0.5 break-all font-medium">{{ $node?->name }} ({{ $node?->ip }})</dd></div>
+                            <div><dt class="text-neutral-500 dark:text-fg-faint">Server</dt><dd class="mt-0.5 break-all font-medium">{{ $node?->name }} ({{ $node?->ip }})</dd></div>
                             <div><dt class="text-neutral-500 dark:text-fg-faint">Operating system</dt><dd class="mt-0.5 font-medium">{{ data_get($node?->metadata, 'os', 'Unknown') }}</dd></div>
                             <div><dt class="text-neutral-500 dark:text-fg-faint">Last update</dt><dd class="mt-0.5 font-medium">{{ data_get($onboarding, 'updated_at', 'Unknown') }}</dd></div>
                         </dl>
@@ -109,7 +109,7 @@
                 </details>
                 <div class="mt-5 flex justify-end"><x-forms.button wire:click="retry" isHighlighted wire:loading.attr="disabled">Retry installation</x-forms.button></div>
             @elseif ($status === 'ready')
-                <div class="mt-5 flex flex-wrap justify-end gap-2"><a href="{{ route('node.show', ['node_uuid' => $node?->uuid]) }}" {{ wireNavigate() }} class="button">View Node</a><a href="{{ route('project.index') }}" {{ wireNavigate() }} class="button button-highlighted">Deploy an application</a></div>
+                <div class="mt-5 flex flex-wrap justify-end gap-2"><a href="{{ route('node.show', ['node_uuid' => $node?->uuid]) }}" {{ wireNavigate() }} class="button">View server</a><a href="{{ route('project.index') }}" {{ wireNavigate() }} class="button button-highlighted">Deploy an application</a></div>
             @endif
         </section>
     @endif

@@ -29,7 +29,7 @@ class CreateMoveOperation
                 || $source->team_id !== $target->team_id
                 || $source->node_cluster_id === null
                 || $source->node_cluster_id !== $target->node_cluster_id) {
-                throw new RuntimeException('Select another Node in the same mesh.');
+                throw new RuntimeException('Select another server in the same mesh.');
             }
 
             $workload = NodeWorkload::query()

@@ -3,8 +3,8 @@
         helper="Permanently remove this cluster and its private network from Coolify.">
         <x-danger-zone title="This action cannot be undone">
             <p>
-                Every Node is removed from the cluster and its private network configuration is cleaned up.
-                The Nodes stay connected to Coolify and can join another cluster.
+                Every server is removed from the cluster and its private network configuration is cleaned up.
+                The servers stay connected to Coolify and can join another cluster.
                 Remove all applications from this cluster first.
             </p>
             <p>Type the cluster name in the confirmation dialog to continue.</p>

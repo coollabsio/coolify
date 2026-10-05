@@ -59,7 +59,7 @@ class CreateDeploymentOperation
             }
 
             if (filled(data_get($revision->configuration, 'resources')) && $node->supportsCapability('workload.resources.v1') !== true) {
-                throw new RuntimeException('This Node does not support workload resource settings. Upgrade Sentinel and try again.');
+                throw new RuntimeException('This server does not support workload resource settings. Upgrade Sentinel and try again.');
             }
 
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $revision);

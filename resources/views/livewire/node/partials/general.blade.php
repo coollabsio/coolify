@@ -63,14 +63,14 @@
     <x-slot:actions>
         @can('manageSentinel', $node)
             <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshInformation"
-                title="Refresh node information">
+                title="Refresh server information">
                 <x-reicon name="refresh" class="size-3.5" />
             </x-forms.button>
         @endcan
     </x-slot:actions>
 
     @if (! $node->is_usable && filled($node->validation_logs))
-        <x-callout type="warning" title="Node is not ready" class="mb-4">
+        <x-callout type="warning" title="Server is not ready" class="mb-4">
             {{ $node->validation_logs }}
         </x-callout>
     @endif
@@ -115,8 +115,8 @@
 <x-application.settings-section id="node-usage-section" title="Resource usage"
     helper="Latest CPU, memory, and disk usage that Sentinel reports, compared with the cluster deployment limits.">
     @if ($underPressure)
-        <x-callout type="warning" title="Node pressure" class="mb-4">
-            One or more Node resources reached the cluster deployment limit.
+        <x-callout type="warning" title="Server pressure" class="mb-4">
+            One or more server resources reached the cluster deployment limit.
         </x-callout>
     @endif
 

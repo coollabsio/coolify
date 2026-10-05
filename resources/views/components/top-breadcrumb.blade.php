@@ -100,8 +100,7 @@
         request()->routeIs('dashboard') => 'Dashboard',
         request()->routeIs('project.index') => 'Projects',
         request()->routeIs('terminal') => 'Terminal',
-        request()->routeIs('server.*') => 'Servers',
-        request()->routeIs('node-cluster.*', 'node.*') => 'Clusters',
+        request()->routeIs('server.*', 'node-cluster.*', 'node.*') => 'Servers',
         request()->routeIs('source.*') => 'Sources',
         request()->routeIs('destination.*') => 'Destinations',
         request()->routeIs('storage.*') => 'S3 Storage',
@@ -126,9 +125,6 @@
                 ? ['label' => 'Terminal', 'href' => route('terminal')]
                 : null,
             ['label' => 'Servers', 'href' => url('/servers')],
-            isDev() && config('constants.sentinel.host_enabled', false)
-                ? ['label' => 'Clusters', 'href' => route('node-cluster.index')]
-                : null,
             ['label' => 'Sources', 'href' => route('source.all')],
             ['label' => 'Destinations', 'href' => route('destination.index')],
             ['label' => 'S3 Storage', 'href' => route('storage.index')],

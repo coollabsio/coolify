@@ -11,7 +11,7 @@
 
         <div class="flex w-full min-w-0 flex-col gap-6" @if ($autoRefresh) wire:poll.5s="pollLogs" @endif>
             <x-application.settings-section title="Logs" flush
-                helper="Recent events from the services that run on this Node. Logs are read on demand through Flux. When the Node cannot answer through Flux, Coolify reads the system journal over SSH.">
+                helper="Recent events from the services that run on this server. Logs are read on demand through Flux. When the server cannot answer through Flux, Coolify reads the system journal over SSH.">
                 <x-slot:actions>
                     <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshLogs"
                         title="Refresh logs">

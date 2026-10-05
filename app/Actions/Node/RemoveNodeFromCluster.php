@@ -21,10 +21,10 @@ class RemoveNodeFromCluster
         Gate::forUser($user)->authorize('update', $cluster);
         $cluster->loadMissing('nodes');
         if ($node->node_cluster_id !== $cluster->id || $node->team_id !== $cluster->team_id) {
-            throw new DomainException('The Node does not belong to this cluster.');
+            throw new DomainException('The server does not belong to this cluster.');
         }
         if ($node->containers()->where('is_managed', true)->whereIn('state', ['configured', 'created', 'running', 'paused', 'restarting', 'removing'])->exists()) {
-            throw new DomainException('Stop and remove managed containers from this Node before removing it from the cluster.');
+            throw new DomainException('Stop and remove managed containers from this server before removing it from the cluster.');
         }
 
         $hadAppliedNetwork = $node->network_applied_revision !== null || in_array($cluster->network_status, ['active', 'degraded'], true);
@@ -47,7 +47,7 @@ class RemoveNodeFromCluster
             $cluster = NodeCluster::query()->lockForUpdate()->findOrFail($cluster->id);
             $node = Node::query()->lockForUpdate()->findOrFail($node->id);
             if ($node->node_cluster_id !== $cluster->id) {
-                throw new DomainException('The Node does not belong to this cluster.');
+                throw new DomainException('The server does not belong to this cluster.');
             }
 
             NodeFirewallRule::query()->where('source_node_id', $node->id)->delete();

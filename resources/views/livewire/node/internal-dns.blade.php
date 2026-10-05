@@ -11,7 +11,7 @@
 
         <div class="flex w-full min-w-0 flex-col gap-6">
             <x-application.settings-section title="Internal DNS" flush
-                helper="Private hostnames that workloads in this cluster use to reach each other. Records are shared by every Node in the cluster.">
+                helper="Private hostnames that workloads in this cluster use to reach each other. Records are shared by every server in the cluster.">
                 <x-slot:actions>
                     <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshEndpoints"
                         title="Refresh DNS records">
@@ -34,7 +34,7 @@
                             class="grid min-w-[850px] grid-cols-[minmax(15rem,1.8fr)_minmax(8rem,0.8fr)_minmax(10rem,1fr)_7rem_8rem] border-b border-neutral-200 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
                             <div>Hostname</div>
                             <div>Address</div>
-                            <div>Node</div>
+                            <div>Server</div>
                             <div>Status</div>
                             <div>Expires</div>
                         </div>
@@ -62,7 +62,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="truncate text-black dark:text-fg">
-                                        {{ $nodeNamesByAddress[$ownerNodeIp] ?? 'Unknown Node' }}
+                                        {{ $nodeNamesByAddress[$ownerNodeIp] ?? 'Unknown server' }}
                                     </p>
                                     <p class="font-mono text-[10px] text-neutral-500 dark:text-fg-faint">{{ $ownerNodeIp }}</p>
                                 </div>

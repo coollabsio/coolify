@@ -1,13 +1,13 @@
 @php
     $overview = [
-        'Nodes ready' => $readyNodesCount.' / '.$nodesCount,
+        'Servers ready' => $readyNodesCount.' / '.$nodesCount,
         'Private network' => $cluster->cidr,
         'Last synced' => $cluster->last_reconciled_at?->diffForHumans() ?? 'Never',
     ];
 @endphp
 
 <x-application.settings-section id="node-cluster-overview-section" title="Overview"
-    helper="Private network state of the Nodes in this cluster.">
+    helper="Private network state of the servers in this cluster.">
     @can('update', $cluster)
         <x-slot:actions>
             <x-forms.button wire:click="reconcileNetwork" wire:loading.attr="disabled" wire:target="reconcileNetwork">

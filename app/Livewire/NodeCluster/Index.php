@@ -15,6 +15,10 @@ use Illuminate\View\View;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
+/**
+ * Cluster groups on the Servers page: one group per cluster with its servers (Node models),
+ * servers without a cluster, cluster creation, and the team-wide Sentinel upgrade.
+ */
 class Index extends Component
 {
     use AuthorizesRequests;
@@ -46,7 +50,7 @@ class Index extends Component
         $this->dispatch('success', 'Cluster created.');
     }
 
-    /** Upgrades Sentinel on every usable Node of the current team, one at a time, stopping at the first failure. */
+    /** Upgrades Sentinel on every usable cluster server of the current team, one at a time, stopping at the first failure. */
     public function upgradeAllSentinels(): void
     {
         $nodes = $this->nodesNeedingSentinelUpgrade(FetchLatestSentinelRelease::run());
@@ -54,7 +58,7 @@ class Index extends Component
             $this->authorize('manageSentinel', $node);
         }
         if ($nodes->isEmpty()) {
-            $this->dispatch('info', 'Sentinel is up to date on every Node.');
+            $this->dispatch('info', 'Sentinel is up to date on every cluster server.');
 
             return;
         }
@@ -67,18 +71,23 @@ class Index extends Component
 
         Cache::put(UpgradeSentinel::upgradeAllCacheKey($teamId), ['status' => 'queued', 'upgraded' => []], now()->addDay());
         UpgradeAllNodeSentinelsJob::dispatch($teamId, auth()->id());
-        $this->dispatch('success', 'Sentinel upgrade queued. Nodes are upgraded one at a time.');
+        $this->dispatch('success', 'Sentinel upgrade queued. Servers are upgraded one at a time.');
     }
 
     public function render(): View
     {
-        $clusters = NodeCluster::query()->where('team_id', currentTeam()->id)->withCount('nodes')->orderBy('name')->get();
-        $nodes = Node::query()->with('cluster:id,name,uuid')->where('team_id', currentTeam()->id)->orderBy('name')->get();
+        $teamId = currentTeam()->id;
+        $clusters = NodeCluster::query()
+            ->where('team_id', $teamId)
+            ->with(['nodes' => fn ($query) => $query->where('team_id', $teamId)->orderBy('name')])
+            ->orderBy('name')
+            ->get();
+        $unassignedNodes = Node::query()->where('team_id', $teamId)->whereNull('node_cluster_id')->orderBy('name')->get();
         $sentinelRelease = FetchLatestSentinelRelease::run();
         $sentinelUpgradeNodes = $this->nodesNeedingSentinelUpgrade($sentinelRelease);
-        $sentinelUpgradeSummary = Cache::get(UpgradeSentinel::upgradeAllCacheKey(currentTeam()->id));
+        $sentinelUpgradeSummary = Cache::get(UpgradeSentinel::upgradeAllCacheKey($teamId));
 
-        return view('livewire.node-cluster.index', compact('clusters', 'nodes', 'sentinelRelease', 'sentinelUpgradeNodes', 'sentinelUpgradeSummary'));
+        return view('livewire.node-cluster.index', compact('clusters', 'unassignedNodes', 'sentinelRelease', 'sentinelUpgradeNodes', 'sentinelUpgradeSummary'));
     }
 
     /**

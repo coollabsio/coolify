@@ -110,22 +110,12 @@
                 Infrastructure</li>
             <li>
                 <a title="Servers" {{ wireNavigate() }}
-                    class="{{ request()->is('server/*') || request()->is('servers') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                    class="{{ request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*') ? 'menu-item menu-item-active' : 'menu-item' }}"
                     :class="collapsed && 'lg:justify-center lg:px-0'" href="/servers">
                     <x-reicon name="servers" class="menu-item-icon" />
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Servers</span>
                 </a>
             </li>
-            @if (isDev() && config('constants.sentinel.host_enabled', false))
-                <li>
-                    <a title="Clusters" {{ wireNavigate() }}
-                        class="{{ request()->is('node-clusters*') || request()->is('node/*') ? 'menu-item menu-item-active' : 'menu-item' }}"
-                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('node-cluster.index') }}">
-                        <x-reicon name="layers" class="menu-item-icon" />
-                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Clusters</span>
-                    </a>
-                </li>
-            @endif
             <li>
                 <a title="Sources" {{ wireNavigate() }}
                     class="{{ request()->is('source*') ? 'menu-item-active menu-item' : 'menu-item' }}"

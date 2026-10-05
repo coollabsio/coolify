@@ -35,7 +35,7 @@
 @endphp
 
 <x-application.settings-section id="node-sentinel-connection-section" title="Connection"
-    helper="Sentinel runs on the Node as a systemd service and keeps a secure control connection to Coolify.">
+    helper="Sentinel runs on the server as a systemd service and keeps a secure control connection to Coolify.">
     <x-slot:actions>
         @can('manageSentinel', $node)
             <x-forms.button wire:click="testFluxConnection">Test connection</x-forms.button>
@@ -98,7 +98,7 @@
             @if ($sentinelUpgradeAvailable && ! $sentinelUpgradeActive)
                 <x-modal-confirmation title="Upgrade Sentinel?" buttonTitle="Upgrade Sentinel"
                     submitAction="upgradeSentinel" :actions="[
-                        'Sentinel ' . $latestSentinelVersion . ' is installed on this Node over SSH and the service restarts.',
+                        'Sentinel ' . $latestSentinelVersion . ' is installed on this server over SSH and the service restarts.',
                         'The control connection drops briefly while Sentinel restarts.',
                         'If Sentinel does not reconnect within 60 seconds, the previous version is restored.',
                     ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Upgrade Sentinel" />
@@ -116,7 +116,7 @@
     </x-application.settings-section>
 
     <x-application.settings-section id="node-sentinel-service-section" title="Sentinel service"
-        helper="Install the latest Sentinel release on this Node or restart the service.">
+        helper="Install the latest Sentinel release on this server or restart the service.">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-[13px] text-neutral-600 dark:text-fg-dim">
                 Updating installs the latest Sentinel release over SSH and restarts the service.
@@ -124,7 +124,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 <x-forms.button wire:click="installSentinel">Update Sentinel</x-forms.button>
                 <x-forms.button wire:click="restartSentinel"
-                    wire:confirm="Restart Sentinel on this Node? The control connection drops briefly.">
+                    wire:confirm="Restart Sentinel on this server? The control connection drops briefly.">
                     Restart
                 </x-forms.button>
             </div>
@@ -132,22 +132,22 @@
     </x-application.settings-section>
 
     <x-application.settings-section id="node-sentinel-troubleshooting-section" title="Troubleshooting"
-        helper="Use these actions when the Node is not ready or Sentinel cannot connect.">
+        helper="Use these actions when the server is not ready or Sentinel cannot connect.">
         <div class="flex flex-col divide-y divide-neutral-200 dark:divide-white/[0.07]">
             <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
                 <div class="min-w-0">
-                    <p class="text-[13px] font-medium text-black dark:text-fg">Validate node</p>
+                    <p class="text-[13px] font-medium text-black dark:text-fg">Validate server</p>
                     <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                        Check Podman and the host requirements, then update the Node status.
+                        Check Podman and the host requirements, then update the server status.
                     </p>
                 </div>
-                <x-forms.button wire:click="validateNode">Validate node</x-forms.button>
+                <x-forms.button wire:click="validateNode">Validate server</x-forms.button>
             </div>
             <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div class="min-w-0">
                     <p class="text-[13px] font-medium text-black dark:text-fg">Repair trust</p>
                     <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                        Reinstall the Coolify certificate authority on the Node when the secure connection is rejected.
+                        Reinstall the Coolify certificate authority on the server when the secure connection is rejected.
                     </p>
                 </div>
                 <x-forms.button wire:click="repairFluxTrust">Repair trust</x-forms.button>
@@ -157,7 +157,7 @@
                     <div class="min-w-0">
                         <p class="text-[13px] font-medium text-black dark:text-fg">Renew certificate</p>
                         <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                            Development only. Renews the instance-wide Flux TLS certificate used by every Node.
+                            Development only. Renews the instance-wide Flux TLS certificate used by every cluster server.
                         </p>
                     </div>
                     <x-forms.button wire:click="renewFluxCertificate">Renew certificate</x-forms.button>

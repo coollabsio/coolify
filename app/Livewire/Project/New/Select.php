@@ -475,7 +475,7 @@ class Select extends Component
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => 'docker-image',
-            'node' => $node->uuid,
+            'server' => $node->uuid,
         ]);
     }
 

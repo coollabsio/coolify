@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -13,6 +14,8 @@ use App\Notifications\Node\ClusterNetworkRecovered;
 use App\Notifications\Node\ClusterNetworkUnhealthy;
 use App\Notifications\Node\Reachable;
 use App\Notifications\Node\Unreachable;
+use App\Notifications\Server\Reachable as ServerReachable;
+use App\Notifications\Server\Unreachable as ServerUnreachable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -81,7 +84,7 @@ it('notifies once when a Node stays unreachable longer than the grace period', f
     Notification::assertSentToTimes($this->team, Unreachable::class, 1);
     Notification::assertSentTo($this->team, Unreachable::class, fn (Unreachable $notification, array $channels) => $notification->node->is($this->node)
         && $channels === [EmailChannel::class]
-        && str_contains($notification->toWebhook()['url'], "/node/{$this->node->uuid}"));
+        && str_contains($notification->toWebhook()['url'], "/cluster-server/{$this->node->uuid}"));
     Notification::assertNotSentTo($this->otherTeam, Unreachable::class);
     expect($this->node->refresh()->unreachable_notified_at)->not->toBeNull();
 });
@@ -173,7 +176,7 @@ it('notifies once when the cluster network fails and once when it recovers', fun
     Notification::assertSentTo($this->team, ClusterNetworkUnhealthy::class, fn (ClusterNetworkUnhealthy $notification) => $notification->cluster->is($this->cluster)
         && $notification->networkStatus === 'error'
         && $notification->affectedNodeNames === [$this->node->name]
-        && str_contains($notification->toWebhook()['url'], "/node-clusters/{$this->cluster->uuid}"));
+        && str_contains($notification->toWebhook()['url'], "/cluster/{$this->cluster->uuid}"));
     Notification::assertNotSentTo($this->team, ClusterNetworkRecovered::class);
 
     $this->cluster->update(['network_status' => 'active']);
@@ -284,4 +287,39 @@ it('schedules the Node health check every minute on one server', function () {
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('* * * * *')
         ->and($event->onOneServer)->toBeTrue();
+});
+
+it('sends cluster server webhooks with the same events as Docker servers', function () {
+    $server = Server::factory()->create(['team_id' => $this->node->team_id, 'private_key_id' => $this->node->private_key_id]);
+
+    expect((new Unreachable($this->node))->toWebhook())->toMatchArray([
+        'event' => 'server_unreachable',
+        'server_name' => $this->node->name,
+        'server_uuid' => $this->node->uuid,
+        'server_type' => 'cluster',
+    ])->not->toHaveKeys(['node_name', 'node_uuid'])
+        ->and((new Reachable($this->node))->toWebhook())->toMatchArray([
+            'event' => 'server_reachable',
+            'server_uuid' => $this->node->uuid,
+            'server_type' => 'cluster',
+        ])
+        ->and((new ServerUnreachable($server))->toWebhook())->toMatchArray([
+            'event' => 'server_unreachable',
+            'server_uuid' => $server->uuid,
+            'server_type' => 'docker',
+        ])
+        ->and((new ServerReachable($server))->toWebhook())->toMatchArray([
+            'event' => 'server_reachable',
+            'server_type' => 'docker',
+        ])
+        ->and((new ClusterNetworkUnhealthy($this->cluster, 'degraded', [$this->node->name]))->toWebhook())->toMatchArray([
+            'event' => 'cluster_network_unhealthy',
+            'cluster_uuid' => $this->cluster->uuid,
+            'network_status' => 'degraded',
+            'affected_servers' => [$this->node->name],
+        ])
+        ->and((new ClusterNetworkRecovered($this->cluster))->toWebhook())->toMatchArray([
+            'event' => 'cluster_network_recovered',
+            'cluster_uuid' => $this->cluster->uuid,
+        ]);
 });

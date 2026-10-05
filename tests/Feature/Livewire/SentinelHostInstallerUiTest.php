@@ -49,7 +49,7 @@ it('shows and runs node Sentinel controls in development', function () {
         ->assertSee('Connection')
         ->assertSee('Update Sentinel')
         ->assertSee('Troubleshooting')
-        ->assertSee('Validate node')
+        ->assertSee('Validate server')
         ->assertSee('Repair trust')
         ->assertDontSee('Renew certificate')
         ->assertDontSee('Refresh state')
@@ -99,7 +99,7 @@ it('shows current Node capacity and resource pressure', function () {
         ->assertSee('Disk usage')
         ->assertSee('75%')
         ->assertSee('1.25 / 1.00 / 0.75')
-        ->assertSee('Node pressure');
+        ->assertSee('Server pressure');
 });
 
 it('does not expose node controls on a legacy server', function () {
@@ -142,11 +142,11 @@ it('hides raw revision and discovery state from the Node overview', function () 
         ->assertDontSee('Coolify endpoint');
 });
 
-it('shows validation output only while the Node is not ready', function () {
+it('shows validation output only while the Server is not ready', function () {
     $this->node->update(['is_usable' => false, 'validation_logs' => 'Podman is not installed.']);
 
     Livewire::test(Show::class, ['node_uuid' => $this->node->uuid])
-        ->assertSee('Node is not ready')
+        ->assertSee('Server is not ready')
         ->assertSee('Podman is not installed.');
 
     $this->node->update(['is_usable' => true]);

@@ -13,18 +13,18 @@
             'group' => 'Settings',
         ],
         [
-            'label' => 'Workloads',
+            'label' => 'Applications',
             'route' => 'node.workloads',
             'active' => $activeMenu === 'workloads',
             'icon' => 'layers',
-            'group' => 'Workloads',
+            'group' => 'Applications',
         ],
         [
             'label' => 'Containers',
             'route' => 'node.containers',
             'active' => $activeMenu === 'containers',
             'icon' => 'grid',
-            'group' => 'Workloads',
+            'group' => 'Applications',
         ],
         [
             'label' => 'Internal DNS',
@@ -72,7 +72,7 @@
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start">
-    <nav aria-label="Node configuration sections"
+    <nav aria-label="Server configuration sections"
         x-data="settingsSidebarAccordion({ activeGroup: @js($activeGroup), storageKey: 'coolify.settings-sidebar.node' })"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedNodeMenuItems as $groupLabel => $groupItems)

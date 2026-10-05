@@ -21,6 +21,15 @@ Coolify owns product intent, authorization, and durable product state. Flux
 routes typed requests to connected hosts. Sentinel validates and performs
 explicit host-local operations. SSH remains the bootstrap and recovery path.
 
+## Glossary
+
+In the UI a Node is called a server. In code, `Node` is a server in the
+cluster stack (Podman, Sentinel, Flux) and `Server` is a Docker server. Where
+both kinds appear together, the UI says "cluster server" and "Docker server".
+Class, table, column, and route names keep `Node`, `NodeCluster`, and
+`NodeWorkload`. The Servers page groups cluster servers by cluster above the
+Docker servers.
+
 ## Documents
 
 | Document | Purpose |

@@ -166,7 +166,7 @@ it('requires an available workload node in the selected cluster', function () {
         $this->cluster,
         'nginx:latest',
         $this->user,
-    ))->toThrow(RuntimeException::class, 'The cluster has no workload Node that can accept a deployment.');
+    ))->toThrow(RuntimeException::class, 'The cluster has no workload server that can accept a deployment.');
 });
 
 it('deploys only to converged Nodes of a degraded cluster network', function () {
@@ -186,7 +186,7 @@ it('deploys only to converged Nodes of a degraded cluster network', function () 
 
     expect(fn () => CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster, 'nginx:latest', $this->user, $this->node,
-    ))->toThrow(RuntimeException::class, 'The selected Node is not available in this cluster.');
+    ))->toThrow(RuntimeException::class, 'The selected server is not available in this cluster.');
 
     $deployment = CreateClusterDockerImageWorkload::run(
         $this->project, $this->environment, $this->cluster->refresh(), 'nginx:latest', $this->user,
@@ -424,7 +424,7 @@ it('allows a specific Node to be selected from New resource', function () {
     expect($response->getTargetUrl())->toBe(route('project.resource.create', [
         ...$routeParameters,
         'type' => 'docker-image',
-        'node' => $this->node->uuid,
+        'server' => $this->node->uuid,
     ]));
 });
 
@@ -519,7 +519,7 @@ it('opens the Docker image form for a specific Node target', function () {
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'type' => 'docker-image',
-        'node' => $this->node->uuid,
+        'server' => $this->node->uuid,
     ]))
         ->assertOk()
         ->assertSeeLivewire(DockerImage::class)

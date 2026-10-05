@@ -55,7 +55,7 @@ class Terminal extends Component
         $this->authorize('view', $server);
 
         if ($server instanceof Node && (! $server->is_reachable || ! $server->is_usable)) {
-            abort(403, 'Terminal access is unavailable while this Node is not ready.');
+            abort(403, 'Terminal access is unavailable while this server is not ready.');
         }
         if ($server instanceof Server && (! $server->isTerminalEnabled() || $server->isForceDisabled())) {
             abort(403, 'Terminal access is disabled on this server.');

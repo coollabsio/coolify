@@ -147,7 +147,7 @@ it('queues a safe move from the Node page', function () {
     Queue::fake();
 
     Livewire::test(Show::class, ['node_uuid' => $source->uuid, 'section' => 'workloads'])
-        ->assertSee('Move to Node')
+        ->assertSee('Move to another server')
         ->assertSee('Target Node')
         ->set('moveTargets.'.$workload->uuid, $target->uuid)
         ->call('moveWorkload', $workload->uuid)

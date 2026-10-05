@@ -43,7 +43,7 @@ class DockerImage extends Component
     public function loadDeploymentTargets(): void
     {
         $clusterUuid = $this->query['cluster'] ?? null;
-        $nodeUuid = $this->query['node'] ?? null;
+        $nodeUuid = $this->query['server'] ?? null;
         $destinationUuid = $this->query['destination'] ?? null;
         $this->deploymentTarget = is_string($nodeUuid) && $nodeUuid !== ''
             ? 'node:'.$nodeUuid
@@ -69,8 +69,8 @@ class DockerImage extends Component
 
                 $targets = [[
                     'value' => 'cluster:'.$cluster->uuid,
-                    'label' => $cluster->name.' — Automatic placement — '.($ready
-                        ? $cluster->available_nodes_count.' available '.str('node')->plural($cluster->available_nodes_count)
+                    'label' => $cluster->name.' · Automatic placement · '.($ready
+                        ? $cluster->available_nodes_count.' available '.str('server')->plural($cluster->available_nodes_count)
                         : 'not ready'),
                     'disabled' => ! $ready,
                 ]];
@@ -78,7 +78,7 @@ class DockerImage extends Component
                     foreach ($cluster->nodes as $node) {
                         $targets[] = [
                             'value' => 'node:'.$node->uuid,
-                            'label' => $cluster->name.' — Node: '.$node->name,
+                            'label' => $cluster->name.' · Server: '.$node->name,
                             'disabled' => false,
                         ];
                     }
@@ -94,7 +94,7 @@ class DockerImage extends Component
             if ($destination !== null) {
                 $this->deploymentTargets[] = [
                     'value' => 'destination:'.$destination->uuid,
-                    'label' => $destination->server->name.' — Legacy server',
+                    'label' => $destination->server->name.' · Docker server',
                     'disabled' => false,
                 ];
             }

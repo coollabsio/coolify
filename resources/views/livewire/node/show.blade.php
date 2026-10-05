@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($node, 'name')->limit(24) }} | Node | Coolify
+        {{ data_get_str($node, 'name')->limit(24) }} | Server | Coolify
     </x-slot>
 
     <x-node.navbar :node="$node" />

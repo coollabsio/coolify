@@ -103,19 +103,16 @@ it('shows only team clusters in the cluster UI', function () {
         ->assertSee($own->name)->assertDontSee('Foreign cluster');
 });
 
-it('uses the standard collection controls on the cluster index', function () {
-    $view = file_get_contents(resource_path('views/livewire/node-cluster/index.blade.php'))
-        .file_get_contents(resource_path('views/livewire/shared/list-search-controls.blade.php'));
+it('renders cluster groups with the cluster actions on the servers page', function () {
+    $view = file_get_contents(resource_path('views/livewire/node-cluster/index.blade.php'));
 
     expect($view)
-        ->toContain('<x-slot:title>Clusters | Coolify</x-slot>')
-        ->toContain('>Clusters</h1>')
+        ->toContain('>Clusters</h2>')
         ->toContain('New cluster')
-        ->toContain('Search clusters')
-        ->toContain("viewMode === 'table'")
-        ->toContain("viewMode === 'grid'")
-        ->toContain('control-selected')
-        ->toContain("localStorage.setItem('coolify-node-clusters-view', mode)")
+        ->toContain('Not in a cluster')
+        ->toContain('Cluster settings')
+        ->toContain('wire:key="cluster-group-{{ $cluster->uuid }}"')
+        ->not->toContain('<x-slot:title>')
         ->not->toContain('title="Create cluster"');
 });
 
@@ -313,7 +310,7 @@ it('deletes a cluster after cleaning unused assigned nodes', function () {
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->call('deleteCluster', 'password')
-        ->assertRedirect(route('node-cluster.index'));
+        ->assertRedirect(route('server.index'));
 
     expect($cluster->fresh())->toBeNull()
         ->and($node->fresh()->node_cluster_id)->toBeNull();
@@ -457,7 +454,7 @@ it('adds a firewall rule from a Node to a workload', function () {
     $this->get(route('node-cluster.firewall', $cluster->uuid))
         ->assertSuccessful()
         ->assertSee($node->name)
-        ->assertSee('Nodes allow only required cluster traffic by default.');
+        ->assertSee('Servers allow only required cluster traffic by default.');
 
     Livewire::test(Show::class, ['cluster_uuid' => $cluster->uuid])
         ->set('firewallSourceUuid', 'node:'.$node->uuid)
@@ -608,15 +605,14 @@ it('builds an SSH repair script that restores only Coolify network state', funct
         ->not->toContain('flush ruleset');
 });
 
-it('uses the Clusters label and layers icon in the sidebar', function () {
+it('shows cluster pages under the Servers item in the sidebar', function () {
     $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
 
     expect($navbar)
-        ->toContain('title="Clusters"')
-        ->toContain("request()->is('node-clusters*') || request()->is('node/*')")
-        ->toContain('<x-reicon name="layers" class="menu-item-icon" />')
-        ->toContain('>Clusters</span>')
-        ->not->toContain('title="Node clusters"');
+        ->toContain('title="Servers"')
+        ->toContain("request()->is('server/*', 'servers', 'servers/*', 'cluster/*', 'cluster-server/*')")
+        ->not->toContain('title="Clusters"')
+        ->not->toContain("route('node-cluster.index')");
 });
 
 it('renders one page per cluster menu item with the grouped sidebar', function (string $routeName, array $expectedText) {
@@ -641,8 +637,8 @@ it('renders one page per cluster menu item with the grouped sidebar', function (
         $response->assertSee($text);
     }
 })->with([
-    'general' => ['node-cluster.show', ['Overview', 'Nodes ready', 'Private network', 'Last synced', 'Sync network', 'Pending']],
-    'nodes' => ['node-cluster.nodes', ['No nodes in this cluster', 'Connect new node']],
+    'general' => ['node-cluster.show', ['Overview', 'Servers ready', 'Private network', 'Last synced', 'Sync network', 'Pending']],
+    'nodes' => ['node-cluster.nodes', ['No servers in this cluster', 'Connect new server']],
     'firewall' => ['node-cluster.firewall', ['Traffic map', 'Application rules', 'Ingress rules', 'System rules']],
     'advanced' => ['node-cluster.advanced', ['Private network', 'WireGuard interface', 'Deployment limits', 'Troubleshooting', 'Recent operations']],
     'danger' => ['node-cluster.delete', ['Delete cluster', 'This action cannot be undone']],
@@ -656,7 +652,7 @@ it('derives the active section from the route', function (string $routeName, str
         ->assertSee('Route sections > '.$title.' | Cluster | Coolify', false);
 })->with([
     ['node-cluster.show', 'General'],
-    ['node-cluster.nodes', 'Nodes'],
+    ['node-cluster.nodes', 'Servers'],
     ['node-cluster.firewall', 'Firewall'],
     ['node-cluster.advanced', 'Advanced'],
     ['node-cluster.delete', 'Danger'],
@@ -688,7 +684,7 @@ it('lists cluster nodes with network state and offers unassigned nodes', functio
         ->assertSee($member->fresh()->wireguard_ip)
         ->assertSee('Ready')
         ->assertSee('Pending')
-        ->assertSee('Add node')
+        ->assertSee('Add server')
         ->assertSee('Spare node')
         ->assertSee('Remove')
         ->assertSee('node-cluster-nodes-warning', escape: false)
@@ -815,7 +811,7 @@ it('hides successful background checks from recent operations', function () {
         ->assertSee('Network Wireguard Reconcile');
 });
 
-it('lists clusters before nodes on the index without development badges', function () {
+it('lists each cluster with its servers before servers without a cluster', function () {
     $team = $this->user->teams()->firstOrFail();
     $cluster = CreateNodeCluster::run($team, $this->user, 'Index cluster');
     $assigned = Node::factory()->create(['team_id' => $team->id, 'name' => 'Assigned node', 'ip' => '203.0.113.10']);
@@ -823,11 +819,10 @@ it('lists clusters before nodes on the index without development badges', functi
     Node::factory()->create(['team_id' => $team->id, 'name' => 'Loose node']);
 
     Livewire::test(Index::class)
-        ->assertSeeInOrder(['Index cluster', 'Nodes', 'Assigned node'])
+        ->assertSeeInOrder(['Index cluster', '1 server', 'Assigned node', 'Not in a cluster', 'Loose node'])
         ->assertSee('203.0.113.10')
-        ->assertSee('Unassigned')
         ->assertSee('New cluster')
-        ->assertSee('Add node')
         ->assertSee('Pending')
+        ->assertSee(route('node-cluster.show', ['cluster_uuid' => $cluster->uuid]), escape: false)
         ->assertDontSeeHtml('>Dev<');
 });

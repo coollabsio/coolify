@@ -10,7 +10,7 @@
                     <span>Revision</span>
                     <span>Started</span>
                     <span>Duration</span>
-                    <span>Node</span>
+                    <span>Server</span>
                 </div>
 
                 @foreach ($deploymentHistory['rows'] as $deployment)

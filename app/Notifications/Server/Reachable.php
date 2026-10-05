@@ -85,6 +85,7 @@ class Reachable extends CustomEmailNotification
             'event' => 'server_reachable',
             'server_name' => $this->server->name,
             'server_uuid' => $this->server->uuid,
+            'server_type' => 'docker',
             'url' => $url,
         ];
     }

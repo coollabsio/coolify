@@ -43,7 +43,7 @@ class ClusterNetworkUnhealthy extends CustomEmailNotification
             color: DiscordMessage::errorColor(),
         );
         if ($this->affectedNodeNames !== []) {
-            $message->addField('Affected Nodes', implode(', ', $this->affectedNodeNames));
+            $message->addField('Affected servers', implode(', ', $this->affectedNodeNames));
         }
         $message->addField('Cluster', "[{$this->cluster->name}]({$this->url()})");
 
@@ -84,11 +84,11 @@ class ClusterNetworkUnhealthy extends CustomEmailNotification
         return [
             'success' => false,
             'message' => 'Cluster network '.$this->statusLabel(),
-            'event' => 'node_cluster_network_unhealthy',
+            'event' => 'cluster_network_unhealthy',
             'cluster_name' => $this->cluster->name,
             'cluster_uuid' => $this->cluster->uuid,
             'network_status' => $this->networkStatus,
-            'affected_nodes' => $this->affectedNodeNames,
+            'affected_servers' => $this->affectedNodeNames,
             'url' => $this->url(),
         ];
     }
@@ -100,12 +100,12 @@ class ClusterNetworkUnhealthy extends CustomEmailNotification
 
     private function description(): string
     {
-        return "The private network of cluster '{$this->cluster->name}' is {$this->statusLabel()}. Workloads on its Nodes may not reach each other.";
+        return "The private network of cluster '{$this->cluster->name}' is {$this->statusLabel()}. Applications on its servers may not reach each other.";
     }
 
     private function affectedNodesLine(): string
     {
-        return $this->affectedNodeNames === [] ? '' : 'Affected Nodes: '.implode(', ', $this->affectedNodeNames);
+        return $this->affectedNodeNames === [] ? '' : 'Affected servers: '.implode(', ', $this->affectedNodeNames);
     }
 
     private function url(): string

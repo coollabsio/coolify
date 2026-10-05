@@ -79,7 +79,7 @@ class ClusterNetworkRecovered extends CustomEmailNotification
         return [
             'success' => true,
             'message' => 'Cluster network recovered',
-            'event' => 'node_cluster_network_recovered',
+            'event' => 'cluster_network_recovered',
             'cluster_name' => $this->cluster->name,
             'cluster_uuid' => $this->cluster->uuid,
             'url' => $this->url(),

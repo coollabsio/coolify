@@ -116,7 +116,7 @@ class ReconcileNodeClusterNetwork
         try {
             $members = $this->members($cluster);
             if ($members->isEmpty()) {
-                throw new RuntimeException('Assign at least one Node before network activation.');
+                throw new RuntimeException('Assign at least one server before network activation.');
             }
             if ($fullRun) {
                 $cluster->update(['network_status' => 'reconciling']);
@@ -161,7 +161,7 @@ class ReconcileNodeClusterNetwork
                             $node->ensureCapability($capability);
                         }
                         if (! LeaveNodeClusterNetwork::completePending($node)) {
-                            throw new RuntimeException('The Node is still leaving its previous cluster network.');
+                            throw new RuntimeException('The server is still leaving its previous cluster network.');
                         }
                         if (blank($node->wireguard_public_key)) {
                             $operations[] = $this->runOperation($node, $user, $attempt, 'network.wireguard.key.ensure.v1', [
@@ -169,7 +169,7 @@ class ReconcileNodeClusterNetwork
                             ]);
                             $node->refresh();
                             if (blank($node->wireguard_public_key)) {
-                                throw new RuntimeException('The Node did not report a WireGuard public key.');
+                                throw new RuntimeException('The server did not report a WireGuard public key.');
                             }
                             $peerSetChanged = true;
                         }
@@ -279,7 +279,7 @@ class ReconcileNodeClusterNetwork
                 }
             }
             foreach ($converging as $nodeId => $node) {
-                $failures[$nodeId] = "Corrosion did not converge on Node {$node->name}.";
+                $failures[$nodeId] = "Corrosion did not converge on server {$node->name}.";
                 unset($applied[$nodeId]);
             }
 

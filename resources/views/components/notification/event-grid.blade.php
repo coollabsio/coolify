@@ -36,13 +36,13 @@
             ['key' => 'serverDiskUsage', 'label' => 'Disk usage warning'],
             [
                 'key' => 'serverReachable',
-                'label' => 'Server or Node reachable',
-                'helper' => 'Also notifies when a Node cluster network is active again.',
+                'label' => 'Server reachable',
+                'helper' => 'Docker servers and cluster servers. Also notifies when a cluster network is active again.',
             ],
             [
                 'key' => 'serverUnreachable',
-                'label' => 'Server or Node unreachable',
-                'helper' => 'Also notifies when a Node cluster network fails or is degraded.',
+                'label' => 'Server unreachable',
+                'helper' => 'Docker servers and cluster servers. Also notifies when a cluster network fails or is degraded.',
             ],
             ['key' => 'serverPatch', 'label' => 'Server patching'],
             ['key' => 'traefikOutdated', 'label' => 'Traefik proxy outdated'],

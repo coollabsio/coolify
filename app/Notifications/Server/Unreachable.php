@@ -93,6 +93,7 @@ class Unreachable extends CustomEmailNotification
             'event' => 'server_unreachable',
             'server_name' => $this->server->name,
             'server_uuid' => $this->server->uuid,
+            'server_type' => 'docker',
             'url' => $url,
         ];
     }

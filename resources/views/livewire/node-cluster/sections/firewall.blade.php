@@ -2,7 +2,7 @@
     $canUpdateCluster = auth()->user()->can('update', $cluster);
     $workloadOptions = $workloads->map(fn ($workload) => ['value' => $workload->uuid, 'label' => $workload->name])->values()->all();
     $sourceOptions = [
-        ['value' => '__group_nodes', 'label' => 'Nodes', 'header' => true],
+        ['value' => '__group_nodes', 'label' => 'Servers', 'header' => true],
         ...$nodes->map(fn ($node) => ['value' => 'node:'.$node->uuid, 'label' => $node->name])->all(),
         ['value' => '__group_workloads', 'label' => 'Applications', 'header' => true],
         ...$workloads->map(fn ($workload) => ['value' => 'workload:'.$workload->uuid, 'label' => $workload->name])->all(),
@@ -19,12 +19,12 @@
 @endphp
 
 <x-application.settings-section id="node-cluster-traffic-map-section" title="Traffic map"
-    helper="Nodes allow only required cluster traffic by default. Applications reject mesh and external connections by default. Outbound internet access stays available.">
+    helper="Servers allow only required cluster traffic by default. Applications reject mesh and external connections by default. Outbound internet access stays available.">
     @include('livewire.node-cluster.firewall-canvas')
 </x-application.settings-section>
 
 <x-application.settings-section id="node-cluster-workload-rules-section" title="Application rules"
-    helper="Allow traffic from a Node or application to an application port inside the cluster." flush>
+    helper="Allow traffic from a server or application to an application port inside the cluster." flush>
     @if ($canUpdateCluster && $workloads->isNotEmpty())
         <x-slot:actions>
             <x-modal-input title="Add application rule" :wireIgnore="false">
@@ -94,7 +94,7 @@
 </x-application.settings-section>
 
 <x-application.settings-section id="node-cluster-ingress-rules-section" title="Ingress rules"
-    helper="Allow a Node process, unmanaged container, LAN host, proxy, or public port mapping to reach one application port. Traffic between applications still needs an application rule."
+    helper="Allow a server process, unmanaged container, LAN host, proxy, or public port mapping to reach one application port. Traffic between applications still needs an application rule."
     flush>
     @if ($canUpdateCluster && $workloads->isNotEmpty())
         <x-slot:actions>

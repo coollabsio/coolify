@@ -80,7 +80,7 @@
                             <p class="truncate text-sm font-semibold" x-text="node.name"></p>
                             <p class="truncate text-[11px] text-neutral-500 dark:text-fg-dim" x-text="node.subtitle"></p>
                         </div>
-                        <span class="table-badge shrink-0" x-text="node.type === 'node' ? 'Node' : 'App'"></span>
+                        <span class="table-badge shrink-0" x-text="node.type === 'node' ? 'Server' : 'App'"></span>
                     </div>
                     <div class="mt-auto flex items-center justify-between gap-2">
                         <span class="text-[11px] text-neutral-500 dark:text-fg-dim" x-text="node.status"></span>

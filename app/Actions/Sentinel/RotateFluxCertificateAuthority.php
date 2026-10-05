@@ -269,7 +269,7 @@ class RotateFluxCertificateAuthority
         $blocking = $this->blockingNodes($rotation);
         if ($blocking->isNotEmpty() && ! $force) {
             throw new RuntimeException(sprintf(
-                'Cannot %s: %d Node(s) have not acknowledged trust bundle %d: %s. Wait for them to reconnect, or force this step and repair trust on them over SSH.',
+                'Cannot %s: %d cluster server(s) have not acknowledged trust bundle %d: %s. Wait for them to reconnect, or force this step and repair trust on them over SSH.',
                 $step,
                 $blocking->count(),
                 $rotation->targetBundleVersion(),

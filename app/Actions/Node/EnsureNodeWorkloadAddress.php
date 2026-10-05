@@ -16,7 +16,7 @@ class EnsureNodeWorkloadAddress
     {
         $node->refresh();
         if ($node->team_id !== $workload->team_id || $node->node_cluster_id === null || blank($node->workload_cidr)) {
-            throw new DomainException('The workload and Node must belong to the same configured mesh.');
+            throw new DomainException('The workload and server must belong to the same configured mesh.');
         }
 
         return DB::transaction(function () use ($node, $workload): string {
@@ -38,7 +38,7 @@ class EnsureNodeWorkloadAddress
                 }
             }
             if ($address === null) {
-                throw new DomainException('No workload address is available on this Node.');
+                throw new DomainException('No workload address is available on this server.');
             }
 
             $node->workloads()->syncWithoutDetaching([$workload->id => ['container_ip' => $address]]);

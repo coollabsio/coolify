@@ -4,29 +4,29 @@
     $nodeGridClasses = 'grid min-w-[760px] grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_6rem_13rem] items-center gap-3 px-4';
 @endphp
 
-<x-application.settings-section id="node-cluster-nodes-section" title="Nodes"
-    helper="Nodes in this cluster share an encrypted private network. Each Node gets a stable private IP." flush>
+<x-application.settings-section id="node-cluster-nodes-section" title="Servers"
+    helper="Servers in this cluster share an encrypted private network. Each server gets a stable private IP." flush>
     @if ($canCreateNode || ($canUpdateCluster && $availableNodes->isNotEmpty()))
         <x-slot:actions>
             @if ($canCreateNode)
                 <a class="button" href="{{ route('node.onboarding') }}" {{ wireNavigate() }}>
                     <x-reicon name="plus" class="size-3.5" />
-                    Connect new node
+                    Connect new server
                 </a>
             @endif
             @if ($canUpdateCluster && $availableNodes->isNotEmpty())
-                <x-modal-input title="Add node to cluster" :wireIgnore="false">
+                <x-modal-input title="Add server to cluster" :wireIgnore="false">
                     <x-slot:content>
                         <button type="button" class="button button-highlighted">
                             <x-reicon name="plus" class="size-3.5" />
-                            Add node
+                            Add server
                         </button>
                     </x-slot:content>
                     <form wire:submit="assignNode" class="flex flex-col gap-4">
-                        <x-forms.listbox id="nodeUuid" label="Node" placeholder="Select a node" required portal
+                        <x-forms.listbox id="nodeUuid" label="Server" placeholder="Select a server" required portal
                             :options="$availableNodes->map(fn ($node) => ['value' => $node->uuid, 'label' => $node->name])->values()->all()" />
                         <div class="flex justify-end">
-                            <x-forms.button type="submit" isHighlighted>Add node</x-forms.button>
+                            <x-forms.button type="submit" isHighlighted>Add server</x-forms.button>
                         </div>
                     </form>
                 </x-modal-input>
@@ -36,13 +36,13 @@
 
     @if ($nodes->isEmpty())
         <div class="p-4">
-            <x-empty size="sm" title="No nodes in this cluster"
-                description="Add a node to start the private network." icon-name="servers">
+            <x-empty size="sm" title="No servers in this cluster"
+                description="Add a server to start the private network." icon-name="servers">
                 @if ($canCreateNode)
                     <x-slot:actions>
                         <a class="button button-highlighted" href="{{ route('node.onboarding') }}" {{ wireNavigate() }}>
                             <x-reicon name="plus" class="size-3.5" />
-                            Connect new node
+                            Connect new server
                         </a>
                     </x-slot:actions>
                 @endif
@@ -52,7 +52,7 @@
         <div class="overflow-x-auto">
             <div
                 class="{{ $nodeGridClasses }} border-b border-neutral-200 bg-neutral-50 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                <div>Node</div>
+                <div>Server</div>
                 <div>Private IP</div>
                 <div>Status</div>
                 <div>Network</div>
@@ -122,7 +122,7 @@
                         @if ($canUpdateCluster)
                             <x-forms.button wire:click="setIngress('{{ $node->uuid }}', {{ $node->is_ingress ? 'false' : 'true' }})"
                                 wire:loading.attr="disabled" wire:target="setIngress"
-                                title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this Node.' : 'Serve public HTTP traffic for cluster applications on port 80 of this Node.' }}">
+                                title="{{ $node->is_ingress ? 'Stop serving public HTTP traffic on this server.' : 'Serve public HTTP traffic for cluster applications on port 80 of this server.' }}">
                                 {{ $node->is_ingress ? 'Turn off ingress' : 'Turn on ingress' }}
                             </x-forms.button>
                             <x-forms.button wire:click="removeNode('{{ $node->uuid }}')"

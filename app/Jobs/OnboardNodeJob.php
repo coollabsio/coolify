@@ -33,7 +33,7 @@ class OnboardNodeJob implements ShouldQueue
             $this->step($node, 'preparing', 'Preparing the server');
             PrepareNodeHost::run($node);
 
-            $this->step($node, 'installing', 'Installing Node components');
+            $this->step($node, 'installing', 'Installing server components');
             InstallSentinel::run($node);
 
             $this->step($node, 'connecting', 'Connecting to Coolify');
@@ -48,7 +48,7 @@ class OnboardNodeJob implements ShouldQueue
             $this->step($node, 'verifying', 'Running final checks');
             PingFluxConnection::run($node);
 
-            $this->step($node, 'ready', 'Node ready', 'ready');
+            $this->step($node, 'ready', 'Server ready', 'ready');
         } catch (Throwable $exception) {
             $failedStep = (string) data_get($node->fresh()->metadata, 'onboarding.step', 'preparing');
             $this->step(
@@ -72,7 +72,7 @@ class OnboardNodeJob implements ShouldQueue
                 return;
             } catch (Throwable) {
                 if ($attempt === 30) {
-                    throw new RuntimeException('The Node did not connect to Coolify.');
+                    throw new RuntimeException('The server did not connect to Coolify.');
                 }
                 sleep(1);
             }
@@ -105,8 +105,8 @@ class OnboardNodeJob implements ShouldQueue
     {
         return match (true) {
             str_contains($exception->getMessage(), 'Podman') => 'Coolify could not prepare Podman on this server.',
-            str_contains($exception->getMessage(), 'connect') => 'The Node could not connect to Coolify.',
-            default => 'Coolify could not finish the Node installation. Open the technical details or retry.',
+            str_contains($exception->getMessage(), 'connect') => 'The server could not connect to Coolify.',
+            default => 'Coolify could not finish the server installation. Open the technical details or retry.',
         };
     }
 }

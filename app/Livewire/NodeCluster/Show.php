@@ -114,13 +114,13 @@ class Show extends Component
     public function assignNode(): void
     {
         $this->authorize('update', $this->cluster);
-        $this->validate(['nodeUuid' => ['required', 'string']]);
+        $this->validate(['nodeUuid' => ['required', 'string']], [], ['nodeUuid' => 'server']);
         $node = Node::query()->where('team_id', currentTeam()->id)->whereNull('node_cluster_id')->where('uuid', $this->nodeUuid)->firstOrFail();
         AssignNodeToCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
         $this->reset('nodeUuid');
         $this->dispatch('close-modal');
-        $this->dispatch('success', 'Node assigned to the cluster.');
+        $this->dispatch('success', 'Server assigned to the cluster.');
     }
 
     public function savePressurePolicy(): void
@@ -149,7 +149,7 @@ class Show extends Component
         $node = Node::query()->where('team_id', currentTeam()->id)->where('node_cluster_id', $this->cluster->id)->where('uuid', $nodeUuid)->firstOrFail();
         RemoveNodeFromCluster::run($this->cluster, $node, auth()->user());
         $this->cluster->refresh();
-        $this->dispatch('success', 'Node removed from the cluster.');
+        $this->dispatch('success', 'Server removed from the cluster.');
     }
 
     public function setIngress(string $nodeUuid, bool $enabled): void
@@ -180,7 +180,7 @@ class Show extends Component
 
             return true;
         }
-        $this->redirectRoute('node-cluster.index', navigate: true);
+        $this->redirectRoute('server.index', navigate: true);
 
         return true;
     }
@@ -238,7 +238,7 @@ class Show extends Component
             : null;
         $destination = $this->meshWorkloads()->where('uuid', $validated['destinationUuid'])->first();
         if ($sourceWorkload === null && $sourceNode === null) {
-            $this->addError('firewallSourceUuid', 'Select a workload or Node from this mesh.');
+            $this->addError('firewallSourceUuid', 'Select a workload or server from this mesh.');
         }
         if ($destination === null) {
             $this->addError('firewallDestinationUuid', 'Select a workload from this mesh.');
@@ -356,7 +356,7 @@ class Show extends Component
             return;
         }
         if (! $this->cluster->nodes()->exists()) {
-            $this->dispatch('error', 'Assign at least one Node before network activation.');
+            $this->dispatch('error', 'Assign at least one server before network activation.');
 
             return;
         }
@@ -428,7 +428,7 @@ class Show extends Component
             'type' => 'node',
             'uuid' => $node->uuid,
             'name' => $node->name,
-            'subtitle' => $node->wireguard_ip ?? 'Node',
+            'subtitle' => $node->wireguard_ip ?? 'Server',
             'status' => $node->is_usable ? 'Ready' : 'Not ready',
         ])->concat($workloads->map(fn (NodeWorkload $workload): array => [
             'id' => 'workload:'.$workload->uuid,

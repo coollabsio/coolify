@@ -12,7 +12,7 @@
         ],
     ];
     if (isDev() && config('constants.sentinel.host_enabled', false)) {
-        $settingsMenuSections['Instance'][] = ['label' => 'Node trust', 'route' => 'settings.node-trust', 'icon' => 'shield-star'];
+        $settingsMenuSections['Instance'][] = ['label' => 'Cluster trust', 'route' => 'settings.node-trust', 'icon' => 'shield-star'];
     }
 @endphp
 

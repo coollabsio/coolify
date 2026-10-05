@@ -60,12 +60,12 @@ it('renders each Node section route with the grouped sidebar', function (string 
     foreach (['node.show', 'node.workloads', 'node.containers', 'node.internal-dns', 'node.sentinel'] as $linkedRoute) {
         $response->assertSee(route($linkedRoute, $this->node->uuid), false);
     }
-    foreach (['Settings', 'Workloads', 'Networking', 'Operations', $activeLabel] as $label) {
+    foreach (['Settings', 'Applications', 'Networking', 'Operations', $activeLabel] as $label) {
         $response->assertSee($label);
     }
 })->with([
     'general' => ['node.show', 'General', 'Resource usage'],
-    'workloads' => ['node.workloads', 'Workloads', 'Recent activity'],
+    'workloads' => ['node.workloads', 'Applications', 'Recent activity'],
     'containers' => ['node.containers', 'Containers', 'No containers found'],
     'sentinel' => ['node.sentinel', 'Sentinel', 'Troubleshooting'],
 ]);
@@ -73,13 +73,13 @@ it('renders each Node section route with the grouped sidebar', function (string 
 it('derives the Node section from the route name', function () {
     $this->get(route('node.workloads', $this->node->uuid))
         ->assertSuccessful()
-        ->assertSee('No workloads on this Node')
+        ->assertSee('No applications on this server')
         ->assertDontSee('Resource usage');
 
     $this->get(route('node.sentinel', $this->node->uuid))
         ->assertSuccessful()
         ->assertSee('Update Sentinel')
-        ->assertDontSee('No workloads on this Node');
+        ->assertDontSee('No applications on this server');
 });
 
 it('keeps every Node section route team scoped', function (string $routeName) {

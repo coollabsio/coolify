@@ -29,7 +29,7 @@ class FluxTrust extends Component
 
     public function startRotation(): void
     {
-        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->start(auth()->user()), 'Flux CA rotation started. Nodes are receiving the dual-CA trust bundle.');
+        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->start(auth()->user()), 'Flux CA rotation started. Cluster servers are receiving the dual-CA trust bundle.');
     }
 
     public function continueRotation(): void
@@ -39,17 +39,17 @@ class FluxTrust extends Component
 
     public function forceContinueRotation(): void
     {
-        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->advance(force: true), 'Flux CA rotation advanced. Repair trust on Nodes that had not acknowledged the bundle.');
+        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->advance(force: true), 'Flux CA rotation advanced. Repair trust on cluster servers that had not acknowledged the bundle.');
     }
 
     public function cancelRotation(): void
     {
-        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->cancel(), 'Flux CA rotation cancelled. Nodes are receiving a bundle with the old CA only.');
+        $this->runStep(fn () => RotateFluxCertificateAuthority::make()->cancel(), 'Flux CA rotation cancelled. Cluster servers are receiving a bundle with the old CA only.');
     }
 
     public function retryDistribution(): void
     {
-        $this->runStep(fn () => DistributeFluxTrustBundleJob::dispatch(), 'Trust bundle delivery queued for connected Nodes.');
+        $this->runStep(fn () => DistributeFluxTrustBundleJob::dispatch(), 'Trust bundle delivery queued for connected cluster servers.');
     }
 
     public function refreshStatus(): void

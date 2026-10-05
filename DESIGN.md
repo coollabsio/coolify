@@ -257,6 +257,14 @@ secondary metadata at 11px. They must not grow into dashboard-sized summary
 cards. Sources, destinations, S3 storage, private keys, and shared-variable
 scopes use this pattern.
 
+The Servers page groups servers by kind. When the cluster stack is enabled,
+a Clusters section lists one card per cluster (name, server count, network
+status badge, Cluster settings button) with a dense server table inside, then
+a "Not in a cluster" card, then the Docker servers table. A single Add server
+action opens a two-card choice between a cluster server and a Docker server.
+In UI copy a `Node` is always a "server"; say "cluster server" and "Docker
+server" where both kinds appear together.
+
 Top-level settings families such as Team, Notifications, Keys & Tokens, and
 instance Settings use a compact header followed by a small route-derived tab
 strip. The active tab uses the same purple-light/yellow-dark tint as resource

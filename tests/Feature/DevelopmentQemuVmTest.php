@@ -350,7 +350,7 @@ it('tells the developer where to onboard the clean node', function () {
     ManageDevelopmentQemuVm::shouldRun()->once()->with(['node-onboarding'], false, false);
 
     $this->artisan('dev:qemu', ['profiles' => ['node-onboarding']])
-        ->expectsOutputToContain('Add it at /node-clusters/new-node')
+        ->expectsOutputToContain('Add it at /servers/new/cluster-server')
         ->assertSuccessful();
 });
 

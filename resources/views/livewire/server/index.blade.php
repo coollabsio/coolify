@@ -4,7 +4,12 @@
     </x-slot>
 
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
+        <div class="min-w-0">
+            <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
+            @if ($clusterServersEnabled)
+                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Cluster servers grouped by cluster, and Docker servers.</p>
+            @endif
+        </div>
         <div class="flex flex-wrap items-center gap-2">
             @if (isDev())
                 @can('create', App\Models\Server::class)
@@ -16,15 +21,67 @@
                     </a>
                 @endcan
             @endif
-            @can('createAnyResource')
+            @php
+                $canAddDockerServer = auth()->user()->can('createAnyResource');
+                $canAddClusterServer = $clusterServersEnabled && auth()->user()->can('create', App\Models\Node::class);
+            @endphp
+            @if ($canAddClusterServer)
+                <x-modal-input title="Add server" subtitle="Choose the kind of server to add.">
+                    <x-slot:content>
+                        <button type="button" class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
+                            <x-reicon name="plus" class="size-3.5" />
+                            Add server
+                        </button>
+                    </x-slot:content>
+                    <div data-testid="add-server-choice" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <a href="{{ route('node.onboarding') }}" {{ wireNavigate() }}
+                            class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                            <span
+                                class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <x-reicon name="layers" class="size-4" />
+                            </span>
+                            <div class="mt-auto pt-5">
+                                <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Cluster server</h3>
+                                <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                                    Podman host managed by Sentinel. Joins a cluster and runs cluster applications.
+                                </p>
+                            </div>
+                        </a>
+                        @if ($canAddDockerServer)
+                            <a href="{{ route('server.create') }}" {{ wireNavigate() }}
+                                class="group flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                                <span
+                                    class="flex size-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    <x-reicon name="servers" class="size-4" />
+                                </span>
+                                <div class="mt-auto pt-5">
+                                    <h3 class="text-[13px]! font-semibold! text-black dark:text-fg">Docker server</h3>
+                                    <p class="mt-1 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                                        Docker host managed over SSH. Runs applications, databases, and services.
+                                    </p>
+                                </div>
+                            </a>
+                        @endif
+                    </div>
+                </x-modal-input>
+            @elseif ($canAddDockerServer)
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
                     <x-reicon name="plus" class="size-3.5" />
                     New server
                 </a>
-            @endcan
+            @endif
         </div>
     </div>
+
+    @if ($clusterServersEnabled)
+        <livewire:node-cluster.index key="server-index-cluster-groups" />
+
+        <div class="mt-8 mb-3 min-w-0">
+            <h2 class="text-[15px]! font-semibold!">Docker servers</h2>
+            <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">Docker hosts managed over SSH.</p>
+        </div>
+    @endif
 
     @php
         $serverRows = $servers->map(function ($server) {
@@ -83,7 +140,7 @@
         }
     }">
         @if ($servers->isEmpty())
-            <x-empty title="No servers yet"
+            <x-empty :title="$clusterServersEnabled ? 'No Docker servers yet' : 'No servers yet'"
                 description="Add a server to deploy applications, databases, and services."
                 icon-name="servers" />
         @else

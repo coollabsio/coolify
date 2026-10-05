@@ -9,7 +9,7 @@ use App\Actions\Node\ValidateNodeCallback;
 use App\Actions\Sentinel\PingFluxConnection;
 use App\Jobs\OnboardNodeJob;
 use App\Livewire\Node\Onboarding;
-use App\Livewire\NodeCluster\Index;
+use App\Livewire\Server\Index as ServerIndex;
 use App\Models\InstanceSettings;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -37,8 +37,9 @@ beforeEach(function () {
 it('shows the node onboarding route and call to action', function () {
     $this->get(route('node.onboarding'))->assertOk()->assertSee('Connect your server');
 
-    Livewire::test(Index::class)
-        ->assertSee('Add node')
+    Livewire::test(ServerIndex::class)
+        ->assertSee('Add server')
+        ->assertSee('Cluster server')
         ->assertSee(route('node.onboarding'), escape: false);
 });
 
@@ -121,16 +122,16 @@ it('restores installation progress after a page refresh', function () {
         'node_cluster_id' => $cluster->id,
         'metadata' => [
             'hostname' => 'worker-refresh',
-            'onboarding' => ['status' => 'running', 'step' => 'installing', 'label' => 'Installing Node components'],
+            'onboarding' => ['status' => 'running', 'step' => 'installing', 'label' => 'Installing server components'],
         ],
     ]);
 
-    Livewire::withQueryParams(['node' => $node->uuid])
+    Livewire::withQueryParams(['server' => $node->uuid])
         ->test(Onboarding::class)
         ->assertSet('nodeUuid', $node->uuid)
         ->assertSet('step', 3)
-        ->assertSee('Installing your Node')
-        ->assertSee('Installing Node components');
+        ->assertSee('Installing your server')
+        ->assertSee('Installing server components');
 });
 
 it('does not restore another team node from the URL', function () {
@@ -140,7 +141,7 @@ it('does not restore another team node from the URL', function () {
         'private_key_id' => $this->key->id,
     ]);
 
-    expect(fn () => Livewire::withQueryParams(['node' => $foreignNode->uuid])->test(Onboarding::class))
+    expect(fn () => Livewire::withQueryParams(['server' => $foreignNode->uuid])->test(Onboarding::class))
         ->toThrow(ModelNotFoundException::class);
 });
 
@@ -161,7 +162,7 @@ it('stores and displays technical details for the failed installation stage', fu
         ->and($onboarding['step'])->toBe('preparing')
         ->and($onboarding['technical_error'])->toContain('apt-get failed');
 
-    Livewire::withQueryParams(['node' => $node->uuid])
+    Livewire::withQueryParams(['server' => $node->uuid])
         ->test(Onboarding::class)
         ->assertSet('step', 3)
         ->assertSee('Technical details')
@@ -243,7 +244,7 @@ it('shows the first checkpoint as running while installation is queued', functio
         ],
     ]);
 
-    Livewire::withQueryParams(['node' => $node->uuid])
+    Livewire::withQueryParams(['server' => $node->uuid])
         ->test(Onboarding::class)
         ->assertSet('step', 3)
         ->assertSeeHtml('animate-spin')

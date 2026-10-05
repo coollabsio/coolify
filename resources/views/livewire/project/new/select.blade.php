@@ -618,7 +618,7 @@
     </div>
     @if ($current_step === 'targets')
         <x-application.settings-section title="Select a deployment target"
-            description="Deploy this Docker image to a legacy server or a Node cluster." flush>
+            description="Deploy this Docker image to a cluster or a Docker server." flush>
             <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                 @foreach($clusters ?? [] as $cluster)
                     <button type="button" wire:click="setCluster('{{ $cluster->uuid }}')"
@@ -628,9 +628,9 @@
                         </span>
                         <span class="min-w-0 flex-1">
                             <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $cluster->name }}</span>
-                            <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->nodes_count }} available {{ Str::plural('node', $cluster->nodes_count) }}</span>
+                            <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $cluster->nodes_count }} available {{ Str::plural('server', $cluster->nodes_count) }}</span>
                         </span>
-                        <x-status-badge status="running" text="Node cluster" />
+                        <x-status-badge status="running" text="Cluster" />
                     </button>
                     @foreach($cluster->nodes as $node)
                         <button type="button" wire:click="setNode('{{ $node->uuid }}')"
@@ -640,9 +640,9 @@
                             </span>
                             <span class="min-w-0 flex-1">
                                 <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $node->name }}</span>
-                                <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Deploy to this Node in {{ $cluster->name }}</span>
+                                <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">Deploy to this server in {{ $cluster->name }}</span>
                             </span>
-                            <x-status-badge status="running" text="Node" />
+                            <x-status-badge status="running" text="Cluster server" />
                         </button>
                     @endforeach
                 @endforeach
@@ -656,7 +656,7 @@
                             <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $server->name }}</span>
                             <span class="block truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $server->description ?: $server->ip }}</span>
                         </span>
-                        <x-status-badge status="running" text="Legacy server" />
+                        <x-status-badge status="running" text="Docker server" />
                     </button>
                 @endforeach
             </div>

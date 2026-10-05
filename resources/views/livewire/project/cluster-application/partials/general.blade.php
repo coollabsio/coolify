@@ -30,7 +30,7 @@
             </dd>
         </div>
         <div class="min-w-0">
-            <dt class="text-neutral-500 dark:text-fg-dim">Node</dt>
+            <dt class="text-neutral-500 dark:text-fg-dim">Server</dt>
             <dd class="mt-1">
                 <a class="underline decoration-neutral-400 underline-offset-2 dark:decoration-neutral-600"
                     {{ wireNavigate() }}
@@ -86,7 +86,7 @@
     @endcan
 
     <x-application.settings-section id="cluster-application-domains" title="Domains"
-        helper="Ingress Nodes of the cluster route HTTP traffic for these domains to this application. Changes apply without a redeploy.">
+        helper="Ingress servers of the cluster route HTTP traffic for these domains to this application. Changes apply without a redeploy.">
         <div class="flex flex-col gap-4">
             <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
                 <x-forms.textarea id="domains" label="Domains" rows="3" placeholder="app.example.com"
@@ -112,12 +112,12 @@
             @endif
 
             @if ($ingressAddresses === [])
-                <x-callout type="warning" title="No ingress Node">
-                    This cluster has no ingress Node, so the domains are not reachable yet.
+                <x-callout type="warning" title="No ingress server">
+                    This cluster has no ingress server, so the domains are not reachable yet.
                     @if ($ingressCluster)
                         <a class="font-medium underline" {{ wireNavigate() }}
                             href="{{ route('node-cluster.nodes', ['cluster_uuid' => $ingressCluster->uuid]) }}">Turn on
-                            ingress for a Node</a>.
+                            ingress for a server</a>.
                     @endif
                 </x-callout>
             @else

@@ -56,13 +56,13 @@ class UpgradeSentinel
             throw new RuntimeException('No valid Sentinel release is available. Try again later.');
         }
         if (! $node->needsSentinelUpgrade($release)) {
-            throw new RuntimeException('Sentinel on this Node is already up to date.');
+            throw new RuntimeException('Sentinel on this server is already up to date.');
         }
 
         return DB::transaction(function () use ($node, $release, $requestedBy): NodeOperation {
             $node = Node::query()->lockForUpdate()->findOrFail($node->id);
             if ($node->operations()->whereIn('status', self::ACTIVE_STATUSES)->exists()) {
-                throw new RuntimeException('Another operation is active on this Node. Wait for it to finish, then upgrade Sentinel.');
+                throw new RuntimeException('Another operation is active on this server. Wait for it to finish, then upgrade Sentinel.');
             }
 
             return CreateOperation::run(
@@ -154,7 +154,7 @@ class UpgradeSentinel
         foreach ($nodes as $node) {
             try {
                 if (! $user->can('manageSentinel', $node)) {
-                    throw new RuntimeException('You are not allowed to upgrade Sentinel on this Node.');
+                    throw new RuntimeException('You are not allowed to upgrade Sentinel on this server.');
                 }
                 $operation = $this->handle($this->start($node, $user));
                 if ($operation->status !== NodeOperationStatus::SUCCEEDED) {

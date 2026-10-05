@@ -48,7 +48,7 @@ class LeaveNodeClusterNetwork
                 && data_get($result, 'discovery_removed') === true
                 && data_get($result, 'resolver_reverted') === true;
             if (! $valid) {
-                throw new RuntimeException('Flux returned an invalid Node cleanup result.');
+                throw new RuntimeException('Flux returned an invalid server cleanup result.');
             }
             $operation = TransitionOperation::run($operation, NodeOperationStatus::VERIFYING, result: $result);
             TransitionOperation::run($operation, NodeOperationStatus::SUCCEEDED, result: $result);

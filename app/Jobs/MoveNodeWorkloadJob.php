@@ -90,7 +90,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             }
             $deploymentOperation = $this->waitForDeployment($deployment['operation']);
             if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
-                throw new RuntimeException('The workload did not become ready on the target Node. '.($deploymentOperation->error ?? ''));
+                throw new RuntimeException('The workload did not become ready on the target server. '.($deploymentOperation->error ?? ''));
             }
             $targetDeploymentSucceeded = true;
             $targetContainer = $target->containers()
@@ -168,7 +168,7 @@ class MoveNodeWorkloadJob implements ShouldQueue
             $failed = $pending->first(fn (Node $node): bool => $node->network_status === 'error'
                 && $node->network_attempts > (int) $attempts->get($node->id));
             if ($failed !== null) {
-                throw new RuntimeException("Node {$failed->name} could not apply the network for the target: {$failed->network_error} The source remains active.");
+                throw new RuntimeException("Server {$failed->name} could not apply the network for the target: {$failed->network_error} The source remains active.");
             }
             if ($pending->isEmpty()) {
                 return;

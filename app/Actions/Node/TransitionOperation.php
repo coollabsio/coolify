@@ -22,7 +22,7 @@ class TransitionOperation
         return DB::transaction(function () use ($operation, $status, $result, $error): NodeOperation {
             $operation = NodeOperation::query()->lockForUpdate()->findOrFail($operation->id);
             if (! $operation->status->canTransitionTo($status)) {
-                throw new InvalidArgumentException("Invalid Node operation transition from {$operation->status->value} to {$status->value}.");
+                throw new InvalidArgumentException("Invalid server operation transition from {$operation->status->value} to {$status->value}.");
             }
 
             $attributes = ['status' => $status];

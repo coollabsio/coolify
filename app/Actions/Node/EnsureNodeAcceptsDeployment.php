@@ -15,15 +15,15 @@ class EnsureNodeAcceptsDeployment
     public function handle(Node $node, ?NodeWorkloadRevision $revision = null): void
     {
         if (! $node->is_usable) {
-            throw new DomainException("Node {$node->name} is not usable.");
+            throw new DomainException("Server {$node->name} is not usable.");
         }
         if (! $node->is_reachable) {
-            throw new DomainException("Node {$node->name} is not reachable.");
+            throw new DomainException("Server {$node->name} is not reachable.");
         }
 
         $cluster = $node->cluster;
         if ($cluster === null) {
-            throw new DomainException("Node {$node->name} does not belong to a cluster.");
+            throw new DomainException("Server {$node->name} does not belong to a cluster.");
         }
 
         $metadata = is_array($node->metadata) ? $node->metadata : [];
@@ -31,10 +31,10 @@ class EnsureNodeAcceptsDeployment
         try {
             $collectedAt = Carbon::parse($metadata['collected_at'] ?? '');
         } catch (\Throwable) {
-            throw new DomainException("Node {$node->name} resource data is unavailable.");
+            throw new DomainException("Server {$node->name} resource data is unavailable.");
         }
         if ($collectedAt->isBefore(now()->subMinutes($maximumAge))) {
-            throw new DomainException("Node {$node->name} resource data is older than {$maximumAge} minutes.");
+            throw new DomainException("Server {$node->name} resource data is older than {$maximumAge} minutes.");
         }
 
         $cpu = $this->number($metadata, 'cpu_usage_percent');
@@ -43,7 +43,7 @@ class EnsureNodeAcceptsDeployment
         $diskTotal = $this->positiveNumber($metadata, 'disk_total_bytes');
         $diskAvailable = $this->number($metadata, 'disk_available_bytes');
         if ($cpu === null || $memoryTotal === null || $memoryUsed === null || $diskTotal === null || $diskAvailable === null) {
-            throw new DomainException("Node {$node->name} resource data is incomplete.");
+            throw new DomainException("Server {$node->name} resource data is incomplete.");
         }
 
         $this->rejectAtLimit('CPU', $cpu, $cluster->cpu_pressure_threshold, $node);
@@ -76,7 +76,7 @@ class EnsureNodeAcceptsDeployment
         if ($usage >= $limit) {
             $formattedUsage = number_format($usage, 1);
 
-            throw new DomainException("Node {$node->name} has {$resource} pressure: {$formattedUsage}% usage reached the {$limit}% deployment limit.");
+            throw new DomainException("Server {$node->name} has {$resource} pressure: {$formattedUsage}% usage reached the {$limit}% deployment limit.");
         }
     }
 
@@ -99,16 +99,16 @@ class EnsureNodeAcceptsDeployment
         if ($cpuReservation > 0) {
             $cpuCount = $this->positiveNumber(is_array($node->metadata) ? $node->metadata : [], 'cpus');
             if ($cpuCount === null) {
-                throw new DomainException("Node {$node->name} CPU capacity is unavailable for this reservation.");
+                throw new DomainException("Server {$node->name} CPU capacity is unavailable for this reservation.");
             }
             $availableCpuReservation = $cpuCount * ($node->cluster->cpu_pressure_threshold / 100);
             if ($cpuReservation > $availableCpuReservation) {
-                throw new DomainException("Node {$node->name} does not have enough CPU reservation capacity.");
+                throw new DomainException("Server {$node->name} does not have enough CPU reservation capacity.");
             }
         }
         $availableMemoryReservation = $memoryTotal * ($node->cluster->memory_pressure_threshold / 100);
         if ($memoryReservation > $availableMemoryReservation) {
-            throw new DomainException("Node {$node->name} does not have enough memory reservation capacity.");
+            throw new DomainException("Server {$node->name} does not have enough memory reservation capacity.");
         }
     }
 }

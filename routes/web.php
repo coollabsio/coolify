@@ -18,7 +18,6 @@ use App\Livewire\Node\InternalDns as NodeInternalDns;
 use App\Livewire\Node\Logs as NodeLogs;
 use App\Livewire\Node\Onboarding as NodeOnboarding;
 use App\Livewire\Node\Show as NodeShow;
-use App\Livewire\NodeCluster\Index as NodeClusterIndex;
 use App\Livewire\NodeCluster\Show as NodeClusterShow;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -180,7 +179,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
     Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
     Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
-    Route::get('/settings/node-trust', SettingsFluxTrust::class)->name('settings.node-trust');
+    Route::get('/settings/cluster-trust', SettingsFluxTrust::class)->name('settings.node-trust');
+    Route::permanentRedirect('/settings/node-trust', '/settings/cluster-trust');
 
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
@@ -393,24 +393,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/tasks/{task_uuid}', ServiceConfiguration::class)->name('project.service.scheduled-tasks');
     });
 
-    Route::get('/node-clusters', NodeClusterIndex::class)->name('node-cluster.index');
-    Route::get('/node-clusters/new-node', NodeOnboarding::class)->name('node.onboarding');
-    Route::prefix('node-clusters/{cluster_uuid}')->group(function () {
+    Route::get('/servers/new/cluster-server', NodeOnboarding::class)->name('node.onboarding');
+    Route::prefix('cluster/{cluster_uuid}')->group(function () {
         Route::get('/', NodeClusterShow::class)->name('node-cluster.show');
-        Route::get('/nodes', NodeClusterShow::class)->name('node-cluster.nodes');
+        Route::get('/servers', NodeClusterShow::class)->name('node-cluster.nodes');
         Route::get('/firewall', NodeClusterShow::class)->name('node-cluster.firewall');
         Route::get('/advanced', NodeClusterShow::class)->name('node-cluster.advanced');
         Route::get('/danger', NodeClusterShow::class)->name('node-cluster.delete');
     });
-    Route::prefix('node/{node_uuid}')->group(function () {
+    Route::prefix('cluster-server/{node_uuid}')->group(function () {
         Route::get('/', NodeShow::class)->name('node.show');
-        Route::get('/workloads', NodeShow::class)->name('node.workloads');
+        Route::get('/applications', NodeShow::class)->name('node.workloads');
         Route::get('/containers', NodeShow::class)->name('node.containers');
         Route::get('/sentinel', NodeShow::class)->name('node.sentinel');
         Route::get('/internal-dns', NodeInternalDns::class)->name('node.internal-dns');
         Route::get('/logs', NodeLogs::class)->name('node.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('node.command')->middleware('can.access.terminal');
     });
+
+    // Cluster pages moved under the Servers view. Keep old bookmarks and notification links working.
+    Route::permanentRedirect('/node-clusters', '/servers');
+    Route::permanentRedirect('/node-clusters/new-node', '/servers/new/cluster-server');
+    Route::permanentRedirect('/node-clusters/{cluster_uuid}', '/cluster/{cluster_uuid}');
+    Route::permanentRedirect('/node-clusters/{cluster_uuid}/nodes', '/cluster/{cluster_uuid}/servers');
+    Route::permanentRedirect('/node-clusters/{cluster_uuid}/firewall', '/cluster/{cluster_uuid}/firewall');
+    Route::permanentRedirect('/node-clusters/{cluster_uuid}/advanced', '/cluster/{cluster_uuid}/advanced');
+    Route::permanentRedirect('/node-clusters/{cluster_uuid}/danger', '/cluster/{cluster_uuid}/danger');
+    Route::permanentRedirect('/node/{node_uuid}', '/cluster-server/{node_uuid}');
+    Route::permanentRedirect('/node/{node_uuid}/workloads', '/cluster-server/{node_uuid}/applications');
+    Route::permanentRedirect('/node/{node_uuid}/containers', '/cluster-server/{node_uuid}/containers');
+    Route::permanentRedirect('/node/{node_uuid}/sentinel', '/cluster-server/{node_uuid}/sentinel');
+    Route::permanentRedirect('/node/{node_uuid}/internal-dns', '/cluster-server/{node_uuid}/internal-dns');
+    Route::permanentRedirect('/node/{node_uuid}/logs', '/cluster-server/{node_uuid}/logs');
+    Route::permanentRedirect('/node/{node_uuid}/terminal', '/cluster-server/{node_uuid}/terminal');
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
     Route::get('/servers/import', ServerTransferImport::class)->name('server.transfer.import')->middleware('can:create,'.Server::class);

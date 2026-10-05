@@ -21,10 +21,10 @@ class SetNodeIngress
     {
         Gate::forUser($user)->authorize('update', $cluster);
         if ($node->team_id !== $cluster->team_id || $node->node_cluster_id !== $cluster->id) {
-            throw new DomainException('The Node does not belong to this cluster.');
+            throw new DomainException('The server does not belong to this cluster.');
         }
         if ($enabled && ! $node->supportsIngress()) {
-            throw new DomainException('Upgrade Sentinel on this Node to use ingress.');
+            throw new DomainException('Upgrade Sentinel on this server to use ingress.');
         }
         if ($node->is_ingress === $enabled) {
             return $node;

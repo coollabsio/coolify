@@ -11,7 +11,7 @@
             </div>
             <div class="application-settings-section-body space-y-4">
                 <x-forms.select id="deploymentTarget" label="Deployment target" required
-                    helper="Choose automatic cluster placement, a specific Node, or the selected legacy server.">
+                    helper="Choose automatic cluster placement, a specific cluster server, or the selected Docker server.">
                     <option value="">Select a deployment target</option>
                     @foreach ($deploymentTargets as $target)
                         <option value="{{ $target['value'] }}" @disabled($target['disabled'])>

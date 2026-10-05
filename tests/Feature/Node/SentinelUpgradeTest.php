@@ -245,7 +245,7 @@ it('refuses to upgrade while the Node has another active operation', function (N
     InstallSentinel::partialMock()->shouldNotReceive('handle');
 
     expect(fn () => UpgradeSentinel::make()->start($this->node, $this->user))
-        ->toThrow(RuntimeException::class, 'Another operation is active on this Node. Wait for it to finish, then upgrade Sentinel.')
+        ->toThrow(RuntimeException::class, 'Another operation is active on this server. Wait for it to finish, then upgrade Sentinel.')
         ->and(NodeOperation::query()->where('command_type', 'sentinel.upgrade.v1')->exists())->toBeFalse();
 })->with([
     NodeOperationStatus::QUEUED,
@@ -259,7 +259,7 @@ it('refuses to upgrade a Node that is already current', function () {
     $this->node->update(['sentinel_version' => '1.1.0']);
 
     expect(fn () => UpgradeSentinel::make()->start($this->node, $this->user))
-        ->toThrow(RuntimeException::class, 'Sentinel on this Node is already up to date.');
+        ->toThrow(RuntimeException::class, 'Sentinel on this server is already up to date.');
 });
 
 it('fails the operation when the upgrade worker stops', function () {
@@ -268,7 +268,7 @@ it('fails the operation when the upgrade worker stops', function () {
     (new UpgradeNodeSentinelJob($operation->id))->failed(new RuntimeException('killed'));
 
     expect($operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
-        ->and($operation->error)->toBe('The Sentinel upgrade stopped before completion. Check the Sentinel version on the Node.');
+        ->and($operation->error)->toBe('The Sentinel upgrade stopped before completion. Check the Sentinel version on the server.');
 });
 
 it('upgrades all Nodes one at a time and stops at the first failure', function () {
@@ -321,7 +321,7 @@ it('stops upgrading all Nodes when one Node has an active operation', function (
     expect($summary)->toMatchArray([
         'status' => 'failed',
         'failed_node_uuid' => $this->node->uuid,
-        'error' => 'Another operation is active on this Node. Wait for it to finish, then upgrade Sentinel.',
+        'error' => 'Another operation is active on this server. Wait for it to finish, then upgrade Sentinel.',
     ])->and($bravo->operations()->exists())->toBeFalse();
 });
 
@@ -364,7 +364,7 @@ describe('Livewire', function () {
 
         Livewire::test(Show::class, ['node_uuid' => $this->node->uuid, 'section' => 'sentinel'])
             ->call('upgradeSentinel')
-            ->assertDispatched('error', 'Another operation is active on this Node. Wait for it to finish, then upgrade Sentinel.');
+            ->assertDispatched('error', 'Another operation is active on this server. Wait for it to finish, then upgrade Sentinel.');
 
         Queue::assertNothingPushed();
         expect(NodeOperation::query()->where('command_type', 'sentinel.upgrade.v1')->exists())->toBeFalse();
@@ -402,7 +402,7 @@ describe('Livewire', function () {
         Livewire::test(NodeClusterIndex::class)
             ->assertDontSee('Upgrade all')
             ->call('upgradeAllSentinels')
-            ->assertDispatched('info', 'Sentinel is up to date on every Node.');
+            ->assertDispatched('info', 'Sentinel is up to date on every cluster server.');
 
         Queue::assertNothingPushed();
     });
@@ -414,7 +414,7 @@ describe('Livewire', function () {
             ->assertSee('Upgrade available')
             ->assertSee('Upgrade all')
             ->call('upgradeAllSentinels')
-            ->assertDispatched('success', 'Sentinel upgrade queued. Nodes are upgraded one at a time.')
+            ->assertDispatched('success', 'Sentinel upgrade queued. Servers are upgraded one at a time.')
             ->assertDontSee('Upgrade all');
 
         Queue::assertPushed(UpgradeAllNodeSentinelsJob::class, fn ($job) => $job->teamId === $this->team->id && $job->userId === $this->user->id);

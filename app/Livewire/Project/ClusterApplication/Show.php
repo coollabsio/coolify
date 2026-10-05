@@ -189,7 +189,7 @@ class Show extends Component
         }
         $this->loadData();
         $this->loadDomains();
-        $this->dispatch('success', 'Domains saved. Ingress Nodes apply them without a redeploy.');
+        $this->dispatch('success', 'Domains saved. Ingress servers apply them without a redeploy.');
     }
 
     public function manage(string $actionValue): void
@@ -348,13 +348,13 @@ class Show extends Component
         $add = function ($at, string $line, bool $stderr = false) use (&$lines): void {
             $lines[] = ['timestamp' => Carbon::parse($at)->format('Y-M-d H:i:s'), 'line' => $line, 'stderr' => $stderr];
         };
-        $nodeName = $operation->node?->name ?? 'the Node';
+        $nodeName = $operation->node?->name ?? 'the server';
         $requestedBy = $operation->requestedBy?->name ?: $operation->requestedBy?->email;
 
         if ($operation->command_type === 'workload.move.v1') {
             $targetName = Node::query()->where('team_id', $this->workload->team_id)
                 ->where('uuid', data_get($operation->request, 'target_node_uuid'))->value('name');
-            $add($operation->created_at, 'Move to '.($targetName ?? 'another Node').' queued'.($requestedBy ? " by {$requestedBy}." : '.'));
+            $add($operation->created_at, 'Move to '.($targetName ?? 'another server').' queued'.($requestedBy ? " by {$requestedBy}." : '.'));
         } else {
             $add($operation->created_at, 'Deployment queued'.($requestedBy ? " by {$requestedBy}." : '.'));
         }
@@ -390,7 +390,7 @@ class Show extends Component
             NodeOperationStatus::SUCCEEDED => $add($finishedAt, 'Deployment finished successfully.'),
             NodeOperationStatus::FAILED => $add($finishedAt, 'Deployment failed.', true),
             NodeOperationStatus::TIMED_OUT => $add($finishedAt, 'Sentinel did not report a result in time.', true),
-            NodeOperationStatus::UNCERTAIN => $add($finishedAt, 'The result is uncertain. Recover the operation from the Node workloads page.', true),
+            NodeOperationStatus::UNCERTAIN => $add($finishedAt, 'The result is uncertain. Recover the operation from the Applications page of the server.', true),
             NodeOperationStatus::CANCELLED => $add($finishedAt, 'Deployment cancelled.'),
             default => null,
         };

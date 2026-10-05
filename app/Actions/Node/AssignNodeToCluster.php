@@ -17,7 +17,7 @@ class AssignNodeToCluster
     public function handle(NodeCluster $cluster, Node $node, ?User $user = null): Node
     {
         if ($cluster->team_id !== $node->team_id) {
-            throw new DomainException('The Node and cluster must belong to the same team.');
+            throw new DomainException('The server and cluster must belong to the same team.');
         }
 
         $wasActivated = $cluster->hasActivatedNetwork();
@@ -28,12 +28,12 @@ class AssignNodeToCluster
                 return $node;
             }
             if ($node->node_cluster_id !== null && $node->node_cluster_id !== $cluster->id) {
-                throw new DomainException('The Node already belongs to another cluster. Remove it before assigning it again.');
+                throw new DomainException('The server already belongs to another cluster. Remove it before assigning it again.');
             }
             $ip = $node->wireguard_ip;
             if ($node->node_cluster_id === null) {
                 if ($cluster->nodes()->count() >= 100) {
-                    throw new DomainException('A full-mesh cluster supports at most 100 Nodes.');
+                    throw new DomainException('A full-mesh cluster supports at most 100 servers.');
                 }
                 [$network, $prefix] = explode('/', $cluster->cidr);
                 $base = (int) sprintf('%u', ip2long($network));
@@ -48,7 +48,7 @@ class AssignNodeToCluster
                     }
                 }
                 if (! $ip) {
-                    throw new DomainException('No Node address is available in this cluster.');
+                    throw new DomainException('No server address is available in this cluster.');
                 }
             }
             $workloadCidr = $node->workload_cidr ?? $this->nextWorkloadCidr();

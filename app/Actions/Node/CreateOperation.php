@@ -39,7 +39,7 @@ class CreateOperation
             throw new InvalidArgumentException('The idempotency key is invalid.');
         }
         if ($workload !== null && $workload->team_id !== $node->team_id) {
-            throw new InvalidArgumentException('The workload and Node must belong to the same team.');
+            throw new InvalidArgumentException('The workload and server must belong to the same team.');
         }
         if ($revision !== null && ($workload === null || $revision->node_workload_id !== $workload->id)) {
             throw new InvalidArgumentException('The revision must belong to the operation workload.');

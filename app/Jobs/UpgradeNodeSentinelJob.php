@@ -31,7 +31,7 @@ class UpgradeNodeSentinelJob implements ShouldQueue
     {
         $operation = NodeOperation::query()->find($this->operationId);
         if ($operation !== null && ! $operation->status->isFinal() && $operation->status->canTransitionTo(NodeOperationStatus::FAILED)) {
-            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'The Sentinel upgrade stopped before completion. Check the Sentinel version on the Node.');
+            TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: 'The Sentinel upgrade stopped before completion. Check the Sentinel version on the server.');
         }
     }
 }

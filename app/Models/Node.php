@@ -221,7 +221,7 @@ class Node extends BaseModel
     public function ensureCapability(string $capability): void
     {
         if ($this->supportsCapability($capability) === false) {
-            throw new RuntimeException("This Node does not support {$capability}. Upgrade Sentinel and try again.");
+            throw new RuntimeException("This server does not support {$capability}. Upgrade Sentinel and try again.");
         }
     }
 

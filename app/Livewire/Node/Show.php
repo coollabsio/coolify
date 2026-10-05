@@ -111,14 +111,14 @@ class Show extends Component
 
     public function validateNode(): void
     {
-        $this->runAction(fn () => ValidateNode::run($this->node), 'Node validation completed.');
+        $this->runAction(fn () => ValidateNode::run($this->node), 'Server validation completed.');
         $this->node->refresh();
         $this->loadSectionData();
     }
 
     public function refreshInformation(): void
     {
-        $this->runAction(fn () => FetchFluxNodeInformation::run($this->node), 'Node details refreshed through Flux.');
+        $this->runAction(fn () => FetchFluxNodeInformation::run($this->node), 'Server details refreshed through Flux.');
         $this->node->refresh();
         $this->loadSectionData();
     }

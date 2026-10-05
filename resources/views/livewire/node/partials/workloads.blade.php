@@ -9,19 +9,19 @@
         : [];
 @endphp
 
-<x-application.settings-section id="node-workloads-section" title="Workloads" flush
-    helper="Applications that Coolify schedules on this Node. Deploy, restart, or move them to another Node in the cluster.">
+<x-application.settings-section id="node-workloads-section" title="Applications" flush
+    helper="Applications that Coolify schedules on this server. Deploy, restart, or move them to another server in the cluster.">
     <x-slot:actions>
         <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshWorkloads"
-            title="Refresh workload state">
+            title="Refresh application state">
             <x-reicon name="refresh" class="size-3.5" />
         </x-forms.button>
     </x-slot:actions>
 
     @if ($node->workloads->isEmpty())
         <div class="p-4">
-            <x-empty size="sm" title="No workloads on this Node"
-                description="Workloads appear here after an application is deployed to this cluster." icon-name="layers" />
+            <x-empty size="sm" title="No applications on this server"
+                description="Applications appear here after they are deployed to this cluster." icon-name="layers" />
         </div>
     @else
         <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
@@ -95,24 +95,24 @@
                             @endif
 
                             @if ($revision && $moveTargetOptions !== [])
-                                <x-modal-input title="Move to Node" :subtitle="$workload->name" :wireIgnore="false">
+                                <x-modal-input title="Move to another server" :subtitle="$workload->name" :wireIgnore="false">
                                     <x-slot:content>
-                                        <button type="button" class="icon-button" title="Move to another Node"
-                                            aria-label="Move {{ $workload->name }} to another Node">
+                                        <button type="button" class="icon-button" title="Move to another server"
+                                            aria-label="Move {{ $workload->name }} to another server">
                                             <x-reicon name="arrow-right" class="size-3.5" />
                                         </button>
                                     </x-slot:content>
                                     <form wire:submit="moveWorkload('{{ $workload->uuid }}')" class="flex flex-col gap-4">
                                         <x-forms.listbox id="moveTargets.{{ $workload->uuid }}"
-                                            htmlId="move-target-{{ $workload->uuid }}" label="Target Node"
-                                            placeholder="Select a Node" :options="$moveTargetOptions" portal required />
+                                            htmlId="move-target-{{ $workload->uuid }}" label="Target server"
+                                            placeholder="Select a server" :options="$moveTargetOptions" portal required />
                                         <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                                            The workload keeps running here until it is ready on the target Node.
+                                            The application keeps running here until it is ready on the target server.
                                         </p>
                                         <div class="flex justify-end">
                                             <x-forms.button type="submit" isHighlighted
                                                 wire:target="moveWorkload('{{ $workload->uuid }}')">
-                                                Move workload
+                                                Move application
                                             </x-forms.button>
                                         </div>
                                     </form>
@@ -145,7 +145,7 @@
 
                             @if ($revision && in_array($workloadState, ['Running', 'Stopped', 'Outdated'], true))
                                 <x-forms.button isError class="size-8! px-0!" title="Remove" aria-label="Remove"
-                                    wire:confirm="Remove the {{ $workload->name }} container from this Node?"
+                                    wire:confirm="Remove the {{ $workload->name }} container from this server?"
                                     wire:click="manageWorkload('remove', '{{ $revision->uuid }}')">
                                     <x-reicon name="trash" class="size-3.5" />
                                 </x-forms.button>
@@ -159,7 +159,7 @@
 </x-application.settings-section>
 
 <x-application.settings-section id="node-activity-section" title="Recent activity" flush
-    helper="The latest deploy, lifecycle, and move operations on this Node.">
+    helper="The latest deploy, lifecycle, and move operations on this server.">
     @if ($node->operations->isEmpty())
         <div class="p-4">
             <x-empty size="sm" title="No activity yet" description="Deployments and lifecycle actions appear here."
@@ -169,7 +169,7 @@
         <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
             @foreach ($node->operations as $operation)
                 @php
-                    $operationTarget = $operation->workload?->name ?? 'workload';
+                    $operationTarget = $operation->workload?->name ?? 'application';
                     $operationLabel = match ($operation->command_type) {
                         'workload.deploy.v1' => 'Deploy '.$operationTarget,
                         'workload.lifecycle.v1' => str(data_get($operation->request, 'action', 'update'))->title().' '.$operationTarget,

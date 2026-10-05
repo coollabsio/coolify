@@ -544,7 +544,7 @@ describe('make-before-break move', function () {
         (new MoveNodeWorkloadJob($operation->id))->handle();
 
         expect($operation->refresh()->status)->toBe(NodeOperationStatus::FAILED)
-            ->and($operation->error)->toContain("Node {$this->target->name} could not apply the network for the target")
+            ->and($operation->error)->toContain("Server {$this->target->name} could not apply the network for the target")
             ->and($this->requests->pluck('command'))->not->toContain('workload.deploy')
             ->and($this->source->workloads()->whereKey($this->workload->id)->exists())->toBeTrue()
             ->and($this->target->workloads()->whereKey($this->workload->id)->exists())->toBeFalse();
@@ -589,12 +589,12 @@ describe('ingress toggle', function () {
 
         Livewire::test(NodeClusterShow::class, ['cluster_uuid' => $this->cluster->uuid])
             ->call('setIngress', $this->node->uuid, true)
-            ->assertDispatched('error', 'Upgrade Sentinel on this Node to use ingress.');
+            ->assertDispatched('error', 'Upgrade Sentinel on this server to use ingress.');
 
         expect($this->node->refresh()->is_ingress)->toBeFalse()
             ->and($this->cluster->refresh()->desired_revision)->toBe($revision);
         expect(fn () => SetNodeIngress::run($this->cluster, $this->node, true, $this->user))
-            ->toThrow(DomainException::class, 'Upgrade Sentinel on this Node to use ingress.');
+            ->toThrow(DomainException::class, 'Upgrade Sentinel on this server to use ingress.');
         Queue::assertNotPushed(ReconcileNodeClusterNetworkJob::class);
     });
 
@@ -681,7 +681,7 @@ describe('cluster application domains page', function () {
             ->assertSee('http://www.example.com')
             ->assertSee('Point an A record for each domain to one or more of these addresses.')
             ->assertSee($this->edge->ip)
-            ->assertDontSee('No ingress Node');
+            ->assertDontSee('No ingress server');
 
         expect($this->workload->refresh()->domains)->toBe(['app.example.com', 'www.example.com'])
             ->and($this->workload->http_port)->toBe(3000);
@@ -704,7 +704,7 @@ describe('cluster application domains page', function () {
 
     it('warns when the cluster has no ingress Node', function () {
         Livewire::test(ClusterApplicationShow::class, $this->parameters)
-            ->assertSee('No ingress Node')
+            ->assertSee('No ingress server')
             ->assertSee(route('node-cluster.nodes', ['cluster_uuid' => $this->cluster->uuid]), false);
     });
 

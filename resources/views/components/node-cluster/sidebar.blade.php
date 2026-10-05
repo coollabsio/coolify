@@ -18,7 +18,7 @@
             'group' => 'Settings',
         ],
         [
-            'label' => 'Nodes',
+            'label' => 'Servers',
             'route' => 'node-cluster.nodes',
             'active' => $activeMenu === 'nodes',
             'icon' => 'servers',

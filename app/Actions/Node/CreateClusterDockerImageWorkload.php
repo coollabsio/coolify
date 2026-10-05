@@ -64,8 +64,8 @@ class CreateClusterDockerImageWorkload
                 : $availableNodes->whereKey($targetNode->id)->first();
             if ($node === null) {
                 throw new RuntimeException($targetNode === null
-                    ? 'The cluster has no workload Node that can accept a deployment.'
-                    : 'The selected Node is not available in this cluster.');
+                    ? 'The cluster has no workload server that can accept a deployment.'
+                    : 'The selected server is not available in this cluster.');
             }
             EnsureNodeAcceptsDeployment::run($node);
 

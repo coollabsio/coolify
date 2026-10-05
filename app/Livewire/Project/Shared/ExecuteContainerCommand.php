@@ -194,7 +194,7 @@ class ExecuteContainerCommand extends Component
                 throw new \RuntimeException('Server is disabled.');
             }
             if ($server instanceof Node && (! $server->is_reachable || ! $server->is_usable)) {
-                throw new \RuntimeException('Node is not ready.');
+                throw new \RuntimeException('Server is not ready.');
             }
             $this->dispatch(
                 'send-terminal-command',

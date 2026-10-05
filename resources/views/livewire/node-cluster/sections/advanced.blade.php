@@ -24,7 +24,7 @@
 </x-application.settings-section>
 
 <x-application.settings-section id="node-cluster-deployment-limits-section" title="Deployment limits"
-    helper="Block new deployments when a selected Node is unavailable, its resource data is stale, or usage reaches a limit. A value of 100 blocks only when that resource is fully used. Running applications are not stopped.">
+    helper="Block new deployments when a selected server is unavailable, its resource data is stale, or usage reaches a limit. A value of 100 blocks only when that resource is fully used. Running applications are not stopped.">
     <form wire:submit="savePressurePolicy" class="flex flex-col gap-4">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <x-forms.input id="cpuPressureThreshold" type="number" min="1" max="100" label="CPU limit (%)" required
@@ -45,12 +45,12 @@
 </x-application.settings-section>
 
 <x-application.settings-section id="node-cluster-troubleshooting-section" title="Troubleshooting"
-    helper="Use repair only when Nodes lost their private network connection and a sync cannot reach them." flush>
+    helper="Use repair only when servers lost their private network connection and a sync cannot reach them." flush>
     @if ($canUpdateCluster)
         <x-slot:actions>
             <x-modal-confirmation title="Repair cluster network?" buttonTitle="Repair network over SSH"
                 submitAction="repairNetwork" :actions="[
-                    'The last known good network and firewall state is restored on every Node over SSH.',
+                    'The last known good network and firewall state is restored on every server over SSH.',
                     'Run a network sync afterwards to verify the current state.',
                 ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Repair network" />
         </x-slot:actions>

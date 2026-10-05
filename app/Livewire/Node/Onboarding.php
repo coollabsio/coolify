@@ -45,7 +45,7 @@ class Onboarding extends Component
 
     public string $clusterName = '';
 
-    #[Url(as: 'node', except: '')]
+    #[Url(as: 'server', except: '')]
     public ?string $nodeUuid = null;
 
     /** @var array<string, mixed> */

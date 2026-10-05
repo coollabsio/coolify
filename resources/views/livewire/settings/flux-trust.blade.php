@@ -32,7 +32,7 @@
             'Flux restarts and every Sentinel reconnects with the dual-CA bundle.',
             'If Flux does not serve the new certificate, the previous certificate is restored.',
         ],
-        'retire' => ['Nodes receive a trust bundle with the new CA only.'],
+        'retire' => ['Cluster servers receive a trust bundle with the new CA only.'],
         'complete' => ['The old CA is retired and its private key is erased.'],
         'finish_cancel' => ['The cancelled rotation is closed.'],
         default => [],
@@ -41,13 +41,13 @@
 
 <div>
     <x-slot:title>
-        Node Trust | Coolify
+        Cluster Trust | Coolify
     </x-slot>
 
     <x-settings.layout>
         <div class="application-settings-form flex min-w-0 flex-col gap-6">
             <x-application.settings-section title="Flux certificate authority"
-                helper="Sentinel on every Node verifies Flux with this instance-wide CA. Rotation first sends a bundle with the old and new CA over the secure Flux connection, then switches the Flux certificate, then removes the old CA.">
+                helper="Sentinel on every cluster server verifies Flux with this instance-wide CA. Rotation first sends a bundle with the old and new CA over the secure Flux connection, then switches the Flux certificate, then removes the old CA.">
                 <x-slot:actions>
                     <x-forms.button type="button" class="size-8! px-0!" wire:click="refreshStatus"
                         title="Refresh rotation state">
@@ -66,13 +66,13 @@
                     </div>
                     @if ($inProgress)
                         <div>
-                            <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Nodes acknowledged</dt>
+                            <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Servers acknowledged</dt>
                             <dd class="mt-1 text-sm font-medium text-neutral-950 dark:text-fg">
                                 {{ collect($nodes)->where('acknowledged', true)->count() }} / {{ count($nodes) }}
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Blocking Nodes</dt>
+                            <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Blocking servers</dt>
                             <dd class="mt-1 text-sm font-medium {{ $blocking > 0 ? 'text-warning' : 'text-neutral-950 dark:text-fg' }}">{{ $blocking }}</dd>
                         </div>
                     @endif
@@ -83,7 +83,7 @@
                 @endif
                 @if (data_get($rotation, 'switch_forced') || data_get($rotation, 'completion_forced'))
                     <p class="mt-4 text-[12px] text-warning">
-                        A step was forced. Run Repair trust over SSH on Nodes that cannot connect.
+                        A step was forced. Run Repair trust over SSH on cluster servers that cannot connect.
                     </p>
                 @endif
 
@@ -92,7 +92,7 @@
                         <x-modal-confirmation title="Start Flux CA rotation?" buttonTitle="Start rotation"
                             submitAction="startRotation" :actions="[
                                 'Coolify creates a new certificate authority.',
-                                'Connected Nodes receive a trust bundle with the old and new CA over Flux.',
+                                'Connected cluster servers receive a trust bundle with the old and new CA over Flux.',
                                 'Nothing switches until you continue the rotation.',
                             ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Start rotation" />
                     @else
@@ -104,7 +104,7 @@
                             <x-modal-confirmation :title="'Force: ' . $nextStepLabel . '?'"
                                 :buttonTitle="'Force: ' . $nextStepLabel" isErrorButton submitAction="forceContinueRotation"
                                 :actions="$nextStepActions"
-                                :warningMessage="$blocking . ' usable Node(s) have not acknowledged the trust bundle. They may lose their Flux connection and need Repair trust over SSH.'"
+                                :warningMessage="$blocking . ' usable cluster server(s) have not acknowledged the trust bundle. They may lose their Flux connection and need Repair trust over SSH.'"
                                 :confirmWithText="false" :confirmWithPassword="false" :step2ButtonText="'Force: ' . $nextStepLabel" />
                         @endif
                         <x-forms.button type="button" wire:click="retryDistribution">Retry delivery</x-forms.button>
@@ -112,17 +112,17 @@
                             <x-modal-confirmation title="Cancel Flux CA rotation?" buttonTitle="Cancel rotation"
                                 isErrorButton submitAction="cancelRotation" :actions="[
                                     'The new CA is discarded and its private key is erased.',
-                                    'Nodes receive a trust bundle with the old CA only.',
+                                    'Cluster servers receive a trust bundle with the old CA only.',
                                 ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Cancel rotation" />
                         @endif
                     @endif
                 </div>
             </x-application.settings-section>
 
-            <x-application.settings-section title="Nodes"
-                helper="The trust bundle each Node acknowledged. Offline Nodes receive the bundle when they reconnect. Nodes whose Sentinel cannot receive bundles over Flux need Repair trust from the Node's Sentinel page.">
+            <x-application.settings-section title="Cluster servers"
+                helper="The trust bundle each cluster server acknowledged. Offline servers receive the bundle when they reconnect. Servers whose Sentinel cannot receive bundles over Flux need Repair trust from the server's Sentinel page.">
                 @if ($nodes === [])
-                    <x-empty size="sm" title="No Nodes" description="Nodes appear here after they are added." icon-name="servers" />
+                    <x-empty size="sm" title="No cluster servers" description="Cluster servers appear here after they are added." icon-name="servers" />
                 @else
                     <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
                         @foreach ($nodes as $trustNode)

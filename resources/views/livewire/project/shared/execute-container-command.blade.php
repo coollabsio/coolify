@@ -69,7 +69,7 @@
             @if ($isHostTerminal)
                 <x-empty size="lg" title="Terminal unavailable"
                     :description="$type === 'node'
-                        ? 'This Node is not ready for terminal access.'
+                        ? 'This server is not ready for terminal access.'
                         : 'This server is not functional or terminal access is disabled.'"
                     icon-name="browser-terminal" />
             @else

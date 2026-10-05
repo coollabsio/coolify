@@ -32,7 +32,7 @@ class Create extends Component
         if (! $environment) {
             return redirect()->route('dashboard');
         }
-        if ($type->value() === 'docker-image' && (request()->filled('cluster') || request()->filled('node'))) {
+        if ($type->value() === 'docker-image' && (request()->filled('cluster') || request()->filled('server'))) {
             $this->type = $type->value();
 
             return;

@@ -93,7 +93,7 @@ it('shows dotted IP owner keys and falls back to the running state without a hea
         ->assertSee('Running')
         ->assertSee('justify-self-start', false)
         ->assertDontSee('Not reported')
-        ->assertDontSee('Unknown Node');
+        ->assertDontSee('Unknown server');
 });
 
 it('does not expose a foreign Node internal DNS page', function () {

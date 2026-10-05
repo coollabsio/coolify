@@ -24,7 +24,7 @@ class Reachable extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: Node ({$this->node->name}) is reachable again.");
+        $mail->subject("Coolify: Cluster server ({$this->node->name}) is reachable again.");
         $mail->view('emails.node-health-changed', [
             'description' => $this->description(),
             'url' => $this->url(),
@@ -36,11 +36,11 @@ class Reachable extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':white_check_mark: Node reachable again',
+            title: ':white_check_mark: Cluster server reachable again',
             description: $this->description(),
             color: DiscordMessage::successColor(),
         );
-        $message->addField('Node', "[{$this->node->name}]({$this->url()})");
+        $message->addField('Server', "[{$this->node->name}]({$this->url()})");
 
         return $message;
     }
@@ -50,7 +50,7 @@ class Reachable extends CustomEmailNotification
         return [
             'message' => "Coolify: {$this->description()}",
             'buttons' => [
-                ['text' => 'Open Node', 'url' => $this->url()],
+                ['text' => 'Open server', 'url' => $this->url()],
             ],
         ];
     }
@@ -58,17 +58,17 @@ class Reachable extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
-            title: 'Node reachable again',
+            title: 'Cluster server reachable again',
             level: 'success',
             message: $this->description(),
-            buttons: ['Open Node' => $this->url()],
+            buttons: ['Open server' => $this->url()],
         );
     }
 
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: 'Node reachable again',
+            title: 'Cluster server reachable again',
             description: "{$this->description()}\n{$this->url()}",
             color: SlackMessage::successColor(),
         );
@@ -78,17 +78,18 @@ class Reachable extends CustomEmailNotification
     {
         return [
             'success' => true,
-            'message' => 'Node reachable again',
-            'event' => 'node_reachable',
-            'node_name' => $this->node->name,
-            'node_uuid' => $this->node->uuid,
+            'message' => 'Cluster server reachable again',
+            'event' => 'server_reachable',
+            'server_name' => $this->node->name,
+            'server_uuid' => $this->node->uuid,
+            'server_type' => 'cluster',
             'url' => $this->url(),
         ];
     }
 
     private function description(): string
     {
-        return "Node '{$this->node->name}' is connected to Coolify again.";
+        return "Cluster server '{$this->node->name}' is connected to Coolify again.";
     }
 
     private function url(): string

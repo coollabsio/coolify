@@ -24,7 +24,7 @@ class Unreachable extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: Node ({$this->node->name}) is unreachable.");
+        $mail->subject("Coolify: Cluster server ({$this->node->name}) is unreachable.");
         $mail->view('emails.node-health-changed', [
             'description' => $this->description(),
             'url' => $this->url(),
@@ -36,11 +36,11 @@ class Unreachable extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':cross_mark: Node unreachable',
+            title: ':cross_mark: Cluster server unreachable',
             description: $this->description(),
             color: DiscordMessage::errorColor(),
         );
-        $message->addField('Node', "[{$this->node->name}]({$this->url()})");
+        $message->addField('Server', "[{$this->node->name}]({$this->url()})");
 
         return $message;
     }
@@ -50,7 +50,7 @@ class Unreachable extends CustomEmailNotification
         return [
             'message' => "Coolify: {$this->description()}",
             'buttons' => [
-                ['text' => 'Open Node', 'url' => $this->url()],
+                ['text' => 'Open server', 'url' => $this->url()],
             ],
         ];
     }
@@ -58,17 +58,17 @@ class Unreachable extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
-            title: 'Node unreachable',
+            title: 'Cluster server unreachable',
             level: 'error',
             message: $this->description(),
-            buttons: ['Open Node' => $this->url()],
+            buttons: ['Open server' => $this->url()],
         );
     }
 
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: 'Node unreachable',
+            title: 'Cluster server unreachable',
             description: "{$this->description()}\n{$this->url()}",
             color: SlackMessage::errorColor(),
         );
@@ -78,17 +78,18 @@ class Unreachable extends CustomEmailNotification
     {
         return [
             'success' => false,
-            'message' => 'Node unreachable',
-            'event' => 'node_unreachable',
-            'node_name' => $this->node->name,
-            'node_uuid' => $this->node->uuid,
+            'message' => 'Cluster server unreachable',
+            'event' => 'server_unreachable',
+            'server_name' => $this->node->name,
+            'server_uuid' => $this->node->uuid,
+            'server_type' => 'cluster',
             'url' => $this->url(),
         ];
     }
 
     private function description(): string
     {
-        return "Node '{$this->node->name}' has not reported to Coolify for more than 3 minutes. Check that the machine and the Sentinel service are running.";
+        return "Cluster server '{$this->node->name}' has not reported to Coolify for more than 3 minutes. Check that the machine and the Sentinel service are running.";
     }
 
     private function url(): string
