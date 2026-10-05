@@ -51,13 +51,28 @@ function customInternalNameCreatePayload(array $overrides): array
 
 const CUSTOM_INTERNAL_NAME_NEEDS_CONSISTENT_NAMING = 'Set is_consistent_container_name_enabled to true to use custom_internal_name. Coolify ignores the custom internal name while consistent container naming is turned off.';
 
-test('updating only custom_internal_name is rejected while consistent container naming is off', function () {
+test('updating only custom_internal_name turns consistent container naming on', function () {
     $this->withToken($this->bearerToken)
         ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_internal_name' => 'my-app'])
+        ->assertOk();
+
+    $settings = $this->application->fresh()->settings;
+    expect($settings->custom_internal_name)->toBe('my-app')
+        ->and($settings->is_consistent_container_name_enabled)->toBeTrue();
+});
+
+test('updating custom_internal_name with consistent container naming explicitly off is rejected', function () {
+    $this->withToken($this->bearerToken)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_internal_name' => 'my-app',
+            'is_consistent_container_name_enabled' => false,
+        ])
         ->assertUnprocessable()
         ->assertJsonPath('errors.custom_internal_name.0', CUSTOM_INTERNAL_NAME_NEEDS_CONSISTENT_NAMING);
 
-    expect($this->application->fresh()->settings->custom_internal_name)->toBeNull();
+    $settings = $this->application->fresh()->settings;
+    expect($settings->custom_internal_name)->toBeNull()
+        ->and($settings->is_consistent_container_name_enabled)->toBeFalse();
 });
 
 test('updating custom_internal_name while turning consistent container naming off is rejected', function () {
@@ -99,13 +114,30 @@ test('clearing custom_internal_name does not need consistent container naming', 
     $this->withToken($this->bearerToken)
         ->patchJson("/api/v1/applications/{$this->application->uuid}", ['custom_internal_name' => $value])
         ->assertOk();
+
+    expect($this->application->fresh()->settings->is_consistent_container_name_enabled)->toBeFalse();
 })->with(['null' => [null], 'empty string' => ['']]);
 
-test('creating an application with custom_internal_name requires consistent container naming', function () {
+test('creating an application with only custom_internal_name turns consistent container naming on', function () {
+    Queue::fake();
+
+    $response = $this->withToken($this->bearerToken)
+        ->postJson('/api/v1/applications/public', customInternalNameCreatePayload(['custom_internal_name' => 'my-app']))
+        ->assertCreated();
+
+    $settings = Application::query()->where('uuid', $response->json('uuid'))->sole()->settings;
+    expect($settings->custom_internal_name)->toBe('my-app')
+        ->and($settings->is_consistent_container_name_enabled)->toBeTrue();
+});
+
+test('creating an application with custom_internal_name and consistent container naming explicitly off is rejected', function () {
     Queue::fake();
 
     $this->withToken($this->bearerToken)
-        ->postJson('/api/v1/applications/public', customInternalNameCreatePayload(['custom_internal_name' => 'my-app']))
+        ->postJson('/api/v1/applications/public', customInternalNameCreatePayload([
+            'custom_internal_name' => 'my-app',
+            'is_consistent_container_name_enabled' => false,
+        ]))
         ->assertUnprocessable()
         ->assertJsonPath('errors.custom_internal_name.0', CUSTOM_INTERNAL_NAME_NEEDS_CONSISTENT_NAMING);
 
