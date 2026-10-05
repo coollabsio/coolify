@@ -1,46 +1,51 @@
 # documentation: https://www.bugsink.com/docs/
 # slogan: Self-hosted Error Tracking.
 # category: monitoring
-# tags: python, error-tracking, django, mysql
+# tags: python, error-tracking, django, postgresql
 # logo: svgs/bugsink.svg
 # port: 8000
 
 services:
-  mysql:
-    image: 'mysql:latest'
+  db:
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-bugsink}
-      - MYSQL_USER=${SERVICE_USER_BUGSINK}
-      - MYSQL_PASSWORD=${SERVICE_PASSWORD_BUGSINK}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-bugsink}
     volumes:
-      - my-datavolume:/var/lib/mysql
+      - bugsink-postgresql-data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        - CMD
-        - mysqladmin
-        - ping
-        - '-h'
-        - 127.0.0.1
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRESQL} -d ${POSTGRESQL_DATABASE:-bugsink}"]
       interval: 5s
       timeout: 20s
       retries: 10
+
   web:
     image: bugsink/bugsink
     restart: unless-stopped
     environment:
       - SECRET_KEY=$SERVICE_PASSWORD_64_BUGSINK
-      - CREATE_SUPERUSER=admin:$SERVICE_PASSWORD_BUGSINK
+      - CREATE_SUPERUSER=${BUGSINK_ADMIN_EMAIL:?}:$SERVICE_PASSWORD_BUGSINK
       - SERVICE_URL_BUGSINK_8000
       - BASE_URL=$SERVICE_URL_BUGSINK
-      - DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@db:5432/${POSTGRESQL_DATABASE:-bugsink}
       - BEHIND_HTTPS_PROXY=True
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - SITE_TITLE=${SITE_TITLE:-Bugsink}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - PHONEHOME=${PHONEHOME:-False}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-False}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/\").raise_for_status()'"]
       interval: 5s
       timeout: 20s
       retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
