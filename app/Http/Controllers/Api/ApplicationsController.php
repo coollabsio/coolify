@@ -428,7 +428,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                             'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
@@ -623,7 +623,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                             'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
@@ -818,7 +818,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                             'is_preserve_repository_enabled' => ['type' => 'boolean', 'default' => false, 'description' => 'Preserve repository during deployment.'],
@@ -984,7 +984,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                         ],
@@ -1146,7 +1146,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
-                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Default: true.'],
+                            'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
                             'is_container_label_escape_enabled' => ['type' => 'boolean', 'default' => true, 'description' => 'Escape special characters in labels. By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$. If you want to use env variables inside the labels, turn this off.'],
                             'tags' => ['type' => 'array', 'items' => new OA\Items(type: 'string'), 'description' => 'Tags to assign to the application.'],
                         ],
@@ -1296,7 +1296,8 @@ class ApplicationsController extends Controller
             $fqdn = ValidationPatterns::normalizeApplicationDomains($request->domains);
             $request->offsetSet('domains', $fqdn);
         }
-        $autogenerateDomain = $request->boolean('autogenerate_domain', true);
+        // A Docker Compose application uses per-service domains; a top-level domain is never routed.
+        $autogenerateDomain = $request->boolean('autogenerate_domain', true) && $request->build_pack !== 'dockercompose';
         $instantDeploy = $request->instant_deploy;
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
