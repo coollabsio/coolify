@@ -19,6 +19,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
@@ -173,4 +174,44 @@ it('reads the data mount with sudo on a non-root server', function () {
 
     expect($database->fresh()->anonymousDataVolume())->toBe('3f1c0ffee')
         ->and(ranRemoteCommandContaining("sudo docker inspect --format '{{range .Mounts}}{{if eq .Destination \"/var/lib/clickhouse\"}}{{.Type}} {{.Name}}{{end}}{{end}}' '{$database->uuid}' 2>/dev/null || sudo true"))->toBeTrue();
+});
+
+it('rejects an API start or restart of a blocked database at once', function (string $method, string $path) {
+    $database = create_standalone_clickhouse($this->environment->id, $this->destination);
+    fakeClickhouseDataMount('3f1c0ffee');
+    $plainToken = Str::random(40);
+    $token = $this->owner->tokens()->create([
+        'name' => 'clickhouse-test',
+        'token' => hash('sha256', $plainToken),
+        'abilities' => ['*'],
+        'team_id' => $this->team->id,
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token->getKey().'|'.$plainToken)
+        ->json($method, str_replace('{uuid}', $database->uuid, $path));
+
+    $response->assertStatus(422);
+    expect($response->json('message'))->toContain('unnamed Docker volume 3f1c0ffee');
+    Queue::assertNothingPushed();
+})->with([
+    'start' => ['POST', '/api/v1/databases/{uuid}/start'],
+    'restart' => ['POST', '/api/v1/databases/{uuid}/restart'],
+]);
+
+it('reports a blocked database in the deploy API', function () {
+    $database = create_standalone_clickhouse($this->environment->id, $this->destination);
+    fakeClickhouseDataMount('3f1c0ffee');
+    $plainToken = Str::random(40);
+    $token = $this->owner->tokens()->create([
+        'name' => 'clickhouse-test',
+        'token' => hash('sha256', $plainToken),
+        'abilities' => ['*'],
+        'team_id' => $this->team->id,
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token->getKey().'|'.$plainToken)
+        ->postJson('/api/v1/deploy', ['uuid' => $database->uuid]);
+
+    expect($response->json('deployments.0.message'))->toContain('unnamed Docker volume 3f1c0ffee');
+    Queue::assertNothingPushed();
 });

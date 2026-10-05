@@ -183,7 +183,7 @@
                     window.dispatchEvent(new CustomEvent('database-action-finished'));
                     return;
                 }
-                window.dispatchEvent(new CustomEvent('startdatabase'));
+                // start() opens the log dialog only when the start was queued.
                 try {
                     await $wire.$call('start');
                 } finally {
@@ -197,8 +197,7 @@
                     return;
                 }
                 window.dispatchEvent(new CustomEvent('database-busy'));
-                $wire.$dispatch('info', 'Restarting database.');
-                window.dispatchEvent(new CustomEvent('startdatabase'));
+                // restart() opens the log dialog only when the restart was queued.
                 try {
                     await $wire.$call('restart');
                 } finally {

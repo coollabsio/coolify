@@ -266,6 +266,26 @@ test('API create accepts a safe docker_compose_raw', function () {
         ->assertCreated();
 });
 
+test('API create does not generate a domain for a docker compose application', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(['Authorization' => 'Bearer '.$this->token])
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/compose-app',
+            'git_branch' => 'main',
+            'build_pack' => 'dockercompose',
+            'ports_exposes' => '80',
+            'autogenerate_domain' => true,
+            'docker_compose_raw' => SAFE_APPLICATION_COMPOSE,
+        ])
+        ->assertCreated();
+
+    expect(Application::query()->where('uuid', $response->json('uuid'))->value('fqdn'))->toBeNull();
+});
+
 test('API update does not accept docker_compose_raw', function () {
     $this->withHeaders(['Authorization' => 'Bearer '.$this->token])
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [

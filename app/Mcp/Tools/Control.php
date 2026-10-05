@@ -141,6 +141,11 @@ class Control extends Tool
             return ['message' => 'Database is already running.'];
         }
 
+        $prerequisiteError = StartDatabase::prerequisiteError($database);
+        if ($prerequisiteError !== null) {
+            throw new \RuntimeException($prerequisiteError);
+        }
+
         $reservation = StartDatabase::reserveOperation($database);
         if ($reservation === null) {
             throw new \RuntimeException(ResourceStartActivity::DATABASE_OPERATION_IN_PROGRESS_MESSAGE);
