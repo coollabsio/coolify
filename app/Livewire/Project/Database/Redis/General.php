@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Server;
 use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
@@ -122,9 +123,6 @@ class General extends Component
         }
 
         $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
-        if ($this->isPasswordHiddenForMember) {
-            $this->redisPassword = '';
-        }
     }
 
     private function syncData(bool $toModel = false): void
@@ -155,7 +153,8 @@ class General extends Component
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->redisVersion = $this->database->getRedisVersion();
             $this->redisUsername = $this->database->redis_username;
-            $this->redisPassword = $this->database->redis_password;
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->redisPassword = $canSeeCredentials ? $this->database->redis_password : '';
         }
     }
 
@@ -204,7 +203,7 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshEnvs')->to(All::class);
         }
     }
 

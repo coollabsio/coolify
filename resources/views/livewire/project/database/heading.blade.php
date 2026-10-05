@@ -65,7 +65,8 @@
                     {{ $database->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$database->status" title="Database status" />
+                    <x-status-summary :status="$database->status" title="Database status"
+                        :healthcheck-url="route('project.database.healthcheck', $parameters)" />
                     @if ($isDeploymentProgress)
                         <x-deploying-indicator label="Working" />
                     @endif

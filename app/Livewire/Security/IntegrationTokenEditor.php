@@ -58,12 +58,12 @@ class IntegrationTokenEditor extends Component
         ];
 
         if ($this->integrationToken->provider === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
         }
 
         if ($this->integrationToken->provider === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
         }
 
@@ -92,9 +92,16 @@ class IntegrationTokenEditor extends Component
                 $metadata['automatic_dns'] = false;
             }
         }
+        $storedMetadata = $this->integrationToken->metadata ?? [];
+        $changedConnectionFields = $this->changedConnectionFields($provider, $storedMetadata, $metadata);
+        if ($changedConnectionFields !== [] && blank($validated['newToken'])) {
+            $this->addError('newToken', $this->reenterSecretMessage($provider));
+
+            return;
+        }
         $capabilitiesChanged = collect($validated['capabilities'])->sort()->values()->all()
             !== collect($this->integrationToken->capabilities)->sort()->values()->all();
-        $metadataChanged = $metadata != ($this->integrationToken->metadata ?? []);
+        $metadataChanged = $metadata != $storedMetadata;
 
         try {
             if ((filled($validated['newToken']) || $capabilitiesChanged || $metadataChanged)
@@ -129,7 +136,19 @@ class IntegrationTokenEditor extends Component
                 'integration_token_name' => $this->integrationToken->name,
                 'provider' => $this->integrationToken->provider,
                 'rotated' => array_key_exists('token', $updates),
+                'connection_changed_fields' => $changedConnectionFields,
             ]);
+
+            if (in_array('base_url', $changedConnectionFields, true)) {
+                auditLog('ui.integration_token.base_url_changed', [
+                    'team_id' => currentTeam()->id,
+                    'integration_token_uuid' => $this->integrationToken->uuid,
+                    'integration_token_name' => $this->integrationToken->name,
+                    'provider' => $provider,
+                    'previous_base_url' => data_get($storedMetadata, 'base_url'),
+                    'base_url' => data_get($metadata, 'base_url'),
+                ], 'warning');
+            }
 
             $this->dispatch(
                 'integration-token-updated',
@@ -141,6 +160,43 @@ class IntegrationTokenEditor extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Metadata keys that decide where or how the stored secret is sent.
+     * Changing any of them must require the secret to be entered again.
+     *
+     * @return array<int, string>
+     */
+    private function connectionFields(string $provider): array
+    {
+        return match ($provider) {
+            'vault' => ['base_url', 'namespace'],
+            'infisical' => ['base_url', 'client_id'],
+            default => [],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $storedMetadata
+     * @param  array<string, mixed>  $metadata
+     * @return array<int, string>
+     */
+    private function changedConnectionFields(string $provider, array $storedMetadata, array $metadata): array
+    {
+        return array_values(array_filter(
+            $this->connectionFields($provider),
+            fn (string $field): bool => (string) data_get($storedMetadata, $field, '') !== (string) data_get($metadata, $field, ''),
+        ));
+    }
+
+    private function reenterSecretMessage(string $provider): string
+    {
+        return match ($provider) {
+            'infisical' => 'Enter the client secret again when you change the base URL or the client ID.',
+            'vault' => 'Enter the token again when you change the base URL or the namespace.',
+            default => 'Enter the token again when you change the connection settings.',
+        };
     }
 
     public function delete(string $password = ''): void

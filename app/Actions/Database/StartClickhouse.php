@@ -107,7 +107,7 @@ class StartClickhouse
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
@@ -158,11 +158,13 @@ class StartClickhouse
         foreach ($this->database->runtime_environment_variables as $env) {
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'CLICKHOUSE_USER') {
-                $this->resolvedClickhouseUser = $rawValue;
+                $this->resolvedClickhouseUser = $composeFileValue;
             } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
-                $this->resolvedClickhousePassword = $rawValue;
+                $this->resolvedClickhousePassword = $composeFileValue;
             }
         }
 

@@ -1,8 +1,13 @@
 import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
+import { parseSubmitAction } from './modal-confirmation.js';
+
+// Used by the modal-confirmation Blade component to call its submitAction.
+window.parseModalSubmitAction = parseSubmitAction;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
@@ -21,6 +26,7 @@ document.addEventListener('livewire:navigated', () => {
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
 document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
 
 /**

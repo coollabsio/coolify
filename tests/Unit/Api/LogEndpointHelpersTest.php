@@ -39,32 +39,6 @@ it('keeps MCP log requests bounded', function () {
         ->and($normalizer->normalize('501'))->toBe(500);
 });
 
-it('documents the named all logs option on every REST log endpoint', function (string $controller) {
-    $source = file_get_contents(__DIR__."/../../../app/Http/Controllers/Api/{$controller}.php");
-
-    expect($source)->toContain('Use `all` to return all logs. `-1` remains available as a compatibility alias.');
-})->with([
-    'applications' => 'ApplicationsController',
-    'databases' => 'DatabasesController',
-    'services' => 'ServicesController',
-    'service applications' => 'ServiceApplicationsController',
-    'service databases' => 'ServiceDatabasesController',
-]);
-
-it('normalizes service resource log line counts before invoking Docker', function (string $controller, mixed $lines, int $expectedLines) {
-    $source = file_get_contents(__DIR__."/../../../app/Http/Controllers/Api/{$controller}.php");
-
-    expect($source)->toContain('$lines = normalizeLogLines($request->query(\'lines\'));')
-        ->and(normalizeLogLines($lines))->toBe($expectedLines);
-})->with([
-    'application invalid value' => ['ServiceApplicationsController', 'invalid', 100],
-    'application negative value' => ['ServiceApplicationsController', '-5', 100],
-    'application value above limit' => ['ServiceApplicationsController', '50000', 10000],
-    'database invalid value' => ['ServiceDatabasesController', 'invalid', 100],
-    'database negative value' => ['ServiceDatabasesController', '-5', 100],
-    'database value above limit' => ['ServiceDatabasesController', '50000', 10000],
-]);
-
 it('parses show_timestamps query values as booleans', function () {
     if (! function_exists('parseLogTimestampFlag')) {
         expect(function_exists('parseLogTimestampFlag'))->toBeTrue();

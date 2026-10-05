@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Project\Shared\SecretManagerLinks;
 use App\Models\Application;
@@ -11,6 +12,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Js;
@@ -179,25 +181,45 @@ test('browse keys shows key names only and search filters them', function () {
         ->assertDontSee('API_KEY');
 });
 
-test('browse key actions encode apostrophes and backslashes', function () {
+test('browse keys marks names that are not valid variable keys without an add action', function () {
     Http::fake([
         'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'API_KEY' => 'a',
+            'db-password' => 'b',
             "TEAM'S_KEY" => 'apostrophe-secret',
-            'TEAM\\KEY' => 'backslash-secret',
+            '<b>HTML</b>' => 'html-secret',
         ]),
     ]);
 
     $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
 
-    $apostropheExpression = 'addReference('.Js::from("TEAM'S_KEY").')';
-    $backslashExpression = 'addReference('.Js::from('TEAM\\KEY').')';
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('loadKeys')
+        ->assertSeeHtml('wire:click="addReference('.Js::from('API_KEY').')"')
+        ->assertSee('db-password')
+        ->assertSee('Not a valid variable name')
+        ->assertDontSeeHtml('addReference('.Js::from('db-password').')')
+        ->assertDontSeeHtml('addReference('.Js::from("TEAM'S_KEY").')')
+        ->assertSeeHtml('&lt;b&gt;HTML&lt;/b&gt;')
+        ->assertDontSeeHtml('<b>HTML</b>');
+});
+
+test('add reference rejects a remote name that is not a valid variable key', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'db-password' => 'b',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('loadKeys')
-        ->assertSeeHtml('wire:click="'.$apostropheExpression.'"')
-        ->assertSeeHtml('wire:target="'.$apostropheExpression.'"')
-        ->assertSeeHtml('wire:click="'.$backslashExpression.'"')
-        ->assertSeeHtml('wire:target="'.$backslashExpression.'"');
+        ->call('addReference', 'db-password')
+        ->assertDispatched('error', 'db-password is not a valid variable name.')
+        ->assertNotDispatched('refreshEnvs');
+
+    expect($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
 });
 
 test('add reference creates a variable with a secret reference value', function () {
@@ -212,7 +234,7 @@ test('add reference creates a variable with a secret reference value', function 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('loadKeys')
         ->call('addReference', 'DB_PASSWORD')
-        ->assertDispatched('refreshEnvs')
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
         ->assertDispatched('success');
 
     $created = $this->application->environment_variables()->where('key', 'DB_PASSWORD')->firstOrFail();
@@ -235,8 +257,8 @@ test('import all creates references for missing keys and skips existing ones', f
 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
         ->call('importAll')
-        ->assertDispatched('refreshEnvs')
-        ->assertDispatched('success');
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
+        ->assertDispatched('success', 'Imported 1 keys as {{vault.KEY}} references.');
 
     expect($this->application->environment_variables()->where('key', 'NEW_KEY')->firstOrFail()->value)
         ->toBe('{{vault.NEW_KEY}}')
@@ -246,6 +268,49 @@ test('import all creates references for missing keys and skips existing ones', f
     $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.references_imported')->sole();
     expect($auditEvent->metadata['key_count'])->toBe(1)
         ->and($auditEvent->metadata['secret_keys'])->toBe('[REDACTED]');
+});
+
+test('import all skips invalid remote names, imports the rest, and reports both', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'API_KEY' => 'a',
+            'db-password' => 'b',
+            'ZED' => 'c',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('importAll')
+        ->assertDispatchedTo(All::class, 'refreshEnvs')
+        ->assertDispatched('success', 'Imported 2 keys as {{vault.KEY}} references. Skipped 1 key that is not a valid variable name: db-password.')
+        ->assertNotDispatched('error');
+
+    expect($this->application->environment_variables()->whereIn('key', ['API_KEY', 'ZED'])->pluck('value', 'key')->sortKeys()->all())
+        ->toBe(['API_KEY' => '{{vault.API_KEY}}', 'ZED' => '{{vault.ZED}}'])
+        ->and($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.references_imported')->sole();
+    expect($auditEvent->metadata['key_count'])->toBe(2)
+        ->and($auditEvent->metadata['skipped_key_count'])->toBe(1);
+});
+
+test('import all reports skipped names when no remote name is a valid variable key', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'db-password' => 'a',
+            '<b>x</b>' => 'b',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('importAll')
+        ->assertDispatched('success', 'No keys imported. Skipped 2 keys that are not valid variable names: &lt;b&gt;x&lt;/b&gt;, db-password.');
+
+    expect($this->application->environment_variables()->whereIn('key', ['db-password', '<b>x</b>'])->exists())->toBeFalse();
 });
 
 test('the source can be removed', function () {
@@ -260,6 +325,31 @@ test('the source can be removed', function () {
         'team_id' => $this->team->id,
         'event' => 'ui.application.secret_manager.source_removed',
         'resource_uuid' => $this->application->uuid,
+    ]);
+});
+
+test('only tokens of the resource team can be linked, also after a team switch', function () {
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'member']);
+    $otherToken = IntegrationToken::query()->create([
+        'team_id' => $otherTeam->id,
+        'provider' => 'doppler',
+        'name' => 'Other team Doppler',
+        'token' => 'dp.st.other',
+        'capabilities' => ['secrets'],
+    ]);
+
+    $component = Livewire::test(SecretManagerLinks::class, ['resource' => $this->application]);
+    // The user switches to the other team in another browser tab; the next save reloads the token list.
+    session(['currentTeam' => $otherTeam]);
+    $component->set('integration_token_uuid', $this->token->uuid)
+        ->set('integration_token_uuid', $otherToken->uuid);
+
+    expect($component->get('availableTokens')->pluck('id')->all())->toBe([$this->token->id]);
+    $this->assertDatabaseMissing('secret_manager_links', ['integration_token_id' => $otherToken->id]);
+    $this->assertDatabaseHas('secret_manager_links', [
+        'resourceable_id' => $this->application->id,
+        'integration_token_id' => $this->token->id,
     ]);
 });
 
@@ -292,6 +382,35 @@ test('the edit modal value autocomplete offers the vault scope with lazy key fet
 
     expect($component->instance()->fetchSecretManagerKeys())->toBe(['DB_PASSWORD']);
 });
+
+test('the value autocomplete lists secret manager keys only for users who can update the resource', function (string $role, bool $allowed) {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'DB_PASSWORD' => 'super-secret-value',
+        ]),
+    ]);
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+    $env = $this->application->environment_variables()->create(['key' => 'MY_VAR', 'value' => 'plain']);
+
+    $user = User::factory()->create();
+    $this->team->members()->attach($user->id, ['role' => $role]);
+    $this->actingAs($user);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+
+    if ($allowed) {
+        expect($component->instance()->fetchSecretManagerKeys())->toBe(['DB_PASSWORD']);
+
+        return;
+    }
+
+    expect(fn () => $component->instance()->fetchSecretManagerKeys())->toThrow(AuthorizationException::class);
+    Http::assertNothingSent();
+})->with([
+    'member' => ['member', false],
+    'admin' => ['admin', true],
+]);
 
 test('the edit modal value autocomplete reports secret provider failures', function () {
     Http::fake([

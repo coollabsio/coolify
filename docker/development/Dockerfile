@@ -8,6 +8,8 @@ ARG CLOUDFLARED_VERSION=2025.7.0
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.2-r1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.0
 
 # =================================================================
 # Get MinIO client
@@ -26,6 +28,7 @@ ARG TARGETARCH
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 
 WORKDIR /var/www/html
 
@@ -70,7 +73,8 @@ RUN apk add --no-cache \
     vim
 
 # Install PHP extensions
-RUN install-php-extensions sockets
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions sockets uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \

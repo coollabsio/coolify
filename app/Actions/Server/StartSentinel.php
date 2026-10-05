@@ -10,11 +10,12 @@ class StartSentinel
 {
     use AsAction;
 
+    /**
+     * Sentinel and the proxy both mount this host path, and Sentinel reads the access log at the same path.
+     */
     public static function trafficLogDirectory(Server $server): string
     {
-        return isDev()
-            ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy'
-            : rtrim($server->proxyPath(), '/');
+        return devHostDockerPath($server, rtrim($server->proxyPath(), '/'));
     }
 
     /**
@@ -88,7 +89,7 @@ class StartSentinel
         $token = $server->settings->ensureValidSentinelToken();
         $endpoint = $server->settings->ensureSentinelUrl();
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
-        $mountDir = '/data/coolify/sentinel';
+        $mountDir = devHostDockerPath($server, base_configuration_dir().'/sentinel');
         $image = coolifyRegistryUrl().'/coollabsio/sentinel:'.$version;
         $environments = [
             'TOKEN' => $token,
@@ -108,7 +109,6 @@ class StartSentinel
             if ($customImage && ! empty($customImage)) {
                 $image = $customImage;
             }
-            $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
         }
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
@@ -117,7 +117,7 @@ class StartSentinel
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';
-        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         $server->sentinelHeartbeat(isReset: true);
         $server->forceFill(['sentinel_waiting_since' => now()])->save();

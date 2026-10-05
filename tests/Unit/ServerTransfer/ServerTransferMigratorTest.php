@@ -57,7 +57,6 @@ test('migrate exports imports via http and completes locally', function () {
         server: $this->server,
         targetUrl: 'http://8.8.8.8',
         targetToken: 'target-token-xyz',
-        writeRemote: false,
     );
 
     expect($result['server_uuid'])->toBe($this->server->uuid)
@@ -72,7 +71,7 @@ test('migrate exports imports via http and completes locally', function () {
     Http::assertSent(function ($request) {
         return $request->url() === 'http://8.8.8.8/api/v1/servers/import'
             && $request->hasHeader('Authorization', 'Bearer target-token-xyz')
-            && data_get($request->data(), 'claim') === true
+            && ! array_key_exists('write_remote', $request->data())
             && data_get($request->data(), 'bundle.server.uuid') === $this->server->uuid;
     });
 });
@@ -175,5 +174,26 @@ test('migrate surfaces recovery guidance when complete fails after successful re
         $this->server,
         'http://8.8.8.8',
         'token',
-    ))->toThrow(RuntimeException::class, 'Retry complete');
+    ))->toThrow(RuntimeException::class, 'Disable management of this server here');
+});
+
+test('migrate keeps managing the server here when the target could not take management', function () {
+    Http::fake([
+        'http://8.8.8.8/api/v1/servers/import' => Http::response([
+            'dry_run' => false,
+            'server_uuid' => $this->server->uuid,
+            'claimed' => false,
+            'warnings' => ['Server imported, but automatic claim failed: boom'],
+        ], 201),
+    ]);
+
+    expect(fn () => app(ServerTransferMigrator::class)->migrate(
+        $this->server,
+        'http://8.8.8.8',
+        'token',
+    ))->toThrow(RuntimeException::class, 'could not take management');
+
+    $this->server->refresh();
+    expect($this->server->isTransferredAway())->toBeFalse()
+        ->and((bool) $this->server->settings->force_disabled)->toBeFalse();
 });

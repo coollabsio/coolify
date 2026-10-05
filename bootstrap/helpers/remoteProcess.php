@@ -9,12 +9,12 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Support\RemoteProcessCommand;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
@@ -27,6 +27,8 @@ function remote_process(
     $callEventOnFinish = null,
     $callEventData = null,
     array $properties = [],
+    ?int $timeout = null,
+    string $queue = 'high',
 ): Activity {
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -49,7 +51,7 @@ function remote_process(
     $properties = [
         ...$properties,
         'server_uuid' => $server->uuid,
-        'command' => $command_string,
+        ...RemoteProcessCommand::properties($command_string),
         'type' => $type,
         'type_uuid' => $type_uuid,
         'status' => ProcessStatus::QUEUED->value,
@@ -71,6 +73,8 @@ function remote_process(
         ignore_errors: $ignore_errors,
         call_event_on_finish: $callEventOnFinish,
         call_event_data: $callEventData,
+        timeout: $timeout,
+        queue: $queue,
     ));
 
     $activity->refresh();
@@ -203,24 +207,17 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     );
 }
 
-function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
+/**
+ * Throws the remote command error. Handler::register() never sends RuntimeException to Sentry,
+ * so SSH key, DNS, and timeout failures on user servers are not reported.
+ */
+function excludeCertainErrors(string $errorOutput, ?int $exitCode = null): never
 {
-    $ignoredErrors = collect([
-        'Permission denied (publickey',
-        'Could not resolve hostname',
-    ]);
-    $ignored = $ignoredErrors->contains(fn ($error) => Str::contains($errorOutput, $error));
-
-    // Ensure we always have a meaningful error message
     $errorMessage = trim($errorOutput);
     if (empty($errorMessage)) {
         $errorMessage = "SSH command failed with exit code: $exitCode";
     }
 
-    if ($ignored) {
-        // TODO: Create new exception and disable in sentry
-        throw new RuntimeException($errorMessage, $exitCode);
-    }
     throw new RuntimeException($errorMessage, $exitCode);
 }
 

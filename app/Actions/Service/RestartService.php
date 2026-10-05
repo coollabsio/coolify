@@ -4,12 +4,16 @@ namespace App\Actions\Service;
 
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 class RestartService
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     public function handle(Service $service, bool $pullLatestImages)
     {

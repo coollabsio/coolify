@@ -4,7 +4,7 @@
     'label' => null,
     'helper' => null,
     'required' => false,
-    'options' => [], // list of ['value' => ..., 'label' => ..., 'disabled' => bool]
+    'options' => [], // list of ['value' => ..., 'label' => ..., 'description' => ?string, 'disabled' => bool]
     'placeholder' => 'Select…',
     'emptyText' => 'No options available.',
     'live' => false,
@@ -163,7 +163,11 @@
                                 <button type="button" class="listbox-option" role="option"
                                     :class="{ 'listbox-option-disabled': option.disabled }"
                                     :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                                    <span class="truncate" x-text="option.label"></span>
+                                    <span class="flex min-w-0 flex-col">
+                                        <span class="truncate" x-text="option.label"></span>
+                                        <span x-show="option.description" x-text="option.description"
+                                            class="text-xs whitespace-normal text-neutral-500 dark:text-fg-dim"></span>
+                                    </span>
                                     <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
                                         fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
                                         class="size-3.5 shrink-0">
@@ -198,7 +202,11 @@
                             <button type="button" class="listbox-option" role="option"
                                 :class="{ 'listbox-option-disabled': option.disabled }"
                                 :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                                <span class="truncate" x-text="option.label"></span>
+                                <span class="flex min-w-0 flex-col">
+                                    <span class="truncate" x-text="option.label"></span>
+                                    <span x-show="option.description" x-text="option.description"
+                                        class="text-xs whitespace-normal text-neutral-500 dark:text-fg-dim"></span>
+                                </span>
                                 <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
                                     fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
                                     class="size-3.5 shrink-0">

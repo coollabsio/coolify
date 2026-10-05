@@ -1,19 +1,43 @@
 <?php
 
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::unguarded(function () {
+        InstanceSettings::updateOrCreate(['id' => 0], []);
+    });
+
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->team->members()->attach($this->user, ['role' => 'owner']);
-    $this->application = Application::factory()->create([
-        'team_id' => $this->team->id,
-    ]);
 
     $this->actingAs($this->user);
+    session(['currentTeam' => $this->team]);
+
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'coolify-test']);
+
+    $this->application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
 });
 
 test('environment variable can be created with comment', function () {
@@ -143,10 +167,12 @@ test('environment variable comment cannot exceed 256 characters via Livewire', f
 
     $longComment = str_repeat('a', 257);
 
-    Livewire::test(\App\Livewire\Project\Shared\EnvironmentVariable\Show::class, ['env' => $env, 'type' => 'application'])
+    Livewire::test(Show::class, ['env' => $env, 'type' => 'application'])
         ->set('comment', $longComment)
         ->call('submit')
         ->assertHasErrors(['comment' => 'max']);
+
+    expect($env->fresh()->comment)->toBeNull();
 });
 
 test('bulk update preserves existing comments when no inline comment provided', function () {
@@ -162,7 +188,7 @@ test('bulk update preserves existing comments when no inline comment provided', 
     // User switches to Developer view and pastes new value without inline comment
     $bulkContent = "DATABASE_URL=postgres://new-host\nOTHER_VAR=value";
 
-    Livewire::test(\App\Livewire\Project\Shared\EnvironmentVariable\All::class, [
+    Livewire::test(All::class, [
         'resource' => $this->application,
         'type' => 'application',
     ])
@@ -192,7 +218,7 @@ test('bulk update overwrites existing comments when inline comment provided', fu
     // User pastes new value WITH inline comment
     $bulkContent = 'API_KEY=new-key #Updated production key';
 
-    Livewire::test(\App\Livewire\Project\Shared\EnvironmentVariable\All::class, [
+    Livewire::test(All::class, [
         'resource' => $this->application,
         'type' => 'application',
     ])
@@ -230,7 +256,7 @@ test('bulk update handles mixed inline and stored comments correctly', function 
     // Bulk paste: one with inline comment, one without
     $bulkContent = "VAR_WITH_COMMENT=new_value1 #New inline comment\nVAR_WITHOUT_COMMENT=new_value2";
 
-    Livewire::test(\App\Livewire\Project\Shared\EnvironmentVariable\All::class, [
+    Livewire::test(All::class, [
         'resource' => $this->application,
         'type' => 'application',
     ])
@@ -254,7 +280,7 @@ test('bulk update creates new variables with inline comments', function () {
     // Bulk paste creates new variables, some with inline comments
     $bulkContent = "NEW_VAR1=value1 #Comment for var1\nNEW_VAR2=value2\nNEW_VAR3=value3 #Comment for var3";
 
-    Livewire::test(\App\Livewire\Project\Shared\EnvironmentVariable\All::class, [
+    Livewire::test(All::class, [
         'resource' => $this->application,
         'type' => 'application',
     ])

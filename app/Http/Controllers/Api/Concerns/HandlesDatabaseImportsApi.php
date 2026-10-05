@@ -61,7 +61,7 @@ trait HandlesDatabaseImportsApi
     {
         $this->authorize('update', $resource);
         $payload = $request->json()->all() ?: $request->request->all();
-        $allowed = ['source', 'upload_id', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing'];
+        $allowed = ['source', 'upload_id', 's3_storage_uuid', 'path', 'dump_all', 'replace_existing', 'keep_owners', 'restore_mysql_users', 'sqlite_database'];
         $validator = Validator::make($payload, [
             'source' => ['required', Rule::in(['upload', 's3', 'server'])],
             'upload_id' => ['required_if:source,upload', 'prohibited_unless:source,upload', 'uuid'],
@@ -69,6 +69,9 @@ trait HandlesDatabaseImportsApi
             'path' => ['required_if:source,s3,server', 'prohibited_if:source,upload', 'string', 'max:4096'],
             'dump_all' => ['sometimes', 'boolean'],
             'replace_existing' => ['sometimes', 'boolean'],
+            'keep_owners' => ['sometimes', 'boolean'],
+            'restore_mysql_users' => ['sometimes', 'boolean'],
+            'sqlite_database' => ['sometimes', 'string', 'max:255'],
         ]);
         $extraFields = array_diff(array_keys($payload), $allowed);
         if ($validator->fails() || ! empty($extraFields)) {
@@ -81,7 +84,7 @@ trait HandlesDatabaseImportsApi
         }
 
         try {
-            $source = new DatabaseImportSource((string) $payload['source'], $payload['upload_id'] ?? null, $payload['path'] ?? null, $payload['s3_storage_uuid'] ?? null, (bool) ($payload['dump_all'] ?? false), (bool) ($payload['replace_existing'] ?? false));
+            $source = new DatabaseImportSource((string) $payload['source'], $payload['upload_id'] ?? null, $payload['path'] ?? null, $payload['s3_storage_uuid'] ?? null, (bool) ($payload['dump_all'] ?? false), (bool) ($payload['replace_existing'] ?? false), (bool) ($payload['keep_owners'] ?? false), isset($payload['sqlite_database']) ? (string) $payload['sqlite_database'] : null, (bool) ($payload['restore_mysql_users'] ?? false));
             $activity = app(StartDatabaseImport::class)->handle($resource, $source, $teamId);
         } catch (DatabaseImportException $exception) {
             return response()->json(['message' => $exception->getMessage()], $exception->status);
@@ -92,6 +95,8 @@ trait HandlesDatabaseImportsApi
             'database_name' => $resource->name,
             'source' => $source->type,
             'replace_existing' => $source->replaceExisting,
+            'keep_owners' => $source->keepOwners,
+            'restore_mysql_users' => $source->restoreMysqlUsers,
             'activity_id' => $activity->id,
         ]);
         $url = route($statusRoute, [...$routeParameters, 'activity_id' => $activity->id], false);
@@ -116,7 +121,9 @@ trait HandlesDatabaseImportsApi
             'id' => $activity->id,
             'status' => $status,
             'exit_code' => data_get($activity, 'properties.exitCode'),
-            'output' => remove_iip(RunRemoteProcess::decodeOutput($activity)),
+            'output' => request()->attributes->get('can_read_sensitive', false) === true && request()->user()->can('update', $resource)
+                ? remove_iip(RunRemoteProcess::decodeOutput($activity))
+                : null,
             'created_at' => $activity->created_at,
             'updated_at' => $activity->updated_at,
             'finished_at' => $terminal ? $activity->updated_at : null,

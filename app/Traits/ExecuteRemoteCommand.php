@@ -52,10 +52,7 @@ trait ExecuteRemoteCommand
             }
 
             if (isset($this->remote_secrets_cache)) {
-                $lockedVars = $lockedVars->merge(array_values(array_filter(
-                    $this->remote_secrets_cache,
-                    static fn (mixed $value): bool => is_string($value) && $value !== ''
-                )));
+                $lockedVars = $lockedVars->merge(EnvironmentVariable::remoteSecretLogRedactionValues($this->remote_secrets_cache));
             }
 
             foreach ($lockedVars as $key => $value) {
@@ -83,6 +80,9 @@ trait ExecuteRemoteCommand
         }
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
+        }
+        if (isset($this->application_deployment_queue, $this->remote_secrets_cache)) {
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
         }
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
@@ -125,7 +125,7 @@ trait ExecuteRemoteCommand
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshError($errorMessage) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
@@ -243,7 +243,7 @@ trait ExecuteRemoteCommand
                 if (empty($error)) {
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
-                throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log));
+                throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
             }
         }
     }

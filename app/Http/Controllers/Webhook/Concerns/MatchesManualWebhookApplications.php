@@ -66,26 +66,39 @@ trait MatchesManualWebhookApplications
 
     /**
      * Respond to a delivery that could not be authenticated (no matching
-     * application or no signature) and count it as a failed attempt.
+     * application or no valid signature). A locked scope gets a 429 without
+     * counting again; otherwise the delivery is counted as a failed attempt.
      *
      * Deliveries without a matching application are counted too: the failure
      * key is scoped to the repository and branch, so this cannot lock out other
      * applications, and it keeps the 429 response from revealing which
      * repositories exist in this instance.
+     *
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
      */
-    protected function unauthenticatedManualWebhookResponse(string $failureKey): Response
+    protected function unauthenticatedManualWebhookResponse(string $failureKey, string $attempt): Response
     {
-        $this->recordManualWebhookFailure($failureKey);
+        if ($this->hasTooManyManualWebhookFailures($failureKey)) {
+            return $this->tooManyManualWebhookFailuresResponse($failureKey);
+        }
+
+        $this->recordManualWebhookFailure($failureKey, $attempt);
 
         return response([$this->unauthenticatedManualWebhookFailurePayload()]);
     }
 
-    protected function manualWebhookResponse(Collection $payloads, string $failureKey): Response
+    /**
+     * Return the authorized payloads. When no matched application authorized
+     * the delivery, respond as an unauthenticated delivery.
+     *
+     * @param  string  $attempt  Attempt identity from manualWebhookTokenAttempt() or manualWebhookSignedPayloadAttempt().
+     */
+    protected function manualWebhookResponse(Collection $payloads, string $failureKey, string $attempt): Response
     {
         $failure = $this->unauthenticatedManualWebhookFailurePayload();
         $authorizedPayloads = $payloads->reject(fn (array $payload): bool => $payload === $failure)->values();
         if ($authorizedPayloads->isEmpty() && $payloads->isNotEmpty()) {
-            return $this->unauthenticatedManualWebhookResponse($failureKey);
+            return $this->unauthenticatedManualWebhookResponse($failureKey, $attempt);
         }
 
         return response($authorizedPayloads);

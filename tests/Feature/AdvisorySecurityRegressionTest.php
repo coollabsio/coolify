@@ -74,7 +74,7 @@ it('throttles only failed authentication on manual webhook routes', function (st
 
         public function reply(array $payloads, string $failureKey): int
         {
-            return $this->manualWebhookResponse(collect($payloads), $failureKey)->getStatusCode();
+            return $this->manualWebhookResponse(collect($payloads), $failureKey, $this->manualWebhookTokenAttempt('wrong-token'))->getStatusCode();
         }
     };
     $failureKey = $helper->key($request, $provider);
@@ -96,7 +96,7 @@ it('does not reveal how many applications share a manual webhook repository', fu
 
         public function reply(array $payloads): string
         {
-            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test')->getContent();
+            return $this->manualWebhookResponse(collect($payloads), 'manual-webhook-failures:test', $this->manualWebhookTokenAttempt('wrong-token'))->getContent();
         }
     };
     $failure = ['status' => 'failed', 'message' => 'Invalid signature.'];

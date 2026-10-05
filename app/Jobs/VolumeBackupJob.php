@@ -17,7 +17,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +41,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('volume-backup-'.$this->backup->id))
+            ScheduledJobDeliveryService::withoutOverlapping('volume-backup-'.$this->backup->id, $this->occurrenceUuid)
                 ->shared()
                 ->expireAfter($this->timeout + 60)
                 ->dontRelease(),
@@ -489,6 +488,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->backup->executions()
             ->where('local_storage_deleted', true)
+            ->where('stop_recovery_pending', false)
+            ->where('s3_cleanup_pending', false)
             ->where(function (Builder $query): void {
                 $query->where('s3_storage_deleted', true)->orWhereNull('s3_uploaded');
             })

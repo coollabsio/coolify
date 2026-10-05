@@ -777,3 +777,53 @@ test('do keyword with word boundary is not given sudo', function () {
 
     expect($result[0])->toBe('do');
 });
+
+test('keeps a single sudo sh -c script unchanged in both parsers', function () {
+    // A redirect inside the script is opened by root. Inner sudo fails where root is not in sudoers (Alpine).
+    $line = 'sh -c '.escapeshellarg("docker exec 'db' pg_dump 'app' > '/data/coolify/backups/app.dmp' && echo it's done | cat");
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toBe("sudo {$line}")
+        ->and(parseLineForSudo($line, $this->server))->toBe("sudo {$line}");
+});
+
+test('still wraps a sh -c call that is not the whole line', function () {
+    $line = "docker exec db pg_dumpall | docker run --rm -i helper sh -c 'gzip' > /data/coolify/backups/all.gz";
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toStartWith("sudo bash -c '");
+});
+
+test('parseLineForSudo adds sudo to each pipe stage without doubling it', function () {
+    expect(parseLineForSudo("echo 'ZW52' | base64 -d | tee /data/coolify/applications/app/.env > /dev/null", $this->server))
+        ->toBe("sudo echo 'ZW52' | sudo base64 -d | sudo tee /data/coolify/applications/app/.env > /dev/null")
+        ->and(parseLineForSudo('docker ps | sudo grep app', $this->server))
+        ->toBe('sudo docker ps | sudo grep app');
+});
+
+test('parseLineForSudo keeps pipes inside quoted strings unchanged', function (string $line, string $expected) {
+    expect(parseLineForSudo($line, $this->server))->toBe($expected);
+})->with([
+    'single-quoted go template' => [
+        "docker inspect --format '{{a | b}}' coolify-proxy | grep x",
+        "sudo docker inspect --format '{{a | b}}' coolify-proxy | sudo grep x",
+    ],
+    'double-quoted sh -c script' => [
+        'sh -c "x | y"',
+        'sudo sh -c "x | y"',
+    ],
+    'escaped double quote inside double quotes' => [
+        'echo "a \" | b" | tee /tmp/coolify/file',
+        'sudo echo "a \" | b" | sudo tee /tmp/coolify/file',
+    ],
+    'single quote inside double quotes' => [
+        "echo \"it's | here\" | tee /tmp/coolify/file",
+        "sudo echo \"it's | here\" | sudo tee /tmp/coolify/file",
+    ],
+]);
+
+test('parseCommandsByLineForSudo keeps pipes inside quoted strings unchanged', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        "docker ps --format '{{.Names}} | {{.Image}}' | grep app",
+    ]), $this->server);
+
+    expect($result[0])->toBe("sudo docker ps --format '{{.Names}} | {{.Image}}' | sudo grep app");
+});

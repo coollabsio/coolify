@@ -6,7 +6,6 @@ use App\Data\Traffic\TrafficPathData;
 use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Livewire\Analytics as GlobalAnalytics;
 use App\Livewire\Project\Application\Analytics as ApplicationAnalytics;
-use App\Livewire\Project\Application\TrafficOverview;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\PrivateKey;
@@ -96,7 +95,7 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-function makeComposeApplication(): Application
+function makeTrafficComposeApplication(): Application
 {
     return Application::factory()->create([
         'name' => 'Compose Shop',
@@ -260,7 +259,7 @@ it('merges overviews, paths, breakdowns, and series of several keys', function (
 });
 
 it('shows a compose application with the data of all its compose service keys', function () {
-    $application = makeComposeApplication();
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 
@@ -286,8 +285,8 @@ it('shows a compose application with the data of all its compose service keys', 
         ->and($paths['/checkout']['domain'])->toBe('www.shop.test');
 });
 
-it('sums every compose key in the application traffic card', function () {
-    $application = makeComposeApplication();
+it('sums every compose key on the application analytics page', function () {
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 
@@ -297,13 +296,13 @@ it('sums every compose key in the application traffic card', function () {
         "/app/{$webKey}/traffic/overview" => resourceKeysOverview(200),
     ]);
 
-    loadLazy(Livewire::test(TrafficOverview::class, ['application' => $application]))
+    loadLazy(Livewire::test(ApplicationAnalytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('4,200');
 });
 
 it('groups compose keys of one application into one leaderboard row', function () {
-    $application = makeComposeApplication();
+    $application = makeTrafficComposeApplication();
     $apiKey = $application->uuid.'-'.traefikSafeServiceNameSegment('api');
     $webKey = $application->uuid.'-'.traefikSafeServiceNameSegment('web');
 

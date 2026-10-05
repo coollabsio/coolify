@@ -21,6 +21,7 @@ use OpenApi\Attributes as OA;
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both']],
+        'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
@@ -116,6 +117,7 @@ class ServerSetting extends Model
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'server_disk_usage_check_frequency',
+        'server_disk_usage_notification_interval_hours',
         'is_terminal_enabled',
         'deployment_queue_limit',
         'backup_compression_cpu_percentage',
@@ -168,6 +170,7 @@ class ServerSetting extends Model
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
+        'server_disk_usage_notification_interval_hours' => 'integer',
     ];
 
     /**
@@ -312,6 +315,38 @@ class ServerSetting extends Model
         return $url;
     }
 
+    /**
+     * The Sentinel push URL that the instance URL or public IP gives to a remote server.
+     */
+    public static function instanceSentinelUrl(?string $fqdn, ?string $publicIpv4, ?string $publicIpv6): ?string
+    {
+        return match (true) {
+            filled($fqdn) => $fqdn,
+            filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
+            filled($publicIpv6) => 'http://'.$publicIpv6.':8000',
+            default => null,
+        };
+    }
+
+    /**
+     * Move remote servers that use the generated Sentinel URL to the new instance URL. Saving the
+     * new URL restarts their Sentinel. Servers with a custom URL keep it.
+     */
+    public static function followInstanceUrlChange(?string $oldUrl, ?string $newUrl): void
+    {
+        if (blank($oldUrl) || blank($newUrl) || $oldUrl === $newUrl) {
+            return;
+        }
+
+        self::query()
+            ->where('sentinel_custom_url', $oldUrl)
+            ->where('server_id', '!=', 0)
+            ->each(function (ServerSetting $setting) use ($newUrl) {
+                $setting->sentinel_custom_url = $newUrl;
+                $setting->save();
+            });
+    }
+
     public function restoreDefaultSentinelConfiguration(): void
     {
         $this->generateSentinelUrl(save: false, ignoreEvent: true);
@@ -324,18 +359,12 @@ class ServerSetting extends Model
 
     public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
-        $domain = null;
         $settings = InstanceSettings::get();
         if ($this->server->isLocalhost()) {
             $domain = 'http://coolify:8080';
-        } elseif ($settings->fqdn) {
-            $domain = $settings->fqdn;
-        } elseif ($settings->public_ipv4) {
-            $domain = 'http://'.$settings->public_ipv4.':8000';
-        } elseif ($settings->public_ipv6) {
-            $domain = 'http://'.$settings->public_ipv6.':8000';
         } else {
-            $domain = $this->sentinelUrlFromCurrentRequest();
+            $domain = self::instanceSentinelUrl($settings->fqdn, $settings->public_ipv4, $settings->public_ipv6)
+                ?? $this->sentinelUrlFromCurrentRequest();
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {

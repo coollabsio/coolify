@@ -4,6 +4,7 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,7 +45,19 @@ it('does not execute remote commands for a malformed legacy stored port', functi
     $this->server->save();
 
     expect(CheckProxy::run($this->server))->toBeFalse();
-    Process::assertNothingRan();
+    Process::assertDidntRun(fn ($process): bool => str_contains((string) $process->command, '$(id)'));
+});
+
+it('refreshes the status of a running proxy even when its stored configuration is invalid', function () {
+    Process::fake([
+        '*' => Process::result(output: json_encode(['State' => ['Status' => 'running']])),
+    ]);
+    $this->server->private_key_id = PrivateKey::factory()->create(['team_id' => $this->server->team_id])->id;
+    $this->server->proxy->last_saved_proxy_configuration = "services:\n  traefik:\n    image: traefik:v3.7\n    ports:\n      - '$(id):80'\n";
+    $this->server->save();
+
+    expect(CheckProxy::run($this->server->fresh()))->toBeFalse()
+        ->and($this->server->fresh()->proxy->status)->toBe('running');
 });
 
 it('builds port checks only from normalized integer ports', function () {

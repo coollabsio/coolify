@@ -10,12 +10,14 @@ use App\Services\TrafficAnalyticsAggregator;
 use App\Services\TrafficResource;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 
 /**
  * Traffic analytics tab of one resource (Application or Service). A resource can record
- * under several Sentinel keys (compose services, previews); every key is fetched and
- * merged into one view.
+ * under several Sentinel keys (compose services, previews). Sentinel's resource scope
+ * merges them exactly; an older Sentinel gets every key fetched and merged here.
  */
 abstract class ResourceTrafficAnalytics extends Component
 {
@@ -28,6 +30,7 @@ abstract class ResourceTrafficAnalytics extends Component
 
     public bool $enabled = false;
 
+    #[Locked]
     public ?string $analyticsServerUuid = null;
 
     // Realtime refresh. Off by default (click "Live" to arm it). Only meaningful on the
@@ -89,6 +92,14 @@ abstract class ResourceTrafficAnalytics extends Component
         }
     }
 
+    /**
+     * Subclasses redeclare $chartId, which drops #[Locked], so the lock is enforced here.
+     */
+    public function updatingChartId(): void
+    {
+        throw new CannotUpdateLockedPropertyException('chartId');
+    }
+
     public function setRange(string $range): void
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
@@ -124,14 +135,10 @@ abstract class ResourceTrafficAnalytics extends Component
             [$from, $to] = SentinelTrafficClient::rangeWindow($this->range);
             $client = app(SentinelTrafficClient::class, ['server' => $resource->server()]);
 
-            // Resolve every key of this resource and warm all of them in one or two
-            // docker execs; the per-call methods below then read from cache.
-            $keys = $client->prefetchResource($resource->uuid(), $from, $to, $this->breakdownDimensions, $this->range);
-
+            // Sentinel's resource scope merges every key exactly in one docker exec. An older
+            // Sentinel falls back to all keys of the resource, merged here (approximate).
             $aggregator = new TrafficAnalyticsAggregator($this->breakdownDimensions);
-            foreach ($keys as $key) {
-                $aggregator->collect($client, $key, $from, $to, $this->range, fn (string $appKey) => $resource->domainForKey($appKey));
-            }
+            $aggregator->collectResource($client, $resource->uuid(), $from, $to, $this->range, fn (string $appKey) => $resource->domainForKey($appKey));
 
             $result = $aggregator->overview();
             $this->overview = $result['overview']->toArray();

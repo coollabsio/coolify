@@ -33,6 +33,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
@@ -57,6 +58,7 @@ class ServerTransferImporter
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneSqlite' => StandaloneSqlite::class,
     ];
 
     /** @var array<string, PrivateKey> */
@@ -87,6 +89,13 @@ class ServerTransferImporter
     private array $databaseMap = [];
 
     /**
+     * Imported volumes that mount a SQLite database volume, keyed by volume id. The database may be imported later.
+     *
+     * @var array<int, array{volume: LocalPersistentVolume, sqlite_uuid: string}>
+     */
+    private array $pendingSqliteLinks = [];
+
+    /**
      * @param  array<string, mixed>  $bundle
      * @return array{
      *     dry_run: bool,
@@ -106,9 +115,6 @@ class ServerTransferImporter
         bool $dryRun = false,
         bool $preserveUuids = true,
         bool $adoptMode = true,
-        bool $claim = true,
-        bool $writeRemote = false,
-        bool $rebindSentinel = true,
     ): array {
         ServerTransferBundle::assertValid($bundle);
 
@@ -220,6 +226,7 @@ class ServerTransferImporter
             $this->applicationMap = [];
             $this->serviceMap = [];
             $this->databaseMap = [];
+            $this->pendingSqliteLinks = [];
 
             // Import shared dependencies first
             $keyPayloads = data_get($bundle, 'private_keys', []);
@@ -307,6 +314,8 @@ class ServerTransferImporter
                 }
             }
 
+            $warnings = array_merge($warnings, $this->linkSqliteVolumes());
+
             $created['ssl_certificates'] = $this->importSslCertificates(data_get($bundle, 'ssl_certificates', []), $server);
             $created['volume_backups'] = $this->importVolumeBackups(data_get($bundle, 'volume_backups', []), $teamId);
 
@@ -342,21 +351,13 @@ class ServerTransferImporter
             ];
         });
 
-        // Claim after the import transaction commits so host/SSH work cannot roll back DB rows.
-        if ($claim && filled(data_get($result, 'server_uuid'))) {
+        // Claim after the import transaction commits so a claim failure cannot roll back DB rows.
+        if (filled(data_get($result, 'server_uuid'))) {
             $server = Server::where('uuid', $result['server_uuid'])->where('team_id', $teamId)->first();
             if ($server) {
                 try {
-                    $claimResult = app(ServerTransferClaimer::class)->claim(
-                        $server,
-                        writeRemote: $writeRemote,
-                        rebindSentinel: $rebindSentinel,
-                    );
+                    $result['claim'] = app(ServerTransferClaimer::class)->claim($server);
                     $result['claimed'] = true;
-                    $result['claim'] = $claimResult;
-                    if (! data_get($claimResult, 'claim_written') && $writeRemote) {
-                        $result['warnings'][] = 'Server imported and claimed in Coolify, but the remote ownership file was not written (SSH unavailable).';
-                    }
                 } catch (Throwable $e) {
                     $result['claimed'] = false;
                     $result['claim'] = null;
@@ -382,14 +383,12 @@ class ServerTransferImporter
             ?? data_get($payload, 'fingerprint');
 
         if ($fingerprint) {
-            $existing = PrivateKey::query()->where('fingerprint', $fingerprint)->first();
+            // Keys are unique per team, so only a key of the target team can be reused.
+            $existing = PrivateKey::query()
+                ->where('team_id', $teamId)
+                ->where('fingerprint', $fingerprint)
+                ->first();
             if ($existing) {
-                if ((int) $existing->team_id !== $teamId) {
-                    throw ValidationException::withMessages([
-                        'private_key' => ['This SSH private key already exists on another team on this instance.'],
-                    ]);
-                }
-
                 return $existing;
             }
         }
@@ -1060,6 +1059,8 @@ class ServerTransferImporter
                 'mount_path' => data_get($volume, 'mount_path'),
                 'host_path' => data_get($volume, 'host_path'),
                 'is_preview_suffix_enabled' => (bool) data_get($volume, 'is_preview_suffix_enabled', false),
+                // The server keeps its Docker volumes. A bundle without the flag is from a Coolify version that created them without driver options.
+                'ignores_compose_driver_options' => (bool) data_get($volume, 'ignores_compose_driver_options', true),
                 'resource_type' => $resource->getMorphClass(),
                 'resource_id' => $resource->id,
             ]);
@@ -1069,7 +1070,35 @@ class ServerTransferImporter
             if (filled(data_get($volume, 'uuid'))) {
                 $this->volumeMap[(string) data_get($volume, 'uuid')] = $volumeModel;
             }
+            if (filled(data_get($volume, 'standalone_sqlite_uuid'))) {
+                $this->pendingSqliteLinks[$volumeModel->id] = [
+                    'volume' => $volumeModel,
+                    'sqlite_uuid' => (string) data_get($volume, 'standalone_sqlite_uuid'),
+                ];
+            }
         }
+    }
+
+    /**
+     * Connect imported volumes to the imported SQLite database whose data volume they mount.
+     *
+     * @return list<string> warnings for volumes whose database is not in the bundle
+     */
+    private function linkSqliteVolumes(): array
+    {
+        $warnings = [];
+        foreach ($this->pendingSqliteLinks as $link) {
+            $sqlite = $this->databaseMap[$link['sqlite_uuid']] ?? null;
+            if (! $sqlite instanceof StandaloneSqlite) {
+                $warnings[] = "Volume {$link['volume']->name} mounts a SQLite database that is not part of this transfer. Coolify does not protect it when that database or its applications are deleted.";
+
+                continue;
+            }
+
+            $link['volume']->forceFill(['standalone_sqlite_id' => $sqlite->id])->save();
+        }
+
+        return $warnings;
     }
 
     /**

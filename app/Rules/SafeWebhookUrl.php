@@ -4,8 +4,13 @@ namespace App\Rules;
 
 use App\Models\InstanceSettings;
 use Closure;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\UriComparator;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Log;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Throwable;
@@ -161,6 +166,32 @@ class SafeWebhookUrl implements ValidationRule
         ];
 
         return $options;
+    }
+
+    /**
+     * Redirect options that follow up to five redirects on the same scheme, host and port.
+     * The DNS pin from httpClientOptions() covers only that host and port, so a redirect
+     * to another origin is refused. Git providers use such redirects for renamed repositories.
+     *
+     * @return array<string, mixed>
+     */
+    public static function sameOriginRedirectOptions(): array
+    {
+        return [
+            'max' => 5,
+            'strict' => true,
+            'referer' => false,
+            'protocols' => ['http', 'https'],
+            'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $target): void {
+                if (UriComparator::isCrossOrigin($request->getUri(), $target)) {
+                    throw new RequestException(
+                        "Refused a redirect to another host ({$target->getScheme()}://{$target->getAuthority()}).",
+                        $request,
+                        $response,
+                    );
+                }
+            },
+        ];
     }
 
     /**

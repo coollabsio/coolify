@@ -8,12 +8,16 @@ use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\ServiceDatabase;
+use App\Models\Subscription;
 use App\Models\Team;
 use App\Services\ScheduledJobDeliveryService;
 use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -30,6 +34,27 @@ class ScheduledJobManager implements ShouldQueue
     private const CHUNK_SIZE = 100;
 
     /**
+     * Pending volume backup recovery is retried at most once in this interval for each execution.
+     */
+    private const VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES = 5;
+
+    /**
+     * Bounds the volume backup recovery jobs dispatched in one scheduler run.
+     */
+    private const VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES = 100;
+
+    /**
+     * The schedule types that run as separate dispatchers, with the delivery job types they own.
+     * Each type has its own overlap lock, so a slow type cannot make another type skip a run.
+     */
+    public const TYPES = [
+        'backups' => ['database-backup'],
+        'tasks' => ['scheduled-task'],
+        'volume-backups' => ['volume-backup'],
+        'docker-cleanups' => ['docker-cleanup'],
+    ];
+
+    /**
      * The time when this job execution started.
      * Used to ensure all scheduled items are evaluated against the same point in time.
      */
@@ -40,10 +65,14 @@ class ScheduledJobManager implements ShouldQueue
     private int $skippedCount = 0;
 
     /**
-     * Create a new job instance.
+     * @param  string|null  $type  One key of TYPES, or null for all types.
      */
-    public function __construct()
+    public function __construct(public ?string $type = null)
     {
+        if ($type !== null && ! array_key_exists($type, self::TYPES)) {
+            throw new \InvalidArgumentException("Unknown scheduled job type [{$type}].");
+        }
+
         $this->onQueue(crons_queue());
     }
 
@@ -55,10 +84,10 @@ class ScheduledJobManager implements ShouldQueue
         // Self-healing: clear any stale lock before WithoutOverlapping tries to acquire it.
         // Stale locks (TTL = -1) can occur during upgrades, Redis restarts, or edge cases.
         // @see https://github.com/coollabsio/coolify/issues/8327
-        self::clearStaleLockIfPresent();
+        $this->clearStaleLockIfPresent();
 
         return [
-            (new WithoutOverlapping('scheduled-job-manager'))
+            (new WithoutOverlapping($this->lockName()))
                 ->expireAfter(90)   // Lock expires after 90s to handle high-load environments with many tasks
                 ->dontRelease(),    // Don't re-queue on lock conflict
         ];
@@ -70,11 +99,11 @@ class ScheduledJobManager implements ShouldQueue
      * This provides continuous self-healing since it runs every time the job is dispatched.
      * Stale locks permanently block all scheduled job executions with no user-visible error.
      */
-    private static function clearStaleLockIfPresent(): void
+    private function clearStaleLockIfPresent(): void
     {
         try {
             $cachePrefix = config('cache.prefix', '');
-            $lockKey = $cachePrefix.'laravel-queue-overlap:'.self::class.':scheduled-job-manager';
+            $lockKey = $cachePrefix.'laravel-queue-overlap:'.self::class.':'.$this->lockName();
 
             $ttl = Redis::connection('default')->ttl($lockKey);
 
@@ -92,6 +121,16 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
+    private function lockName(): string
+    {
+        return $this->type === null ? 'scheduled-job-manager' : "scheduled-job-manager:{$this->type}";
+    }
+
+    private function includes(string $type): bool
+    {
+        return $this->type === null || $this->type === $type;
+    }
+
     public function handle(): void
     {
         // Freeze the execution time at the start of the job
@@ -99,16 +138,30 @@ class ScheduledJobManager implements ShouldQueue
         $this->dispatchedCount = 0;
         $this->skippedCount = 0;
 
-        Log::channel('scheduled')->info('ScheduledJobManager started', [
-            'execution_time' => $this->executionTime->toIso8601String(),
-        ]);
+        $this->logStart();
+        $jobTypes = $this->type === null ? null : self::TYPES[$this->type];
 
-        app(ScheduledJobDeliveryService::class)->publishPending();
+        $deliveries = app(ScheduledJobDeliveryService::class);
+        foreach ([
+            'Failed to recover stale enqueued occurrences' => fn () => $deliveries->recoverStaleEnqueued($jobTypes),
+            'Failed to recover interrupted occurrences' => fn () => $deliveries->failInterruptedClaims($jobTypes),
+            'Failed to publish pending occurrences' => fn () => $deliveries->publishPending($jobTypes),
+        ] as $errorMessage => $recover) {
+            try {
+                $recover();
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error($errorMessage, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         // Process scheduled backups and tasks together so neither type starves the other.
         try {
-            $this->processScheduledBackupsAndTasks();
-        } catch (\Exception $e) {
+            if ($this->includes('backups') || $this->includes('tasks')) {
+                $this->processScheduledBackupsAndTasks($this->includes('backups'), $this->includes('tasks'));
+            }
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled backups and tasks', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -116,9 +169,11 @@ class ScheduledJobManager implements ShouldQueue
         }
 
         try {
-            $this->recoverStoppedVolumeBackupContainers();
-            $this->processScheduledVolumeBackups();
-        } catch (\Exception $e) {
+            if ($this->includes('volume-backups')) {
+                $this->recoverStoppedVolumeBackupContainers();
+                $this->processScheduledVolumeBackups();
+            }
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled volume backups', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -127,8 +182,10 @@ class ScheduledJobManager implements ShouldQueue
 
         // Process Docker cleanups - don't let failures stop the job manager
         try {
-            $this->processDockerCleanups();
-        } catch (\Exception $e) {
+            if ($this->includes('docker-cleanups')) {
+                $this->processDockerCleanups();
+            }
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to process docker cleanups', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -136,10 +193,16 @@ class ScheduledJobManager implements ShouldQueue
         }
 
         Log::channel('scheduled')->info('ScheduledJobManager completed', [
+            'type' => $this->type ?? 'all',
             'execution_time' => $this->executionTime->toIso8601String(),
             'duration_ms' => $this->executionTime->diffInMilliseconds(Carbon::now()),
             'dispatched' => $this->dispatchedCount,
             'skipped' => $this->skippedCount,
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+            'memory_peak_mb' => round(memory_get_peak_usage(true) / 1048576, 1),
+            'open_occurrences_over_15_minutes' => rescue(fn () => app(ScheduledJobDeliveryService::class)->staleOpenOccurrenceCounts(), [], report: false),
         ]);
 
         // Write heartbeat so the UI can detect when the scheduler has stopped
@@ -150,14 +213,43 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
-    private function processScheduledBackupsAndTasks(): void
+    /**
+     * Log which worker runs the manager and how late it starts. The manager only catches up
+     * occurrences from the last CATCH_UP_WINDOW_MINUTES, so a larger delay skips them silently.
+     */
+    private function logStart(): void
+    {
+        $lastStartedKey = $this->lockName().':last-started-at';
+        $previousStartedAt = rescue(fn () => Cache::get($lastStartedKey), report: false);
+        rescue(fn () => Cache::put($lastStartedKey, $this->executionTime->toIso8601String(), 86400), report: false);
+        $queuedAt = data_get($this->job?->payload(), 'createdAt');
+
+        $context = [
+            'type' => $this->type ?? 'all',
+            'execution_time' => $this->executionTime->toIso8601String(),
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'queue_wait_seconds' => $queuedAt ? $this->executionTime->timestamp - (int) $queuedAt : null,
+            'seconds_since_previous_start' => $previousStartedAt ? (int) Carbon::parse($previousStartedAt)->diffInSeconds($this->executionTime) : null,
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+        ];
+
+        Log::channel('scheduled')->info('ScheduledJobManager started', $context);
+
+        $catchUpWindowSeconds = ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES * 60;
+        if ($context['queue_wait_seconds'] > $catchUpWindowSeconds || $context['seconds_since_previous_start'] > $catchUpWindowSeconds) {
+            Log::channel('scheduled-errors')->warning('ScheduledJobManager started late; occurrences due before the catch-up window were not run', $context);
+        }
+    }
+
+    private function processScheduledBackupsAndTasks(bool $withBackups, bool $withTasks): void
     {
         $lastBackupId = null;
         $lastTaskId = null;
 
         do {
-            $backups = $this->scheduledBackupQuery($lastBackupId)->get();
-            $tasks = $this->scheduledTaskQuery($lastTaskId)->get();
+            $backups = $withBackups ? $this->scheduledBackupQuery($lastBackupId)->get() : collect();
+            $tasks = $withTasks ? $this->scheduledTaskQuery($lastTaskId)->get() : collect();
 
             if ($backups->isNotEmpty()) {
                 $lastBackupId = $backups->last()->id;
@@ -193,9 +285,19 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
+    /**
+     * Load the server chain of each backup with the chunk. Otherwise $backup->server()
+     * queries the destination, service, server, and settings once for each backup.
+     */
     private function scheduledBackupQuery(?int $lastBackupId): Builder
     {
-        return ScheduledDatabaseBackup::with(['database', 'team.subscription'])
+        return ScheduledDatabaseBackup::with([
+            'team.subscription',
+            'database' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                ServiceDatabase::class => ['service.destination.server.settings', 'service.destination.server.team.subscription'],
+                ...array_fill_keys(STANDALONE_DATABASE_MODELS, ['destination.server.settings', 'destination.server.team.subscription']),
+            ]),
+        ])
             ->where('enabled', true)
             ->when($lastBackupId !== null, fn (Builder $query) => $query->where('id', '>', $lastBackupId))
             ->orderBy('id')
@@ -240,7 +342,7 @@ class ScheduledJobManager implements ShouldQueue
                         'server' => $server,
                     ];
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::channel('scheduled-errors')->error('Error prechecking backup', [
                     'backup_id' => $backup->id,
                     'error' => $e->getMessage(),
@@ -275,7 +377,7 @@ class ScheduledJobManager implements ShouldQueue
                         'server' => $server,
                     ];
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::channel('scheduled-errors')->error('Error prechecking task', [
                     'task_id' => $task->id,
                     'error' => $e->getMessage(),
@@ -294,7 +396,7 @@ class ScheduledJobManager implements ShouldQueue
             if ($skipReason !== null) {
                 if ($server === null || $this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
                     $this->skippedCount++;
-                    $this->logBackupSkip($backup, $skipReason);
+                    $this->logBackupSkip($backup, $skipReason, $server);
                 }
 
                 return;
@@ -316,7 +418,7 @@ class ScheduledJobManager implements ShouldQueue
                     'server_id' => $server->id,
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing backup', [
                 'backup_id' => $backup->id,
                 'error' => $e->getMessage(),
@@ -366,7 +468,7 @@ class ScheduledJobManager implements ShouldQueue
                 'team_id' => $server->team_id,
                 'server_id' => $server->id,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing task', [
                 'task_id' => $task->id,
                 'error' => $e->getMessage(),
@@ -388,14 +490,31 @@ class ScheduledJobManager implements ShouldQueue
 
     private function recoverStoppedVolumeBackupContainers(): void
     {
+        $dispatched = 0;
+
         ScheduledVolumeBackupExecution::query()
             ->where(fn (Builder $query) => $query
                 ->where('stop_recovery_pending', true)
                 ->orWhere('s3_cleanup_pending', true))
-            ->chunkById(self::CHUNK_SIZE, function ($executions): void {
+            ->where('recovery_needs_attention', false)
+            ->with('scheduledVolumeBackup.backupable.resource')
+            ->chunkById(self::CHUNK_SIZE, function ($executions) use (&$dispatched): bool {
                 foreach ($executions as $execution) {
-                    VolumeBackupRecoveryJob::dispatch($execution);
+                    if ($dispatched >= self::VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES) {
+                        return false;
+                    }
+
+                    if ($execution->stop_recovery_pending && $execution->scheduledVolumeBackup?->server()?->isFunctional() === false) {
+                        continue;
+                    }
+
+                    if (Cache::add(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id), true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {
+                        VolumeBackupRecoveryJob::dispatch($execution);
+                        $dispatched++;
+                    }
                 }
+
+                return true;
             });
     }
 
@@ -404,13 +523,9 @@ class ScheduledJobManager implements ShouldQueue
         try {
             $server = $backup->server();
 
-            if ($backup->executions()
-                ->where(fn (Builder $query) => $query
-                    ->where('stop_recovery_pending', true)
-                    ->orWhere('s3_cleanup_pending', true))
-                ->exists()) {
+            if ($backup->executions()->where('stop_recovery_pending', true)->exists()) {
                 $this->skippedCount++;
-                $this->logSkip('volume_backup', 'container_recovery_pending', [
+                $this->logSkip('volume_backup', 'stopped_container_recovery_pending', [
                     'backup_id' => $backup->id,
                     'team_id' => $backup->team_id,
                 ]);
@@ -449,7 +564,7 @@ class ScheduledJobManager implements ShouldQueue
                     $this->logSkip('volume_backup', 'server_not_functional', [
                         'backup_id' => $backup->id,
                         'team_id' => $backup->team_id,
-                        'server_id' => $server->id,
+                        ...$this->serverStateContext($server),
                     ]);
                 }
 
@@ -462,7 +577,7 @@ class ScheduledJobManager implements ShouldQueue
                     $this->logSkip('volume_backup', 'subscription_unpaid', [
                         'backup_id' => $backup->id,
                         'team_id' => $backup->team_id,
-                        'server_id' => $server->id,
+                        ...$this->serverStateContext($server),
                     ]);
                 }
 
@@ -485,7 +600,7 @@ class ScheduledJobManager implements ShouldQueue
                     'server_id' => $server->id,
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing volume backup', [
                 'backup_id' => $backup->id,
                 'error' => $e->getMessage(),
@@ -606,7 +721,7 @@ class ScheduledJobManager implements ShouldQueue
                     'team_id' => $server->team_id,
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Error processing docker cleanup', [
                 'server_id' => $server->id,
                 'server_name' => $server->name,
@@ -712,13 +827,14 @@ class ScheduledJobManager implements ShouldQueue
         return validate_timezone($timezone) ? $timezone : config('app.timezone');
     }
 
-    private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason): void
+    private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason, ?Server $server): void
     {
         $this->logSkip('backup', $reason, [
             'backup_id' => $backup->id,
             'database_id' => $backup->database_id,
             'database_type' => $backup->database_type,
             'team_id' => $backup->team_id ?? null,
+            ...$this->serverStateContext($server),
         ]);
     }
 
@@ -728,6 +844,37 @@ class ScheduledJobManager implements ShouldQueue
             'task_id' => $task->id,
             'task_name' => $task->name,
             'team_id' => $server?->team_id,
+            ...$this->serverStateContext($server),
         ]);
+    }
+
+    /**
+     * Compare the server state that decided the skip with the current database state.
+     * A difference shows that the worker used stale server data.
+     *
+     * @return array<string, mixed>
+     */
+    private function serverStateContext(?Server $server): array
+    {
+        if ($server === null) {
+            return [];
+        }
+
+        $settings = ServerSetting::query()
+            ->where('server_id', $server->id)
+            ->first(['is_reachable', 'is_usable', 'force_disabled']);
+
+        return [
+            'server_id' => $server->id,
+            'server_ip_is_placeholder' => $server->hasPlaceholderIp(),
+            'used_is_reachable' => data_get($server->settings, 'is_reachable'),
+            'used_is_usable' => data_get($server->settings, 'is_usable'),
+            'used_force_disabled' => data_get($server->settings, 'force_disabled'),
+            'used_invoice_paid' => data_get($server->team?->subscription, 'stripe_invoice_paid'),
+            'db_is_reachable' => $settings?->is_reachable,
+            'db_is_usable' => $settings?->is_usable,
+            'db_force_disabled' => $settings?->force_disabled,
+            'db_invoice_paid' => Subscription::query()->where('team_id', $server->team_id)->value('stripe_invoice_paid'),
+        ];
     }
 }

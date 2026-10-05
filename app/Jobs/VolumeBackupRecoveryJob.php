@@ -3,27 +3,63 @@
 namespace App\Jobs;
 
 use App\Models\ScheduledVolumeBackupExecution;
+use App\Notifications\VolumeBackup\RecoveryFailed;
+use Aws\S3\Exception\S3Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
 
-class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
+class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 20;
-
-    public int $backoff = 60;
+    /**
+     * ScheduledJobManager dispatches recovery again once an unreachable server is functional, so this job does not retry by itself.
+     */
+    public int $tries = 1;
 
     public int $timeout = 120;
+
+    public int $uniqueFor = 300;
+
+    public const CATEGORY_S3_AUTH = 's3_auth';
+
+    public const CATEGORY_S3_BUCKET = 's3_bucket';
+
+    public const CATEGORY_SERVER_UNREACHABLE = 'server_unreachable';
+
+    public const CATEGORY_REMOTE_COMMAND = 'remote_command';
+
+    public const CATEGORY_UNKNOWN = 'unknown';
+
+    private const UNREACHABLE_PATTERNS = [
+        'ssh connection failed',
+        'connection refused',
+        'connection timed out',
+        'operation timed out',
+        'no route to host',
+        'network is unreachable',
+        'could not resolve hostname',
+        'permission denied (publickey',
+        'host key verification failed',
+    ];
 
     public function __construct(public ScheduledVolumeBackupExecution $execution)
     {
         $this->onQueue(crons_queue());
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->execution->id;
     }
 
     public function middleware(): array
@@ -41,20 +77,176 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        self::recover($this->execution);
+        self::recoverWithBounds($this->execution);
     }
 
+    /**
+     * Runs one recovery attempt and records its outcome instead of throwing. An unreachable server waits for the
+     * server to be functional again; any other failure needs attention and notifies the team.
+     */
+    public static function recoverWithBounds(ScheduledVolumeBackupExecution $execution): void
+    {
+        $current = $execution->fresh();
+        if (! $current) {
+            return;
+        }
+
+        $execution->setRawAttributes($current->getAttributes(), true);
+
+        if (! $execution->hasPendingRecovery() || $execution->recovery_needs_attention) {
+            return;
+        }
+
+        try {
+            $failure = self::runRecoverySteps($execution);
+        } catch (Throwable $exception) {
+            $failure = ['category' => self::CATEGORY_UNKNOWN, 'exception' => $exception];
+        }
+
+        if ($failure) {
+            self::recordFailure($execution, $failure['category']);
+
+            return;
+        }
+
+        self::recordSuccess($execution);
+    }
+
+    /**
+     * Recovers stopped containers first, then cleans the partial S3 upload. Each step runs even when the other one
+     * fails; the first failure is rethrown after both steps ran.
+     */
     public static function recover(ScheduledVolumeBackupExecution $execution): void
     {
+        $failure = self::runRecoverySteps($execution);
+
+        if ($failure) {
+            throw $failure['exception'];
+        }
+    }
+
+    /**
+     * @return array{category: string, exception: Throwable}|null The first failure, or null when every step succeeded.
+     */
+    private static function runRecoverySteps(ScheduledVolumeBackupExecution $execution): ?array
+    {
         $execution->loadMissing('scheduledVolumeBackup.backupable.resource');
+        $failure = null;
 
         if ($execution->stop_recovery_pending) {
-            self::recoverContainers($execution);
+            try {
+                self::recoverContainers($execution);
+            } catch (Throwable $exception) {
+                $failure = ['category' => self::categorizeContainerFailure($exception), 'exception' => $exception];
+            }
         }
 
         if ($execution->s3_cleanup_pending) {
-            self::cleanupS3Upload($execution);
+            try {
+                self::cleanupS3Upload($execution);
+            } catch (Throwable $exception) {
+                $failure ??= ['category' => self::categorizeS3Failure($exception), 'exception' => $exception];
+            }
         }
+
+        return $failure;
+    }
+
+    public static function dispatchCacheKey(int $executionId): string
+    {
+        return "volume-backup-recovery-dispatched:{$executionId}";
+    }
+
+    private static function recordSuccess(ScheduledVolumeBackupExecution $execution): void
+    {
+        $execution->update([
+            'recovery_last_attempt_at' => null,
+            'recovery_error' => null,
+            'recovery_needs_attention' => false,
+        ]);
+    }
+
+    private static function recordFailure(ScheduledVolumeBackupExecution $execution, string $category): void
+    {
+        $needsAttention = $category !== self::CATEGORY_SERVER_UNREACHABLE;
+        $enteredNeedsAttention = false;
+
+        $recorded = $execution->getConnection()->transaction(function () use ($execution, $category, $needsAttention, &$enteredNeedsAttention): ?ScheduledVolumeBackupExecution {
+            $current = ScheduledVolumeBackupExecution::query()->whereKey($execution->id)->lockForUpdate()->first();
+            if (! $current) {
+                return null;
+            }
+
+            $enteredNeedsAttention = $needsAttention && ! $current->recovery_needs_attention;
+            $current->update([
+                'recovery_last_attempt_at' => now(),
+                'recovery_error' => $category,
+                'recovery_needs_attention' => $needsAttention,
+            ]);
+
+            return $current;
+        });
+
+        if (! $recorded) {
+            return;
+        }
+
+        $execution->setRawAttributes($recorded->getAttributes(), true);
+
+        Log::channel('scheduled-errors')->warning('Volume backup recovery failed', [
+            'execution_id' => $recorded->id,
+            'execution_uuid' => $recorded->uuid,
+            'category' => $category,
+            'needs_attention' => $recorded->recovery_needs_attention,
+        ]);
+
+        if ($enteredNeedsAttention) {
+            self::notifyTeam($recorded);
+        }
+    }
+
+    private static function notifyTeam(ScheduledVolumeBackupExecution $execution): void
+    {
+        try {
+            $execution->loadMissing('scheduledVolumeBackup.team');
+            $execution->scheduledVolumeBackup?->team?->notify(new RecoveryFailed($execution));
+        } catch (Throwable $exception) {
+            Log::channel('scheduled-errors')->error('Failed to send volume backup recovery notification', [
+                'execution_id' => $execution->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private static function categorizeS3Failure(Throwable $exception): string
+    {
+        for ($current = $exception; $current; $current = $current->getPrevious()) {
+            if ($current instanceof S3Exception) {
+                return match ($current->getAwsErrorCode()) {
+                    'InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied' => self::CATEGORY_S3_AUTH,
+                    'NoSuchBucket' => self::CATEGORY_S3_BUCKET,
+                    default => self::CATEGORY_UNKNOWN,
+                };
+            }
+        }
+
+        return self::CATEGORY_UNKNOWN;
+    }
+
+    private static function categorizeContainerFailure(Throwable $exception): string
+    {
+        if ($exception->getCode() === 255) {
+            return self::CATEGORY_SERVER_UNREACHABLE;
+        }
+
+        $message = strtolower($exception->getMessage());
+        foreach (self::UNREACHABLE_PATTERNS as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return self::CATEGORY_SERVER_UNREACHABLE;
+            }
+        }
+
+        return $exception instanceof RuntimeException ? self::CATEGORY_REMOTE_COMMAND : self::CATEGORY_UNKNOWN;
     }
 
     private static function recoverContainers(ScheduledVolumeBackupExecution $execution): void
@@ -62,7 +254,13 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
         $server = $execution->scheduledVolumeBackup?->server();
 
         if (! $server) {
-            throw new \RuntimeException('The server is unavailable for container recovery.');
+            self::skipRecovery(
+                $execution,
+                ['stop_container_ids' => null, 'stop_recovery_pending' => false],
+                'Container recovery was skipped because the server or resource no longer exists.',
+            );
+
+            return;
         }
 
         $stateFile = self::stateFile($execution);
@@ -100,13 +298,34 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldQueue
         $s3 = $execution->s3;
 
         if (! $s3 || blank($execution->filename)) {
-            throw new \RuntimeException('The S3 storage or backup filename is unavailable for upload cleanup.');
+            self::skipRecovery(
+                $execution,
+                ['s3_cleanup_pending' => false],
+                'S3 upload cleanup was skipped because the S3 storage or backup filename no longer exists.',
+            );
+
+            return;
         }
 
         deleteBackupsS3($execution->filename, $s3);
         $execution->update([
             's3_cleanup_pending' => false,
             's3_storage_deleted' => true,
+        ]);
+    }
+
+    /**
+     * Clears a pending recovery that cannot succeed, so it does not retry forever and block new backups.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private static function skipRecovery(ScheduledVolumeBackupExecution $execution, array $attributes, string $reason): void
+    {
+        Log::channel('scheduled-errors')->warning($reason, ['execution_id' => $execution->id]);
+
+        $execution->update([
+            ...$attributes,
+            'message' => trim(($execution->message ?? '').' '.$reason),
         ]);
     }
 

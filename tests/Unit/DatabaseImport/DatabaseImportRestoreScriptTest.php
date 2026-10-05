@@ -11,7 +11,7 @@ use Illuminate\Filesystem\Filesystem;
  * These tests execute the generated scripts with `sh` against stub database clients.
  * Every stub appends "name|arguments|first 5 bytes of stdin" to a log, so the tests
  * prove which clients ran, in which order, and that nothing runs before a backup
- * format is rejected.
+ * format is rejected. The full stdin of every call is kept as well.
  */
 function restoreScriptTempDir(): string
 {
@@ -142,6 +142,8 @@ function restoreScriptFixture(string $name): string
         'mysql-tar' => restoreScriptTar(['backup.sql' => $mysqlSql]),
         'mysql-tar-two' => restoreScriptTar(['app.sql' => $mysqlSql, 'other.sql' => $mysqlSql]),
         'mysql-cluster' => "-- MySQL dump 10.13\n\nCREATE DATABASE `app`;\nUSE `app`;\nCREATE TABLE `items` (`id` int);\nUSE `mysql`;\nINSERT INTO `user` VALUES ();\n",
+        'mysql-all-databases' => mysqlAllDatabasesDump(),
+        'mysql-all-databases-gz' => gzencode(mysqlAllDatabasesDump()),
         'mysql-two-databases' => "-- MySQL dump 10.13\n\nCREATE DATABASE `app`;\nUSE `app`;\nCREATE TABLE `items` (`id` int);\nCREATE DATABASE `other`;\nUSE `other`;\nCREATE TABLE `notes` (`t` text);\n",
         'mysql-one-database' => "-- MySQL dump 10.13\n\nCREATE DATABASE `app`;\nUSE `app`;\nCREATE TABLE `items` (`id` int);\n",
         'mongo-archive' => $mongoArchive,
@@ -152,6 +154,67 @@ function restoreScriptFixture(string $name): string
         'mongo-notes-tar' => restoreScriptTar(['notes.txt' => 'hello', 'readme.txt' => 'world']),
         'mongo-bson' => $bson,
     };
+}
+
+/**
+ * An all-databases dump in the layout of mysqldump and mariadb-dump: application databases
+ * around the mysql and sys system databases, which hold the users and their passwords.
+ */
+function mysqlAllDatabasesDump(): string
+{
+    return <<<'SQL'
+-- MariaDB dump 10.19
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+
+--
+-- Current Database: `app`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `app` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+
+USE `app`;
+CREATE TABLE `items` (`id` int);
+INSERT INTO `items` VALUES (1),(2);
+
+--
+-- Current Database: `mysql`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `mysql` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+
+USE `mysql`;
+DROP TABLE IF EXISTS `global_priv`;
+INSERT INTO `global_priv` VALUES ('localhost','root','{"authentication_string":"*SOURCE"}');
+INSERT INTO `user` VALUES ('%','app_user','*SOURCE');
+DELIMITER ;;
+CREATE PROCEDURE `system_proc`() BEGIN SELECT 1; END ;;
+DELIMITER ;
+
+--
+-- Current Database: `shop`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `shop` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+
+USE `shop`;
+INSERT INTO `orders` VALUES (7);
+
+--
+-- Current Database: `sys`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `sys`;
+
+USE `sys`;
+INSERT INTO `sys_config` VALUES ('source');
+USE performance_schema;
+INSERT INTO `setup_actors` VALUES ('source');
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+-- Dump completed
+
+SQL;
 }
 
 function restoreScriptResource(string $engine): object
@@ -170,9 +233,9 @@ function restoreScriptResource(string $engine): object
 }
 
 /**
- * @return array{exit: int, stdout: string, stderr: string, calls: list<array{name: string, args: string, header: string}>, dir: string, backup: string, leftovers: list<string>}
+ * @return array{exit: int, stdout: string, stderr: string, calls: list<array{name: string, args: string, header: string, stdin: string}>, dir: string, backup: string, leftovers: list<string>}
  */
-function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false): array
+function restoreScriptRun(string $engine, string $contents, bool $dumpAll = false, bool $replaceExisting = false, bool $keepOwners = false, bool $restoreMysqlUsers = false): array
 {
     $dir = restoreScriptTempDir();
 
@@ -180,15 +243,18 @@ function restoreScriptRun(string $engine, string $contents, bool $dumpAll = fals
         $log = $dir.'/calls.log';
         file_put_contents($log, '');
         mkdir($dir.'/bin');
+        mkdir($dir.'/stdin');
 
         foreach (['pg_restore', 'psql', 'dropdb', 'createdb', 'mysql', 'mariadb', 'mongorestore'] as $client) {
             $escapedLog = escapeshellarg($log);
+            $escapedStdin = escapeshellarg($dir.'/stdin');
             file_put_contents($dir.'/bin/'.$client, <<<SH
 #!/bin/sh
 header=''
+call=\$(wc -l < {$escapedLog} | tr -d ' ')
 if [ ! -t 0 ]; then
-    header=\$(head -c 5)
-    cat >/dev/null
+    cat > {$escapedStdin}/\$call
+    header=\$(head -c 5 {$escapedStdin}/\$call)
 fi
 printf '%s|%s|%s\\n' '{$client}' "\$*" "\$header" >> {$escapedLog}
 exit 0
@@ -199,7 +265,7 @@ SH);
         $backup = $dir.'/backup file';
         file_put_contents($backup, $contents);
 
-        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource($engine), $backup, $dumpAll, $replaceExisting);
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource($engine), $backup, $dumpAll, $replaceExisting, $keepOwners, restoreMysqlUsers: $restoreMysqlUsers);
 
         $result = restoreScriptProcess(['sh', '-c', $script], $dir, [
             'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
@@ -219,11 +285,12 @@ SH);
         ]);
 
         $lines = array_values(array_filter(explode("\n", (string) file_get_contents($log)), fn (string $line): bool => $line !== ''));
-        $calls = array_map(function (string $line): array {
+        $calls = array_map(function (string $line, int $index) use ($dir): array {
             [$name, $args, $header] = array_pad(explode('|', $line, 3), 3, '');
+            $stdin = $dir.'/stdin/'.$index;
 
-            return ['name' => $name, 'args' => $args, 'header' => $header];
-        }, $lines);
+            return ['name' => $name, 'args' => $args, 'header' => $header, 'stdin' => is_file($stdin) ? (string) file_get_contents($stdin) : ''];
+        }, $lines, array_keys($lines));
 
         return $result + [
             'calls' => $calls,
@@ -279,39 +346,159 @@ function restoreScriptNormalize(string $contents): array
     }
 }
 
+/**
+ * Runs a SQL replacement against stateful PostgreSQL client stubs. Database values represent
+ * their data, so accidental drops and a failed swap are visible in the final database state.
+ *
+ * @return array{exit: int, stdout: string, stderr: string, databases: array<string, string>}
+ */
+function postgresReplacementScriptRun(string $target = 'app', string $failure = '', bool $gzip = false): array
+{
+    $dir = restoreScriptTempDir();
+
+    try {
+        $backup = $dir.'/backup.sql';
+        file_put_contents($backup, $gzip ? gzencode('SELECT 1;') : 'SELECT 1;');
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource('postgresql'), $backup, false, true);
+        preg_match('/new=(\w+)/', $script, $new);
+        preg_match('/old=(\w+)/', $script, $old);
+        $databases = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'original'];
+        if (in_array($failure, ['new_collision', 'old_collision'], true)) {
+            $databases[$failure === 'new_collision' ? $new[1] : $old[1]] = 'collision';
+        }
+        $state = $dir.'/databases.json';
+        file_put_contents($state, json_encode($databases));
+        mkdir($dir.'/bin');
+
+        $client = <<<'PHP'
+<?php
+$state = getenv('PG_STATE');
+$databases = json_decode(file_get_contents($state), true);
+$name = basename($argv[0]);
+$args = array_slice($argv, 1);
+$sql = stream_get_contents(STDIN);
+$failure = getenv('PG_FAILURE');
+$save = static function () use ($state, &$databases): void { file_put_contents($state, json_encode($databases)); };
+if ($name === 'dropdb') {
+    unset($databases[end($args)]);
+} elseif ($name === 'createdb') {
+    $database = end($args);
+    if (isset($databases[$database])) { exit(1); }
+    $databases[$database] = 'empty';
+} else {
+    $variables = [];
+    foreach ($args as $index => $arg) {
+        if ($arg === '-v') {
+            [$key, $value] = explode('=', $args[$index + 1], 2);
+            $variables[$key] = $value;
+        }
+    }
+    if (str_contains($sql, 'SELECT 1 FROM pg_database')) {
+        if (isset($databases[$variables['new']]) || isset($databases[$variables['old']])) { echo "1\n"; }
+    } elseif (str_contains($sql, 'ALTER DATABASE')) {
+        preg_match_all('/ALTER DATABASE :"(\w+)" RENAME TO :"(\w+)";/', $sql, $renames, PREG_SET_ORDER);
+        foreach ($renames as $rename) {
+            $from = $variables[$rename[1]];
+            $to = $variables[$rename[2]];
+            if (! isset($databases[$from]) || isset($databases[$to]) || ($failure === 'swap' && $rename[1] === 'new')) {
+                $save();
+                exit(1);
+            }
+            $databases[$to] = $databases[$from];
+            unset($databases[$from]);
+        }
+    } else {
+        if ($failure === 'restore') { exit(1); }
+        $database = $args[array_search('-d', $args, true) + 1];
+        if (! isset($databases[$database])) { exit(1); }
+        $databases[$database] = 'restored';
+    }
+}
+$save();
+PHP;
+
+        foreach (['psql', 'createdb', 'dropdb'] as $name) {
+            file_put_contents($dir.'/bin/'.$name, '#!'.PHP_BINARY."\n".$client);
+            chmod($dir.'/bin/'.$name, 0755);
+        }
+
+        return restoreScriptProcess(['sh', '-c', $script], $dir, [
+            'PATH' => $dir.'/bin'.PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin'),
+            'POSTGRES_USER' => 'postgres',
+            'POSTGRES_DB' => $target,
+            'PG_STATE' => $state,
+            'PG_FAILURE' => $failure,
+        ]) + ['databases' => json_decode(file_get_contents($state), true)];
+    } finally {
+        restoreScriptRemoveDir($dir);
+    }
+}
+
+test('SQL replacement preserves unrelated PostgreSQL databases with the former scratch names', function (string $target, bool $gzip) {
+    $run = postgresReplacementScriptRun($target, gzip: $gzip);
+    $expected = ['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', $target => 'restored'];
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($run['databases'])->toEqual($expected);
+})->with(['app', 'coolify_restore_new', 'coolify_restore_old'])->with([false, true]);
+
+test('failed SQL replacement preserves every existing PostgreSQL database and removes only its own scratch database', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toEqual(['coolify_restore_new' => 'unrelated-new', 'coolify_restore_old' => 'unrelated-old', 'app' => 'original']);
+})->with(['restore', 'swap']);
+
+test('SQL replacement refuses scratch database name collisions without changing existing data', function (string $failure) {
+    $run = postgresReplacementScriptRun(failure: $failure);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['databases'])->toHaveCount(4)
+        ->and($run['databases']['app'])->toBe('original')
+        ->and($run['databases']['coolify_restore_new'])->toBe('unrelated-new')
+        ->and($run['databases']['coolify_restore_old'])->toBe('unrelated-old')
+        ->and(array_values($run['databases']))->toContain('collision');
+})->with(['new_collision', 'old_collision']);
+
 test('restores single PostgreSQL archives with pg_restore and SQL with psql', function (string $fixture, bool $replaceExisting, array $expectedCalls) {
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), false, $replaceExisting);
 
     expect($run['exit'])->toBe(0, $run['stderr']);
     restoreScriptExpectCalls($run['calls'], $expectedCalls);
 })->with([
-    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
-    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --clean --if-exists -U postgres -d app']]]],
-    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
-    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction -U postgres -d app']]]],
+    'custom archive' => ['pg-custom', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'custom archive replacing existing objects' => ['pg-custom', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'gzip custom archive' => ['pg-custom-gz', false, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip custom archive replacing existing objects' => ['pg-custom-gz', true, [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction --no-owner --no-acl --clean --if-exists -U postgres -d app']]]],
+    'tar archive' => ['pg-tar', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
+    'gzip tar archive' => ['pg-tar-gz', false, [['pg_restore', 'toc.d', ['--exit-on-error --single-transaction --no-owner --no-acl -U postgres -d app']]]],
     'plain SQL' => ['pg-sql', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
     'gzip SQL' => ['pg-sql-gz', false, [['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d app']]]],
     // SQL cannot replace single objects: it restores into a new database, and only a
     // successful restore replaces the current one, so a failure changes nothing.
     'plain SQL replacing existing objects' => ['pg-sql', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
     'gzip SQL replacing existing objects' => ['pg-sql-gz', true, [
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_new']],
-        ['createdb', '', ['-U postgres coolify_restore_new']],
-        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
-        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old -v new=coolify_restore_new -U postgres -d template1']],
-        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -At', '-v new=coolify_restore_new_', '-v old=coolify_restore_old_']],
+        ['createdb', '', ['-U postgres coolify_restore_new_']],
+        ['psql', '-- Po', ['-v ON_ERROR_STOP=1 --single-transaction -U postgres -d coolify_restore_new_']],
+        ['psql', 'SELEC', ['-v ON_ERROR_STOP=1 -v db=app -v old=coolify_restore_old_', '-v new=coolify_restore_new_', '-U postgres -d template1']],
+        ['dropdb', '', ['--maintenance-db=template1 -U postgres --if-exists coolify_restore_old_']],
     ]],
 ]);
+
+test('keeps PostgreSQL owners and privileges only when requested', function (string $fixture) {
+    $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture), keepOwners: true);
+
+    expect($run['exit'])->toBe(0, $run['stderr']);
+    restoreScriptExpectCalls($run['calls'], [['pg_restore', 'PGDMP', ['--exit-on-error --single-transaction -U postgres -d app']]]);
+    expect($run['calls'][0]['args'])->not->toContain('--no-owner')->not->toContain('--no-acl');
+})->with(['custom archive' => ['pg-custom'], 'gzip custom archive' => ['pg-custom-gz']]);
 
 test('rejects unsupported single PostgreSQL backups before calling any client', function (string $fixture, string $message) {
     $run = restoreScriptRun('postgresql', restoreScriptFixture($fixture));
@@ -383,6 +570,65 @@ test('restores MySQL and MariaDB backups containing all databases after checking
     'tar with one SQL file' => 'mysql-tar',
     'SQL that uses the mysql schema' => 'mysql-cluster',
 ]);
+
+test('skips the MySQL and MariaDB system databases of an all-databases backup by default', function (string $engine, string $fixture) {
+    $run = restoreScriptRun($engine, restoreScriptFixture($fixture), dumpAll: true);
+
+    expect($run['exit'])->toBe(0, $run['stderr']);
+    $restore = end($run['calls']);
+    expect($restore['args'])->toBe('-u root -proot_pass app')
+        ->and($restore['stdin'])
+        ->toContain('INSERT INTO `items` VALUES (1),(2);')
+        ->toContain('CREATE DATABASE /*!32312 IF NOT EXISTS*/ `app`')
+        ->toContain('USE `shop`;')
+        ->toContain('INSERT INTO `orders` VALUES (7);')
+        ->toContain('/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;')
+        ->not->toContain('global_priv')
+        ->not->toContain('app_user')
+        ->not->toContain('*SOURCE')
+        ->not->toContain('system_proc')
+        ->not->toContain('`mysql`')
+        ->not->toContain('`sys`')
+        ->not->toContain('sys_config')
+        ->not->toContain('setup_actors');
+})->with(['mysql', 'mariadb'])->with([
+    'SQL' => 'mysql-all-databases',
+    'gzip SQL' => 'mysql-all-databases-gz',
+]);
+
+test('restores the MySQL and MariaDB system databases of an all-databases backup when requested', function (string $engine) {
+    $run = restoreScriptRun($engine, restoreScriptFixture('mysql-all-databases-gz'), dumpAll: true, restoreMysqlUsers: true);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(end($run['calls'])['stdin'])->toBe(mysqlAllDatabasesDump());
+})->with(['mysql', 'mariadb']);
+
+test('fails an all-databases MySQL restore before dropping anything when awk is missing', function () {
+    $dir = restoreScriptTempDir();
+
+    try {
+        mkdir($dir.'/bin');
+        foreach (['sh', 'head', 'od', 'tr', 'cat', 'gunzip', 'tail', 'wc', 'grep', 'mktemp', 'find'] as $tool) {
+            exec('command -v '.escapeshellarg($tool), $path);
+            if ($path !== []) {
+                symlink(end($path), $dir.'/bin/'.$tool);
+            }
+            $path = [];
+        }
+        file_put_contents($dir.'/bin/mysql', "#!/bin/sh\necho called >> ".escapeshellarg($dir.'/calls')."\n");
+        chmod($dir.'/bin/mysql', 0755);
+        file_put_contents($dir.'/backup', mysqlAllDatabasesDump());
+
+        $script = (new DatabaseImportCommandBuilder)->buildRestoreCommand(restoreScriptResource('mysql'), $dir.'/backup', true);
+        $result = restoreScriptProcess([$dir.'/bin/sh', '-c', $script], $dir, ['PATH' => $dir.'/bin', 'MYSQL_ROOT_PASSWORD' => 'root_pass']);
+
+        expect($result['exit'])->toBe(1)
+            ->and($result['stderr'])->toContain('Nothing was changed.')
+            ->and(file_exists($dir.'/calls'))->toBeFalse();
+    } finally {
+        restoreScriptRemoveDir($dir);
+    }
+});
 
 test('rejects unsupported MySQL and MariaDB backups before calling any client', function (string $engine, string $fixture, bool $dumpAll, string $message) {
     $run = restoreScriptRun($engine, restoreScriptFixture($fixture), $dumpAll);

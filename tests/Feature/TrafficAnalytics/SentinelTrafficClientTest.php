@@ -5,6 +5,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -301,4 +302,54 @@ it('double-quotes the url in the remote curl command so & is not a shell backgro
     // The URL must be wrapped in double quotes inside the inner `sh -c`, otherwise the
     // container shell backgrounds curl at the `&` and only `from=...` reaches Sentinel.
     expect($command)->toContain('"'.$url.'"');
+});
+
+it('skips an unsafe app key in the dashboard bundle and keeps the other apps', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    Log::spy();
+
+    $bundle = json_encode([
+        'overview' => ['requests' => 7],
+        'paths' => [],
+        'breakdowns' => [],
+        'series' => [],
+        'apps' => [
+            ['uuid' => 'app-a', 'overview' => ['requests' => 4]],
+            ['uuid' => 'bad key;rm -rf /', 'overview' => ['requests' => 2]],
+            ['uuid' => 'app-b', 'overview' => ['requests' => 1]],
+        ],
+    ]);
+
+    $client = new class($server, $bundle) extends SentinelTrafficClient
+    {
+        public function __construct($server, private string $bundle)
+        {
+            parent::__construct($server);
+        }
+
+        protected function remoteFetch(string $url): string
+        {
+            if (str_contains($url, '/traffic/dashboard')) {
+                return $this->bundle;
+            }
+            throw new RuntimeException("unexpected individual fetch: {$url}");
+        }
+    };
+
+    $apps = $client->prefetchServerWide(null, 'F', 'T', [], '24h');
+
+    expect($apps)->toBe(['app-a', 'app-b'])
+        ->and($client->overview('app-b', 'F', 'T')->requests)->toBe(1);
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'unsafe'))->once();
+});
+
+it('skips an unsafe app key reported by an older Sentinel without the dashboard route', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    Log::spy();
+
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode(['app-a', 'bad"key', 'app-b']);
+
+    expect($client->prefetchServerWide(null, 'F', 'T', [], '24h'))->toBe(['app-a', 'app-b']);
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'unsafe'))->once();
 });

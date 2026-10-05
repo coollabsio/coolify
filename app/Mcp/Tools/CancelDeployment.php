@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
@@ -54,7 +55,6 @@ class CancelDeployment extends Tool
             ApplicationDeploymentStatus::QUEUED->value,
             ApplicationDeploymentStatus::IN_PROGRESS->value,
         ];
-        $deploymentUuid = $deployment->deployment_uuid;
 
         $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
             ->whereIn('status', $cancellable)
@@ -69,32 +69,10 @@ class CancelDeployment extends Tool
         $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
 
         try {
-            $buildServerId = $deployment->build_server_id ?? $deployment->server_id;
-            $server = Server::whereTeamId($teamId)->find($buildServerId);
-            if ($server) {
-                $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');
-
-                $checkCommand = "docker ps -a --filter name={$deploymentUuid} --format '{{.Names}}'";
-                $containerExists = instant_remote_process([$checkCommand], $server);
-
-                if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                    instant_remote_process(["docker rm -f {$deploymentUuid}"], $server);
-                    $deployment->addLogEntry('Deployment container stopped.');
-                } else {
-                    $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
-                }
-
-                // Parity with REST cancel_deployment: stop the remote build process if known.
-                if ($deployment->current_process_id) {
-                    try {
-                        instant_remote_process(["kill -9 {$deployment->current_process_id}"], $server);
-                    } catch (\Throwable) {
-                        // Process might already be gone.
-                    }
-                }
-            }
+            $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');
+            CleanupCancelledDeployment::run($deployment, (int) $teamId);
         } catch (\Throwable) {
-            // Cancellation is still recorded even if remote kill fails.
+            // Cancellation is still recorded even if the helper container cleanup fails.
         }
 
         auditLog('mcp.deployment.cancelled', [

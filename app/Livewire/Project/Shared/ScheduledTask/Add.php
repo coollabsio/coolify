@@ -125,6 +125,14 @@ class Add extends Component
                     break;
             }
             $task->save();
+            auditLog('ui.scheduled_task.created', [
+                'team_id' => $task->team_id,
+                'scheduled_task_uuid' => $task->uuid,
+                'scheduled_task_name' => $task->name,
+                'resource_type' => $this->type,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+            ]);
             $this->dispatch('refreshTasks');
             $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {

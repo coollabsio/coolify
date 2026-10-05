@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ManagedDnsDeletionResult;
 use App\Jobs\ReleaseManagedDnsRecordsJob;
 use App\Livewire\Project\Application\Domains;
 use App\Livewire\Project\Service\Domains as ServiceDomains;
@@ -56,77 +57,6 @@ beforeEach(function () {
     $this->token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'token' => 'secret']);
     $this->zone = DnsProviderZone::factory()->for($this->token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
 });
-
-/**
- * Fakes the Cloudflare DNS record API with an in-memory record store.
- *
- * @param  array<int, array<string, mixed>>  $records
- */
-function fakeCloudflareDns(array $records = []): ArrayObject
-{
-    $state = new ArrayObject(['records' => collect($records)->keyBy('id')->all(), 'next' => 1]);
-
-    Http::fake(function (Request $request) use ($state) {
-        if (! preg_match('#^https://api\.cloudflare\.com/client/v4/zones/[^/]+/dns_records(?:/([^/?]+))?(?:\?(.*))?$#', $request->url(), $matches)) {
-            return Http::response(['success' => false], 404);
-        }
-        $id = ($matches[1] ?? '') !== '' ? $matches[1] : null;
-        $records = $state['records'];
-
-        if ($id === null && $request->method() === 'GET') {
-            parse_str($matches[2] ?? '', $query);
-            $result = collect($records)->filter(fn (array $record): bool => $record['name'] === ($query['name'] ?? null)
-                && $record['type'] === ($query['type'] ?? null))->values()->all();
-
-            return Http::response(['success' => true, 'result' => $result]);
-        }
-        if ($id === null && $request->method() === 'POST') {
-            $id = 'record-new-'.$state['next'];
-            $state['next']++;
-            $records[$id] = array_merge(['proxied' => false, 'ttl' => 1, 'comment' => null], $request->data(), ['id' => $id]);
-            $state['records'] = $records;
-
-            return Http::response(['success' => true, 'result' => $records[$id]]);
-        }
-        if (! isset($records[$id])) {
-            return Http::response(['success' => false, 'errors' => [['code' => 81044, 'message' => 'Record does not exist.']]], 404);
-        }
-        if ($request->method() === 'PATCH') {
-            $records[$id] = array_merge($records[$id], $request->data());
-            $state['records'] = $records;
-        }
-        if ($request->method() === 'DELETE') {
-            unset($records[$id]);
-            $state['records'] = $records;
-
-            return Http::response(['success' => true, 'result' => ['id' => $id]]);
-        }
-
-        return Http::response(['success' => true, 'result' => $records[$id]]);
-    });
-
-    return $state;
-}
-
-function createDnsTestApplication(object $test, string $fqdn): Application
-{
-    $application = Application::factory()->create([
-        'environment_id' => $test->environment->id,
-        'destination_id' => $test->destination->id,
-        'destination_type' => $test->destination->getMorphClass(),
-        'fqdn' => $fqdn,
-        'build_pack' => 'nixpacks',
-    ]);
-    $application->settings()->update(['is_container_label_readonly_enabled' => true]);
-
-    return $application->fresh();
-}
-
-function sentDnsRequests(string $method): int
-{
-    return Http::recorded(fn (Request $request) => $request->method() === $method
-        && str_contains($request->url(), 'api.cloudflare.com'))->count();
-}
 
 test('a created record carries the ownership comment and is owned', function () {
     fakeCloudflareDns();
@@ -505,4 +435,31 @@ test('releasing a hostname never touches records of another team', function () {
         ->and($cloudflare['records'])->toHaveKey('record-foreign')
         ->and($foreignRecord->fresh())->not->toBeNull()
         ->and($foreignRecord->references()->count())->toBe(1);
+});
+
+test('an existing AAAA record written in another IPv6 notation satisfies the request', function () {
+    fakeCloudflareDns([
+        ['id' => 'record-1', 'type' => 'AAAA', 'name' => 'app.example.com', 'content' => '2001:db8::1', 'comment' => null],
+    ]);
+    $application = createDnsTestApplication($this, 'https://app.example.com');
+
+    $record = app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '2001:0DB8:0:0::1', $application);
+
+    expect($record->provider_record_id)->toBe('record-1')->and($record->owned)->toBeFalse();
+    expect(sentDnsRequests('POST'))->toBe(0);
+});
+
+test('an owned AAAA record is deleted when the provider returns it in canonical IPv6 notation', function () {
+    $cloudflare = fakeCloudflareDns();
+    $application = createDnsTestApplication($this, 'https://app.example.com');
+    $record = app(CloudflareDnsProvider::class)->createRecord($this->zone, 'app.example.com', '2001:0db8:0000:0000:0000:0000:0000:0001', $application);
+
+    $records = $cloudflare['records'];
+    $records[$record->provider_record_id]['content'] = '2001:db8::1';
+    $cloudflare['records'] = $records;
+
+    $result = app(CloudflareDnsProvider::class)->deleteRecord($record->fresh(), $application);
+
+    expect($result)->toBe(ManagedDnsDeletionResult::Deleted)
+        ->and($cloudflare['records'])->not->toHaveKey($record->provider_record_id);
 });

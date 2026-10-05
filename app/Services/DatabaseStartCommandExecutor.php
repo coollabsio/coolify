@@ -14,7 +14,7 @@ class DatabaseStartCommandExecutor
     {
         $server = $database->destination->server;
         if ($server->isNonRoot()) {
-            $commands = parseCommandsByLineForSudo(collect($commands), $server)->all();
+            $commands = parseCommandsByLineForSudo(collect($commands), $server);
         }
 
         $secrets = method_exists($database, 'resolvedSecretManagerValuesForRedaction')

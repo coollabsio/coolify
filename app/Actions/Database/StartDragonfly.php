@@ -25,6 +25,8 @@ class StartDragonfly
 
     private string $resolvedRedisPassword;
 
+    private bool $redisPasswordFromSecretManager = false;
+
     public function handle(StandaloneDragonfly $database, ?Activity $activity = null)
     {
         $this->database = $database;
@@ -61,6 +63,7 @@ class StartDragonfly
 
             $server = $this->database->destination->server;
             $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
@@ -179,7 +182,7 @@ class StartDragonfly
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         if ($this->database->enable_ssl) {
@@ -195,8 +198,8 @@ class StartDragonfly
 
     private function buildStartCommand(): string
     {
-        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
-        $command = "dragonfly --requirepass {$escapedRedisPassword}";
+        $passwordArgument = $this->requirePassArgument();
+        $command = "dragonfly --requirepass {$passwordArgument}";
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
@@ -248,11 +251,21 @@ class StartDragonfly
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
         foreach ($this->database->runtime_environment_variables as $env) {
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+            if ($env->key === 'REDIS_PASSWORD' && ! $env->is_shared && ! $usesSecretManager) {
+                $env->update(['value' => $this->database->dragonfly_password]);
+            }
             $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
             $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $rawValue;
+                if ($env->is_shared && ! $usesSecretManager) {
+                    $this->database->update(['dragonfly_password' => $rawValue]);
+                }
+                $this->resolvedRedisPassword = $composeFileValue;
+                $this->redisPasswordFromSecretManager = $usesSecretManager;
             }
         }
 
@@ -261,5 +274,20 @@ class StartDragonfly
         }
 
         return $environment_variables->all();
+    }
+
+    /**
+     * The password argument of the start command. Docker Compose splits the command like a shell, so the
+     * password is quoted. Databases created before this release keep their unquoted v4.3.23 argument when
+     * quoting would change it (quotes, backslashes, whitespace, ; & | < >): Compose splits or cuts the old
+     * command there, so quoting now would change the password or options and can lose data.
+     */
+    private function requirePassArgument(): string
+    {
+        $keepsUnquotedPassword = $this->database->legacy_password_quoting
+            && ! $this->redisPasswordFromSecretManager
+            && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
+
+        return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
     }
 }

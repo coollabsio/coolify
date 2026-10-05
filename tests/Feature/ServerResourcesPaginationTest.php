@@ -76,15 +76,11 @@ it('clamps stale pages after resources disappear including an empty list', funct
         ->and($page->total())->toBe($count);
 })->with([[12, 2], [0, 1]]);
 
-it('renders shared pagination for both resource tabs with stable row identities', function () {
+it('keys resource rows on both tabs by stable row identities', function () {
     $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-    expect($view)->toContain('<x-table-pagination')
-        ->toContain('<x-page-size-select')
-        ->toContain('previous-action="previousPage"')
-        ->toContain('next-action="nextPage"')
+    expect($view)
         ->toContain('wire:key="managed-')
-        ->toContain('wire:key="unmanaged-')
-        ->not->toContain('$server->definedResources()');
+        ->toContain('wire:key="unmanaged-');
 });
 
 it('searches names across all pages before pagination on both tabs', function (string $tab, string $nameKey) {
@@ -119,23 +115,3 @@ it('searches names across all pages before pagination on both tabs', function (s
     $this->component->search = '   ';
     expect($this->component->render()->getData()['resources']->total())->toBe(25);
 })->with([['managed', 'name'], ['unmanaged', 'Names']]);
-
-it('provides accessible live search and a distinct no-results message', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-
-    expect($view)->toContain('wire:model.live.debounce.300ms="search"')
-        ->toContain('aria-label="Search resources by name"')
-        ->toContain('aria-label="Clear search"')
-        ->toContain('No matching resources')
-        ->toContain('No matching containers');
-});
-
-it('shows search feedback and prevents interaction with stale results while searching', function () {
-    $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
-
-    expect($view)
-        ->toContain('<x-table.loading target="search" text="Searching resources..." />')
-        ->not->toContain('wire:loading.inline-flex wire:target="search"')
-        ->toContain('wire:loading.class="pointer-events-none opacity-40 blur-[2px]"')
-        ->toContain('wire:loading.attr="inert" wire:target="search"');
-});

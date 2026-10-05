@@ -19,16 +19,16 @@ class TrafficAnalyticsSettings extends Component
 
     public bool $isTrafficAnalyticsEnabled;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:1000'])]
     public int|string $trafficTopn;
 
     #[Validate(['required', 'integer', 'min:0'])]
     public int|string $trafficSampleThreshold;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:365'])]
     public int|string $trafficRetention1hDays;
 
-    #[Validate(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1', 'max:3650'])]
     public int|string $trafficRetention1dDays;
 
     public bool $isGeoipEnabled;
@@ -112,6 +112,7 @@ class TrafficAnalyticsSettings extends Component
         return view('livewire.server.traffic-analytics-settings', [
             'unsupportedReason' => $this->server->trafficAnalyticsUnsupportedReason(),
             'caddyRedeployNote' => $this->caddyRedeployNote(),
+            'outdatedCaddyImage' => $this->server->outdatedCaddyProxyImage(),
         ]);
     }
 

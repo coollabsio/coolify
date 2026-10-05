@@ -100,7 +100,7 @@ class ExecuteContainerCommand extends Component
                         ],
                     ]);
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
+                    $containers = getCurrentApplicationContainerStatus($server, $this->resource, includePullrequests: true);
                 }
                 foreach ($containers as $container) {
                     // if container state is running

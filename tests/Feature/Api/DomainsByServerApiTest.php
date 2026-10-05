@@ -2,6 +2,7 @@
 
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -12,6 +13,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -45,7 +48,7 @@ test('returns domains for own team application via uuid query param', function (
         ->getJson("/api/v1/servers/{$this->server->uuid}/domains?uuid={$application->uuid}");
 
     $response->assertOk();
-    $response->assertJsonFragment(['my-app.example.com']);
+    $response->assertExactJson(['https://my-app.example.com']);
 });
 
 test('returns 404 when application uuid belongs to another team', function () {
@@ -87,7 +90,7 @@ test('returns 404 when server uuid belongs to another team', function () {
 
     $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
 
-    $response = $this->withHeaders(authHeaders())
+    $response = $this->withHeaders(domainApiAuthHeaders())
         ->getJson("/api/v1/servers/{$otherServer->uuid}/domains");
 
     $response->assertNotFound();
@@ -112,7 +115,7 @@ test('only returns domains for applications on the specified server', function (
         'destination_type' => $otherDestination->getMorphClass(),
     ]);
 
-    $response = $this->withHeaders(authHeaders())
+    $response = $this->withHeaders(domainApiAuthHeaders())
         ->getJson("/api/v1/servers/{$this->server->uuid}/domains");
 
     $response->assertOk();
