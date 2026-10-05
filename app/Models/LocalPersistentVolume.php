@@ -227,8 +227,9 @@ class LocalPersistentVolume extends BaseModel
     /**
      * The external Compose volume that this storage entry still replaces, or null. Before Coolify
      * used external volumes as written, the parsers gave them a generated name, for example
-     * "{uuid}_{volume}" or "{uuid}_{volume}-pr-{id}". While this storage entry exists, the parsers
-     * keep that name so that the resource keeps its data (see useComposeExternalVolumeAsWritten()).
+     * "{uuid}_{volume}". While this storage entry exists, the parsers keep that name so that the
+     * resource keeps its data (see useComposeExternalVolumeAsWritten()). A preview volume
+     * ("{uuid}_{volume}-pr-{id}") replaces nothing: a preview never uses the external volume.
      */
     public function replacedExternalComposeVolume(): ?string
     {
@@ -256,8 +257,7 @@ class LocalPersistentVolume extends BaseModel
                     $resource instanceof Application => $resource->uuid.'_'.Str::slug($key, '-'),
                     default => data_get($resource, 'service.uuid').'_'.Str::slug($key, '-'),
                 };
-                $isLegacyName = $legacyName !== $key && $this->name === $legacyName;
-                if ($isLegacyName || preg_match('/^'.preg_quote($legacyName, '/').'-pr-\d+$/', $this->name) === 1) {
+                if ($legacyName !== $key && $this->name === $legacyName) {
                     return $key;
                 }
             }
