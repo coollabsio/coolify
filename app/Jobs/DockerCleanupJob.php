@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -95,6 +96,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
             ]);
+            $this->rememberExecution();
 
             if (! $this->server->isFunctional()) {
                 $this->execution_log->update([
@@ -204,7 +206,29 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'finished_at' => Carbon::now()->toImmutable(),
                 ]);
             }
+
+            if (! $failed && $this->executionCacheKey()) {
+                Cache::forget($this->executionCacheKey());
+            }
         }
+    }
+
+    /**
+     * failed() runs on a fresh job copy built from the queue payload (for example after a worker timeout),
+     * so the execution this run created is kept under the queue job uuid instead of on the job.
+     */
+    private function rememberExecution(): void
+    {
+        if ($this->executionCacheKey()) {
+            Cache::put($this->executionCacheKey(), $this->execution_log->id, now()->addSeconds((int) config('queue.connections.redis.retry_after', 86400) + 3600));
+        }
+    }
+
+    private function executionCacheKey(): ?string
+    {
+        $jobUuid = $this->job?->uuid();
+
+        return $jobUuid ? 'docker-cleanup-execution:'.$jobUuid : null;
     }
 
     public function failed(?\Throwable $exception): void
@@ -213,12 +237,10 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
         }
 
-        $execution = DockerCleanupExecution::query()
-            ->where('server_id', $this->server->id)
-            ->where('status', 'running')
-            ->whereNull('finished_at')
-            ->latest('id')
-            ->first();
+        // Only this run's own execution. A run that never started (e.g. a manual run whose wait for the
+        // server lock ran out) created none and must not fail another running cleanup.
+        $executionId = $this->executionCacheKey() ? Cache::pull($this->executionCacheKey()) : null;
+        $execution = $executionId ? DockerCleanupExecution::query()->find($executionId) : null;
 
         if (! $execution) {
             return;

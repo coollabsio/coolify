@@ -19,6 +19,8 @@ use App\Services\ScheduledJobDeliveryService;
 use App\Support\Actions\UniqueUntilProcessingJobDecorator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Jobs\FakeJob;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
@@ -134,26 +136,63 @@ it('creates a failed execution record when server is force disabled', function (
         ->and($execution->message)->toContain('not functional');
 });
 
-it('finishes the latest running execution when the job fails after a timeout', function () {
-    $user = User::factory()->create();
-    $team = $user->teams()->first();
-    $server = Server::factory()->create(['team_id' => $team->id]);
+function dockerCleanupQueueJob(string $uuid): FakeJob
+{
+    return new class($uuid) extends FakeJob
+    {
+        public function __construct(private string $jobUuid) {}
 
-    $olderExecution = DockerCleanupExecution::create([
-        'server_id' => $server->id,
-    ]);
-    $timedOutExecution = DockerCleanupExecution::create([
-        'server_id' => $server->id,
-    ]);
+        public function getRawBody()
+        {
+            return json_encode(['uuid' => $this->jobUuid]);
+        }
+    };
+}
 
-    $job = new DockerCleanupJob($server);
-    $job->failed(new RuntimeException('Docker cleanup job has timed out.'));
+it('finishes its own execution when the job fails after a timeout, not a newer running cleanup', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $queueJob = dockerCleanupQueueJob('prr-fix-timed-out-cleanup');
+    $statesWhenTimedOut = null;
+    dockerCleanupFakeProcesses(function () use ($server, $queueJob, &$statesWhenTimedOut) {
+        if ($statesWhenTimedOut !== null) {
+            return;
+        }
+        $ownExecution = DockerCleanupExecution::query()->sole();
+        $scheduledExecution = DockerCleanupExecution::create(['server_id' => $server->id]);
 
-    expect($timedOutExecution->refresh()->status)->toBe('failed')
-        ->and($timedOutExecution->message)->toBe('Docker cleanup job has timed out.')
-        ->and($timedOutExecution->finished_at)->not->toBeNull()
-        ->and($olderExecution->refresh()->status)->toBe('running')
-        ->and($olderExecution->finished_at)->toBeNull();
+        // The worker timeout calls failed() on a fresh job copy built from the same queue payload.
+        (new DockerCleanupJob($server, true))->setJob($queueJob)->failed(new RuntimeException('Docker cleanup job has timed out.'));
+
+        $statesWhenTimedOut = [
+            'own' => $ownExecution->fresh()->only(['status', 'message']),
+            'ownFinished' => $ownExecution->fresh()->finished_at !== null,
+            'scheduled' => $scheduledExecution->fresh()->only(['status', 'finished_at']),
+        ];
+    });
+
+    (new DockerCleanupJob($server, true))->setJob($queueJob)->handle();
+
+    expect($statesWhenTimedOut['own'])->toBe(['status' => 'failed', 'message' => 'Docker cleanup job has timed out.'])
+        ->and($statesWhenTimedOut['ownFinished'])->toBeTrue()
+        ->and($statesWhenTimedOut['scheduled'])->toBe(['status' => 'running', 'finished_at' => null]);
+});
+
+it('leaves a running scheduled cleanup untouched when a manual cleanup fails before it started', function () {
+    Notification::fake();
+    Event::fake([DockerCleanupDone::class]);
+    $server = dockerCleanupReachableServer();
+    $scheduledExecution = DockerCleanupExecution::create(['server_id' => $server->id]);
+
+    (new DockerCleanupJob($server, true))
+        ->setJob(dockerCleanupQueueJob('prr-fix-waiting-manual-cleanup'))
+        ->failed(new MaxAttemptsExceededException('App\Jobs\DockerCleanupJob has been attempted too many times.'));
+
+    expect($scheduledExecution->fresh()->status)->toBe('running')
+        ->and($scheduledExecution->fresh()->finished_at)->toBeNull();
+    Notification::assertNothingSent();
+    Event::assertNotDispatched(DockerCleanupDone::class);
 });
 
 it('skips a scheduled cleanup occurrence while another cleanup holds the server lock, so it is not reported missed later', function () {
